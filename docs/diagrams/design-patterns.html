@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThingsBoard 设计思想与模式</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a1a; color: #e0e0e0; }
+        .header { padding: 50px 20px; text-align: center; background: radial-gradient(ellipse at top, #1a1a3e, #0a0a1a); }
+        .header h1 { font-size: 2.5em; background: linear-gradient(90deg, #00d2ff, #7b2ff7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { color: #888; margin-top: 10px; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+        .pattern { margin-bottom: 50px; border: 1px solid #222; border-radius: 16px; overflow: hidden; background: #111; }
+        .pattern-header { padding: 24px 30px; background: linear-gradient(135deg, #1a1a3e, #0d0d2a); border-bottom: 1px solid #222; display: flex; align-items: center; gap: 15px; }
+        .pattern-header .num { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1em; }
+        .pattern-header h2 { font-size: 1.4em; }
+        .pattern-body { padding: 30px; }
+        .pattern-body p { color: #aaa; margin-bottom: 15px; line-height: 1.7; }
+        .pattern-body h3 { color: #00d2ff; margin: 20px 0 10px; font-size: 1.1em; }
+        .code-block { background: #0d0d1a; border: 1px solid #222; border-radius: 8px; padding: 16px 20px; font-family: 'Consolas', monospace; font-size: 0.85em; line-height: 1.8; overflow-x: auto; margin: 12px 0; color: #b0b0b0; }
+        .code-block .keyword { color: #c792ea; }
+        .code-block .type { color: #82aaff; }
+        .code-block .string { color: #c3e88d; }
+        .code-block .comment { color: #545454; }
+        .benefit { display: inline-block; padding: 4px 12px; margin: 3px 4px; background: #1a3a2a; border: 1px solid #2a5a3a; border-radius: 6px; font-size: 0.8em; color: #6ee7b7; }
+        .diagram-box { background: #0d0d1a; border: 1px solid #222; border-radius: 10px; padding: 20px; margin: 15px 0; text-align: center; font-family: 'Consolas', monospace; font-size: 0.85em; line-height: 2; color: #90a4ae; }
+        .highlight { color: #00d2ff; font-weight: 600; }
+        .vs-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .vs-table th { background: #1a1a3e; padding: 10px 15px; text-align: left; color: #00d2ff; border: 1px solid #222; }
+        .vs-table td { padding: 10px 15px; border: 1px solid #222; color: #aaa; }
+        .num-blue { background: #1e3a5f; color: #60a5fa; }
+        .num-green { background: #1a3a2a; color: #6ee7b7; }
+        .num-purple { background: #2d1b4e; color: #c4b5fd; }
+        .num-orange { background: #3b2f10; color: #fcd34d; }
+        .num-red { background: #3b1010; color: #fca5a5; }
+        .num-cyan { background: #0d3b3b; color: #67e8f9; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ThingsBoard 设计思想与架构模式</h1>
+        <p>深入理解平台背后的设计哲学、架构决策和核心模式</p>
+    </div>
+
+    <div class="container">
+        <!-- Pattern 1: Actor Model -->
+        <div class="pattern">
+            <div class="pattern-header">
+                <div class="num num-blue">1</div>
+                <h2>Actor 并发模型</h2>
+            </div>
+            <div class="pattern-body">
+                <p>ThingsBoard 采用自定义的 <span class="highlight">Actor 模型</span> 来处理海量设备的消息并发。每个设备、每条规则链都是一个独立的 Actor，通过非阻塞消息传递实现高效通信。</p>
+
+                <h3>为什么选择 Actor 模型？</h3>
+                <p>IoT 平台面临的核心挑战：百万级设备同时上报数据，需要保证同一设备消息的有序性，同时最大化吞吐量。</p>
+
+                <table class="vs-table">
+                    <tr><th>方案</th><th>优点</th><th>缺点</th></tr>
+                    <tr><td>线程池 + 锁</td><td>简单直观</td><td>锁竞争严重，难以扩展</td></tr>
+                    <tr><td>Actor 模型</td><td>无锁、消息隔离、可扩展</td><td>调试复杂</td></tr>
+                    <tr><td>协程/纤程</td><td>轻量级</td><td>Java 生态不成熟(当时)</td></tr>
+                </table>
+
+                <h3>Actor 层级设计</h3>
+                <div class="diagram-box">
+AppActor (1个，系统级)<br>
+  ├── TenantActor (N个，每租户1个)<br>
+  │     ├── RuleChainActor (M个，每规则链1个)<br>
+  │     │     └── RuleNodeActor (K个，每节点1个)<br>
+  │     └── DeviceActor (P个，每活跃设备1个)<br>
+  └── TenantActor ...<br>
+                </div>
+
+                <h3>核心设计决策</h3>
+                <p>1. <span class="highlight">每个 Actor 有独立邮箱(Mailbox)</span>：消息先入队，Actor单线程消费，天然保证消息有序</p>
+                <p>2. <span class="highlight">分层调度器(Dispatcher)</span>：不同类型Actor使用不同线程池，避免互相影响</p>
+                <p>3. <span class="highlight">懒加载</span>：DeviceActor 仅在设备有消息时创建，空闲超时后销毁</p>
+                <p>4. <span class="highlight">高优先级队列</span>：生命周期消息(如分区变更)优先于普通消息处理</p>
+
+                <span class="benefit">无锁并发</span>
+                <span class="benefit">消息有序性</span>
+                <span class="benefit">故障隔离</span>
+                <span class="benefit">可水平扩展</span>
+            </div>
+        </div>
+
+        <!-- Pattern 2: Multi-tenancy -->
+        <div class="pattern">
+            <div class="pattern-header">
+                <div class="num num-green">2</div>
+                <h2>多租户隔离架构</h2>
+            </div>
+            <div class="pattern-body">
+                <p>ThingsBoard 从设计之初就是 <span class="highlight">原生多租户(Multi-tenant)</span> 架构，所有租户共享同一套基础设施，但数据完全隔离。</p>
+
+                <h3>隔离机制</h3>
+                <p>1. <span class="highlight">数据隔离</span>：每条数据记录都关联 tenant_id，查询时自动过滤</p>
+                <p>2. <span class="highlight">计算隔离</span>：每个租户独立的 TenantActor，规则引擎执行互不干扰</p>
+                <p>3. <span class="highlight">资源隔离</span>：通过 Tenant Profile 配置 API 限流、存储配额、规则节点执行次数等</p>
+                <p>4. <span class="highlight">队列隔离</span>：支持为不同租户配置独立的 Rule Engine 队列</p>
+
+                <h3>Tenant Profile 资源控制</h3>
+                <div class="code-block">
+<span class="comment">// 租户配置文件控制资源使用</span><br>
+<span class="type">TenantProfile</span>:<br>
+&nbsp;&nbsp;maxDevices: 1000          <span class="comment">// 最大设备数</span><br>
+&nbsp;&nbsp;maxAssets: 500            <span class="comment">// 最大资产数</span><br>
+&nbsp;&nbsp;maxDashboards: 100        <span class="comment">// 最大仪表盘数</span><br>
+&nbsp;&nbsp;maxRuleChains: 50         <span class="comment">// 最大规则链数</span><br>
+&nbsp;&nbsp;transportTenantMsgRateLimit: <span class="string">"1000:1,20000:60"</span> <span class="comment">// 速率限制</span><br>
+&nbsp;&nbsp;maxREExecutions: 10000000 <span class="comment">// 规则引擎月执行次数</span><br>
+                </div>
+
+                <span class="benefit">共享基础设施降低成本</span>
+                <span class="benefit">严格数据隔离</span>
+                <span class="benefit">灵活资源配额</span>
+                <span class="benefit">SaaS就绪</span>
+            </div>
+        </div>
+
+        <!-- Pattern 3: Queue-based Architecture -->
+        <div class="pattern">
+            <div class="pattern-header">
+                <div class="num num-purple">3</div>
+                <h2>基于队列的解耦架构</h2>
+            </div>
+            <div class="pattern-body">
+                <p>ThingsBoard 使用 <span class="highlight">消息队列(Kafka)</span> 作为所有服务间通信的骨干，实现了完全的生产者-消费者解耦。</p>
+
+                <h3>队列拓扑</h3>
+                <div class="diagram-box">
+Transport Service ──→ [tb_rule_engine.main] ──→ Rule Engine Service<br>
+Transport Service ──→ [tb_core] ──→ Core Service<br>
+Core Service ──→ [tb_transport.notifications] ──→ Transport Service<br>
+Any Service ──→ [tb_transport.api.requests] ──→ Transport Service<br>
+Transport Service ──→ [tb_transport.api.responses] ──→ Requesting Service<br>
+                </div>
+
+                <h3>设计优势</h3>
+                <p>1. <span class="highlight">服务解耦</span>：Transport 不需要知道 Core 的位置，只需写入队列</p>
+                <p>2. <span class="highlight">弹性扩展</span>：任何服务都可以独立扩容，增加消费者即可提升吞吐</p>
+                <p>3. <span class="highlight">消息持久化</span>：Kafka 保证消息不丢失，服务重启后继续消费</p>
+                <p>4. <span class="highlight">背压控制</span>：消费者处理不过来时，消息堆积在队列而非 OOM</p>
+                <p>5. <span class="highlight">分区有序</span>：同一设备的消息进入同一分区，保证有序处理</p>
+
+                <span class="benefit">服务解耦</span>
+                <span class="benefit">弹性扩展</span>
+                <span class="benefit">消息不丢失</span>
+                <span class="benefit">背压控制</span>
+                <span class="benefit">有序处理</span>
+            </div>
+        </div>
+
+        <!-- Pattern 4: Plugin Architecture -->
+        <div class="pattern">
+            <div class="pattern-header">
+                <div class="num num-orange">4</div>
+                <h2>可插拔规则引擎</h2>
+            </div>
+            <div class="pattern-body">
+                <p>规则引擎采用 <span class="highlight">Strategy + Plugin</span> 模式，所有规则节点都是可替换的组件，支持第三方扩展。</p>
+
+                <h3>插件发现机制</h3>
+                <div class="code-block">
+<span class="comment">// 1. 通过 @RuleNode 注解标记组件</span><br>
+<span class="keyword">@RuleNode</span>(type = ComponentType.FILTER, name = <span class="string">"my-filter"</span>)<br>
+<span class="keyword">public class</span> <span class="type">MyFilterNode</span> <span class="keyword">implements</span> <span class="type">TbNode</span> { ... }<br><br>
+<span class="comment">// 2. Spring ComponentScan 自动发现</span><br>
+<span class="comment">// 3. ComponentDescriptorService 注册到数据库</span><br>
+<span class="comment">// 4. UI 从 API 获取可用节点列表</span><br>
+                </div>
+
+                <h3>节点生命周期</h3>
+                <div class="diagram-box">
+init(ctx, config) → [等待消息] → onMsg(ctx, msg) → [处理] → tellNext/tellSuccess/tellFailure → destroy()
+                </div>
+
+                <p><span class="highlight">关注点分离</span>：规则节点只需关注自己的业务逻辑，框架负责消息路由、错误处理、调试追踪。</p>
+
+                <span class="benefit">可扩展</span>
+                <span class="benefit">低耦合</span>
+                <span class="benefit">热加载</span>
+                <span class="benefit">统一生命周期</span>
+            </div>
+        </div>
+
+        <!-- Pattern 5: Transport Abstraction -->
+        <div class="pattern">
+            <div class="pattern-header">
+                <div class="num num-red">5</div>
+                <h2>传输层抽象与适配器模式</h2>
+            </div>
+            <div class="pattern-body">
+                <p>传输层采用 <span class="highlight">Adapter Pattern</span>，将不同IoT协议适配为统一的内部消息格式。核心业务逻辑完全不感知具体协议。</p>
+
+                <h3>统一接口设计</h3>
+                <div class="code-block">
+<span class="keyword">public interface</span> <span class="type">TransportService</span> {<br>
+&nbsp;&nbsp;<span class="comment">// 无论 MQTT/CoAP/HTTP，最终都调用这些统一方法</span><br>
+&nbsp;&nbsp;<span class="keyword">void</span> process(SessionInfoProto session, <span class="type">PostTelemetryMsg</span> msg);<br>
+&nbsp;&nbsp;<span class="keyword">void</span> process(SessionInfoProto session, <span class="type">PostAttributeMsg</span> msg);<br>
+&nbsp;&nbsp;<span class="keyword">void</span> process(SessionInfoProto session, <span class="type">ToServerRpcRequestMsg</span> msg);<br>
+}<br>
+                </div>
+
+                <h3>协议适配流程</h3>
+                <div class="diagram-box">
+MQTT PUBLISH → MqttTransportHandler.channelRead() → 解析topic和payload<br>
+&nbsp;&nbsp;→ adaptorService.convertToPostTelemetry(mqttMsg)<br>
+&nbsp;&nbsp;→ transportService.process(session, PostTelemetryMsg)<br>
+&nbsp;&nbsp;→ 编码为Protobuf → 发送到Kafka<br>
+                </div>
+
+                <p>这意味着添加新协议只需要实现协议解析和适配层，核心处理逻辑完全复用。</p>
+
+                <span class="benefit">协议无关</span>
+                <span class="benefit">易于扩展新协议</span>
+                <span class="benefit">核心逻辑复用</span>
+            </div>
+        </div>
+
+        <!-- Pattern 6: Partition-based Scaling -->
+        <div class="pattern">
+            <div class="pattern-header">
+                <div class="num num-cyan">6</div>
+                <h2>基于分区的水平扩展</h2>
+            </div>
+            <div class="pattern-body">
+                <p>ThingsBoard 通过 <span class="highlight">一致性分区(Consistent Partitioning)</span> 实现集群水平扩展。每个实体(设备)被映射到固定的分区，分区分配给具体的服务节点。</p>
+
+                <h3>分区算法</h3>
+                <div class="code-block">
+<span class="comment">// 计算实体所属分区</span><br>
+partition = hash(entityId) % totalPartitions<br><br>
+<span class="comment">// 分区分配给节点</span><br>
+Node A: partitions [0, 1, 2, 3]<br>
+Node B: partitions [4, 5, 6, 7]<br>
+Node C: partitions [8, 9, 10, 11]<br>
+                </div>
+
+                <h3>扩展场景</h3>
+                <p>1. <span class="highlight">新节点加入</span>：Zookeeper 感知，触发分区重新分配，部分分区迁移到新节点</p>
+                <p>2. <span class="highlight">节点退出</span>：该节点的分区重新分配给存活节点</p>
+                <p>3. <span class="highlight">消息路由</span>：Transport 计算目标分区，写入对应 Kafka Partition</p>
+                <p>4. <span class="highlight">Actor重建</span>：新负责节点重建该分区内的 Actor 状态</p>
+
+                <h3>保证</h3>
+                <p>• 同一设备的消息始终由同一节点处理（有序性）<br>
+                   • 扩容时仅部分设备受影响（最小化迁移）<br>
+                   • 无需外部协调即可确定消息路由（高效）</p>
+
+                <span class="benefit">线性扩展</span>
+                <span class="benefit">消息有序</span>
+                <span class="benefit">最小化迁移</span>
+                <span class="benefit">无单点</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

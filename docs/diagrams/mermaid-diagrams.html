@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThingsBoard Mermaid 架构图表</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+        .header { background: linear-gradient(135deg, #0f172a, #1e293b); color: white; padding: 40px 20px; text-align: center; }
+        .header h1 { font-size: 2.4em; margin-bottom: 8px; }
+        .header p { color: #94a3b8; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+        .diagram-section { margin-bottom: 50px; background: white; border-radius: 16px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+        .diagram-section h2 { color: #1e293b; margin-bottom: 8px; font-size: 1.5em; }
+        .diagram-section .desc { color: #64748b; margin-bottom: 20px; font-size: 0.95em; }
+        .mermaid { display: flex; justify-content: center; overflow-x: auto; padding: 20px 0; }
+        .nav { display: flex; gap: 10px; justify-content: center; padding: 20px; flex-wrap: wrap; position: sticky; top: 0; background: #f8fafc; z-index: 10; border-bottom: 1px solid #e2e8f0; }
+        .nav a { padding: 8px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; text-decoration: none; color: #475569; font-size: 0.85em; transition: all 0.2s; }
+        .nav a:hover { background: #1e293b; color: white; border-color: #1e293b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📐 ThingsBoard 架构图表集</h1>
+        <p>使用 Mermaid 渲染的 UML图、时序图、类图、流程图</p>
+    </div>
+
+    <div class="nav">
+        <a href="#system-arch">系统架构</a>
+        <a href="#telemetry-seq">遥测时序图</a>
+        <a href="#rpc-seq">RPC时序图</a>
+        <a href="#actor-class">Actor类图</a>
+        <a href="#rule-engine-flow">规则引擎流程</a>
+        <a href="#auth-seq">认证时序图</a>
+        <a href="#deploy">部署架构</a>
+        <a href="#entity-rel">实体关系</a>
+    </div>
+
+    <div class="container">
+        <!-- 1. System Architecture -->
+        <div class="diagram-section" id="system-arch">
+            <h2>1. 系统整体架构</h2>
+            <p class="desc">展示 ThingsBoard 各层之间的关系</p>
+            <div class="mermaid">
+graph TB
+    subgraph Devices["IoT 设备层"]
+        D1[MQTT设备]
+        D2[CoAP设备]
+        D3[HTTP设备]
+        D4[LwM2M设备]
+        D5[SNMP设备]
+    end
+
+    subgraph Transport["传输层"]
+        T1[MQTT Transport]
+        T2[CoAP Transport]
+        T3[HTTP Transport]
+        T4[LwM2M Transport]
+        T5[SNMP Transport]
+    end
+
+    subgraph Queue["消息队列"]
+        K1[Kafka - Rule Engine Queue]
+        K2[Kafka - Core Queue]
+        K3[Kafka - Transport API Queue]
+    end
+
+    subgraph Core["核心服务层"]
+        C1[REST API Controllers]
+        C2[Actor System]
+        C3[Rule Engine]
+        C4[Subscription Service]
+        C5[RPC Service]
+    end
+
+    subgraph Data["数据层"]
+        DB1[(PostgreSQL)]
+        DB2[(Cassandra)]
+        DB3[(Valkey/Redis)]
+    end
+
+    subgraph UI["前端"]
+        U1[Angular Web App]
+        U2[WebSocket Client]
+    end
+
+    D1 --> T1
+    D2 --> T2
+    D3 --> T3
+    D4 --> T4
+    D5 --> T5
+
+    T1 --> K1
+    T2 --> K1
+    T3 --> K1
+    T4 --> K1
+    T5 --> K1
+    T1 --> K3
+    
+    K1 --> C3
+    K2 --> C2
+    K3 --> C1
+
+    C3 --> C2
+    C1 --> C2
+    C2 --> DB1
+    C2 --> DB2
+    C2 --> DB3
+    C4 --> U2
+    U1 --> C1
+            </div>
+        </div>
+
+        <!-- 2. Telemetry Sequence -->
+        <div class="diagram-section" id="telemetry-seq">
+            <h2>2. 设备遥测上报时序图</h2>
+            <p class="desc">完整展示设备从发送数据到存储的全流程</p>
+            <div class="mermaid">
+sequenceDiagram
+    participant Device as IoT设备
+    participant MQTT as MQTT Transport
+    participant TS as TransportService
+    participant Kafka as Kafka Queue
+    participant Consumer as RuleEngine Consumer
+    participant Actor as TenantActor
+    participant RC as RuleChainActor
+    participant Node as SaveTelemetry Node
+    participant DB as PostgreSQL
+
+    Device->>MQTT: PUBLISH v1/devices/me/telemetry
+    MQTT->>MQTT: 解析JSON, 验证Session
+    MQTT->>TS: process(sessionInfo, PostTelemetryMsg)
+    TS->>TS: 编码为TbProtoQueueMsg
+    TS->>Kafka: send(topic=tb_rule_engine, partition=hash(deviceId))
+    TS-->>Device: PUBACK (QoS 1)
+    
+    Kafka->>Consumer: poll() 拉取消息
+    Consumer->>Consumer: 反序列化为QueueToRuleEngineMsg
+    Consumer->>Actor: tell(QUEUE_TO_RULE_ENGINE_MSG)
+    Actor->>RC: 路由到Root Rule Chain
+    RC->>Node: onMsg(ctx, tbMsg)
+    Node->>DB: INSERT INTO ts_kv
+    DB-->>Node: OK
+    Node->>RC: tellSuccess(msg)
+    RC-->>Consumer: ACK 消息处理完成
+            </div>
+        </div>
+
+        <!-- 3. RPC Sequence -->
+        <div class="diagram-section" id="rpc-seq">
+            <h2>3. RPC 命令下发时序图</h2>
+            <p class="desc">展示从用户发起RPC到设备接收命令的完整流程</p>
+            <div class="mermaid">
+sequenceDiagram
+    participant User as 用户/应用
+    participant API as REST API
+    participant Actor as DeviceActor
+    participant Kafka as Kafka Queue
+    participant Transport as MQTT Transport
+    participant Device as IoT设备
+
+    User->>API: POST /api/rpc/oneway/{deviceId}
+    API->>API: 验证JWT Token和权限
+    API->>Actor: tell(DEVICE_RPC_REQUEST)
+    Actor->>Actor: 查找设备活跃会话
+    
+    alt 设备在线(本节点)
+        Actor->>Transport: 直接推送到会话
+    else 设备在线(其他节点)
+        Actor->>Kafka: send(transport.notifications)
+        Kafka->>Transport: 消费通知消息
+    end
+    
+    Transport->>Device: PUBLISH v1/devices/me/rpc/request/{id}
+    Device->>Transport: PUBLISH v1/devices/me/rpc/response/{id}
+    Transport->>Actor: RPC响应
+    Actor->>API: 返回响应结果
+    API->>User: HTTP 200 {result}
+            </div>
+        </div>
+
+        <!-- 4. Actor Class Diagram -->
+        <div class="diagram-section" id="actor-class">
+            <h2>4. Actor 系统类图</h2>
+            <p class="desc">展示Actor框架的继承关系和核心接口</p>
+            <div class="mermaid">
+classDiagram
+    class TbActorSystem {
+        &lt;&lt;interface&gt;&gt;
+        +createRootActor()
+        +createChildActor()
+        +tell(TbActorId, TbActorMsg)
+        +stop()
+        +broadcastToChildren()
+    }
+
+    class TbActor {
+        &lt;&lt;interface&gt;&gt;
+        +init(TbActorCtx)
+        +process(TbActorMsg)
+        +destroy()
+    }
+
+    class TbActorMailbox {
+        -normalMailbox: Queue
+        -highPriorityMailbox: Queue
+        +enqueue(TbActorMsg)
+        +processMailbox()
+    }
+
+    class AppActor {
+        -tenantActors: Map
+        +onComponentLifecycleMsg()
+        +onQueueToRuleEngineMsg()
+    }
+
+    class TenantActor {
+        -ruleChainActors: Map
+        -deviceActors: Map
+        +onRuleEngineMsg()
+        +onToDeviceActorMsg()
+    }
+
+    class RuleChainActor {
+        -nodeActors: Map
+        -nodeRoutes: Map
+        +onRuleChainToRuleMsg()
+        +onTellNext()
+    }
+
+    class DeviceActor {
+        -sessions: Map
+        -rpcRequests: Map
+        +onTransportMsg()
+        +onRpcRequest()
+    }
+
+    TbActorSystem --> TbActorMailbox
+    TbActorMailbox --> TbActor
+    TbActor <|-- AppActor
+    TbActor <|-- TenantActor
+    TbActor <|-- RuleChainActor
+    TbActor <|-- DeviceActor
+    AppActor --> TenantActor : creates
+    TenantActor --> RuleChainActor : creates
+    TenantActor --> DeviceActor : creates
+            </div>
+        </div>
+
+        <!-- 5. Rule Engine Flow -->
+        <div class="diagram-section" id="rule-engine-flow">
+            <h2>5. 规则引擎处理流程</h2>
+            <p class="desc">展示消息在规则链中的流转逻辑</p>
+            <div class="mermaid">
+flowchart TD
+    A[TbMsg 进入规则链] --> B{消息类型路由}
+    B -->|POST_TELEMETRY| C[Device Profile Node]
+    B -->|POST_ATTRIBUTES| D[Save Attributes]
+    B -->|RPC_REQUEST| E[RPC Handler]
+    B -->|其他| F[Script Filter]
+    
+    C --> G{告警条件检查}
+    G -->|阈值超限| H[Create Alarm]
+    G -->|正常| I[Save Timeseries]
+    
+    H --> J[Send Notification]
+    H --> I
+    
+    I --> K{是否需要外部推送?}
+    K -->|是| L[REST API Call]
+    K -->|是| M[Kafka Publish]
+    K -->|否| N[处理完成]
+    L --> N
+    M --> N
+    
+    D --> O[属性变更事件]
+    O --> P[Push to Device]
+    
+    F -->|True| Q[Transform Script]
+    F -->|False| R[Log & Drop]
+    Q --> I
+            </div>
+        </div>
+
+        <!-- 6. Auth Sequence -->
+        <div class="diagram-section" id="auth-seq">
+            <h2>6. 用户认证时序图</h2>
+            <p class="desc">JWT Token认证流程</p>
+            <div class="mermaid">
+sequenceDiagram
+    participant Client as 前端/客户端
+    participant Auth as AuthController
+    participant Security as SecurityService
+    participant UserSvc as UserService
+    participant DB as Database
+    participant JWT as JwtTokenFactory
+
+    Client->>Auth: POST /api/auth/login {username, password}
+    Auth->>Security: authenticate(username, password)
+    Security->>UserSvc: findByEmail(username)
+    UserSvc->>DB: SELECT FROM tb_user
+    DB-->>UserSvc: User entity
+    Security->>Security: validatePassword(input, stored_hash)
+    
+    alt 密码正确
+        Security->>JWT: createAccessToken(user)
+        JWT-->>Security: accessToken (15min)
+        Security->>JWT: createRefreshToken(user)
+        JWT-->>Security: refreshToken (1week)
+        Security-->>Auth: TokenPair
+        Auth-->>Client: 200 {token, refreshToken}
+    else 密码错误
+        Security-->>Auth: AuthenticationException
+        Auth-->>Client: 401 Unauthorized
+    end
+
+    Note over Client: 后续请求携带 Authorization: Bearer {token}
+    
+    Client->>Auth: POST /api/auth/token (refreshToken过期前)
+    Auth->>JWT: validateRefreshToken()
+    JWT->>JWT: 验证签名和过期时间
+    JWT-->>Auth: 新的TokenPair
+    Auth-->>Client: 200 {newToken, newRefreshToken}
+            </div>
+        </div>
+
+        <!-- 7. Deployment Architecture -->
+        <div class="diagram-section" id="deploy">
+            <h2>7. 微服务部署架构</h2>
+            <p class="desc">生产环境微服务部署拓扑</p>
+            <div class="mermaid">
+graph TB
+    subgraph LB["负载均衡层"]
+        HAProxy[HAProxy / Nginx]
+    end
+
+    subgraph WebUI["Web UI 集群"]
+        UI1[Web UI Node 1]
+        UI2[Web UI Node 2]
+    end
+
+    subgraph CoreCluster["Core + Rule Engine 集群"]
+        Core1[TB Node 1<br/>Core + RE]
+        Core2[TB Node 2<br/>Core + RE]
+        Core3[TB Node 3<br/>Core + RE]
+    end
+
+    subgraph TransportCluster["Transport 集群"]
+        MQTT1[MQTT Transport 1]
+        MQTT2[MQTT Transport 2]
+        HTTP1[HTTP Transport 1]
+        CoAP1[CoAP Transport 1]
+    end
+
+    subgraph MQ["消息队列"]
+        Kafka1[Kafka Broker 1]
+        Kafka2[Kafka Broker 2]
+        Kafka3[Kafka Broker 3]
+        ZK[Zookeeper]
+    end
+
+    subgraph DataLayer["数据层"]
+        PG[(PostgreSQL<br/>Primary)]
+        PGR[(PostgreSQL<br/>Replica)]
+        Redis[(Valkey/Redis<br/>Cluster)]
+    end
+
+    subgraph Monitoring["监控"]
+        Prom[Prometheus]
+        Grafana[Grafana]
+    end
+
+    HAProxy --> UI1
+    HAProxy --> UI2
+    HAProxy --> Core1
+    HAProxy --> Core2
+    HAProxy --> Core3
+
+    MQTT1 --> Kafka1
+    MQTT2 --> Kafka2
+    HTTP1 --> Kafka1
+    CoAP1 --> Kafka3
+
+    Core1 --> Kafka1
+    Core2 --> Kafka2
+    Core3 --> Kafka3
+
+    Core1 --> PG
+    Core2 --> PG
+    Core3 --> PG
+    Core1 --> Redis
+    PG --> PGR
+
+    Kafka1 --> ZK
+    Kafka2 --> ZK
+    Kafka3 --> ZK
+
+    Core1 --> Prom
+    Core2 --> Prom
+    Prom --> Grafana
+            </div>
+        </div>
+
+        <!-- 8. Entity Relationships -->
+        <div class="diagram-section" id="entity-rel">
+            <h2>8. 核心实体关系图</h2>
+            <p class="desc">平台核心实体之间的关系</p>
+            <div class="mermaid">
+erDiagram
+    TENANT ||--o{ CUSTOMER : has
+    TENANT ||--o{ USER : has
+    TENANT ||--o{ DEVICE : owns
+    TENANT ||--o{ ASSET : owns
+    TENANT ||--o{ DASHBOARD : owns
+    TENANT ||--o{ RULE_CHAIN : owns
+    TENANT ||--o{ DEVICE_PROFILE : has
+    
+    CUSTOMER ||--o{ USER : has
+    CUSTOMER ||--o{ DEVICE : assigned
+    CUSTOMER ||--o{ ASSET : assigned
+    
+    DEVICE ||--|| DEVICE_PROFILE : uses
+    DEVICE ||--o{ TELEMETRY : generates
+    DEVICE ||--o{ ATTRIBUTE : has
+    DEVICE ||--o{ ALARM : triggers
+    DEVICE ||--o{ EVENT : logs
+    
+    ASSET ||--o{ DEVICE : contains
+    ASSET ||--o{ ASSET : contains
+    
+    RULE_CHAIN ||--o{ RULE_NODE : contains
+    RULE_NODE ||--o{ RULE_NODE : connects_to
+    
+    DASHBOARD ||--o{ WIDGET : contains
+    WIDGET ||--|| DEVICE : subscribes
+    
+    ALARM }|--|| DEVICE : originates_from
+    ALARM }o--|| ASSET : propagates_to
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: { useMaxWidth: true, htmlLabels: true },
+            sequence: { useMaxWidth: true }
+        });
+    </script>
+</body>
+</html>
