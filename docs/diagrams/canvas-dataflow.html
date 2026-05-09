@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThingsBoard 数据流转图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; }
+        .header { text-align: center; padding: 30px; background: linear-gradient(135deg, #16213e, #0f3460); }
+        .header h1 { font-size: 2.2em; color: #4fc3f7; }
+        .header p { color: #90a4ae; margin-top: 8px; }
+        .tabs { display: flex; justify-content: center; gap: 10px; padding: 20px; background: #16213e; }
+        .tab { padding: 10px 24px; border-radius: 8px; cursor: pointer; background: #1a1a2e; border: 1px solid #333; color: #90a4ae; transition: all 0.3s; }
+        .tab.active { background: #0f3460; border-color: #4fc3f7; color: #4fc3f7; }
+        .tab:hover { border-color: #4fc3f7; }
+        .flow-container { max-width: 1200px; margin: 30px auto; padding: 20px; }
+        .flow-section { display: none; }
+        .flow-section.active { display: block; }
+        .flow-title { font-size: 1.5em; color: #4fc3f7; margin-bottom: 20px; text-align: center; }
+        /* Flow diagram styles */
+        .flow-diagram { display: flex; flex-direction: column; align-items: center; gap: 0; }
+        .flow-node { padding: 16px 28px; border-radius: 12px; text-align: center; min-width: 200px; position: relative; transition: all 0.3s; }
+        .flow-node:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(79, 195, 247, 0.3); }
+        .flow-node .title { font-weight: 700; font-size: 1em; }
+        .flow-node .desc { font-size: 0.8em; opacity: 0.7; margin-top: 4px; }
+        .flow-arrow { width: 2px; height: 40px; background: linear-gradient(180deg, #4fc3f7, #7c4dff); position: relative; }
+        .flow-arrow::after { content: '▼'; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); color: #7c4dff; font-size: 10px; }
+        .flow-arrow-label { font-size: 0.75em; color: #90a4ae; position: absolute; left: 15px; top: 50%; transform: translateY(-50%); white-space: nowrap; }
+        .flow-arrow-container { position: relative; display: flex; justify-content: center; }
+        /* Node colors */
+        .node-device { background: linear-gradient(135deg, #1b5e20, #2e7d32); border: 1px solid #4caf50; }
+        .node-transport { background: linear-gradient(135deg, #e65100, #f57c00); border: 1px solid #ff9800; }
+        .node-queue { background: linear-gradient(135deg, #4a148c, #6a1b9a); border: 1px solid #9c27b0; }
+        .node-core { background: linear-gradient(135deg, #0d47a1, #1565c0); border: 1px solid #2196f3; }
+        .node-rule { background: linear-gradient(135deg, #004d40, #00695c); border: 1px solid #009688; }
+        .node-db { background: linear-gradient(135deg, #b71c1c, #c62828); border: 1px solid #f44336; }
+        .node-user { background: linear-gradient(135deg, #311b92, #4527a0); border: 1px solid #673ab7; }
+        .node-external { background: linear-gradient(135deg, #33691e, #558b2f); border: 1px solid #8bc34a; }
+        /* Parallel flows */
+        .parallel-flow { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; }
+        .parallel-branch { display: flex; flex-direction: column; align-items: center; gap: 0; }
+        /* Description panel */
+        .description { background: #16213e; border: 1px solid #333; border-radius: 12px; padding: 20px; margin-top: 30px; }
+        .description h3 { color: #4fc3f7; margin-bottom: 12px; }
+        .description ol { padding-left: 20px; color: #b0bec5; }
+        .description ol li { margin-bottom: 8px; line-height: 1.6; }
+        .description .highlight { color: #4fc3f7; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 ThingsBoard 数据流转图</h1>
+        <p>理解数据从设备到平台的完整流转路径</p>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showFlow('telemetry')">遥测数据上报</div>
+        <div class="tab" onclick="showFlow('rpc')">RPC命令下发</div>
+        <div class="tab" onclick="showFlow('alarm')">告警生成流程</div>
+        <div class="tab" onclick="showFlow('attribute')">属性数据流</div>
+        <div class="tab" onclick="showFlow('cluster')">集群消息路由</div>
+    </div>
+
+    <div class="flow-container">
+        <!-- Telemetry Flow -->
+        <div class="flow-section active" id="flow-telemetry">
+            <h2 class="flow-title">🌡️ 设备遥测数据上报流程</h2>
+            <div class="flow-diagram">
+                <div class="flow-node node-device"><div class="title">🔧 IoT 设备</div><div class="desc">发送遥测JSON: {"temperature": 25.3}</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">MQTT/CoAP/HTTP</span></div></div>
+                <div class="flow-node node-transport"><div class="title">📡 Transport Layer</div><div class="desc">协议解析 → PostTelemetryMsg</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">Protobuf编码</span></div></div>
+                <div class="flow-node node-queue"><div class="title">📬 Kafka Queue</div><div class="desc">Topic: tb_rule_engine.main</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">Consumer拉取</span></div></div>
+                <div class="flow-node node-core"><div class="title">⚙️ Rule Engine Consumer</div><div class="desc">TbRuleEngineConsumerService</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">Actor消息</span></div></div>
+                <div class="flow-node node-rule"><div class="title">🔗 Rule Chain</div><div class="desc">Root Rule Chain → 节点链式处理</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">tellSuccess</span></div></div>
+                <div class="parallel-flow">
+                    <div class="parallel-branch">
+                        <div class="flow-node node-db"><div class="title">💾 Save Telemetry</div><div class="desc">保存到 ts_kv 表</div></div>
+                    </div>
+                    <div class="parallel-branch">
+                        <div class="flow-node node-rule"><div class="title">🚨 Alarm Check</div><div class="desc">设备配置文件告警规则</div></div>
+                    </div>
+                    <div class="parallel-branch">
+                        <div class="flow-node node-external"><div class="title">📤 External Push</div><div class="desc">Kafka/REST/邮件</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="description">
+                <h3>详细步骤说明</h3>
+                <ol>
+                    <li><span class="highlight">设备发送数据</span>：设备通过MQTT发布到 topic <code>v1/devices/me/telemetry</code>，payload为JSON格式</li>
+                    <li><span class="highlight">Transport层解析</span>：MqttTransportHandler 解析MQTT消息，转换为 PostTelemetryMsg (Protobuf)</li>
+                    <li><span class="highlight">推入消息队列</span>：DefaultTransportService 将消息编码后通过 TbQueueProducer 发送到Kafka</li>
+                    <li><span class="highlight">Consumer消费</span>：TbRuleEngineConsumerService 从Kafka拉取消息，反序列化为 QueueToRuleEngineMsg</li>
+                    <li><span class="highlight">Actor路由</span>：消息通过 Actor 系统路由到对应租户的 Root Rule Chain</li>
+                    <li><span class="highlight">规则链处理</span>：按配置的节点链式处理，通常包括保存数据、告警检查、外部推送等</li>
+                    <li><span class="highlight">数据持久化</span>：Save Timeseries 节点将数据写入 PostgreSQL/Cassandra</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- RPC Flow -->
+        <div class="flow-section" id="flow-rpc">
+            <h2 class="flow-title">📲 RPC 命令下发流程</h2>
+            <div class="flow-diagram">
+                <div class="flow-node node-user"><div class="title">👤 用户/应用</div><div class="desc">REST API: POST /api/rpc/oneway/{deviceId}</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">HTTP Request</span></div></div>
+                <div class="flow-node node-core"><div class="title">⚙️ RpcController</div><div class="desc">验证权限，创建RPC请求</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">Actor消息</span></div></div>
+                <div class="flow-node node-core"><div class="title">🎭 Device Actor</div><div class="desc">管理设备会话，查找活跃连接</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">Kafka/直连</span></div></div>
+                <div class="flow-node node-queue"><div class="title">📬 Transport Queue</div><div class="desc">Topic: tb_transport.notifications</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">Push to session</span></div></div>
+                <div class="flow-node node-transport"><div class="title">📡 Transport Layer</div><div class="desc">通过设备活跃会话发送</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">MQTT Publish</span></div></div>
+                <div class="flow-node node-device"><div class="title">🔧 IoT 设备</div><div class="desc">接收RPC: v1/devices/me/rpc/request/{id}</div></div>
+            </div>
+            <div class="description">
+                <h3>详细步骤说明</h3>
+                <ol>
+                    <li><span class="highlight">用户发起RPC</span>：通过REST API或规则引擎节点发送RPC请求</li>
+                    <li><span class="highlight">权限验证</span>：RpcController验证用户权限和设备归属</li>
+                    <li><span class="highlight">Device Actor处理</span>：查找设备当前的活跃Transport会话</li>
+                    <li><span class="highlight">消息路由</span>：如果设备连接在其他节点，通过Kafka路由到对应Transport</li>
+                    <li><span class="highlight">Transport下发</span>：Transport层通过MQTT在对应topic发布RPC消息</li>
+                    <li><span class="highlight">设备接收</span>：设备订阅 rpc/request/+ topic 接收命令</li>
+                    <li><span class="highlight">响应回传</span>：设备响应通过 rpc/response/{id} 回传到平台</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Alarm Flow -->
+        <div class="flow-section" id="flow-alarm">
+            <h2 class="flow-title">🚨 告警生成流程</h2>
+            <div class="flow-diagram">
+                <div class="flow-node node-device"><div class="title">🌡️ 遥测数据</div><div class="desc">temperature: 95°C (超阈值)</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">进入规则链</span></div></div>
+                <div class="flow-node node-rule"><div class="title">🔗 Device Profile Node</div><div class="desc">检查设备配置文件的告警规则</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">条件匹配</span></div></div>
+                <div class="flow-node node-rule"><div class="title">⚠️ Create Alarm</div><div class="desc">创建CRITICAL级别告警</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">持久化</span></div></div>
+                <div class="flow-node node-db"><div class="title">💾 Alarm Storage</div><div class="desc">保存告警到数据库</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">通知</span></div></div>
+                <div class="parallel-flow">
+                    <div class="parallel-branch">
+                        <div class="flow-node node-user"><div class="title">📧 邮件通知</div><div class="desc">发送告警邮件</div></div>
+                    </div>
+                    <div class="parallel-branch">
+                        <div class="flow-node node-user"><div class="title">🔔 WebSocket</div><div class="desc">实时推送到UI</div></div>
+                    </div>
+                    <div class="parallel-branch">
+                        <div class="flow-node node-rule"><div class="title">📊 告警传播</div><div class="desc">传播到父实体</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="description">
+                <h3>详细步骤说明</h3>
+                <ol>
+                    <li><span class="highlight">遥测数据到达</span>：设备上报的遥测数据进入规则链处理</li>
+                    <li><span class="highlight">配置文件检查</span>：Device Profile Node 根据设备配置文件的告警规则进行条件评估</li>
+                    <li><span class="highlight">告警创建</span>：条件满足时创建告警（含严重程度、类型、详情）</li>
+                    <li><span class="highlight">告警持久化</span>：保存到数据库，包含关联设备、时间戳、状态</li>
+                    <li><span class="highlight">通知分发</span>：通过配置的通知渠道（邮件、短信、Slack等）发送告警</li>
+                    <li><span class="highlight">实时推送</span>：通过WebSocket推送到已订阅的前端界面</li>
+                    <li><span class="highlight">告警传播</span>：告警从设备传播到关联的资产、客户、租户层级</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Attribute Flow -->
+        <div class="flow-section" id="flow-attribute">
+            <h2 class="flow-title">📋 属性数据流</h2>
+            <div class="flow-diagram">
+                <div class="parallel-flow">
+                    <div class="parallel-branch">
+                        <div class="flow-node node-device"><div class="title">📤 客户端属性</div><div class="desc">设备上报自身属性</div></div>
+                        <div class="flow-arrow-container"><div class="flow-arrow"></div></div>
+                        <div class="flow-node node-transport"><div class="title">Transport</div><div class="desc">PostAttributeMsg</div></div>
+                    </div>
+                    <div class="parallel-branch">
+                        <div class="flow-node node-user"><div class="title">📥 共享属性</div><div class="desc">用户设置推送给设备</div></div>
+                        <div class="flow-arrow-container"><div class="flow-arrow"></div></div>
+                        <div class="flow-node node-core"><div class="title">REST API</div><div class="desc">TelemetryController</div></div>
+                    </div>
+                    <div class="parallel-branch">
+                        <div class="flow-node node-core"><div class="title">🖥️ 服务端属性</div><div class="desc">平台内部使用</div></div>
+                        <div class="flow-arrow-container"><div class="flow-arrow"></div></div>
+                        <div class="flow-node node-core"><div class="title">REST API</div><div class="desc">仅服务端可见</div></div>
+                    </div>
+                </div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">统一存储</span></div></div>
+                <div class="flow-node node-db"><div class="title">💾 Attribute Storage</div><div class="desc">attribute_kv 表 (entity_id + scope + key → value)</div></div>
+            </div>
+            <div class="description">
+                <h3>三种属性类型</h3>
+                <ol>
+                    <li><span class="highlight">客户端属性(Client)</span>：设备主动上报，如固件版本、电池电量。设备可读写，服务端只读</li>
+                    <li><span class="highlight">共享属性(Shared)</span>：服务端设置，推送给设备。如配置参数、开关状态。设备只读，变更时主动推送</li>
+                    <li><span class="highlight">服务端属性(Server)</span>：仅服务端使用，设备不可见。如地理位置、安装日期等管理信息</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Cluster Flow -->
+        <div class="flow-section" id="flow-cluster">
+            <h2 class="flow-title">🌐 集群消息路由</h2>
+            <div class="flow-diagram">
+                <div class="flow-node node-transport"><div class="title">📡 Transport Node A</div><div class="desc">接收设备消息</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">按分区hash路由</span></div></div>
+                <div class="flow-node node-queue"><div class="title">📬 Kafka Partition</div><div class="desc">按 entityId hash 到固定分区</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">分区分配</span></div></div>
+                <div class="flow-node node-core"><div class="title">⚙️ Core Node B</div><div class="desc">消费该分区的所有消息</div></div>
+                <div class="flow-arrow-container"><div class="flow-arrow"><span class="flow-arrow-label">Actor处理</span></div></div>
+                <div class="flow-node node-rule"><div class="title">🎭 Tenant Actor</div><div class="desc">处理该租户的规则引擎逻辑</div></div>
+            </div>
+            <div class="description">
+                <h3>集群分区机制</h3>
+                <ol>
+                    <li><span class="highlight">一致性Hash</span>：每个实体(设备)通过 entityId 的 hash 映射到固定的 Kafka 分区</li>
+                    <li><span class="highlight">分区分配</span>：每个 Core 节点负责消费一组分区，保证同一设备的消息总是由同一节点处理</li>
+                    <li><span class="highlight">再平衡</span>：节点加入/退出时，通过 Zookeeper 协调重新分配分区</li>
+                    <li><span class="highlight">Transport路由</span>：Transport 层根据目标实体的分区信息，将消息发送到正确的 Kafka 分区</li>
+                    <li><span class="highlight">跨节点RPC</span>：如果设备连接在 Node A，但 Actor 在 Node B，RPC响应通过 Kafka 路由</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showFlow(id) {
+            document.querySelectorAll('.flow-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('flow-' + id).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

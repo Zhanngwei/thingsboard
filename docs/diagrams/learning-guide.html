@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThingsBoard 学习指南</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #fafbfc; color: #24292e; line-height: 1.6; }
+        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 20px; text-align: center; }
+        .hero h1 { font-size: 2.8em; margin-bottom: 12px; }
+        .hero p { font-size: 1.2em; opacity: 0.9; max-width: 700px; margin: 0 auto; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+        .section { margin-bottom: 50px; }
+        .section h2 { font-size: 1.8em; color: #24292e; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 3px solid #667eea; display: inline-block; }
+        /* Learning Path */
+        .path { position: relative; padding-left: 40px; }
+        .path::before { content: ''; position: absolute; left: 15px; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, #667eea, #764ba2); border-radius: 2px; }
+        .path-item { position: relative; margin-bottom: 30px; padding: 20px 24px; background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border-left: 4px solid #667eea; cursor: pointer; transition: all 0.3s; }
+        .path-item:hover { transform: translateX(5px); box-shadow: 0 4px 20px rgba(102,126,234,0.2); }
+        .path-item::before { content: attr(data-step); position: absolute; left: -52px; top: 20px; width: 28px; height: 28px; background: #667eea; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8em; font-weight: 700; }
+        .path-item.completed::before { background: #22c55e; }
+        .path-item h3 { color: #667eea; margin-bottom: 6px; }
+        .path-item p { color: #586069; font-size: 0.95em; }
+        .path-item .tags { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .tag { padding: 3px 10px; background: #f0f0ff; color: #667eea; border-radius: 12px; font-size: 0.75em; font-weight: 500; }
+        /* Concept cards */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { padding: 24px; background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border-top: 4px solid; transition: transform 0.3s; }
+        .card:hover { transform: translateY(-4px); }
+        .card h3 { margin-bottom: 10px; font-size: 1.1em; }
+        .card p { color: #586069; font-size: 0.9em; }
+        .card ul { color: #586069; font-size: 0.9em; padding-left: 18px; margin-top: 8px; }
+        .card ul li { margin-bottom: 4px; }
+        .card-blue { border-color: #3b82f6; }
+        .card-blue h3 { color: #1d4ed8; }
+        .card-green { border-color: #10b981; }
+        .card-green h3 { color: #065f46; }
+        .card-purple { border-color: #8b5cf6; }
+        .card-purple h3 { color: #5b21b6; }
+        .card-orange { border-color: #f59e0b; }
+        .card-orange h3 { color: #92400e; }
+        .card-red { border-color: #ef4444; }
+        .card-red h3 { color: #991b1b; }
+        .card-indigo { border-color: #6366f1; }
+        .card-indigo h3 { color: #3730a3; }
+        /* FAQ */
+        .faq-item { margin-bottom: 16px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+        .faq-q { padding: 16px 20px; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .faq-q:hover { background: #f8f9ff; }
+        .faq-a { padding: 0 20px 16px; color: #586069; display: none; }
+        .faq-item.open .faq-a { display: block; }
+        .faq-item.open .faq-q::after { transform: rotate(180deg); }
+        .faq-q::after { content: '▼'; font-size: 0.7em; color: #667eea; transition: transform 0.3s; }
+        /* Tips */
+        .tip { padding: 16px 20px; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; margin: 15px 0; }
+        .tip strong { color: #1d4ed8; }
+        /* Progress tracker */
+        .progress-bar { height: 6px; background: #e5e7eb; border-radius: 3px; margin: 20px 0; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 3px; transition: width 0.5s; }
+        .progress-text { text-align: center; color: #586069; font-size: 0.9em; }
+        /* Key files */
+        .file-list { font-family: 'Consolas', monospace; background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 10px; font-size: 0.85em; line-height: 2; }
+        .file-list .dir { color: #60a5fa; }
+        .file-list .file { color: #86efac; }
+        .file-list .comment { color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>🎓 ThingsBoard 学习指南</h1>
+        <p>从零开始系统学习 ThingsBoard IoT 平台，按推荐路径逐步深入</p>
+    </div>
+
+    <div class="container">
+        <!-- Progress -->
+        <div class="section">
+            <div class="progress-text">学习进度追踪（点击完成的步骤可标记）</div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 0%"></div></div>
+        </div>
+
+        <!-- Learning Path -->
+        <div class="section">
+            <h2>📍 推荐学习路径</h2>
+            <div class="path">
+                <div class="path-item" data-step="1" onclick="toggleComplete(this)">
+                    <h3>第一步：理解项目全貌</h3>
+                    <p>阅读项目 README 和 pom.xml，理解模块划分和整体架构。了解 ThingsBoard 要解决的核心问题：设备连接、数据处理、可视化。</p>
+                    <div class="tags"><span class="tag">pom.xml</span><span class="tag">README.md</span><span class="tag">架构图</span></div>
+                </div>
+                <div class="path-item" data-step="2" onclick="toggleComplete(this)">
+                    <h3>第二步：核心数据模型</h3>
+                    <p>阅读 common/data 模块，理解核心实体：Device, Asset, Tenant, User, Dashboard, Alarm。理解实体ID系统和实体类型。</p>
+                    <div class="tags"><span class="tag">common/data</span><span class="tag">EntityType</span><span class="tag">Device.java</span></div>
+                </div>
+                <div class="path-item" data-step="3" onclick="toggleComplete(this)">
+                    <h3>第三步：消息模型</h3>
+                    <p>阅读 common/message 模块，重点理解 TbMsg（规则引擎消息）和 MsgType（内部消息类型）。这是整个系统的"血液"。</p>
+                    <div class="tags"><span class="tag">TbMsg.java</span><span class="tag">MsgType.java</span><span class="tag">TbActorMsg</span></div>
+                </div>
+                <div class="path-item" data-step="4" onclick="toggleComplete(this)">
+                    <h3>第四步：传输层</h3>
+                    <p>阅读 common/transport 模块，理解设备如何连接到平台。重点看 TransportService 接口和 DefaultTransportService 实现。</p>
+                    <div class="tags"><span class="tag">TransportService</span><span class="tag">MQTT</span><span class="tag">DefaultTransportService</span></div>
+                </div>
+                <div class="path-item" data-step="5" onclick="toggleComplete(this)">
+                    <h3>第五步：消息队列</h3>
+                    <p>阅读 common/queue 模块，理解 Kafka 消息队列在系统中的角色。Transport→Queue→Consumer 是数据流的核心路径。</p>
+                    <div class="tags"><span class="tag">TbQueueProducer</span><span class="tag">TbQueueConsumer</span><span class="tag">Kafka</span></div>
+                </div>
+                <div class="path-item" data-step="6" onclick="toggleComplete(this)">
+                    <h3>第六步：Actor 模型</h3>
+                    <p>阅读 common/actor 了解框架，再看 application/actors 了解业务层 Actor。理解消息如何通过 Actor 层级路由到具体处理逻辑。</p>
+                    <div class="tags"><span class="tag">TbActorSystem</span><span class="tag">AppActor</span><span class="tag">TenantActor</span><span class="tag">DeviceActor</span></div>
+                </div>
+                <div class="path-item" data-step="7" onclick="toggleComplete(this)">
+                    <h3>第七步：规则引擎</h3>
+                    <p>阅读 rule-engine 模块，理解 TbNode 接口和 TbContext。浏览几个典型的规则节点实现（Filter、Save Telemetry、Create Alarm）。</p>
+                    <div class="tags"><span class="tag">TbNode</span><span class="tag">TbContext</span><span class="tag">RuleChain</span></div>
+                </div>
+                <div class="path-item" data-step="8" onclick="toggleComplete(this)">
+                    <h3>第八步：数据持久层</h3>
+                    <p>阅读 dao 模块，理解数据如何存储到 PostgreSQL/Cassandra。关注 Service→Dao→Repository 分层模式。</p>
+                    <div class="tags"><span class="tag">JpaAbstractDao</span><span class="tag">ts_kv</span><span class="tag">Spring Data JPA</span></div>
+                </div>
+                <div class="path-item" data-step="9" onclick="toggleComplete(this)">
+                    <h3>第九步：REST API</h3>
+                    <p>阅读 application/controller，了解平台对外暴露的 API。重点看 DeviceController 和 TelemetryController。</p>
+                    <div class="tags"><span class="tag">BaseController</span><span class="tag">Swagger</span><span class="tag">Spring Security</span></div>
+                </div>
+                <div class="path-item" data-step="10" onclick="toggleComplete(this)">
+                    <h3>第十步：前端 UI</h3>
+                    <p>阅读 ui-ngx 模块，理解 Angular 前端如何与后端交互。关注 Dashboard 组件和规则链编辑器的实现。</p>
+                    <div class="tags"><span class="tag">Angular</span><span class="tag">Material</span><span class="tag">WebSocket</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Concepts -->
+        <div class="section">
+            <h2>💡 核心概念速览</h2>
+            <div class="cards">
+                <div class="card card-blue">
+                    <h3>🏢 多租户架构</h3>
+                    <p>ThingsBoard 原生支持多租户隔离：</p>
+                    <ul>
+                        <li>SysAdmin → 管理所有租户</li>
+                        <li>Tenant → 独立业务单元</li>
+                        <li>Customer → 租户的子客户</li>
+                        <li>数据完全隔离，互不可见</li>
+                    </ul>
+                </div>
+                <div class="card card-green">
+                    <h3>📡 设备连接</h3>
+                    <p>灵活的设备接入方式：</p>
+                    <ul>
+                        <li>MQTT - 最主流的IoT协议</li>
+                        <li>CoAP - 低功耗受限设备</li>
+                        <li>HTTP - 简单场景</li>
+                        <li>网关设备 - 代理子设备</li>
+                    </ul>
+                </div>
+                <div class="card card-purple">
+                    <h3>🔗 规则引擎</h3>
+                    <p>可视化的消息处理流水线：</p>
+                    <ul>
+                        <li>Rule Chain - 处理流水线</li>
+                        <li>Rule Node - 处理单元</li>
+                        <li>支持 JS/TBEL 脚本</li>
+                        <li>可扩展自定义节点</li>
+                    </ul>
+                </div>
+                <div class="card card-orange">
+                    <h3>📊 数据模型</h3>
+                    <p>三种核心数据类型：</p>
+                    <ul>
+                        <li>Telemetry - 时序遥测数据</li>
+                        <li>Attributes - 键值属性(3类)</li>
+                        <li>Events - 系统事件日志</li>
+                    </ul>
+                </div>
+                <div class="card card-red">
+                    <h3>🚨 告警系统</h3>
+                    <p>完整的告警生命周期：</p>
+                    <ul>
+                        <li>条件触发(阈值/不活跃等)</li>
+                        <li>5级严重程度</li>
+                        <li>告警传播(设备→资产)</li>
+                        <li>通知渠道(邮件/短信/Slack)</li>
+                    </ul>
+                </div>
+                <div class="card card-indigo">
+                    <h3>🎭 Actor 模型</h3>
+                    <p>高并发消息处理框架：</p>
+                    <ul>
+                        <li>每设备独立Actor</li>
+                        <li>非阻塞消息传递</li>
+                        <li>层级结构自动路由</li>
+                        <li>故障隔离和恢复</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Source Files -->
+        <div class="section">
+            <h2>📁 关键源码文件导航</h2>
+            <div class="file-list">
+                <span class="comment"># === 入口和配置 ===</span><br>
+                <span class="file">application/.../ThingsboardServerApplication.java</span> <span class="comment">← Spring Boot 主入口</span><br>
+                <span class="file">application/src/main/resources/thingsboard.yml</span> <span class="comment">← 主配置文件</span><br><br>
+                <span class="comment"># === 核心数据模型 ===</span><br>
+                <span class="file">common/data/.../Device.java</span> <span class="comment">← 设备实体</span><br>
+                <span class="file">common/data/.../EntityType.java</span> <span class="comment">← 实体类型枚举</span><br>
+                <span class="file">common/data/.../id/EntityId.java</span> <span class="comment">← 实体ID基类</span><br><br>
+                <span class="comment"># === 消息系统 ===</span><br>
+                <span class="file">common/message/.../TbMsg.java</span> <span class="comment">← 规则引擎消息(核心!)</span><br>
+                <span class="file">common/message/.../MsgType.java</span> <span class="comment">← 内部消息类型</span><br><br>
+                <span class="comment"># === Actor 系统 ===</span><br>
+                <span class="file">common/actor/.../TbActorSystem.java</span> <span class="comment">← Actor框架接口</span><br>
+                <span class="file">application/.../actors/ActorSystemContext.java</span> <span class="comment">← Actor上下文(32KB)</span><br><br>
+                <span class="comment"># === 传输层 ===</span><br>
+                <span class="file">common/transport/.../TransportService.java</span> <span class="comment">← 传输服务接口</span><br>
+                <span class="file">common/transport/.../DefaultTransportService.java</span> <span class="comment">← 默认实现(68KB)</span><br><br>
+                <span class="comment"># === 规则引擎 ===</span><br>
+                <span class="file">rule-engine/rule-engine-api/.../TbNode.java</span> <span class="comment">← 规则节点接口</span><br>
+                <span class="file">rule-engine/rule-engine-api/.../TbContext.java</span> <span class="comment">← 节点执行上下文</span><br><br>
+                <span class="comment"># === REST API ===</span><br>
+                <span class="file">application/.../controller/DeviceController.java</span> <span class="comment">← 设备API(54KB)</span><br>
+                <span class="file">application/.../controller/TelemetryController.java</span> <span class="comment">← 遥测API(68KB)</span><br>
+            </div>
+        </div>
+
+        <!-- FAQ -->
+        <div class="section">
+            <h2>❓ 常见问题</h2>
+            <div class="faq-item" onclick="this.classList.toggle('open')">
+                <div class="faq-q">ThingsBoard 单体和微服务有什么区别？</div>
+                <div class="faq-a">单体模式(Monolith)将所有功能打包在一个Java进程中，适合开发测试和小规模部署。微服务模式将Transport、Core、Rule Engine拆分为独立进程，通过Kafka通信，支持独立扩展，适合生产环境。代码是同一套，区别在于部署方式和Spring Profile。</div>
+            </div>
+            <div class="faq-item" onclick="this.classList.toggle('open')">
+                <div class="faq-q">为什么使用自定义 Actor 模型而不是 Akka？</div>
+                <div class="faq-a">ThingsBoard 早期使用 Akka，后来切换为自定义轻量级 Actor 框架。原因：1) 减少依赖复杂度；2) 针对IoT场景优化（海量设备Actor）；3) 更容易控制线程模型和资源使用；4) 避免 Akka 许可证问题。</div>
+            </div>
+            <div class="faq-item" onclick="this.classList.toggle('open')">
+                <div class="faq-q">规则引擎消息(TbMsg)和Kafka消息是什么关系？</div>
+                <div class="faq-a">TbMsg 是规则引擎内部的消息对象，包含消息类型、数据、元数据和来源实体。它通过 Protobuf 序列化后封装为 Kafka 消息进行传输。从Kafka消费后反序列化回 TbMsg，再在 Actor 系统中流转。</div>
+            </div>
+            <div class="faq-item" onclick="this.classList.toggle('open')">
+                <div class="faq-q">设备如何保证消息有序性？</div>
+                <div class="faq-a">通过 entityId 的 hash 将同一设备的消息路由到同一个 Kafka 分区，同一分区内消息严格有序。同一个 Core 节点消费该分区，保证同一设备的消息串行处理。</div>
+            </div>
+            <div class="faq-item" onclick="this.classList.toggle('open')">
+                <div class="faq-q">如何自定义开发规则节点？</div>
+                <div class="faq-a">1) 创建类实现 TbNode 接口；2) 添加 @RuleNode 注解（指定类型、名称、配置类）；3) 实现 init/onMsg/destroy 方法；4) 创建对应的前端配置组件。打包后平台自动发现并注册。</div>
+            </div>
+        </div>
+
+        <div class="tip">
+            <strong>💡 学习建议：</strong> 建议先在本地启动ThingsBoard，通过UI创建设备并发送数据，实际体验完整流程后再深入源码。理论结合实践效果最佳！
+        </div>
+    </div>
+
+    <script>
+        let completed = 0;
+        const total = 10;
+        function toggleComplete(el) {
+            el.classList.toggle('completed');
+            completed = document.querySelectorAll('.path-item.completed').length;
+            document.getElementById('progressFill').style.width = (completed / total * 100) + '%';
+        }
+    </script>
+</body>
+</html>

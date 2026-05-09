@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThingsBoard 系统架构图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; overflow-x: hidden; }
+        .header { text-align: center; padding: 40px 20px 20px; }
+        .header h1 { font-size: 2.5em; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { color: #94a3b8; margin-top: 10px; font-size: 1.1em; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .layer { margin: 20px 0; padding: 24px; border-radius: 16px; position: relative; transition: transform 0.3s; }
+        .layer:hover { transform: translateY(-2px); }
+        .layer-title { font-size: 1.3em; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+        .layer-title .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2em; }
+        .components { display: flex; flex-wrap: wrap; gap: 12px; }
+        .component { padding: 12px 20px; border-radius: 10px; font-size: 0.9em; font-weight: 500; cursor: pointer; transition: all 0.3s; border: 1px solid transparent; }
+        .component:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .component .sub { font-size: 0.75em; opacity: 0.7; display: block; margin-top: 4px; }
+        /* Layer colors */
+        .layer-ui { background: linear-gradient(135deg, #1e3a5f20, #1e3a5f40); border: 1px solid #3b82f630; }
+        .layer-ui .component { background: #1e40af30; border-color: #3b82f650; color: #93c5fd; }
+        .layer-app { background: linear-gradient(135deg, #3b1f5e20, #3b1f5e40); border: 1px solid #8b5cf630; }
+        .layer-app .component { background: #5b21b630; border-color: #8b5cf650; color: #c4b5fd; }
+        .layer-rule { background: linear-gradient(135deg, #1e3a2a20, #1e3a2a40); border: 1px solid #10b98130; }
+        .layer-rule .component { background: #065f4630; border-color: #10b98150; color: #6ee7b7; }
+        .layer-transport { background: linear-gradient(135deg, #3b2f1020, #3b2f1040); border: 1px solid #f59e0b30; }
+        .layer-transport .component { background: #92400e30; border-color: #f59e0b50; color: #fcd34d; }
+        .layer-data { background: linear-gradient(135deg, #3b101020, #3b101040); border: 1px solid #ef444430; }
+        .layer-data .component { background: #991b1b30; border-color: #ef444450; color: #fca5a5; }
+        .layer-infra { background: linear-gradient(135deg, #1a1a2e20, #1a1a2e40); border: 1px solid #6366f130; }
+        .layer-infra .component { background: #312e8130; border-color: #6366f150; color: #a5b4fc; }
+        /* Arrows */
+        .arrow-container { display: flex; justify-content: center; padding: 5px 0; }
+        .arrow { width: 3px; height: 30px; background: linear-gradient(180deg, #60a5fa, #a78bfa); position: relative; border-radius: 2px; }
+        .arrow::after { content: '▼'; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); color: #a78bfa; font-size: 12px; }
+        /* Info panel */
+        .info-panel { position: fixed; right: -400px; top: 0; width: 400px; height: 100vh; background: #1e293b; border-left: 1px solid #334155; padding: 30px; overflow-y: auto; transition: right 0.4s ease; z-index: 1000; }
+        .info-panel.active { right: 0; }
+        .info-panel h3 { color: #60a5fa; font-size: 1.4em; margin-bottom: 15px; }
+        .info-panel p { color: #94a3b8; line-height: 1.8; margin-bottom: 12px; }
+        .info-panel .close { position: absolute; top: 20px; right: 20px; background: none; border: none; color: #94a3b8; font-size: 1.5em; cursor: pointer; }
+        .info-panel ul { color: #94a3b8; padding-left: 20px; }
+        .info-panel ul li { margin-bottom: 8px; line-height: 1.6; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+        .overlay.active { display: block; }
+        /* Legend */
+        .legend { display: flex; justify-content: center; gap: 20px; margin: 30px 0; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85em; color: #94a3b8; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ThingsBoard 系统架构</h1>
+        <p>点击组件查看详细说明 | IoT Platform Architecture v4.4.0</p>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>UI层</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>应用层</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>规则引擎</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>传输层</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>数据层</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>基础设施</div>
+    </div>
+
+    <div class="container">
+        <!-- UI Layer -->
+        <div class="layer layer-ui">
+            <div class="layer-title"><div class="icon" style="background:#1e40af">🖥</div> UI 表现层 (Angular)</div>
+            <div class="components">
+                <div class="component" onclick="showInfo('dashboard')">Dashboard<span class="sub">仪表盘设计器</span></div>
+                <div class="component" onclick="showInfo('rulechain-editor')">Rule Chain Editor<span class="sub">规则链编辑器</span></div>
+                <div class="component" onclick="showInfo('device-mgmt')">Device Management<span class="sub">设备管理界面</span></div>
+                <div class="component" onclick="showInfo('alarm-ui')">Alarm Center<span class="sub">告警中心</span></div>
+                <div class="component" onclick="showInfo('websocket')">WebSocket Client<span class="sub">实时数据订阅</span></div>
+            </div>
+        </div>
+
+        <div class="arrow-container"><div class="arrow"></div></div>
+
+        <!-- Application Layer -->
+        <div class="layer layer-app">
+            <div class="layer-title"><div class="icon" style="background:#5b21b6">⚙</div> 应用服务层 (Spring Boot)</div>
+            <div class="components">
+                <div class="component" onclick="showInfo('rest-api')">REST Controllers<span class="sub">65+ API控制器</span></div>
+                <div class="component" onclick="showInfo('actor-system')">Actor System<span class="sub">并发消息处理</span></div>
+                <div class="component" onclick="showInfo('auth-service')">Auth & Security<span class="sub">JWT/OAuth2认证</span></div>
+                <div class="component" onclick="showInfo('subscription')">Subscription Service<span class="sub">WS订阅管理</span></div>
+                <div class="component" onclick="showInfo('queue-consumer')">Queue Consumers<span class="sub">消息消费者</span></div>
+                <div class="component" onclick="showInfo('rpc-service')">RPC Service<span class="sub">远程过程调用</span></div>
+            </div>
+        </div>
+
+        <div class="arrow-container"><div class="arrow"></div></div>
+
+        <!-- Rule Engine Layer -->
+        <div class="layer layer-rule">
+            <div class="layer-title"><div class="icon" style="background:#065f46">🔗</div> 规则引擎层</div>
+            <div class="components">
+                <div class="component" onclick="showInfo('rule-chain')">Rule Chains<span class="sub">消息处理流水线</span></div>
+                <div class="component" onclick="showInfo('filter-nodes')">Filter Nodes<span class="sub">消息过滤(19种)</span></div>
+                <div class="component" onclick="showInfo('transform-nodes')">Transform Nodes<span class="sub">数据转换(18种)</span></div>
+                <div class="component" onclick="showInfo('action-nodes')">Action Nodes<span class="sub">动作执行(28种)</span></div>
+                <div class="component" onclick="showInfo('enrichment-nodes')">Enrichment Nodes<span class="sub">数据增强(31种)</span></div>
+                <div class="component" onclick="showInfo('external-nodes')">External Nodes<span class="sub">外部集成</span></div>
+            </div>
+        </div>
+
+        <div class="arrow-container"><div class="arrow"></div></div>
+
+        <!-- Transport Layer -->
+        <div class="layer layer-transport">
+            <div class="layer-title"><div class="icon" style="background:#92400e">📡</div> 传输协议层</div>
+            <div class="components">
+                <div class="component" onclick="showInfo('mqtt')">MQTT<span class="sub">tcp:1883 / ssl:8883</span></div>
+                <div class="component" onclick="showInfo('coap')">CoAP<span class="sub">udp:5683 / dtls:5684</span></div>
+                <div class="component" onclick="showInfo('http-transport')">HTTP<span class="sub">RESTful设备API</span></div>
+                <div class="component" onclick="showInfo('lwm2m')">LwM2M<span class="sub">设备管理协议</span></div>
+                <div class="component" onclick="showInfo('snmp')">SNMP<span class="sub">网络管理协议</span></div>
+            </div>
+        </div>
+
+        <div class="arrow-container"><div class="arrow"></div></div>
+
+        <!-- Data Layer -->
+        <div class="layer layer-data">
+            <div class="layer-title"><div class="icon" style="background:#991b1b">💾</div> 数据持久层</div>
+            <div class="components">
+                <div class="component" onclick="showInfo('postgresql')">PostgreSQL<span class="sub">实体/关系数据</span></div>
+                <div class="component" onclick="showInfo('cassandra')">Cassandra<span class="sub">时序数据(可选)</span></div>
+                <div class="component" onclick="showInfo('cache')">Valkey/Redis<span class="sub">分布式缓存</span></div>
+            </div>
+        </div>
+
+        <div class="arrow-container"><div class="arrow"></div></div>
+
+        <!-- Infrastructure Layer -->
+        <div class="layer layer-infra">
+            <div class="layer-title"><div class="icon" style="background:#312e81">🏗</div> 基础设施层</div>
+            <div class="components">
+                <div class="component" onclick="showInfo('kafka')">Apache Kafka<span class="sub">消息队列</span></div>
+                <div class="component" onclick="showInfo('zookeeper')">Zookeeper<span class="sub">服务发现/协调</span></div>
+                <div class="component" onclick="showInfo('docker')">Docker/K8s<span class="sub">容器化部署</span></div>
+                <div class="component" onclick="showInfo('haproxy')">HAProxy/LB<span class="sub">负载均衡</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="overlay" onclick="hideInfo()"></div>
+    <div class="info-panel" id="infoPanel">
+        <button class="close" onclick="hideInfo()">&times;</button>
+        <h3 id="infoTitle"></h3>
+        <div id="infoContent"></div>
+    </div>
+
+    <script>
+        const infoData = {
+            'dashboard': { title: '仪表盘 (Dashboard)', content: '<p>ThingsBoard 仪表盘是数据可视化的核心组件：</p><ul><li>拖拽式编辑器，所见即所得</li><li>丰富的Widget库：图表、地图、表格、控制面板</li><li>数据源绑定：实体属性、遥测、告警</li><li>支持多状态和状态间导航</li><li>实时数据通过WebSocket推送</li><li>支持全屏和移动端适配</li></ul>' },
+            'rulechain-editor': { title: '规则链编辑器', content: '<p>可视化的规则链设计工具：</p><ul><li>拖拽添加规则节点</li><li>可视化连接配置</li><li>实时调试：查看每个节点的消息流</li><li>支持导入/导出规则链</li><li>版本控制集成</li></ul>' },
+            'device-mgmt': { title: '设备管理', content: '<p>完整的设备生命周期管理：</p><ul><li>设备注册和凭证管理</li><li>设备分组和配置文件</li><li>实时状态监控(在线/离线)</li><li>OTA固件升级</li><li>设备关系图谱</li></ul>' },
+            'alarm-ui': { title: '告警中心', content: '<p>统一的告警管理界面：</p><ul><li>告警列表（按严重程度、类型过滤）</li><li>告警确认和清除</li><li>告警评论和协作</li><li>告警传播（设备→资产→租户）</li><li>告警通知配置</li></ul>' },
+            'websocket': { title: 'WebSocket 实时通信', content: '<p>前端通过WebSocket实现实时数据更新：</p><ul><li>遥测数据实时推送（无需轮询）</li><li>告警状态实时变更通知</li><li>设备连接状态实时更新</li><li>支持订阅/取消订阅指定实体</li><li>自动重连机制</li></ul>' },
+            'rest-api': { title: 'REST API 控制器', content: '<p>65+ 个REST控制器提供完整的平台API：</p><ul><li>设备管理：DeviceController</li><li>遥测数据：TelemetryController (最大68KB)</li><li>告警管理：AlarmController</li><li>规则链：RuleChainController</li><li>用户管理：UserController</li><li>OAuth2：OAuth2Controller</li><li>Swagger文档自动生成</li></ul>' },
+            'actor-system': { title: 'Actor 并发模型', content: '<p>自定义Actor框架，处理海量设备消息：</p><ul><li>AppActor → TenantActor → RuleChainActor → RuleNodeActor</li><li>每个设备有独立的DeviceActor管理状态</li><li>非阻塞消息传递，高吞吐量</li><li>支持消息优先级</li><li>自动故障恢复</li></ul>' },
+            'auth-service': { title: '认证与安全', content: '<p>多层安全机制：</p><ul><li>JWT Token认证（Access + Refresh）</li><li>OAuth2第三方登录</li><li>双因素认证(TOTP)</li><li>基于角色的访问控制(RBAC)</li><li>API速率限制</li><li>设备凭证：Token/X.509/Basic</li></ul>' },
+            'subscription': { title: '订阅服务', content: '<p>管理WebSocket数据订阅：</p><ul><li>实体遥测数据订阅</li><li>告警状态订阅</li><li>设备状态订阅</li><li>高效的数据分发机制</li><li>自动清理过期订阅</li></ul>' },
+            'queue-consumer': { title: '队列消费者', content: '<p>从Kafka消费消息并分发处理：</p><ul><li>TbCoreConsumerService：核心消息</li><li>TbRuleEngineConsumerService：规则引擎消息</li><li>支持多线程消费</li><li>消息确认和重试机制</li><li>背压控制</li></ul>' },
+            'rpc-service': { title: 'RPC 服务', content: '<p>设备远程过程调用：</p><ul><li>服务端到设备的RPC（下行）</li><li>设备到服务端的RPC（上行）</li><li>RPC超时和重试</li><li>双向RPC</li></ul>' },
+            'rule-chain': { title: '规则链', content: '<p>规则链是消息处理的核心单元：</p><ul><li>有向无环图(DAG)结构</li><li>根规则链处理所有设备消息</li><li>支持规则链嵌套调用</li><li>每个租户可有多条规则链</li><li>支持调试模式查看消息流</li></ul>' },
+            'filter-nodes': { title: '过滤节点', content: '<p>19种过滤节点用于消息路由：</p><ul><li>消息类型过滤/路由</li><li>JavaScript脚本过滤</li><li>来源实体类型路由</li><li>关系检查</li><li>告警状态检查</li><li>地理围栏检查</li></ul>' },
+            'transform-nodes': { title: '转换节点', content: '<p>18种转换节点用于数据变换：</p><ul><li>JavaScript脚本转换</li><li>更改消息来源实体</li><li>Key复制/重命名/删除</li><li>JSON路径提取</li><li>格式转换(邮件/通知)</li></ul>' },
+            'action-nodes': { title: '动作节点', content: '<p>28种动作节点执行具体操作：</p><ul><li>创建/更新/清除告警</li><li>保存遥测/属性数据</li><li>日志记录</li><li>RPC调用</li><li>消息延迟/去重</li><li>分配设备到客户</li></ul>' },
+            'enrichment-nodes': { title: '数据增强节点', content: '<p>31种数据增强节点：</p><ul><li>获取设备属性</li><li>获取历史遥测</li><li>获取关联实体数据</li><li>获取客户/租户详情</li><li>查询数据库</li></ul>' },
+            'external-nodes': { title: '外部集成节点', content: '<p>连接第三方系统：</p><ul><li>REST API调用</li><li>MQTT发布</li><li>Kafka发布</li><li>RabbitMQ发布</li><li>AWS SNS/SQS</li><li>邮件发送</li><li>短信发送</li></ul>' },
+            'mqtt': { title: 'MQTT 传输', content: '<p>最常用的IoT通信协议：</p><ul><li>基于Netty的高性能Broker</li><li>支持MQTT 3.1.1和5.0</li><li>QoS 0/1支持</li><li>TLS/SSL加密</li><li>设备认证：Token/Basic/X.509</li><li>网关设备支持(代理子设备)</li><li>Topic: v1/devices/me/telemetry</li></ul>' },
+            'coap': { title: 'CoAP 传输', content: '<p>受限设备的轻量协议：</p><ul><li>基于Eclipse Californium</li><li>UDP传输，低开销</li><li>DTLS安全传输</li><li>适合低功耗设备</li><li>Observe模式支持</li></ul>' },
+            'http-transport': { title: 'HTTP 传输', content: '<p>简单的REST风格设备API：</p><ul><li>POST /api/v1/{token}/telemetry</li><li>POST /api/v1/{token}/attributes</li><li>GET /api/v1/{token}/attributes</li><li>适合不需要持久连接的场景</li></ul>' },
+            'lwm2m': { title: 'LwM2M 传输', content: '<p>OMA设备管理协议：</p><ul><li>基于Eclipse Leshan</li><li>标准对象模型(3303温度等)</li><li>Read/Write/Execute/Observe</li><li>固件升级(FOTA)</li><li>Bootstrap流程</li></ul>' },
+            'snmp': { title: 'SNMP 传输', content: '<p>网络管理协议：</p><ul><li>SNMP v1/v2c/v3</li><li>GET/SET操作</li><li>TRAP接收</li><li>MIB表映射</li></ul>' },
+            'postgresql': { title: 'PostgreSQL', content: '<p>主要关系型数据库：</p><ul><li>存储所有实体数据(设备、用户、规则等)</li><li>可选TimescaleDB扩展存储时序数据</li><li>使用Spring Data JPA</li><li>支持数据分区</li><li>全文搜索支持</li></ul>' },
+            'cassandra': { title: 'Cassandra (可选)', content: '<p>分布式NoSQL数据库：</p><ul><li>仅用于时序数据存储</li><li>适合超大规模数据(>1M设备)</li><li>高写入吞吐量</li><li>自动数据分片</li><li>可配置TTL自动清理</li></ul>' },
+            'cache': { title: 'Valkey/Redis 缓存', content: '<p>分布式缓存层：</p><ul><li>设备信息缓存</li><li>设备凭证缓存</li><li>属性缓存</li><li>会话缓存</li><li>支持集群/哨兵模式</li></ul>' },
+            'kafka': { title: 'Apache Kafka', content: '<p>核心消息队列：</p><ul><li>Transport→Core消息传递</li><li>Core→Rule Engine消息传递</li><li>高吞吐量、持久化</li><li>消息分区和负载均衡</li><li>支持多个消费者组</li></ul>' },
+            'zookeeper': { title: 'Zookeeper', content: '<p>分布式协调服务：</p><ul><li>服务注册和发现</li><li>分区分配协调</li><li>集群节点管理</li><li>配置同步</li></ul>' },
+            'docker': { title: 'Docker/Kubernetes', content: '<p>容器化部署支持：</p><ul><li>Docker Compose一键部署</li><li>Kubernetes Helm Charts</li><li>微服务独立扩展</li><li>健康检查和自动重启</li></ul>' },
+            'haproxy': { title: 'HAProxy 负载均衡', content: '<p>流量分发和高可用：</p><ul><li>HTTP/HTTPS负载均衡</li><li>MQTT TCP负载均衡</li><li>WebSocket支持</li><li>健康检查</li><li>SSL终止</li></ul>' }
+        };
+
+        function showInfo(key) {
+            const data = infoData[key];
+            if (!data) return;
+            document.getElementById('infoTitle').textContent = data.title;
+            document.getElementById('infoContent').innerHTML = data.content;
+            document.getElementById('infoPanel').classList.add('active');
+            document.querySelector('.overlay').classList.add('active');
+        }
+
+        function hideInfo() {
+            document.getElementById('infoPanel').classList.remove('active');
+            document.querySelector('.overlay').classList.remove('active');
+        }
+    </script>
+</body>
+</html>
