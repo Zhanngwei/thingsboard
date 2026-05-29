@@ -1,0 +1,1694 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>从 MySQL 工程师迁移到 PostgreSQL / TimescaleDB / ThingsBoard</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #18202a;
+      --muted: #5f6b7a;
+      --line: #d8dee8;
+      --brand: #0f6b68;
+      --brand-2: #8b3a3a;
+      --code-bg: #111827;
+      --code-fg: #e5e7eb;
+      --note: #eef8f7;
+      --warn: #fff6e6;
+      --danger: #fff1f0;
+      --ok: #effaf1;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.72;
+    }
+
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .toc {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 28px 22px;
+      background: #17212b;
+      color: #dce5ee;
+      border-right: 1px solid #0f1720;
+    }
+
+    .toc h2 {
+      margin: 0 0 16px;
+      font-size: 18px;
+      line-height: 1.35;
+      color: #fff;
+      letter-spacing: 0;
+    }
+
+    .toc .meta {
+      margin: 0 0 22px;
+      font-size: 12px;
+      color: #a8b4c2;
+      line-height: 1.55;
+    }
+
+    .toc ol {
+      padding-left: 18px;
+      margin: 0;
+    }
+
+    .toc li {
+      margin: 8px 0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .toc a { color: #e7eef6; }
+
+    main {
+      width: min(1220px, 100%);
+      margin: 0 auto;
+      padding: 38px 40px 80px;
+    }
+
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 34px;
+      margin-bottom: 28px;
+    }
+
+    .hero h1 {
+      margin: 0 0 16px;
+      font-size: clamp(30px, 4vw, 52px);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 920px;
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 28px 32px;
+      margin: 22px 0;
+      box-shadow: var(--shadow);
+    }
+
+    h2, h3, h4 {
+      line-height: 1.28;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: 28px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--line);
+    }
+
+    h3 {
+      margin: 28px 0 12px;
+      font-size: 21px;
+    }
+
+    h4 {
+      margin: 20px 0 10px;
+      font-size: 17px;
+      color: #243040;
+    }
+
+    p { margin: 10px 0; }
+
+    .lead {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .mini-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 15px 16px;
+      background: #fbfcfe;
+    }
+
+    .mini-card h4 { margin-top: 0; }
+
+    .note, .warn, .danger, .ok {
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--brand);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 16px 0;
+      background: var(--note);
+    }
+
+    .warn {
+      border-left-color: #b87503;
+      background: var(--warn);
+    }
+
+    .danger {
+      border-left-color: #c0352b;
+      background: var(--danger);
+    }
+
+    .ok {
+      border-left-color: #2f8b46;
+      background: var(--ok);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 22px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+    }
+
+    th {
+      background: #edf2f7;
+      text-align: left;
+      font-weight: 700;
+    }
+
+    code {
+      font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+      font-size: 0.92em;
+      background: #eef2f6;
+      border: 1px solid #dfe5ed;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    pre {
+      overflow: auto;
+      border-radius: 8px;
+      padding: 16px;
+      background: var(--code-bg);
+      color: var(--code-fg);
+      border: 1px solid #0b1220;
+      margin: 14px 0 20px;
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    pre code {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    .mermaid {
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      margin: 14px 0 22px;
+      overflow: auto;
+    }
+
+    .tagline {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .tag {
+      border: 1px solid #c9d6e2;
+      border-radius: 999px;
+      padding: 3px 10px;
+      color: #314154;
+      background: #f4f8fb;
+      font-size: 12px;
+    }
+
+    .source-list li { margin: 6px 0; }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .toc {
+        position: relative;
+        height: auto;
+        max-height: none;
+      }
+      main { padding: 22px 16px 60px; }
+      .section, .hero { padding: 22px 18px; }
+      .grid, .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="toc">
+    <h2>PostgreSQL / TimescaleDB 迁移知识库</h2>
+    <p class="meta">面向熟悉 InnoDB / redo / undo / binlog / B+Tree / MyBatis / Spring Boot 的 MySQL 工程师。结合当前 ThingsBoard 仓库：<code>D:\projectSelf\thingsboard</code></p>
+    <ol>
+      <li><a href="#part1">MySQL 与 PostgreSQL 全面对比</a></li>
+      <li><a href="#part2">PostgreSQL 内核架构</a></li>
+      <li><a href="#part3">WAL / MVCC / Vacuum 深入</a></li>
+      <li><a href="#part4">锁与事务</a></li>
+      <li><a href="#part5">查询执行与优化器</a></li>
+      <li><a href="#part6">配置与调优</a></li>
+      <li><a href="#part7">TimescaleDB 深度原理</a></li>
+      <li><a href="#part8">ThingsBoard + PostgreSQL + TimescaleDB</a></li>
+      <li><a href="#appendix">诊断手册与参考资料</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <section class="hero">
+      <h1>从 MySQL 工程师迁移到 PostgreSQL / TimescaleDB / ThingsBoard</h1>
+      <p>这是一份偏数据库内核教材和工程手册的知识库。它不把 PostgreSQL 讲成“另一种 MySQL”，而是从进程模型、WAL、MVCC、Vacuum、查询优化器、TimescaleDB chunk 路由和 ThingsBoard 遥测写入链路出发，建立可以用于生产定位和架构设计的心智模型。</p>
+      <div class="tagline">
+        <span class="tag">PostgreSQL 16 视角</span>
+        <span class="tag">TimescaleDB Hypertable</span>
+        <span class="tag">ThingsBoard SQL DAO</span>
+        <span class="tag">IoT 时序架构</span>
+        <span class="tag">MySQL 对照学习</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>阅读地图</h2>
+      <p>如果你熟悉 MySQL，需要先卸掉三个直觉：第一，PostgreSQL 没有可替换的“存储引擎层”，Heap、WAL、索引访问方法、事务系统是一个整体；第二，MVCC 旧版本不在 undo log 里，而在表 heap 页面里，清理由 Vacuum 完成；第三，PostgreSQL 的一个连接通常对应一个 OS 进程，连接池是生产必需品，不是可选优化。</p>
+      <pre class="mermaid">mindmap
+  root((迁移主线))
+    MySQL直觉
+      InnoDB作为核心存储引擎
+      undo保存旧版本
+      binlog负责逻辑复制
+      Buffer Pool承载大部分缓存心智
+    PostgreSQL心智
+      postmaster加backend进程
+      shared buffers加OS page cache
+      WAL是恢复和复制主线
+      HeapTuple链和Vacuum
+      Planner可扩展且统计驱动
+    TimescaleDB心智
+      hypertable抽象
+      chunk自动分片
+      chunk pruning减少扫描
+      压缩和retention管理生命周期
+    ThingsBoard心智
+      entity关系型元数据
+      ts_kv历史遥测
+      ts_kv_latest最新遥测
+      key_dictionary压缩key
+      批量队列写入数据库</pre>
+    </section>
+
+    <section id="part1" class="section">
+      <h2>第一部分：MySQL 与 PostgreSQL 全面对比</h2>
+
+      <h3>1. 设计哲学：产品边界不同</h3>
+      <p>MySQL 在工程心智上通常以 InnoDB 为中心：SQL 层解析、优化、执行，存储引擎层完成事务、索引、Buffer Pool、redo/undo、锁。这个边界非常清晰，也形成了 MySQL 工程师熟悉的“server layer + engine layer”。</p>
+      <p>PostgreSQL 更像一个数据库操作系统：进程管理、共享内存、WAL、事务状态、锁管理、buffer manager、存储访问方法、扩展机制、后台 worker、复制协议都在同一套内核框架内协同。它不是把复杂能力藏在某个可替换引擎里，而是把能力做成可扩展的内核接口：access method、operator class、extension、foreign data wrapper、logical decoding、background worker、custom scan 等。</p>
+
+      <pre class="mermaid">flowchart LR
+  subgraph mysql[MySQL 典型分层]
+    MClient[Client]
+    MConn[连接/线程]
+    MSQL[Parser / Optimizer / Executor]
+    MHandler[Handler API]
+    InnoDB[InnoDB: Buffer Pool / redo / undo / lock / B+Tree]
+    Binlog[binlog: 逻辑复制与恢复辅助]
+    MData[(ibd / undo / redo / binlog)]
+  end
+  MClient --> MConn --> MSQL --> MHandler --> InnoDB --> MData
+  MSQL --> Binlog --> MData
+
+  subgraph pg[PostgreSQL 典型分层]
+    PClient[Client]
+    Postmaster[postmaster]
+    Backend[backend process]
+    Parser[Parser / Analyzer / Rewriter]
+    Planner[Planner / Optimizer]
+    Executor[Executor]
+    Storage[Heap / Index AM / SMGR]
+    Shared[Shared Buffers / WAL Buffers / ProcArray / LockMgr]
+    WAL[WAL / CLOG pg_xact / FSM / VM]
+    PData[(base / pg_wal / pg_xact / pg_multixact)]
+  end
+  PClient --> Postmaster --> Backend --> Parser --> Planner --> Executor --> Storage --> Shared --> PData
+  Storage --> WAL --> PData</pre>
+
+      <div class="grid">
+        <div class="mini-card">
+          <h4>MySQL 的优势直觉</h4>
+          <p>路径短、生态广、主从部署成熟、InnoDB 行为稳定、在线 OLTP 易上手。简单主键查询、短事务、互联网 CRUD 场景很顺。</p>
+        </div>
+        <div class="mini-card">
+          <h4>PostgreSQL 的优势直觉</h4>
+          <p>SQL 能力更完整，复杂查询、窗口函数、CTE、递归、JSONB、数组、GIS、扩展、并行查询和统计驱动优化器更强，适合把更多业务语义推到数据库内。</p>
+        </div>
+      </div>
+
+      <h3>2. 存储引擎对比</h3>
+      <table>
+        <thead><tr><th>维度</th><th>MySQL / InnoDB</th><th>PostgreSQL</th><th>迁移思维</th></tr></thead>
+        <tbody>
+        <tr><td>存储引擎</td><td>Server 层通过 Handler API 调用 InnoDB、MyISAM 等。</td><td>没有类似 MySQL 的可替换事务存储引擎层；heap、index AM、WAL 与事务系统高度集成。</td><td>不要寻找“PostgreSQL 的 InnoDB 参数”，要按 heap + WAL + vacuum + planner 拆问题。</td></tr>
+        <tr><td>表组织</td><td>InnoDB 聚簇索引表，主键叶子页保存整行。</td><td>Heap 表，索引保存 TID 指向 heap tuple；表不按主键物理聚簇，除非手工 <code>CLUSTER</code>。</td><td>主键查询需要 index scan 到 heap；覆盖查询依赖 index-only scan + visibility map。</td></tr>
+        <tr><td>旧版本</td><td>undo log 存旧版本，purge 清理 undo。</td><td>旧 tuple 留在 heap 页面，Vacuum 标记可复用并清索引死项。</td><td>更新频繁的表会膨胀，Vacuum 是数据库生命体征。</td></tr>
+        <tr><td>缓存</td><td>InnoDB Buffer Pool 是核心缓存。</td><td>shared_buffers + OS page cache 双层配合。</td><td>PostgreSQL 不建议把 shared_buffers 调到接近全部内存。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>3. WAL 与 Binlog 对比</h3>
+      <p>MySQL 工程师容易把 PostgreSQL WAL 类比成 MySQL redo log 或 binlog，但它更接近“redo + 物理复制 + crash recovery 的统一日志”。MySQL redo 是 InnoDB 内部物理日志，binlog 是 server 层逻辑日志；PostgreSQL WAL 是内核统一的预写日志，提交、checkpoint、物理流复制、崩溃恢复、逻辑解码都围绕 LSN 展开。</p>
+      <pre class="mermaid">flowchart TB
+  subgraph mysqlWal[MySQL]
+    Tx1[事务修改]
+    Redo[InnoDB redo log<br/>页物理重做]
+    Undo[undo log<br/>MVCC和回滚]
+    Binlog[binlog<br/>statement/row/mixed]
+    Replica[主从复制读取binlog]
+  end
+  Tx1 --> Redo
+  Tx1 --> Undo
+  Tx1 --> Binlog --> Replica
+
+  subgraph pgWal[PostgreSQL]
+    Tx2[事务修改 heap/index]
+    WalBuf[WAL buffer]
+    WalFile[pg_wal segment]
+    LSN[LSN推进]
+    Recovery[crash recovery redo]
+    Physical[physical streaming replication]
+    Logical[logical decoding]
+  end
+  Tx2 --> WalBuf --> WalFile --> LSN
+  WalFile --> Recovery
+  WalFile --> Physical
+  WalFile --> Logical</pre>
+
+      <h3>4. MVCC 实现差异</h3>
+      <p>InnoDB 的记录有隐藏列和 undo 链，读旧版本时沿 undo 回溯。PostgreSQL 的 heap tuple 头部包含 <code>xmin</code>、<code>xmax</code>、<code>ctid</code> 等元数据，更新是“插入新版本 + 标记旧版本 xmax”，版本链在 heap 中通过 <code>ctid</code> 连接。事务提交状态不写在 tuple 自身的完整事务对象里，而是通过 <code>pg_xact</code>（旧称 CLOG）、hint bit、snapshot 的 xmin/xmax/xip 共同判断。</p>
+      <pre class="mermaid">flowchart LR
+  subgraph innodbMvcc[InnoDB MVCC]
+    Row[聚簇索引记录]
+    Hidden[隐藏列 trx_id / roll_ptr]
+    UndoChain[undo version chain]
+    ReadView[ReadView]
+    Purge[purge thread]
+    Row --> Hidden --> UndoChain
+    ReadView --> UndoChain
+    Purge --> UndoChain
+  end
+  subgraph pgMvcc[PostgreSQL MVCC]
+    Heap[Heap page tuple]
+    Header[xmin / xmax / ctid / infomask]
+    PgXact[pg_xact commit status]
+    Snapshot[xmin / xmax / active xids]
+    Vacuum[Vacuum reclaims dead tuple]
+    Heap --> Header
+    Header --> PgXact
+    Snapshot --> Header
+    Vacuum --> Heap
+  end</pre>
+
+      <h3>5. 锁机制差异</h3>
+      <p>MySQL/InnoDB 的锁心智以 record lock、gap lock、next-key lock、insert intention 为主，Repeatable Read 下靠 next-key lock 防幻读。PostgreSQL 的常规 MVCC 读不加行锁，行锁通过 tuple header 的 <code>xmax</code>、MultiXact 和锁表协同表达；表级锁模式多但多数 DML 之间兼容。PostgreSQL Serializable 使用 SSI（Serializable Snapshot Isolation）跟踪读写依赖，而不是用大范围 gap lock 作为主路径。</p>
+
+      <h3>6. 执行器架构差异</h3>
+      <p>MySQL 优化器相对保守，执行器长期以 nested-loop 为基础，复杂计划能力在新版本持续增强。PostgreSQL 的执行器是 volcano iterator 模型，每个 plan node 暴露类似 <code>ExecProcNode</code> 的接口，上层节点不断向下拉取 tuple。Hash Join、Merge Join、Nested Loop、Bitmap Heap Scan、Append、Gather、Materialize、Aggregate 等节点组合能力强。</p>
+      <pre class="mermaid">flowchart TB
+  SQL[SQL]
+  Parser[raw_parser]
+  Analyze[parse_analyze]
+  Rewrite[QueryRewrite]
+  Plan[planner / standard_planner]
+  Exec[ExecutorStart / ExecutorRun]
+  Node[ExecProcNode]
+  Scan[SeqScan / IndexScan / BitmapHeapScan]
+  Join[HashJoin / MergeJoin / NestedLoop]
+  Agg[Aggregate / Sort / Limit]
+  SQL --> Parser --> Analyze --> Rewrite --> Plan --> Exec --> Node
+  Node --> Scan
+  Node --> Join
+  Node --> Agg</pre>
+
+      <h3>7. Buffer 管理差异</h3>
+      <p>InnoDB Buffer Pool 直接承载绝大多数缓存策略，包括 LRU、change buffer、自适应 hash 等。PostgreSQL shared buffers 是数据库内共享页缓存，但 PostgreSQL 仍强依赖操作系统 page cache；它用 clock sweep 近似 LRU，后台 writer 平滑刷脏页，checkpoint 负责恢复边界。高写入场景不是只看 shared buffers 命中率，还要看 checkpoint 写放大、WAL fsync、脏页比例和 OS cache。</p>
+
+      <h3>8. 索引体系差异</h3>
+      <table>
+        <thead><tr><th>索引类型</th><th>PostgreSQL 典型用途</th><th>MySQL 对照</th></tr></thead>
+        <tbody>
+        <tr><td>B-tree</td><td>等值、范围、排序、唯一约束，最常用。</td><td>类似 InnoDB B+Tree，但二级索引指向 heap TID，不包含主键聚簇行。</td></tr>
+        <tr><td>Hash</td><td>等值查询，现代版本 WAL 安全，但仍不如 B-tree 通用。</td><td>MySQL Hash 多见于 Memory 或自适应 hash 内部。</td></tr>
+        <tr><td>GIN</td><td>JSONB、数组、全文检索倒排索引。</td><td>MySQL JSON 索引通常靠 generated column 或 multi-valued index。</td></tr>
+        <tr><td>GiST / SP-GiST</td><td>几何、范围、KNN、PostGIS。</td><td>MySQL GIS 能力相对有限。</td></tr>
+        <tr><td>BRIN</td><td>大表顺序相关数据，例如时间序列。</td><td>类似“块级 min/max 摘要”，MySQL 无直接等价。</td></tr>
+        <tr><td>Partial / Expression</td><td>只索引满足条件的行，或索引表达式。</td><td>MySQL 可用函数索引但 partial index 能力弱。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>9. JSONB vs MySQL JSON</h3>
+      <p>MySQL JSON 是二进制 JSON 文档，路径提取和 generated column 索引常见。PostgreSQL <code>jsonb</code> 是解析后的二进制结构，支持包含、存在、路径、GIN 索引、表达式索引。ThingsBoard 当前 schema 中遥测和属性列使用 <code>json</code> 而不是 <code>jsonb</code>，因为它的典型访问模式是按 <code>entity_id + key + ts</code> 找值，JSON 内容更多是值载荷而非频繁内部检索对象。</p>
+
+      <h3>10. 分区表对比</h3>
+      <p>MySQL 分区常被视为超大表管理手段，但优化器和全局索引限制会影响使用体验。PostgreSQL declarative partitioning 的路由、裁剪、分区 pruning 与 planner/executor 集成较深；TimescaleDB 在此基础上提供 hypertable，把“按时间分 chunk”的管理自动化。</p>
+
+      <h3>11. 并发机制对比</h3>
+      <p>MySQL 一个连接通常对应一个线程，线程缓存和连接池可缓解开销。PostgreSQL 一个连接通常对应一个 backend 进程，进程有私有内存、事务状态、临时上下文，连接数过高会造成上下文切换、内存和锁管理开销。生产中 PgBouncer / HikariCP 参数是数据库架构的一部分。</p>
+
+      <h3>12. 崩溃恢复对比</h3>
+      <p>InnoDB 通过 checkpoint LSN、redo log、undo 回滚未提交事务，binlog 通过两阶段提交保证 server 层与 InnoDB 的一致性。PostgreSQL 从 checkpoint record 开始扫描 WAL，redo 到一致点；未提交事务的 tuple 因提交状态不可见，后续 Vacuum 清理，不需要像 InnoDB 那样用 undo 物理回滚每个旧版本。</p>
+
+      <h3>13. 查询优化器差异</h3>
+      <p>PostgreSQL planner 高度依赖统计信息：<code>pg_statistic</code> 中的 MCV、histogram、null fraction、correlation、ndistinct 会影响成本估算。它支持 join order 搜索、GEQO、并行计划、partition pruning、extended statistics。迁移后慢查询排查第一步不是“强制索引”，而是确认统计信息、选择率、相关性、work_mem 和 join 算法。</p>
+
+      <h3>14. PostgreSQL 的优势与缺点</h3>
+      <div class="grid">
+        <div class="ok">
+          <strong>优势：</strong>SQL 完整性、复杂查询、扩展生态、JSONB/GIS/全文、事务语义严谨、逻辑复制、索引类型丰富、TimescaleDB 这类扩展可以深度嵌入优化器。
+        </div>
+        <div class="warn">
+          <strong>代价：</strong>连接模型更重；更新会产生 heap 膨胀；Vacuum/Freeze 需要运维；写入高峰受 WAL/checkpoint 影响明显；参数调优需要理解内核机制。
+        </div>
+      </div>
+
+      <h3>15. PostgreSQL 常见误区</h3>
+      <ul>
+        <li><strong>误区一：</strong>把 <code>shared_buffers</code> 当成 InnoDB Buffer Pool，直接给 70% 内存。PostgreSQL 还依赖 OS cache，过大可能增加 checkpoint 压力。</li>
+        <li><strong>误区二：</strong>认为没有 undo 就不需要清理旧版本。PostgreSQL 旧版本在 heap 中，Vacuum 是必需品。</li>
+        <li><strong>误区三：</strong>以为 <code>VACUUM FULL</code> 是常规维护。它会重写表并需要强锁，生产应优先 autovacuum、普通 vacuum、合理 fillfactor 和分区/drop chunk。</li>
+        <li><strong>误区四：</strong>慢查询优先找“用哪个索引”。PostgreSQL 要先看 <code>EXPLAIN (ANALYZE, BUFFERS)</code> 中估算行数和真实行数偏差。</li>
+        <li><strong>误区五：</strong>TimescaleDB 等于另一个数据库。它是 PostgreSQL 扩展，底层仍受 WAL、Vacuum、checkpoint、planner 和连接模型影响。</li>
+      </ul>
+    </section>
+
+    <section id="part2" class="section">
+      <h2>第二部分：PostgreSQL 内核架构</h2>
+
+      <h3>1. PostgreSQL 整体架构图</h3>
+      <pre class="mermaid">flowchart TB
+  Client[客户端 JDBC / psql / PgBouncer]
+  Postmaster[postmaster 主进程]
+  Backend1[backend process 1]
+  Backend2[backend process N]
+  SharedMemory[共享内存<br/>Shared Buffers / WAL Buffers / LockMgr / ProcArray]
+  BgWriter[bgwriter]
+  Checkpointer[checkpointer]
+  WalWriter[walwriter]
+  AutoVac[autovacuum launcher/workers]
+  Stats[statistics shared memory]
+  Archiver[archiver]
+  Replication[wal sender / wal receiver]
+  Files[(PGDATA<br/>base / global / pg_wal / pg_xact / pg_multixact)]
+
+  Client --> Postmaster
+  Postmaster --> Backend1
+  Postmaster --> Backend2
+  Backend1 <--> SharedMemory
+  Backend2 <--> SharedMemory
+  BgWriter <--> SharedMemory
+  Checkpointer <--> SharedMemory
+  WalWriter <--> SharedMemory
+  AutoVac <--> SharedMemory
+  Stats <--> SharedMemory
+  Replication <--> SharedMemory
+  SharedMemory <--> Files
+  Archiver --> Files</pre>
+
+      <p>源码级主线可以粗略映射为：<code>src/backend/postmaster/postmaster.c</code> 负责监听、fork backend 和管理后台进程；<code>src/backend/tcop/postgres.c</code> 是 backend 查询主循环；<code>src/backend/parser</code>、<code>optimizer</code>、<code>executor</code> 处理 SQL；<code>storage/buffer</code> 管 shared buffers；<code>access/transam/xlog.c</code> 管 WAL；<code>commands/vacuum.c</code> 和 <code>access/heap/vacuumlazy.c</code> 管 Vacuum。</p>
+
+      <h3>2. postmaster 架构</h3>
+      <p><code>postmaster</code> 是 PostgreSQL 集群的父进程。它监听 socket，做认证前后的连接编排，fork backend；同时管理 checkpointer、bgwriter、walwriter、autovacuum launcher、stats、archiver、wal sender 等后台进程。和 MySQL 单进程多线程模型相比，PostgreSQL 的 backend 崩溃隔离性更好，但连接成本更高。</p>
+      <pre class="mermaid">sequenceDiagram
+  participant C as Client
+  participant PM as postmaster
+  participant BE as backend process
+  participant SM as shared memory
+  participant CAT as system catalog
+  C->>PM: TCP/Unix socket connect
+  PM->>PM: accept connection
+  PM->>BE: fork backend
+  BE->>C: authentication challenge
+  C->>BE: password/SCRAM response
+  BE->>CAT: load pg_authid/pg_database metadata
+  BE->>SM: register PGPROC in ProcArray
+  BE->>C: ReadyForQuery
+  loop simple/extended query protocol
+    C->>BE: Parse/Bind/Execute or Query
+    BE->>SM: locks/buffers/snapshot
+    BE->>C: rows/command complete
+  end</pre>
+
+      <h3>3. backend process 模型</h3>
+      <p>每个 backend 有私有内存上下文、事务状态、Portal、PreparedStatement、临时文件、work_mem 消耗。一个 SQL 中多个 Sort/Hash 节点都可能各自使用 <code>work_mem</code>，并发连接数乘以复杂计划节点数才是内存风险。</p>
+      <div class="note">
+        <strong>MySQL 对照：</strong>MySQL 线程栈、join_buffer、sort_buffer、read_buffer 等按线程消耗；PostgreSQL 的进程私有内存更强调 memory context 生命周期，例如 <code>TopMemoryContext</code>、<code>CacheMemoryContext</code>、<code>PortalContext</code>、<code>ExecutorState</code>。
+      </div>
+
+      <h3>4. shared buffer 原理</h3>
+      <pre class="mermaid">flowchart LR
+  Exec[Executor需要block]
+  BufLookup[BufTable hash查找<br/>relfilenode fork block]
+  Hit{命中shared_buffers?}
+  Pin[Pin buffer + content lock]
+  Read[smgrread从OS读取页面]
+  Victim[clock sweep找victim]
+  Dirty{victim dirty?}
+  Flush[写回脏页]
+  Page[返回Page指针]
+  Exec --> BufLookup --> Hit
+  Hit -- yes --> Pin --> Page
+  Hit -- no --> Victim --> Dirty
+  Dirty -- yes --> Flush --> Read
+  Dirty -- no --> Read
+  Read --> Pin --> Page</pre>
+      <p>关键源码术语：<code>ReadBufferExtended</code>、<code>BufferAlloc</code>、<code>StrategyGetBuffer</code>、<code>PinBuffer</code>、<code>LockBuffer</code>、<code>MarkBufferDirty</code>。PostgreSQL 页面默认 8KB，buffer descriptor 存 pin count、usage_count、dirty 标志，clock sweep 根据 usage_count 递减找替换页。</p>
+
+      <h3>5. WAL Buffer 原理</h3>
+      <p>修改 heap/index 前必须先构造 WAL record 并插入 WAL buffer，遵守 write-ahead：脏数据页落盘前，对应 WAL 必须已经持久化到不小于页面 LSN 的位置。关键路径包括 <code>XLogInsert</code>、<code>WALInsertLock</code>、<code>XLogFlush</code>、<code>issue_xlog_fsync</code>。</p>
+      <pre class="mermaid">flowchart TB
+  Change[heap_insert / heap_update / index_insert]
+  Record[构造WAL record]
+  Insert[XLogInsert分配LSN并写WAL buffer]
+  PageLSN[设置Page LSN]
+  Commit{提交需要flush?}
+  Flush[XLogFlush到commit LSN]
+  WalWriter[walwriter后台刷]
+  Disk[(pg_wal segment)]
+  Change --> Record --> Insert --> PageLSN
+  Insert --> WalWriter --> Disk
+  PageLSN --> Commit
+  Commit -- synchronous_commit on --> Flush --> Disk
+  Commit -- off/local策略 --> WalWriter</pre>
+
+      <h3>6. CLOG / XID 原理</h3>
+      <p>CLOG 现在目录名为 <code>pg_xact</code>，保存事务 ID 的提交状态：in progress、committed、aborted、sub-committed。tuple 头部只放 <code>xmin/xmax</code>，可见性判断会查询事务状态。hint bit 是把已知提交/回滚状态缓存到 tuple header，减少未来查 <code>pg_xact</code> 的成本，但第一次设置 hint bit 会使页面变脏。</p>
+      <pre class="mermaid">flowchart LR
+  Tuple[HeapTuple xmin=100 xmax=0]
+  Snapshot[Snapshot xmin/xmax/xip]
+  XidCheck[TransactionIdDidCommit]
+  PgXact[(pg_xact)]
+  Hint[set hint bit HEAP_XMIN_COMMITTED]
+  Visible{visible?}
+  Tuple --> Snapshot --> XidCheck --> PgXact --> Hint --> Visible</pre>
+
+      <h3>7. Checkpoint 原理</h3>
+      <p>Checkpoint 写出一个恢复边界：保证该 checkpoint 之前的脏页最终刷到数据文件，并在 WAL 中写 checkpoint record。崩溃恢复从最近 checkpoint 开始重放 WAL。过于频繁的 checkpoint 会造成写放大；过少会让恢复时间和 WAL 占用增加。</p>
+      <pre class="mermaid">sequenceDiagram
+  participant CK as checkpointer
+  participant SB as shared buffers
+  participant WAL as pg_wal
+  participant DF as data files
+  CK->>WAL: write CHECKPOINT record
+  CK->>SB: scan dirty buffers
+  loop spread checkpoint writes
+    CK->>DF: write dirty page
+    CK->>SB: clear dirty flag if pageLSN flushed
+  end
+  CK->>DF: fsync data files
+  CK->>WAL: update control file checkpoint LSN
+  Note over CK,WAL: crash recovery从checkpoint redo pointer开始</pre>
+
+      <h3>8. bgwriter 原理</h3>
+      <p>bgwriter 不建立一致性边界，它只提前把脏页写回，减少用户 backend 在找 victim buffer 时被迫刷脏页。MySQL 里你可能关注 page cleaner 和 flushing；PostgreSQL 则要区分 bgwriter 平滑写、checkpointer 边界写、backend write 三种来源。</p>
+
+      <h3>9. autovacuum 原理</h3>
+      <p>autovacuum launcher 周期性扫描数据库，根据表的 dead tuples、insert/update/delete 计数、freeze 年龄决定启动 worker。worker 对表执行 vacuum/analyze/freeze。它不是“可开可关的优化器”，而是 PostgreSQL MVCC 的清道夫和防事务 ID 回卷机制。</p>
+      <pre class="mermaid">flowchart TD
+  Launcher[autovacuum launcher]
+  Stats[pg_stat_all_tables计数]
+  Need{n_dead_tup > threshold + scale_factor * reltuples<br/>或freeze age过高?}
+  Worker[autovacuum worker]
+  Vacuum[heap vacuum + index cleanup]
+  Analyze[ANALYZE更新统计]
+  Freeze[freeze old xid]
+  Launcher --> Stats --> Need
+  Need -- yes --> Worker
+  Worker --> Vacuum
+  Worker --> Analyze
+  Worker --> Freeze
+  Need -- no --> Sleep[等待naptime]</pre>
+
+      <h3>10. stats collector 原理</h3>
+      <p>新版本 PostgreSQL 使用共享内存统计架构替代旧式独立 collector 文件路径。你在 <code>pg_stat_activity</code>、<code>pg_stat_statements</code>、<code>pg_stat_bgwriter</code>、<code>pg_stat_wal</code>、<code>pg_stat_all_tables</code> 看到的是诊断入口。慢查询定位时，统计信息是 planner 的输入，也是 DBA 的观测面。</p>
+
+      <h3>11. logical replication 原理</h3>
+      <p>逻辑复制通过 logical decoding 把 WAL 解释成表级变更流，依赖 replication slot 保留 WAL。发布端 publication 选择表和动作，订阅端 subscription 接收并 apply。和 MySQL row binlog 相似，但 PostgreSQL 的逻辑复制来自 WAL 解码，不是另一个 binlog 文件。</p>
+      <pre class="mermaid">flowchart LR
+  Tx[事务提交WAL]
+  Slot[logical replication slot]
+  Decode[logical decoding<br/>ReorderBuffer]
+  Pub[publication]
+  WSender[wal sender]
+  Network[replication protocol]
+  Apply[subscriber apply worker]
+  Tx --> Slot --> Decode --> Pub --> WSender --> Network --> Apply</pre>
+
+      <h3>12. physical replication 原理</h3>
+      <p>物理复制传输 WAL block/record，备库按 LSN 重放，数据文件二进制一致。流复制延迟可拆成 sent/write/flush/replay 多段。生产要关注 replication slot 导致的 WAL 堆积，尤其 ThingsBoard 高写入遥测场景会快速放大 <code>pg_wal</code>。</p>
+
+      <h3>13. PostgreSQL 启动流程</h3>
+      <pre class="mermaid">flowchart TD
+  Start[postgres启动]
+  ReadConf[读取postgresql.conf/pg_hba.conf]
+  Shared[初始化共享内存和信号量]
+  Control[读取global/pg_control]
+  Recovery{是否需要crash recovery?}
+  Redo[从checkpoint redo LSN重放WAL]
+  Bg[启动checkpointer/bgwriter/walwriter/autovacuum]
+  Listen[监听端口]
+  Ready[接受连接]
+  Start --> ReadConf --> Shared --> Control --> Recovery
+  Recovery -- yes --> Redo --> Bg
+  Recovery -- no --> Bg
+  Bg --> Listen --> Ready</pre>
+
+      <h3>14. PostgreSQL 查询执行完整链路</h3>
+      <pre class="mermaid">sequenceDiagram
+  participant App as JDBC/HikariCP
+  participant BE as backend
+  participant Parser as Parser
+  participant Analyzer as Analyzer
+  participant Rewriter as Rewriter
+  participant Planner as Planner
+  participant Executor as Executor
+  participant Buf as Shared Buffers
+  participant Disk as Data Files
+  App->>BE: SQL
+  BE->>Parser: raw_parse
+  Parser-->>BE: RawStmt
+  BE->>Analyzer: parse_analyze, catalog lookup
+  Analyzer-->>BE: Query tree
+  BE->>Rewriter: rules/view expansion/RLS
+  Rewriter-->>BE: rewritten Query
+  BE->>Planner: standard_planner
+  Planner-->>BE: PlannedStmt
+  BE->>Executor: ExecutorStart/Run
+  loop plan node拉取tuple
+    Executor->>Buf: ReadBuffer / index access
+    Buf-->>Disk: miss时读取页面
+    Buf-->>Executor: tuple slot
+  end
+  Executor-->>App: DataRow/CommandComplete</pre>
+
+      <h3>15. PostgreSQL 写入完整链路</h3>
+      <pre class="mermaid">sequenceDiagram
+  participant App as App/JDBC
+  participant BE as backend
+  participant Heap as heapam
+  participant Idx as index AM
+  participant WAL as WAL buffer
+  participant SB as shared buffers
+  participant Disk as pg_wal/data files
+  App->>BE: INSERT/UPDATE/DELETE
+  BE->>BE: StartTransaction, GetSnapshot
+  BE->>Heap: heap_insert/heap_update
+  Heap->>WAL: XLogInsert heap record
+  Heap->>SB: modify heap page, set LSN, mark dirty
+  BE->>Idx: index_insert if needed
+  Idx->>WAL: XLogInsert index record
+  Idx->>SB: modify index page
+  BE->>WAL: commit record
+  BE->>Disk: XLogFlush commit LSN when required
+  BE-->>App: COMMIT OK</pre>
+
+      <h3>16. PostgreSQL 崩溃恢复流程</h3>
+      <pre class="mermaid">flowchart TD
+  Crash[进程/OS崩溃]
+  Restart[postmaster重启]
+  PgControl[读取pg_control checkpoint]
+  Scan[扫描pg_wal]
+  Redo[redo WAL records到一致状态]
+  CommitStatus[恢复事务提交状态pg_xact]
+  Uncommitted[未提交tuple按MVCC不可见]
+  End[进入正常服务]
+  Crash --> Restart --> PgControl --> Scan --> Redo --> CommitStatus --> Uncommitted --> End</pre>
+
+      <h3>17. PostgreSQL 内存结构</h3>
+      <table>
+        <thead><tr><th>区域</th><th>内容</th><th>调优关注</th><th>MySQL 对照</th></tr></thead>
+        <tbody>
+        <tr><td>共享内存</td><td>shared buffers、WAL buffers、lock table、ProcArray、stats。</td><td><code>shared_buffers</code>、<code>wal_buffers</code>、锁数量。</td><td>类似 InnoDB Buffer Pool + 全局锁结构，但范围更分散。</td></tr>
+        <tr><td>backend 私有内存</td><td>work_mem、temp buffers、memory contexts。</td><td>连接数 * plan 节点数 * work_mem。</td><td>sort_buffer/join_buffer/thread stack。</td></tr>
+        <tr><td>OS page cache</td><td>数据文件缓存。</td><td><code>effective_cache_size</code> 影响 planner 成本估计。</td><td>InnoDB 通常更希望绕开/弱化 OS cache。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>18. PostgreSQL 文件结构</h3>
+      <pre><code>PGDATA/
+  base/             -- 每个database一个目录，表/索引relfilenode文件
+  global/           -- 集群级系统表
+  pg_wal/           -- WAL segment
+  pg_xact/          -- 事务提交状态，旧称CLOG
+  pg_multixact/     -- 多事务行锁状态
+  pg_tblspc/        -- tablespace symlink
+  pg_stat/          -- 统计临时/持久文件，版本相关
+  pg_control        -- checkpoint和控制信息</code></pre>
+
+      <h3>19. PostgreSQL 页结构</h3>
+      <pre class="mermaid">flowchart TB
+  Page[8KB Page]
+  Header[PageHeaderData<br/>pd_lsn/pd_checksum/pd_lower/pd_upper]
+  LinePtr[ItemIdData line pointers]
+  Free[Free Space]
+  Tuple[HeapTupleData区域]
+  Special[Special space<br/>index page使用]
+  Page --> Header
+  Page --> LinePtr
+  Page --> Free
+  Page --> Tuple
+  Page --> Special</pre>
+      <p>Heap 页通过 line pointer 间接定位 tuple。tuple 被删除后 line pointer 可能变成 dead/unused，Vacuum 会整理可复用空间，但普通 Vacuum 不一定收缩文件尾部。</p>
+
+      <h3>20. HeapTuple 原理</h3>
+      <pre class="mermaid">flowchart LR
+  Tuple[HeapTuple]
+  Header[t_xmin / t_xmax / t_field3<br/>t_ctid / infomask / hoff]
+  NullBitmap[null bitmap]
+  Data[用户列数据]
+  Toast[TOAST外部大字段]
+  Tuple --> Header --> NullBitmap --> Data
+  Data --> Toast</pre>
+      <p>更新时，新 tuple 写入新位置，旧 tuple 的 <code>xmax</code> 指向更新事务，<code>ctid</code> 指向新版本。HOT update 只有在不修改索引列且同页有空间时才避免新增索引项，这对高频更新表至关重要。</p>
+    </section>
+
+    <section id="part3" class="section">
+      <h2>第三部分：PostgreSQL WAL / MVCC / Vacuum 深入</h2>
+
+      <h3>1. WAL 写入流程</h3>
+      <p>PostgreSQL 的 WAL 是物理重做日志。任何会修改持久化数据页的操作，都先生成 WAL record，拿到 LSN，再修改 buffer 页面并设置 page LSN。提交时写 commit record，按 <code>synchronous_commit</code> 策略决定是否等待 WAL flush。</p>
+      <pre class="mermaid">flowchart TD
+  Tx[事务开始]
+  Modify[修改heap/index buffer]
+  Build[构造WAL record]
+  Insert[XLogInsert写入WAL buffer并分配LSN]
+  PageLSN[page header pd_lsn = record LSN]
+  Commit[生成commit WAL record]
+  Sync{同步提交策略}
+  Flush[XLogFlush到commit LSN]
+  Ack[返回客户端成功]
+  Later[walwriter稍后flush]
+  Tx --> Modify --> Build --> Insert --> PageLSN --> Commit --> Sync
+  Sync -- on/remote_apply等 --> Flush --> Ack
+  Sync -- off/local异步风险 --> Later --> Ack</pre>
+
+      <h3>2. Group Commit</h3>
+      <p>多个 backend 同时提交时，只有一部分进程真正执行 fsync，其他进程等待同一个或更靠后的 LSN 被刷盘。这个机制类似 MySQL group commit，但 PostgreSQL 的提交等待围绕 WAL flush LSN 展开。高并发 ThingsBoard 遥测写入场景中，批量队列能把应用层 batch 和数据库 WAL group commit 叠加起来。</p>
+      <pre class="mermaid">sequenceDiagram
+  participant B1 as backend A
+  participant B2 as backend B
+  participant B3 as backend C
+  participant WAL as WAL buffer
+  participant Disk as pg_wal
+  B1->>WAL: commit record LSN 100
+  B2->>WAL: commit record LSN 120
+  B3->>WAL: commit record LSN 140
+  B1->>Disk: XLogFlush up to 140
+  B2->>B1: wait flush
+  B3->>B1: wait flush
+  Disk-->>B1: fsync complete
+  B1-->>B2: LSN 120 durable
+  B1-->>B3: LSN 140 durable
+  B1-->>B1: commit ok</pre>
+
+      <h3>3. fsync 与持久化</h3>
+      <p><code>fsync=on</code> 是生产底线。关闭 fsync 不是“快一点但可能丢最后几秒”，而是可能在 OS/硬件崩溃时损坏数据一致性。<code>synchronous_commit=off</code> 的风险相对可控：数据库不会坏，但最近已返回成功的事务可能丢失。</p>
+
+      <h3>4. Checkpoint</h3>
+      <p>Checkpoint 把恢复起点向前推进。<code>checkpoint_timeout</code> 控制时间周期，<code>max_wal_size</code> 控制 WAL 空间触发，<code>checkpoint_completion_target</code> 控制写出平滑度。大量写入时如果日志频繁出现 checkpoint too frequent，应增大 <code>max_wal_size</code>。</p>
+
+      <h3>5. Crash Recovery</h3>
+      <p>崩溃恢复不扫描所有 heap 表，而是读取 checkpoint redo pointer 之后的 WAL。WAL record 是幂等重放：如果页面 LSN 已经大于等于 record LSN，说明该修改已在数据页，无需重复。未提交事务产生的 tuple 在可见性判断时不可见，后续 Vacuum 清理。</p>
+      <pre class="mermaid">flowchart LR
+  CKPT[checkpoint redo LSN]
+  WAL1[WAL record 1]
+  WAL2[WAL record 2]
+  Page[读取目标页面]
+  Check{pageLSN < recordLSN?}
+  Apply[redo record]
+  Skip[skip]
+  Next[下一条WAL]
+  CKPT --> WAL1 --> Page --> Check
+  Check -- yes --> Apply --> Next
+  Check -- no --> Skip --> Next
+  Next --> WAL2</pre>
+
+      <h3>6. MVCC 可见性</h3>
+      <p>一个 snapshot 可简化理解为三部分：<code>xmin</code> 以下事务都已结束；<code>xmax</code> 及以上事务对当前 snapshot 不可见；中间活跃事务列表 <code>xip</code> 不可见。tuple 可见性由 tuple 的 <code>xmin/xmax</code> 与 snapshot、<code>pg_xact</code> 状态共同决定。</p>
+      <pre class="mermaid">flowchart TD
+  T[Tuple xmin/xmax]
+  XminCommitted{xmin已提交?}
+  XminVisible{xmin对snapshot可见?}
+  XmaxZero{xmax=0?}
+  XmaxCommitted{xmax已提交且可见?}
+  Visible[tuple visible]
+  Invisible[tuple invisible]
+  T --> XminCommitted
+  XminCommitted -- no/aborted --> Invisible
+  XminCommitted -- yes --> XminVisible
+  XminVisible -- no --> Invisible
+  XminVisible -- yes --> XmaxZero
+  XmaxZero -- yes --> Visible
+  XmaxZero -- no --> XmaxCommitted
+  XmaxCommitted -- no/未提交/不可见 --> Visible
+  XmaxCommitted -- yes --> Invisible</pre>
+
+      <h3>7. xmin / xmax</h3>
+      <table>
+        <thead><tr><th>字段</th><th>含义</th><th>常见状态</th><th>MySQL 对照</th></tr></thead>
+        <tbody>
+        <tr><td><code>xmin</code></td><td>插入该 tuple 的事务 ID。</td><td>提交则可能可见，未提交/回滚不可见。</td><td>类似 InnoDB 隐藏 <code>trx_id</code>，但旧版本不在 undo。</td></tr>
+        <tr><td><code>xmax</code></td><td>删除或更新该 tuple 的事务 ID，也可承载行锁信息。</td><td>0 表示未删除；已提交删除则旧版本不可见。</td><td>InnoDB 通过 undo 和锁结构表达。</td></tr>
+        <tr><td><code>ctid</code></td><td>tuple 物理位置，更新后旧 tuple 指向新 tuple。</td><td>可用于观察版本链，不应作为业务稳定 ID。</td><td>InnoDB 主键逻辑更稳定，物理位置不暴露。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>8. Tuple Version 生命周期</h3>
+      <pre class="mermaid">stateDiagram-v2
+  [*] --> Inserted: heap_insert xmin=T1
+  Inserted --> Visible: T1 commit
+  Inserted --> Aborted: T1 abort
+  Visible --> UpdatedOld: T2 update sets xmax=T2
+  UpdatedOld --> Dead: T2 commit and no snapshot needs old version
+  UpdatedOld --> Visible: T2 abort
+  Dead --> Reusable: VACUUM marks line pointer/free space
+  Reusable --> [*]
+  Visible --> Deleted: T3 delete sets xmax=T3
+  Deleted --> Dead: T3 commit and old snapshots gone</pre>
+
+      <h3>9. HOT Update</h3>
+      <p>HOT（Heap-Only Tuple）update 在不修改任何索引列且同一 heap page 有空间时，把新版本放在同页，并不为新版本创建新的索引项。索引仍指向 HOT 链根，heap 内跟随版本链找到可见版本。工程上，频繁更新状态字段的表可以用较低 <code>fillfactor</code> 留页内空间，提升 HOT 比例。</p>
+      <pre class="mermaid">flowchart LR
+  Index[Index entry -> TID 1]
+  T1[Tuple v1<br/>xmin=10 xmax=20<br/>ctid -> T2]
+  T2[Tuple v2<br/>xmin=20 xmax=0]
+  Index --> T1 --> T2
+  Note[未修改索引列<br/>同页HOT链<br/>无需新增索引项]
+  T2 --> Note</pre>
+
+      <h3>10. Hint Bit</h3>
+      <p>第一次读取某个 tuple 时，如果发现 <code>xmin</code> 已提交，backend 可能设置 <code>HEAP_XMIN_COMMITTED</code> hint bit。这个小优化会让只读查询也可能弄脏页面，因此在主备、校验和、WAL hint 配置下，第一次大范围扫描可能产生额外写 IO。</p>
+
+      <h3>11. VACUUM</h3>
+      <p>普通 Vacuum 做三件事：找到不再被任何 snapshot 需要的 dead tuple；清理索引中的 dead TID；把 heap 空间登记到 FSM，把全可见页面标记到 VM。它通常不把表文件还给 OS，除非末尾页全部空闲可以 truncate。<code>VACUUM FULL</code> 会重写表，能释放空间但需要强锁。</p>
+      <pre class="mermaid">flowchart TD
+  ScanHeap[扫描heap页面]
+  Dead[识别dead tuple<br/>xmax已提交且早于OldestXmin]
+  IndexVac[Index bulk delete dead TID]
+  HeapClean[清理line pointer/tuple]
+  FSM[更新free space map]
+  VM[更新visibility map]
+  Stats[更新pg_class/pg_stat]
+  ScanHeap --> Dead --> IndexVac --> HeapClean --> FSM --> VM --> Stats</pre>
+
+      <h3>12. Autovacuum</h3>
+      <p>默认触发公式大致是：<code>autovacuum_vacuum_threshold + autovacuum_vacuum_scale_factor * reltuples</code>。大表使用默认 20% scale factor 往往太晚，IoT 时序表如果有 DELETE TTL，会积累大量 dead tuple；更推荐 TimescaleDB retention/drop chunk 或 PostgreSQL 分区 drop，而不是逐行 DELETE。</p>
+
+      <h3>13. Freeze</h3>
+      <p>事务 ID 是 32 位，会回卷。Freeze 把非常老的 tuple 标记成冻结事务，使其对所有未来事务可见。若数据库接近 wraparound，PostgreSQL 会强制 aggressive vacuum，严重时阻止写入。监控 <code>age(datfrozenxid)</code> 和表级 <code>age(relfrozenxid)</code> 是生产必做。</p>
+
+      <h3>14. Transaction Wraparound</h3>
+      <pre class="mermaid">flowchart LR
+  XID[32-bit XID递增]
+  Age[age(datfrozenxid)升高]
+  Warn[接近autovacuum_freeze_max_age]
+  Aggressive[强制aggressive vacuum]
+  Stop[接近极限时拒绝写入保护数据]
+  XID --> Age --> Warn --> Aggressive --> Stop</pre>
+
+      <h3>15. Dead Tuple</h3>
+      <p>Dead tuple 是 PostgreSQL heap MVCC 的自然产物。它可能来自 UPDATE、DELETE、失败插入、ON CONFLICT 更新。对 ThingsBoard 来说，<code>ts_kv</code> 是追加为主，但 <code>ON CONFLICT(entity_id,key,ts) DO UPDATE</code> 遇到重复时仍会产生旧版本；<code>ts_kv_latest</code> 最新值表高频 upsert，更容易产生 dead tuple 和索引膨胀。</p>
+
+      <h3>16. Visibility Map</h3>
+      <p>VM 标记某个 heap page 是否 all-visible 或 all-frozen。Index-only scan 是否真的不回表，很大程度取决于 VM。高更新表 VM 位会频繁被清除，因此即便索引覆盖列，仍可能大量 heap fetch。</p>
+
+      <h3>17. Free Space Map</h3>
+      <p>FSM 记录每个页面大致剩余空间，插入/更新时用来寻找可放入 tuple 的页面。Vacuum 清理后会更新 FSM。表膨胀不只是磁盘问题，也会拉低 cache density、增加 seq scan 和 index scan 的 heap 访问成本。</p>
+
+      <h3>为什么 PostgreSQL 必须 Vacuum：与 MySQL undo purge 的本质区别</h3>
+      <div class="danger">
+        <p><strong>核心差异：</strong>InnoDB 的旧版本主要在 undo 链中，purge 清理 undo 记录和删除标记；PostgreSQL 的旧版本就是表里的真实 heap tuple，索引也可能仍指向旧 tuple。没有 Vacuum，表和索引会持续膨胀，统计信息失真，XID 无法 freeze，最终可能触发 wraparound 风险。</p>
+      </div>
+      <pre class="mermaid">flowchart TB
+  subgraph mysqlPurge[MySQL InnoDB]
+    MUpdate[UPDATE]
+    MRow[聚簇索引当前行]
+    MUndo[undo旧版本]
+    MRead[ReadView读undo]
+    MPurge[purge清理undo和delete-mark]
+    MUpdate --> MRow
+    MUpdate --> MUndo
+    MRead --> MUndo
+    MPurge --> MUndo
+  end
+  subgraph pgVac[PostgreSQL]
+    PUpdate[UPDATE]
+    Old[旧heap tuple xmax=T]
+    New[新heap tuple xmin=T]
+    PIndex[索引可能指向旧TID和新TID]
+    PRead[Snapshot选择可见tuple]
+    PVac[Vacuum清heap和index dead item]
+    PUpdate --> Old
+    PUpdate --> New
+    Old --> PIndex
+    New --> PIndex
+    PRead --> Old
+    PRead --> New
+    PVac --> Old
+    PVac --> PIndex
+  end</pre>
+    </section>
+
+    <section id="part4" class="section">
+      <h2>第四部分：PostgreSQL 锁与事务</h2>
+
+      <h3>1. PostgreSQL 锁体系</h3>
+      <p>PostgreSQL 锁分为 heavyweight locks（表、事务、对象锁）、lightweight locks（内部共享结构保护，如 buffer mapping、WAL insert）、spinlocks、predicate locks、advisory locks、tuple locks。日常 SQL 排查主要看 <code>pg_locks</code> 中 relation/transactionid/tuple/advisory 和 <code>pg_stat_activity.wait_event</code>。</p>
+      <pre class="mermaid">flowchart TB
+  Locks[PostgreSQL锁体系]
+  Heavy[Heavyweight Lock Manager<br/>relation/transactionid/object]
+  Row[Tuple lock<br/>xmax/MultiXact + lock table wait]
+  LW[LWLock<br/>buffer/WAL/procarray]
+  Spin[SpinLock<br/>极短临界区]
+  Predicate[Predicate Lock<br/>SSI]
+  Advisory[Advisory Lock<br/>应用自定义]
+  Locks --> Heavy
+  Locks --> Row
+  Locks --> LW
+  Locks --> Spin
+  Locks --> Predicate
+  Locks --> Advisory</pre>
+
+      <h3>2. 行锁</h3>
+      <p>行锁不是集中存在内存锁表里的每一行对象，而是写入 tuple header 的 <code>xmax</code>，必要时使用 MultiXact 表达多个 locker。等待者通常等待持有者的 transactionid。常见模式：<code>FOR UPDATE</code>、<code>FOR NO KEY UPDATE</code>、<code>FOR SHARE</code>、<code>FOR KEY SHARE</code>。</p>
+
+      <h3>3. 表锁</h3>
+      <p>INSERT/UPDATE/DELETE 通常拿 <code>RowExclusiveLock</code>；SELECT 拿 <code>AccessShareLock</code>；DDL 如 ALTER TABLE 可能拿 <code>AccessExclusiveLock</code>，会阻塞普通读写。生产变更要重点检查 DDL 锁级别和长事务。</p>
+
+      <h3>4. Advisory Lock</h3>
+      <p>Advisory lock 是应用定义的 64-bit 或两个 32-bit key 锁，可事务级或会话级。它不保护具体表行，适合分布式任务互斥、租户级串行化等。误用会造成连接泄露后锁长期保留，特别是 session-level advisory lock。</p>
+
+      <h3>5. MVCC 与锁的关系</h3>
+      <p>普通 SELECT 使用 snapshot，不阻塞写；写写冲突才等待。同一行 UPDATE 时，后来的事务需要等待前一个事务结束，再判断是否可更新或报序列化错误。和 InnoDB RR 下 next-key lock 防幻读不同，PostgreSQL Read Committed/Repeatable Read 更多依赖 MVCC snapshot，Serializable 再用 SSI 检测危险结构。</p>
+      <pre class="mermaid">sequenceDiagram
+  participant T1 as Tx1
+  participant T2 as Tx2
+  participant R as Row tuple
+  T1->>R: UPDATE row, set xmax=T1
+  T2->>R: UPDATE same row
+  R-->>T2: row locked, wait transactionid T1
+  T1->>R: COMMIT
+  T2->>R: recheck visibility
+  alt Read Committed
+    T2->>R: update latest visible version
+  else Repeatable Read/Serializable conflict
+    T2-->>T2: may raise serialization failure
+  end</pre>
+
+      <h3>6. 死锁检测</h3>
+      <p>PostgreSQL 不会立即做昂贵死锁检测，而是等待 <code>deadlock_timeout</code> 后构建 waits-for graph。如果发现环，取消其中一个事务。慢锁等待先看 <code>pg_blocking_pids(pid)</code>，再看阻塞者 SQL 和事务持续时间。</p>
+      <pre class="mermaid">flowchart LR
+  T1[Tx1 holds A waits B]
+  T2[Tx2 holds B waits A]
+  Wait[等待超过deadlock_timeout]
+  Graph[构建wait-for graph]
+  Cycle{发现环?}
+  Abort[中止一个事务]
+  Continue[继续等待]
+  T1 --> Wait
+  T2 --> Wait
+  Wait --> Graph --> Cycle
+  Cycle -- yes --> Abort
+  Cycle -- no --> Continue</pre>
+
+      <h3>7. Serializable 实现</h3>
+      <p>PostgreSQL Serializable 是 SSI：每个事务仍在 snapshot 上运行，同时记录 predicate locks 和 rw-conflicts。当出现可能违反串行化的危险结构时，中止事务。它避免了大量范围锁阻塞，但会带来序列化失败重试需求。</p>
+      <pre class="mermaid">flowchart TD
+  S1[Tx A reads predicate P]
+  S2[Tx B writes rows matching P]
+  RW1[rw-conflict A <- B]
+  S3[Tx C reads/writes形成依赖]
+  Dangerous{dangerous structure?}
+  Abort[abort one transaction<br/>serialization_failure]
+  Commit[allow commit]
+  S1 --> RW1
+  S2 --> RW1
+  RW1 --> S3 --> Dangerous
+  Dangerous -- yes --> Abort
+  Dangerous -- no --> Commit</pre>
+
+      <h3>8. Snapshot Isolation</h3>
+      <p>PostgreSQL 的 Repeatable Read 实际提供 snapshot isolation：事务第一次查询时建立 snapshot，后续读取同一 snapshot，不看到其他事务提交的新行。因此普通幻读不会出现。但 write skew 这类异常仍可能发生，需要 Serializable 或显式锁。</p>
+
+      <h3>9. PostgreSQL 隔离级别</h3>
+      <table>
+        <thead><tr><th>隔离级别</th><th>PostgreSQL 行为</th><th>MySQL/InnoDB 对照</th></tr></thead>
+        <tbody>
+        <tr><td>Read Committed</td><td>每条语句一个 snapshot，默认级别。</td><td>MySQL 默认不是 RC；很多互联网项目会主动设 RC。</td></tr>
+        <tr><td>Repeatable Read</td><td>事务级 snapshot isolation，防普通不可重复读和幻读。</td><td>InnoDB RR 用 ReadView + next-key lock 处理锁定读和写路径。</td></tr>
+        <tr><td>Serializable</td><td>SSI 检测冲突，可能报 <code>40001</code> 需要重试。</td><td>MySQL Serializable 更偏锁化读。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>10. PostgreSQL 与 MySQL RR 的区别</h3>
+      <p>MySQL InnoDB RR 的锁定读和更新路径可能产生 gap/next-key lock，阻塞插入以防幻读。PostgreSQL RR 不使用 gap lock 作为主机制；读 snapshot 固定，写冲突通过行版本和序列化错误处理。迁移时，依赖 MySQL gap lock 做业务互斥的逻辑需要重新设计。</p>
+
+      <h3>11. PostgreSQL 幻读机制</h3>
+      <p>Read Committed 下每条语句 snapshot 不同，可以看到新插入行。Repeatable Read 下同一事务 snapshot 固定，看不到新行。Serializable 下如果业务读谓词和其他事务写入形成不可串行化结构，会通过 SSI 报错。</p>
+
+      <h3>12. 悲观锁</h3>
+      <p>使用 <code>SELECT ... FOR UPDATE</code> 或 <code>FOR NO KEY UPDATE</code>。生产建议加 <code>NOWAIT</code> 或 <code>SKIP LOCKED</code> 用于任务队列，避免无限等待。JDBC 事务必须短，不能在锁内做远程调用。</p>
+
+      <h3>13. 乐观并发</h3>
+      <p>PostgreSQL 支持常规版本列乐观锁。ThingsBoard 多张表有 <code>version BIGINT</code>；<code>ts_kv_latest</code> 使用 <code>ts_kv_latest_version_seq</code> 在 upsert 后返回版本，配合缓存失效。对遥测历史 <code>ts_kv</code>，主键 <code>(entity_id,key,ts)</code> 加 <code>ON CONFLICT DO UPDATE</code> 提供幂等写。</p>
+    </section>
+
+    <section id="part5" class="section">
+      <h2>第五部分：PostgreSQL 查询执行与优化器</h2>
+
+      <h3>1-6. Parser / Analyzer / Rewriter / Planner / Optimizer / Executor</h3>
+      <pre class="mermaid">flowchart TD
+  SQL[SQL文本]
+  Parser[Parser<br/>词法语法生成RawStmt]
+  Analyzer[Analyzer<br/>名字解析/类型推导/权限/系统表]
+  Rewriter[Rewriter<br/>视图展开/规则/RLS]
+  Planner[Planner<br/>路径枚举/成本估算/join order]
+  Plan[Plan Tree]
+  Executor[Executor<br/>火山模型ExecProcNode]
+  Result[结果集]
+  SQL --> Parser --> Analyzer --> Rewriter --> Planner --> Plan --> Executor --> Result</pre>
+      <p>源码路径主线：<code>parser/analyze.c</code> 做语义分析；<code>rewrite/rewriteHandler.c</code> 做规则重写；<code>optimizer/plan/planner.c</code> 进入标准 planner；<code>optimizer/path</code> 构造可选路径；<code>executor/execMain.c</code> 和各 <code>node*.c</code> 执行 plan node。</p>
+
+      <h3>7. Seq Scan</h3>
+      <p>Seq Scan 不是一定坏。大范围扫描、低选择率、表很小、并行扫描、缓存命中高时，顺序扫描可能比索引随机访问更便宜。PostgreSQL 成本模型中 <code>seq_page_cost</code>、<code>random_page_cost</code>、表相关性会影响选择。</p>
+
+      <h3>8. Index Scan</h3>
+      <p>Index Scan 从索引找到 TID，再访问 heap。对高度选择性查询有效。因为 PostgreSQL 表不是主键聚簇，索引扫描可能产生大量随机 heap fetch；如果数据按时间写入而按时间范围查，BRIN 或 Timescale chunk pruning 可能更合适。</p>
+
+      <h3>9. Bitmap Scan</h3>
+      <p>Bitmap Index Scan 先构造 TID 位图，Bitmap Heap Scan 再按 heap block 顺序回表，适合中等选择率或多个索引 AND/OR。若 <code>work_mem</code> 不足，位图会 lossy，导致更多 recheck。</p>
+      <pre class="mermaid">flowchart LR
+  I1[Index cond A]
+  I2[Index cond B]
+  Bitmap[BitmapAnd/BitmapOr]
+  Heap[Bitmap Heap Scan<br/>按block访问]
+  Recheck[Recheck条件]
+  Rows[Rows]
+  I1 --> Bitmap
+  I2 --> Bitmap
+  Bitmap --> Heap --> Recheck --> Rows</pre>
+
+      <h3>10-12. Join 算法</h3>
+      <pre class="mermaid">flowchart TB
+  Join[Join选择]
+  NL[Nested Loop<br/>外表每行驱动内表<br/>适合小外表+内表索引]
+  Hash[Hash Join<br/>小表建hash<br/>适合等值大表join]
+  Merge[Merge Join<br/>两边有序流归并<br/>适合范围/已排序/大结果]
+  Join --> NL
+  Join --> Hash
+  Join --> Merge</pre>
+      <table>
+        <thead><tr><th>算法</th><th>优势</th><th>风险</th><th>调优入口</th></tr></thead>
+        <tbody>
+        <tr><td>Nested Loop</td><td>小结果、索引驱动快。</td><td>估算外表行数过低会灾难性放大。</td><td>统计信息、索引、join 顺序。</td></tr>
+        <tr><td>Hash Join</td><td>大表等值 join 稳定。</td><td>hash table 超过 work_mem 发生 batch spill。</td><td><code>work_mem</code>、过滤条件、预聚合。</td></tr>
+        <tr><td>Merge Join</td><td>有序输入、范围合并、低内存。</td><td>需要排序或合适索引。</td><td>复合索引、排序成本。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>13. Cost Model</h3>
+      <p>Planner 不知道真实运行时间，只用统计信息估算成本。核心输入包括页面数、行数、选择率、相关性、MCV、histogram、CPU tuple/operator cost、random/seq page cost、effective cache size。估算行数偏差通常比“索引不存在”更常见。</p>
+
+      <h3>14. EXPLAIN ANALYZE</h3>
+      <pre class="mermaid">flowchart LR
+  Explain[EXPLAIN ANALYZE BUFFERS]
+  Cost[cost=启动..总成本]
+  Rows[rows=估算行数]
+  Actual[actual time/rows/loops]
+  Buffers[shared hit/read/dirtied/written]
+  Temp[temp read/write]
+  Diff{估算rows与actual rows偏差?}
+  Explain --> Cost
+  Explain --> Rows
+  Explain --> Actual
+  Explain --> Buffers
+  Explain --> Temp
+  Rows --> Diff
+  Actual --> Diff</pre>
+      <pre><code class="language-sql">EXPLAIN (ANALYZE, BUFFERS, WAL, VERBOSE)
+SELECT *
+FROM ts_kv
+WHERE entity_id = '...'::uuid
+  AND key = 42
+  AND ts >= 1710000000000
+  AND ts < 1710086400000
+ORDER BY ts DESC
+LIMIT 1000;</code></pre>
+
+      <h3>15. Statistics</h3>
+      <p><code>ANALYZE</code> 抽样更新 <code>pg_statistic</code>。对多列相关条件，例如 ThingsBoard 常见的 <code>entity_id + key + ts</code>，单列统计可能低估或高估组合选择率。可以考虑 extended statistics，但对时序主查询，正确复合索引和 chunk pruning 更关键。</p>
+
+      <h3>16. ANALYZE 命令</h3>
+      <p>批量导入、分区创建、大量删除后应主动 <code>ANALYZE</code>。Autovacuum 也会触发 autoanalyze，但大表默认阈值可能太慢。对 ThingsBoard 的最新值表 <code>ts_kv_latest</code>、属性表 <code>attribute_kv</code>，统计新鲜度直接影响实体查询和仪表盘加载。</p>
+
+      <h3>17. PostgreSQL 慢查询定位</h3>
+      <ol>
+        <li>先启用 <code>pg_stat_statements</code>，按 total_time、mean_time、calls、shared_blks_read 排序。</li>
+        <li>对目标 SQL 运行 <code>EXPLAIN (ANALYZE, BUFFERS)</code>，比较 estimated rows 与 actual rows。</li>
+        <li>看是否读了过多 heap block、是否 temp spill、是否 nested loop 放大、是否等待锁或 IO。</li>
+        <li>检查 autovacuum 是否滞后：dead tuple、last_autovacuum、n_mod_since_analyze。</li>
+        <li>对时序查询检查 chunk pruning：时间条件是否直接作用在 hypertable 时间列 <code>ts</code>，是否跨太多 chunk。</li>
+      </ol>
+      <pre><code class="language-sql">SELECT queryid, calls, total_exec_time, mean_exec_time,
+       rows, shared_blks_hit, shared_blks_read, temp_blks_read, temp_blks_written,
+       left(query, 500) AS sql
+FROM pg_stat_statements
+ORDER BY total_exec_time DESC
+LIMIT 20;</code></pre>
+    </section>
+
+    <section id="part6" class="section">
+      <h2>第六部分：PostgreSQL 配置与调优</h2>
+      <p class="lead">默认值以 PostgreSQL 16 官方文档为基准；生产值必须结合内存、磁盘、连接池、写入量、备份恢复目标和 ThingsBoard 节点数量压测。</p>
+
+      <table>
+        <thead><tr><th>参数</th><th>默认值</th><th>作用</th><th>风险</th><th>调优建议</th><th>MySQL 对照</th><th>ThingsBoard 建议</th></tr></thead>
+        <tbody>
+        <tr><td><code>shared_buffers</code></td><td>通常 128MB</td><td>PostgreSQL 共享数据页缓存。</td><td>过小导致频繁读；过大增加 checkpoint 和内存压力。</td><td>专用数据库常从内存 25% 起步，再看命中率和 checkpoint。</td><td>不是 InnoDB Buffer Pool 的一比一替代。</td><td>遥测写入多，避免盲目超大；给 OS cache 留空间。</td></tr>
+        <tr><td><code>work_mem</code></td><td>4MB</td><td>每个 sort/hash/materialize 节点的内存上限。</td><td>连接数 * 节点数倍增，过大可 OOM。</td><td>OLTP 小心调；报表/聚合连接可用会话级提高。</td><td>类似 sort_buffer/join_buffer，但按 plan node 消耗。</td><td>仪表盘聚合慢且 temp spill 时提高；不要全局过大。</td></tr>
+        <tr><td><code>maintenance_work_mem</code></td><td>64MB</td><td>VACUUM、CREATE INDEX、ALTER TABLE ADD FK 等维护操作内存。</td><td>autovacuum 多 worker 时叠加。</td><td>建索引/迁移时会话级提高；常规值看表大小。</td><td>类似 sort/index build 维护内存。</td><td>大表重建索引、迁移 Timescale 前提高。</td></tr>
+        <tr><td><code>wal_buffers</code></td><td>-1 自动，通常约 shared_buffers 的 1/32，上限常为 16MB</td><td>WAL 写入共享缓冲。</td><td>过小高并发写入争用；过大收益有限。</td><td>自动通常够；大事务/高写入可固定 16MB 或更高测试。</td><td>类似 redo log buffer。</td><td>遥测批量写入可保持自动或 16MB 起测。</td></tr>
+        <tr><td><code>checkpoint_timeout</code></td><td>5min</td><td>时间触发 checkpoint。</td><td>过短写放大；过长恢复时间变长。</td><td>高写入常设 10-15min，配合 max_wal_size。</td><td>类似 checkpoint age 控制，但机制不同。</td><td>写入高峰避免频繁 checkpoint。</td></tr>
+        <tr><td><code>max_wal_size</code></td><td>1GB</td><td>WAL 体积触发 checkpoint 的软上限。</td><td>过小频繁 checkpoint；过大占磁盘并延长恢复。</td><td>写密集系统常从 8GB、16GB 或更高压测。</td><td>类似 redo 容量影响 checkpoint。</td><td>ThingsBoard 遥测高吞吐必须增大并监控 pg_wal。</td></tr>
+        <tr><td><code>effective_cache_size</code></td><td>4GB</td><td>告诉 planner 估计可用缓存，不分配内存。</td><td>过小低估索引收益；过大高估缓存。</td><td>设为 shared_buffers + OS cache 估计值，常为内存 50%-75%。</td><td>MySQL 无完全等价。</td><td>专用 PG 主机按可用于数据库缓存的内存估计。</td></tr>
+        <tr><td><code>random_page_cost</code></td><td>4.0</td><td>随机页读取相对顺序页成本。</td><td>SSD 上过高可能偏向 seq scan。</td><td>SSD 常测 1.1-2.0；不要用禁用 seqscan 代替调成本。</td><td>类似优化器 IO 成本常量。</td><td>NVMe 存储可降低，改善 entity/key/ts 索引扫描选择。</td></tr>
+        <tr><td><code>synchronous_commit</code></td><td>on</td><td>提交是否等待 WAL flush/同步复制确认。</td><td>off 可能丢最近已确认事务。</td><td>强一致保 on；可丢少量遥测的场景可评估 off/local。</td><td>类似 innodb_flush_log_at_trx_commit 的部分语义。</td><td>业务事件/元数据 on；纯遥测可按 SLA 评估异步。</td></tr>
+        <tr><td><code>autovacuum</code></td><td>on</td><td>自动 vacuum/analyze/freeze。</td><td>关闭会膨胀和 wraparound。</td><td>保持开启；按表设置 scale_factor。</td><td>类似 purge + statistics 自动维护，但更关键。</td><td><code>ts_kv_latest</code> 和高更新表降低 scale_factor。</td></tr>
+        <tr><td><code>autovacuum_vacuum_scale_factor</code></td><td>0.2</td><td>按表行数比例触发 vacuum。</td><td>大表 20% 太晚。</td><td>大表设 0.01-0.05 或表级 storage parameter。</td><td>无直接等价。</td><td>最新遥测 upsert 表建议更激进。</td></tr>
+        <tr><td><code>autovacuum_analyze_scale_factor</code></td><td>0.1</td><td>按变更比例触发 analyze。</td><td>统计过旧导致 planner 错误。</td><td>频繁变化表降低。</td><td>类似 persistent stats 自动更新。</td><td>实体查询涉及表和 <code>ts_kv_latest</code> 要保持统计新鲜。</td></tr>
+        <tr><td><code>max_connections</code></td><td>100</td><td>最大 backend 数。</td><td>过大进程、内存和锁开销高。</td><td>配合连接池/PgBouncer，少而稳。</td><td>MySQL 线程连接模型更轻一些。</td><td>ThingsBoard 默认 Hikari 16；多节点总连接数要小于 PG 能承受。</td></tr>
+        <tr><td><code>wal_level</code></td><td>replica</td><td>WAL 信息量，支持复制/逻辑解码。</td><td>logical 增加 WAL 信息和保留风险。</td><td>物理备库用 replica；逻辑复制才 logical。</td><td>类似 binlog_format + log_bin 能力。</td><td>无逻辑订阅需求不要开 logical。</td></tr>
+        <tr><td><code>max_wal_senders</code></td><td>10</td><td>物理/逻辑复制发送进程数。</td><td>过小备份/复制连不上。</td><td>按备库、备份工具、监控 slot 数设置。</td><td>主从 dump 线程/复制线程。</td><td>有 HA/备份时预留。</td></tr>
+        <tr><td><code>max_replication_slots</code></td><td>10</td><td>复制 slot 数。</td><td>slot 消费停滞会保留 WAL 撑爆磁盘。</td><td>只创建需要的 slot，监控 restart_lsn lag。</td><td>MySQL relay/binlog 保留策略不同。</td><td>高写入 ThingsBoard 必须报警 pg_wal 增长。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ThingsBoard SQL 层参数</h3>
+      <table>
+        <thead><tr><th>配置</th><th>当前仓库默认</th><th>意义</th><th>建议</th></tr></thead>
+        <tbody>
+        <tr><td><code>database.ts.type</code></td><td><code>sql</code>，可选 <code>cassandra</code> 或 <code>timescale</code></td><td>历史遥测 DAO 类型。</td><td>单库或中等规模用 PostgreSQL；需要时序优化可启 Timescale；极大横向写入可评估 Cassandra/分层架构。</td></tr>
+        <tr><td><code>database.ts_latest.type</code></td><td><code>sql</code>，可选 <code>timescale</code></td><td>最新遥测 DAO 类型。</td><td>最新值表是高 upsert 表，重点调 autovacuum 和索引膨胀。</td></tr>
+        <tr><td><code>sql.ts.batch_size</code></td><td>10000</td><td>历史遥测批量持久化大小。</td><td>高吞吐可提高，但观察延迟、WAL burst 和 JDBC batch 时间。</td></tr>
+        <tr><td><code>sql.ts.batch_max_delay</code></td><td>100ms</td><td>队列最大等待。</td><td>低延迟降低，高吞吐升高；和 rule engine 回压联动。</td></tr>
+        <tr><td><code>sql.ts_latest.batch_size</code></td><td>1000</td><td>最新遥测批量更新。</td><td>过大增加行锁和 upsert 冲突延迟；按设备并发测试。</td></tr>
+        <tr><td><code>sql.timescale.chunk_time_interval</code></td><td>604800000ms，即 7 天；安装服务类默认兜底 86400000ms</td><td>Timescale <code>ts_kv</code> chunk 时间跨度。</td><td>按每日写入量和查询窗口选，目标是每个活跃 chunk 大小可控。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="part7" class="section">
+      <h2>第七部分：TimescaleDB 深度原理</h2>
+
+      <h3>1. Hypertable 原理</h3>
+      <p>Hypertable 是 TimescaleDB 暴露给用户的逻辑表，底层由许多 chunk 组成。应用对 hypertable 执行 INSERT/SELECT/UPDATE/DELETE，TimescaleDB planner hook 和 executor 路由会把操作映射到具体 chunk。当前 ThingsBoard 的 Timescale 安装服务执行：</p>
+      <pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+SELECT create_hypertable('ts_kv', 'ts',
+  chunk_time_interval => ${sql.timescale.chunk_time_interval},
+  if_not_exists => true);</code></pre>
+
+      <pre class="mermaid">flowchart TB
+  Hypertable[ts_kv hypertable]
+  Catalog[_timescaledb_catalog<br/>hypertable/dimension/chunk]
+  Chunk1[_hyper_1_1_chunk<br/>ts week 1]
+  Chunk2[_hyper_1_2_chunk<br/>ts week 2]
+  Chunk3[_hyper_1_3_chunk<br/>ts week 3]
+  App[ThingsBoard DAO]
+  App --> Hypertable
+  Hypertable --> Catalog
+  Hypertable --> Chunk1
+  Hypertable --> Chunk2
+  Hypertable --> Chunk3</pre>
+
+      <h3>2. Chunk 分片机制</h3>
+      <p>TimescaleDB 按时间维度把数据切成 chunk。每个 chunk 是真实 PostgreSQL 子表，有自己的 relfilenode、索引、统计信息、约束。对 IoT 遥测，chunk 让时间范围查询只访问相关时间片，也让 retention 可以 drop chunk 近似 O(1) 删除历史数据。</p>
+      <pre class="mermaid">gantt
+  title ts_kv chunk 时间分片示意
+  dateFormat  YYYY-MM-DD
+  axisFormat  %m-%d
+  section ts_kv
+  chunk_2026_05_01 :a1, 2026-05-01, 7d
+  chunk_2026_05_08 :a2, after a1, 7d
+  chunk_2026_05_15 :a3, after a2, 7d
+  chunk_2026_05_22 :a4, after a3, 7d</pre>
+
+      <h3>3. Chunk 路由</h3>
+      <pre class="mermaid">sequenceDiagram
+  participant App as ThingsBoard TimescaleTimeseriesDao
+  participant SQL as INSERT INTO ts_kv
+  participant TS as TimescaleDB insert path
+  participant Cat as chunk catalog/cache
+  participant Ch as target chunk
+  App->>SQL: batch upsert entity_id,key,ts,value
+  SQL->>TS: hypertable insert
+  TS->>Cat: find/create chunk for ts range
+  Cat-->>TS: chunk relid
+  TS->>Ch: route tuple
+  Ch-->>SQL: insert or conflict update
+  SQL-->>App: batch result</pre>
+
+      <h3>4. Chunk 裁剪</h3>
+      <p>查询中必须有可用于约束排除的时间条件，例如 <code>ts >= :startTs AND ts < :endTs</code>。ThingsBoard 的 Timescale repository 正是按 <code>entity_id</code>、<code>key</code>、<code>ts</code> 范围查询。若应用把时间列包在函数里，或缺失时间上界，就可能扫描过多 chunk。</p>
+      <pre class="mermaid">flowchart LR
+  Query[WHERE ts >= T1 AND ts < T2]
+  Planner[Timescale planner hook]
+  Chunks[chunk constraints]
+  Prune[排除不相交chunk]
+  Plan[Append/ChunkAppend只扫描命中chunk]
+  Query --> Planner --> Chunks --> Prune --> Plan</pre>
+
+      <h3>5. 时序查询优化</h3>
+      <p>TimescaleDB 优化的关键不是“把所有查询变快”，而是让时间谓词、chunk 元数据、局部索引、压缩段、聚合策略配合。ThingsBoard 的聚合查询使用 <code>time_bucket(:timeBucket, tskv.ts, :startTs)</code>，按时间桶聚合 <code>AVG/MAX/MIN/SUM/COUNT</code>。</p>
+
+      <h3>6. 压缩机制</h3>
+      <p>TimescaleDB 压缩把较老 chunk 转成列式/压缩布局，适合历史数据少更新、多扫描聚合的场景。压缩后按 segment/order 组织能减少 IO。注意：压缩 chunk 上的 UPDATE/DELETE 成本更高，最新写入 chunk 不应压缩。</p>
+      <pre class="mermaid">flowchart TD
+  Raw[活跃未压缩chunk<br/>行存heap]
+  Policy[压缩策略<br/>older_than]
+  Compress[后台worker压缩chunk]
+  Columnar[压缩列式块<br/>segmentby/orderby]
+  Query[历史聚合查询]
+  Decompress[必要时解压或向量化扫描]
+  Raw --> Policy --> Compress --> Columnar --> Query --> Decompress</pre>
+
+      <h3>7. Continuous Aggregate</h3>
+      <p>Continuous Aggregate 是 TimescaleDB 的增量物化聚合。对 ThingsBoard 仪表盘常见的分钟/小时/日聚合，如果实时精度要求允许，可以把原始 <code>ts_kv</code> 聚合预计算，避免每次从原始点扫描。当前仓库代码没有直接定义 continuous aggregate，但架构上可以作为二次优化层。</p>
+      <pre class="mermaid">flowchart TB
+  Raw[ts_kv hypertable]
+  Invalid[invalidation log<br/>记录变更时间范围]
+  Policy[refresh policy]
+  Mat[materialized hypertable]
+  Query[dashboard query]
+  Realtime[可选real-time aggregate合并最新原始数据]
+  Raw --> Invalid --> Policy --> Mat --> Query
+  Raw --> Realtime --> Query</pre>
+
+      <h3>8. Retention Policy</h3>
+      <p>时序数据 TTL 最好通过 drop chunk 实现，而不是逐行 DELETE。逐行 DELETE 会产生海量 dead tuple，需要 Vacuum；drop chunk 是删除整张子表，速度快、WAL 少得多、不会制造同等规模的 dead tuple。当前 ThingsBoard schema-timescale 中仍提供 <code>cleanup_timeseries_by_ttl</code> 过程逐行删除符合租户/客户 TTL 的 <code>ts_kv</code>，这意味着大规模场景要格外关注 Vacuum 和 TTL 策略。</p>
+      <pre class="mermaid">flowchart LR
+  TTL[保留90天]
+  OldChunk[chunk older than 90d]
+  Drop[drop_chunks / retention policy]
+  Catalog[更新catalog]
+  Disk[释放chunk文件]
+  TTL --> OldChunk --> Drop --> Catalog --> Disk</pre>
+
+      <h3>9. Background Worker</h3>
+      <p>TimescaleDB 使用后台 worker 执行策略任务：压缩、retention、continuous aggregate refresh、reorder 等。它们本质仍是 PostgreSQL background worker，受连接、锁、IO、WAL 和 autovacuum 影响。</p>
+
+      <h3>10. 数据生命周期</h3>
+      <pre class="mermaid">stateDiagram-v2
+  [*] --> HotWrite: 设备遥测写入当前chunk
+  HotWrite --> WarmQuery: dashboard按时间范围查询
+  WarmQuery --> Compressed: 历史chunk压缩
+  Compressed --> Aggregated: continuous aggregate服务粗粒度查询
+  Aggregated --> Retained: 保留期内归档/备份
+  Retained --> Dropped: retention drop chunk
+  Dropped --> [*]</pre>
+
+      <h3>11. TimescaleDB 与 InfluxDB 对比</h3>
+      <table>
+        <thead><tr><th>维度</th><th>TimescaleDB</th><th>InfluxDB</th></tr></thead>
+        <tbody>
+        <tr><td>基础模型</td><td>PostgreSQL 扩展，SQL/事务/索引/Join 完整。</td><td>专用时序数据库，写入和保留策略原生。</td></tr>
+        <tr><td>复杂查询</td><td>强，能和关系型元数据 join。</td><td>取决于版本和查询语言，关系 join 不是核心优势。</td></tr>
+        <tr><td>IoT 平台</td><td>适合 ThingsBoard 这种实体元数据 + 时序查询共存。</td><td>适合指标管道独立、标签模型清晰的场景。</td></tr>
+        <tr><td>运维心智</td><td>PostgreSQL WAL/Vacuum/Planner 都要懂。</td><td>专用集群和 shard/retention 心智。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>12. TimescaleDB 与 Elasticsearch 对比</h3>
+      <p>Elasticsearch 适合全文检索、日志搜索和倒排索引聚合，但事务、一致性、关系 join 和精确更新不是强项。TimescaleDB 适合结构化时序、SQL 聚合、与实体表 join、强一致写入。IoT 遥测如果主要是数值时间范围聚合，TimescaleDB 更直接；如果主要是日志检索和模糊搜索，ES 更合适。</p>
+
+      <h3>13. IoT 时序模型设计</h3>
+      <p>ThingsBoard 使用窄表模型：<code>entity_id</code> 表示设备/资产等实体，<code>key</code> 是遥测键的整数 ID，<code>ts</code> 是毫秒时间戳，值列按类型拆成 <code>bool_v/str_v/long_v/dbl_v/json_v</code>。优点是 schema 稳定、高基数 key 不改表；代价是一个设备一次上报多个 key 会变多行，聚合需要按 key 过滤。</p>
+
+      <h3>14. 高基数问题</h3>
+      <p>IoT 高基数主要来自设备数、租户数、遥测 key 数。PostgreSQL/TimescaleDB 不像某些标签型 TSDB 那样把所有 tag 组合建倒排索引，但高基数仍会影响索引大小、chunk 数、统计信息和 cache locality。ThingsBoard 用 <code>key_dictionary</code> 把字符串 key 映射成 int，是典型降宽优化。</p>
+
+      <h3>15. 写入热点问题</h3>
+      <p>按时间分 chunk 会让所有最新数据进入当前 chunk，形成活跃 chunk 热点。PostgreSQL 单表/单 chunk 写入依赖 WAL 顺序写、索引更新和 buffer 命中。优化方向：批量写、减少二级索引、合理 chunk interval、分散 entity_id、必要时多节点/分库。</p>
+
+      <h3>16. ThingsBoard 时序存储结构</h3>
+      <pre class="mermaid">erDiagram
+  DEVICE ||--o{ TS_KV : writes
+  DEVICE ||--o{ TS_KV_LATEST : latest
+  ASSET ||--o{ TS_KV : writes
+  ENTITY_VIEW }o--|| DEVICE : references
+  KEY_DICTIONARY ||--o{ TS_KV : maps_key
+  KEY_DICTIONARY ||--o{ TS_KV_LATEST : maps_key
+  ATTRIBUTE_KV }o--|| KEY_DICTIONARY : maps_attribute_key
+
+  TS_KV {
+    uuid entity_id PK
+    int key PK
+    bigint ts PK
+    boolean bool_v
+    varchar str_v
+    bigint long_v
+    double dbl_v
+    json json_v
+  }
+  TS_KV_LATEST {
+    uuid entity_id PK
+    int key PK
+    bigint ts
+    bigint version
+  }
+  KEY_DICTIONARY {
+    varchar key PK
+    serial key_id UK
+  }
+  ATTRIBUTE_KV {
+    uuid entity_id PK
+    int attribute_type PK
+    int attribute_key PK
+    bigint last_update_ts
+    bigint version
+  }</pre>
+
+      <h3>17. TTL 清理</h3>
+      <p>当前 schema 中 <code>cleanup_timeseries_by_ttl</code> 会按 tenant/customer 的 <code>TTL</code> 属性查 <code>attribute_kv</code>，再删除 <code>ts_kv</code> 中早于阈值的数据。工程风险是 DELETE 会生成 dead tuple。大规模场景应优先把 TTL 与 chunk 边界对齐，使用 retention/drop chunk；若必须按租户/客户差异 TTL 删除，则要降低 autovacuum 阈值并控制批量大小。</p>
+
+      <h3>18. Chunk Index 原理</h3>
+      <p>Hypertable 上的索引会传播到 chunk，成为每个 chunk 的本地索引。<code>ts_kv</code> 主键 <code>(entity_id,key,ts)</code> 对单设备单 key 时间范围查询友好；如果大量查询按时间扫描多个实体，可能需要额外以 <code>ts</code> 开头或 BRIN 的索引，但写入成本会增加。</p>
+
+      <h3>19. 时序查询执行流程</h3>
+      <pre class="mermaid">sequenceDiagram
+  participant API as REST/WebSocket Dashboard
+  participant Svc as TimeseriesService
+  participant Dao as TimescaleTimeseriesDao
+  participant Repo as AggregationRepository/TsKvRepository
+  participant PG as PostgreSQL Planner
+  participant TS as Timescale ChunkAppend
+  API->>Svc: query entity keys time range aggregation
+  Svc->>Dao: ReadTsKvQuery
+  Dao->>Repo: findAllWithLimit or time_bucket aggregate
+  Repo->>PG: SQL on ts_kv hypertable
+  PG->>TS: chunk pruning + local index plan
+  TS-->>Repo: rows/buckets
+  Repo-->>Dao: TimescaleTsKvEntity list
+  Dao-->>Svc: ReadTsKvQueryResult
+  Svc-->>API: telemetry data</pre>
+
+      <h3>20. 超大规模设备写入优化</h3>
+      <ul>
+        <li>应用层批量：ThingsBoard 已用 <code>TbSqlBlockingQueueWrapper</code> 聚合写入，关注 batch size、max delay、batch threads。</li>
+        <li>数据库层批量：JDBC batch + WAL group commit，避免每个点独立事务。</li>
+        <li>索引最小化：历史表只保留真正服务查询的索引，最新表单独承载 dashboard 当前值。</li>
+        <li>chunk interval：让活跃 chunk 不过大，历史 chunk 数不过多；常用目标是活跃 chunk 能被 cache 和 autovacuum 管住。</li>
+        <li>TTL 策略：优先 drop chunk；逐行 DELETE 必须配合 aggressive autovacuum。</li>
+        <li>连接控制：多 ThingsBoard 节点总 Hikari 连接不能压垮 PostgreSQL backend。</li>
+      </ul>
+    </section>
+
+    <section id="part8" class="section">
+      <h2>第八部分：ThingsBoard + PostgreSQL + TimescaleDB</h2>
+
+      <h3>1. ThingsBoard 为什么使用 PostgreSQL</h3>
+      <p>ThingsBoard 不只是时序写入系统，它还有租户、客户、设备、资产、仪表盘、规则链、告警、权限、审计、事件、实体关系等强关系模型。PostgreSQL 能同时处理元数据事务、复杂实体查询、JSON 字段、事件分区和遥测表；TimescaleDB 则在保持 SQL/JDBC/事务生态的同时增强时序分片和聚合。</p>
+
+      <h3>2. ThingsBoard 时序表结构</h3>
+      <p>当前仓库的关键 SQL 文件：</p>
+      <ul>
+        <li><code>dao/src/main/resources/sql/schema-timescale.sql</code>：TimescaleDB 扩展、<code>ts_kv</code>、<code>key_dictionary</code>、<code>ts_kv_latest</code>、TTL 清理过程。</li>
+        <li><code>application/src/main/java/org/thingsboard/server/service/install/TimescaleTsDatabaseSchemaService.java</code>：安装时执行 <code>create_hypertable('ts_kv','ts')</code>。</li>
+        <li><code>dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java</code>：Timescale 历史遥测 DAO。</li>
+        <li><code>dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/timescale/TimescaleInsertTsRepository.java</code>：批量 <code>INSERT ... ON CONFLICT DO UPDATE</code>。</li>
+      </ul>
+
+      <h3>3. entity 与 telemetry 的关系</h3>
+      <p><code>entity_id</code> 是遥测模型的核心外键语义，但 <code>ts_kv</code> 不是对每种实体建外键约束，而是统一承载 device、asset、entity view 等实体遥测。这避免高写入时外键检查成本，也让遥测层保持窄表通用模型。业务层通过 entity type 和 DAO/service 保证语义。</p>
+
+      <h3>4. attribute 存储结构</h3>
+      <p><code>attribute_kv(entity_id, attribute_type, attribute_key)</code> 存属性，值列同样按类型拆分，<code>attribute_key</code> 指向 <code>key_dictionary.key_id</code>。这和遥测表同构，方便统一 KV 模型。TTL 配置也通过属性表读取：schema 中会查 key 为 <code>TTL</code> 的 attribute。</p>
+
+      <h3>5. event 存储</h3>
+      <p>ThingsBoard 把 debug/stats/lifecycle/error 等事件拆成多张按时间分区表，例如 <code>rule_node_debug_event</code>、<code>rule_chain_debug_event</code>、<code>stats_event</code>、<code>lc_event</code>、<code>error_event</code>，并在 PostgreSQL addon index 中按 <code>(tenant_id, entity_id, ts DESC)</code> 建索引。这是事件查询按租户/实体/时间倒序读取的典型设计。</p>
+
+      <h3>6. rule engine 数据流</h3>
+      <pre class="mermaid">flowchart LR
+  Device[Device MQTT/HTTP/CoAP]
+  Transport[Transport Service]
+  Queue[TB Queue Kafka/InMemory等]
+  RuleEngine[Rule Engine]
+  TsNode[Save Timeseries Node]
+  AttrNode[Save Attributes Node]
+  Core[Telemetry Service]
+  DAO[Timeseries DAO]
+  PG[(PostgreSQL/TimescaleDB)]
+  WS[WebSocket subscriptions]
+  Device --> Transport --> Queue --> RuleEngine
+  RuleEngine --> TsNode --> Core --> DAO --> PG
+  RuleEngine --> AttrNode --> Core
+  Core --> WS</pre>
+
+      <h3>7. telemetry 写入流程</h3>
+      <pre class="mermaid">sequenceDiagram
+  participant Dev as Device
+  participant RE as Rule Engine
+  participant TS as TimeseriesService
+  participant Hist as TimescaleTimeseriesDao
+  participant Latest as SqlTimeseriesLatestDao
+  participant Q1 as TS Timescale Queue
+  participant Q2 as TS Latest Queue
+  participant PG as PostgreSQL/TimescaleDB
+  Dev->>RE: POST_TELEMETRY_REQUEST
+  RE->>TS: save(tenant, entityId, entries)
+  TS->>Hist: save historical ts_kv
+  Hist->>Q1: add TimescaleTsKvEntity
+  TS->>Latest: saveLatest ts_kv_latest
+  Latest->>Q2: add TsKvLatestEntity
+  Q1->>PG: batch INSERT ts_kv ON CONFLICT
+  Q2->>PG: batch UPSERT ts_kv_latest WHERE old.ts <= new.ts
+  PG-->>TS: versions/results
+  TS-->>RE: callback success/failure</pre>
+
+      <h3>8. PostgreSQL 在 ThingsBoard 中的事务模型</h3>
+      <p>ThingsBoard DAO 层大量使用 Spring/JPA/JdbcTemplate。遥测历史写入通过批量队列异步提交，不是每个设备消息都直接在业务线程同步写库。最新遥测 upsert 使用版本序列返回版本，支持缓存一致性。元数据表则更典型地走 JPA repository 和事务边界。</p>
+
+      <h3>9. TimescaleDB 在 ThingsBoard 中如何工作</h3>
+      <p>启用 <code>database.ts.type=timescale</code> 后，<code>@TimescaleDBTsDao</code> 条件装配 Timescale DAO。安装 profile 下创建 Timescale 扩展和 hypertable。历史遥测 <code>ts_kv</code> 走 hypertable；最新遥测 <code>ts_kv_latest</code> 仍是普通表模型，用于快速读取当前值。</p>
+
+      <h3>10. ThingsBoard 时序查询优化</h3>
+      <ul>
+        <li>所有历史查询必须带 <code>entity_id</code>、<code>key</code>、明确 <code>ts</code> 范围。</li>
+        <li>聚合查询优先用 <code>time_bucket</code>，避免应用层拉全量点再聚合。</li>
+        <li>仪表盘最新值走 <code>ts_kv_latest</code>，不要从 <code>ts_kv</code> 反查最新点。</li>
+        <li>跨大量设备的同 key 查询要警惕主键顺序 <code>(entity_id,key,ts)</code> 不适合按 key/time 全局扫描。</li>
+        <li>大窗口报表考虑 continuous aggregate 或离线汇总表。</li>
+      </ul>
+
+      <h3>11. 高并发设备接入场景</h3>
+      <p>瓶颈链路通常是：Transport 收包、队列积压、Rule Engine 处理、SQL batch queue、JDBC pool、PostgreSQL WAL fsync、当前 chunk 索引写入、<code>ts_kv_latest</code> upsert 行锁/膨胀。定位时不要只看数据库 CPU，要同时看 ThingsBoard 队列统计和 PostgreSQL wait events。</p>
+
+      <h3>12. ThingsBoard PostgreSQL 调优</h3>
+      <ul>
+        <li>连接池：<code>spring.datasource.hikari.maximumPoolSize</code> 默认 16，多节点总和要受控。</li>
+        <li>WAL：提高 <code>max_wal_size</code>，使用快 SSD/NVMe，监控 <code>pg_stat_wal</code>。</li>
+        <li>Vacuum：对 <code>ts_kv_latest</code>、<code>attribute_kv</code> 设置更激进 autovacuum；避免长事务阻塞 vacuum。</li>
+        <li>分区/Timescale：历史 TTL 优先 drop partition/chunk，减少 DELETE。</li>
+        <li>统计：高变更表降低 analyze scale factor，慢查询先看估算偏差。</li>
+      </ul>
+
+      <h3>13. ThingsBoard TimescaleDB 调优</h3>
+      <ul>
+        <li>chunk interval：默认配置 7 天适合中等写入；高写入可缩短，低写入可延长。</li>
+        <li>压缩：只压历史冷 chunk，设置 segment/order 与查询模式一致，例如按 entity/key 分段、按 ts 排序。</li>
+        <li>retention：尽量用 Timescale retention policy/drop chunk 替代逐行 TTL DELETE。</li>
+        <li>索引：谨慎增加全局查询索引，每个 chunk 都会有本地索引，写入成本成倍体现。</li>
+        <li>连续聚合：用于固定粒度看板和长期报表，不替代原始数据查询。</li>
+      </ul>
+
+      <h3>14. 常见性能瓶颈</h3>
+      <table>
+        <thead><tr><th>现象</th><th>可能原因</th><th>诊断</th><th>处理</th></tr></thead>
+        <tbody>
+        <tr><td>写入延迟抖动</td><td>checkpoint 过频、WAL fsync 慢、batch 太大。</td><td><code>pg_stat_bgwriter</code>、日志 checkpoint、<code>pg_stat_wal</code>。</td><td>增大 max_wal_size，调 batch，提升磁盘。</td></tr>
+        <tr><td>最新值查询变慢</td><td><code>ts_kv_latest</code> 膨胀、统计过旧、缓存未命中。</td><td><code>pg_stat_all_tables</code> dead tuple、EXPLAIN BUFFERS。</td><td>激进 autovacuum、reindex、降低更新冲突。</td></tr>
+        <tr><td>历史查询扫很多数据</td><td>时间条件不明确、chunk pruning 失败、索引不匹配。</td><td>EXPLAIN 看 chunks、buffers。</td><td>修 SQL、加合适索引、continuous aggregate。</td></tr>
+        <tr><td>TTL 后库变慢</td><td>逐行 DELETE 制造 dead tuple。</td><td>dead tuple、autovacuum 进度。</td><td>drop chunk/partition，分批删除后 vacuum。</td></tr>
+        <tr><td>连接耗尽</td><td>节点数 * Hikari 过大、慢 SQL 占连接。</td><td><code>pg_stat_activity</code>、Hikari metrics。</td><td>收敛连接池、PgBouncer、优化慢查询。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>15. 常见踩坑</h3>
+      <ul>
+        <li>把 <code>ts_kv</code> 当普通业务表频繁 UPDATE/DELETE，导致 Vacuum 压力。</li>
+        <li>给遥测表加过多二级索引，写入吞吐下降。</li>
+        <li>长事务或长时间游标阻塞 Vacuum，old snapshots 保留 dead tuple。</li>
+        <li>未监控 replication slot，备份/复制停滞撑爆 <code>pg_wal</code>。</li>
+        <li>Timescale chunk 太小导致 chunk 数过多，planner 开销上升；太大导致 retention 和压缩粒度粗。</li>
+      </ul>
+
+      <h3>16. 大规模 IoT 场景架构建议</h3>
+      <pre class="mermaid">flowchart TB
+  Devices[百万级设备]
+  LB[Transport负载均衡]
+  TB1[TB Transport/Core/Rule节点]
+  Queue[Kafka/队列削峰]
+  TB2[Rule Engine集群]
+  PG[(PostgreSQL元数据<br/>ts_kv_latest)]
+  TS[(TimescaleDB历史遥测)]
+  Agg[连续聚合/报表库]
+  Archive[对象存储/冷归档]
+  Monitor[Prometheus/Grafana/pg_stat]
+  Devices --> LB --> TB1 --> Queue --> TB2
+  TB2 --> PG
+  TB2 --> TS
+  TS --> Agg
+  TS --> Archive
+  PG --> Monitor
+  TS --> Monitor
+  TB2 --> Monitor</pre>
+      <p>中小规模可以单 PostgreSQL 承载元数据、最新值和历史遥测；中大规模建议启用 TimescaleDB 管理历史遥测；再往上要拆分写入队列、读写负载、冷热数据、租户隔离和报表聚合。不要等数据库已经膨胀到无法 Vacuum 时才设计 TTL。</p>
+    </section>
+
+    <section id="appendix" class="section">
+      <h2>诊断手册与参考资料</h2>
+
+      <h3>生产诊断 SQL</h3>
+      <pre><code class="language-sql">-- 当前活动与等待
+SELECT pid, usename, state, wait_event_type, wait_event,
+       now() - xact_start AS xact_age,
+       now() - query_start AS query_age,
+       left(query, 300) AS query
+FROM pg_stat_activity
+WHERE state <> 'idle'
+ORDER BY query_age DESC;
+
+-- 阻塞链
+SELECT blocked.pid AS blocked_pid,
+       blocker.pid AS blocker_pid,
+       blocked.query AS blocked_query,
+       blocker.query AS blocker_query
+FROM pg_stat_activity blocked
+JOIN pg_stat_activity blocker
+  ON blocker.pid = ANY(pg_blocking_pids(blocked.pid));
+
+-- 表膨胀与vacuum状态
+SELECT relname, n_live_tup, n_dead_tup,
+       last_vacuum, last_autovacuum,
+       last_analyze, last_autoanalyze,
+       vacuum_count, autovacuum_count
+FROM pg_stat_all_tables
+WHERE schemaname = 'public'
+ORDER BY n_dead_tup DESC
+LIMIT 30;
+
+-- XID年龄
+SELECT datname, age(datfrozenxid) AS xid_age
+FROM pg_database
+ORDER BY xid_age DESC;
+
+-- WAL统计
+SELECT * FROM pg_stat_wal;
+
+-- checkpoint统计
+SELECT checkpoints_timed, checkpoints_req,
+       checkpoint_write_time, checkpoint_sync_time,
+       buffers_checkpoint, buffers_clean, buffers_backend
+FROM pg_stat_bgwriter;</code></pre>
+
+      <h3>ThingsBoard 当前仓库事实</h3>
+      <table>
+        <thead><tr><th>事实</th><th>位置</th><th>说明</th></tr></thead>
+        <tbody>
+        <tr><td>默认 Docker PostgreSQL 镜像</td><td><code>docker/docker-compose.postgres.yml</code></td><td>使用 <code>postgres:16</code>。</td></tr>
+        <tr><td>默认 PostgreSQL TS 类型</td><td><code>docker/tb-node.postgres.env</code></td><td><code>DATABASE_TS_TYPE=sql</code>。</td></tr>
+        <tr><td>应用默认 datasource</td><td><code>application/src/main/resources/thingsboard.yml</code></td><td>默认 JDBC URL <code>jdbc:postgresql://localhost:5432/thingsboard</code>，Hikari 最大连接默认 16。</td></tr>
+        <tr><td>Timescale chunk 配置</td><td><code>application/src/main/resources/thingsboard.yml</code></td><td><code>SQL_TIMESCALE_CHUNK_TIME_INTERVAL</code> 默认 604800000ms。</td></tr>
+        <tr><td>Timescale schema</td><td><code>dao/src/main/resources/sql/schema-timescale.sql</code></td><td>创建扩展、<code>ts_kv</code>、<code>ts_kv_latest</code>、TTL 清理过程。</td></tr>
+        <tr><td>Hypertable 创建</td><td><code>TimescaleTsDatabaseSchemaService.java</code></td><td>安装时执行 <code>create_hypertable('ts_kv','ts')</code>。</td></tr>
+        <tr><td>历史遥测写入</td><td><code>TimescaleInsertTsRepository.java</code></td><td><code>INSERT INTO ts_kv ... ON CONFLICT(entity_id,key,ts) DO UPDATE</code>。</td></tr>
+        <tr><td>最新遥测写入</td><td><code>SqlLatestInsertTsRepository.java</code></td><td><code>ts_kv_latest</code> upsert，默认只在新 ts 大于等于旧 ts 时更新。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>官方参考资料</h3>
+      <ul class="source-list">
+        <li>PostgreSQL 16 官方文档：Runtime Resource 参数、WAL、Autovacuum、查询规划、MVCC、锁、监控统计。<a href="https://www.postgresql.org/docs/16/" target="_blank" rel="noreferrer">https://www.postgresql.org/docs/16/</a></li>
+        <li>TimescaleDB 官方文档：Hypertables、chunks、compression/columnstore、continuous aggregates、retention policies。<a href="https://docs.timescale.com/" target="_blank" rel="noreferrer">https://docs.timescale.com/</a></li>
+        <li>ThingsBoard 官方文档：架构与数据库部署说明。<a href="https://thingsboard.io/docs/" target="_blank" rel="noreferrer">https://thingsboard.io/docs/</a></li>
+      </ul>
+
+      <div class="note">
+        <strong>使用方式：</strong>本文件是单页 HTML，可直接在浏览器打开。Mermaid 通过 CDN 渲染；离线环境需要把 Mermaid JS 下载到本地并替换脚本地址。
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: 'loose',
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#eef8f7',
+      primaryTextColor: '#18202a',
+      primaryBorderColor: '#0f6b68',
+      lineColor: '#607080',
+      secondaryColor: '#f7f2ec',
+      tertiaryColor: '#f6f7f9',
+      fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Microsoft YaHei, sans-serif'
+    }
+  });
+</script>
+</body>
+</html>
