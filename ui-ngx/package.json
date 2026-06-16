@@ -48,14 +48,14 @@
     "@svgdotjs/svg.js": "^3.2.0",
     "@tinymce/tinymce-angular": "^7.0.0",
     "ace-builds": "1.4.13",
-    "ace-diff": "^3.0.3",
+    "ace-diff": "3.0.3",
     "angular-gridster2": "~15.0.4",
     "angular2-hotkeys": "^13.1.0",
     "canvas-gauges": "^2.1.7",
     "core-js": "^3.29.1",
     "date-fns": "2.0.0-alpha.27",
     "dayjs": "1.11.4",
-    "echarts": "^5.5.0",
+    "echarts": "5.5.0",
     "flot": "https://github.com/thingsboard/flot.git#0.9-work",
     "flot.curvedlines": "https://github.com/MichaelZinsmaier/CurvedLines.git#master",
     "font-awesome": "^4.7.0",
@@ -150,7 +150,7 @@
     "directory-tree": "^3.5.1",
     "eslint": "^8.37.0",
     "eslint-plugin-import": "latest",
-    "eslint-plugin-jsdoc": "latest",
+    "eslint-plugin-jsdoc": "30.7.6",
     "eslint-plugin-prefer-arrow": "latest",
     "jasmine-core": "~3.10.1",
     "jasmine-spec-reporter": "~7.0.0",
@@ -175,5 +175,6 @@
     "rc-virtual-list": "3.4.13",
     "read-package-json": "6.0.0",
     "cacache": "17.0.4"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

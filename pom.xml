@@ -79,7 +79,7 @@
         <protobuf.version>3.21.9</protobuf.version>
         <grpc.version>1.42.1</grpc.version>
         <tbel.version>1.1.5</tbel.version>
-        <lombok.version>1.18.18</lombok.version>
+        <lombok.version>1.18.42</lombok.version>
         <paho.client.version>1.2.4</paho.client.version>
         <paho.mqttv5.client.version>1.2.5</paho.mqttv5.client.version>
         <netty.version>4.1.91.Final</netty.version>
@@ -521,6 +521,7 @@
                             <groupId>org.thingsboard</groupId>
                             <artifactId>gradle-maven-plugin</artifactId>
                             <configuration>
+                                <gradleVersion>7.6.4</gradleVersion>
                                 <gradleProjectDirectory>${main.dir}/packaging/${pkg.type}</gradleProjectDirectory>
                                 <tasks>
                                     <task>build</task>
@@ -613,7 +614,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.8.1</version>
                     <configuration>
-                        <release>11</release>
+                        <release>17</release>
                         <compilerArgs>
                             <arg>-Xlint:deprecation</arg>
                             <arg>-Xlint:removal</arg>
@@ -859,12 +860,12 @@
                 </plugin>
             </plugins>
         </pluginManagement>
-        <plugins>
-            <plugin>
-                <groupId>com.mycila</groupId>
-                <artifactId>license-maven-plugin</artifactId>
-            </plugin>
-        </plugins>
+<!--        <plugins>-->
+<!--            <plugin>-->
+<!--                <groupId>com.mycila</groupId>-->
+<!--                <artifactId>license-maven-plugin</artifactId>-->
+<!--            </plugin>-->
+<!--        </plugins>-->
     </build>
 
     <dependencies>

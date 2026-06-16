@@ -21,12 +21,14 @@ let _projectRoot = null;
 
 
 (async() => {
-    await fse.move(path.join(projectRoot(), 'target', 'thingsboard-web-ui-linux'),
-                   path.join(targetPackageDir('linux'), 'bin', 'tb-web-ui'),
-                   {overwrite: true});
-    await fse.move(path.join(projectRoot(), 'target', 'thingsboard-web-ui-win.exe'),
-                   path.join(targetPackageDir('windows'), 'bin', 'tb-web-ui.exe'),
-                   {overwrite: true});
+    await moveIfExists([
+        'thingsboard-web-ui-linux',
+        'thingsboard-web-ui'
+    ], path.join(targetPackageDir('linux'), 'bin', 'tb-web-ui'));
+    await moveIfExists([
+        'thingsboard-web-ui-win.exe',
+        'thingsboard-web-ui.exe'
+    ], path.join(targetPackageDir('windows'), 'bin', 'tb-web-ui.exe'));
 })();
 
 
@@ -39,4 +41,14 @@ function projectRoot() {
 
 function targetPackageDir(platform) {
     return path.join(projectRoot(), 'target', 'package', platform);
+}
+
+async function moveIfExists(fileNames, destination) {
+    for (const fileName of fileNames) {
+        const source = path.join(projectRoot(), 'target', fileName);
+        if (fs.existsSync(source)) {
+            await fse.move(source, destination, {overwrite: true});
+            return;
+        }
+    }
 }

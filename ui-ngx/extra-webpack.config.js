@@ -65,10 +65,13 @@ module.exports = (config, options) => {
   );
 
   config.module.rules[2].use[0].options.aot = false;
-  const index = config.plugins.findIndex(p => p instanceof ngWebpack.AngularWebpackPlugin);
+  const index = config.plugins.findIndex(p => isAngularWebpackPlugin(p));
   let angularWebpackPlugin = config.plugins[index];
+  if (!angularWebpackPlugin) {
+    throw new Error('AngularWebpackPlugin was not found in the webpack configuration.');
+  }
   if (config.mode === 'production') {
-    const angularCompilerOptions = angularWebpackPlugin.pluginOptions;
+    const angularCompilerOptions = angularWebpackPlugin.pluginOptions || angularWebpackPlugin.options;
     angularCompilerOptions.emitClassMetadata = true;
     angularCompilerOptions.emitNgModuleScope = true;
     config.plugins.splice(index, 1);
@@ -97,4 +100,13 @@ function addTransformerToAngularWebpackPlugin(plugin, transformer) {
     transformers.before.push(transformer(program.getProgram()));
     return originalCreateFileEmitter.apply(plugin, [program, transformers, getExtraDependencies, onAfterEmit]);
   };
+}
+
+function isAngularWebpackPlugin(plugin) {
+  return plugin && (
+    plugin instanceof ngWebpack.AngularWebpackPlugin ||
+    plugin.constructor && plugin.constructor.name === 'AngularWebpackPlugin' ||
+    plugin.pluginOptions && plugin.createFileEmitter ||
+    plugin.options && plugin.createFileEmitter
+  );
 }

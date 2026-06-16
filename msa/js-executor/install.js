@@ -21,12 +21,14 @@ let _projectRoot = null;
 
 
 (async() => {
-    await fse.move(path.join(projectRoot(), 'target', 'thingsboard-js-executor-linux'),
-                   path.join(targetPackageDir('linux'), 'bin', 'tb-js-executor'),
-                   {overwrite: true});
-    await fse.move(path.join(projectRoot(), 'target', 'thingsboard-js-executor-win.exe'),
-                   path.join(targetPackageDir('windows'), 'bin', 'tb-js-executor.exe'),
-                   {overwrite: true});
+    await moveIfExists([
+        'thingsboard-js-executor-linux',
+        'thingsboard-js-executor'
+    ], path.join(targetPackageDir('linux'), 'bin', 'tb-js-executor'));
+    await moveIfExists([
+        'thingsboard-js-executor-win.exe',
+        'thingsboard-js-executor.exe'
+    ], path.join(targetPackageDir('windows'), 'bin', 'tb-js-executor.exe'));
 })();
 
 
@@ -39,4 +41,14 @@ function projectRoot() {
 
 function targetPackageDir(platform) {
     return path.join(projectRoot(), 'target', 'package', platform);
+}
+
+async function moveIfExists(fileNames, destination) {
+    for (const fileName of fileNames) {
+        const source = path.join(projectRoot(), 'target', fileName);
+        if (fs.existsSync(source)) {
+            await fse.move(source, destination, {overwrite: true});
+            return;
+        }
+    }
 }
