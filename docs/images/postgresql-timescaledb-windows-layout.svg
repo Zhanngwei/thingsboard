@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="430" viewBox="0 0 980 430" role="img" aria-labelledby="title desc">
+  <title id="title">PostgreSQL and TimescaleDB installation layout on Windows</title>
+  <desc id="desc">ThingsBoard connects to PostgreSQL 15.18 with TimescaleDB 2.27.2 installed in D:\softwareCode\postgre.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f8fa; }
+      .box { fill: #ffffff; stroke: #3a4a5b; stroke-width: 1.5; rx: 8; }
+      .accent { fill: #e7f0ff; stroke: #1d5fbf; }
+      .db { fill: #eef8f1; stroke: #23834b; }
+      .warn { fill: #fff7e0; stroke: #a86f00; }
+      .text { font-family: "Segoe UI", Arial, sans-serif; fill: #17212b; font-size: 16px; }
+      .small { font-size: 13px; fill: #44515f; }
+      .title { font-size: 20px; font-weight: 700; }
+      .mono { font-family: Consolas, "Courier New", monospace; font-size: 13px; fill: #27323d; }
+      .arrow { stroke: #53616f; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#53616f" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="980" height="430" />
+
+  <rect class="box accent" x="36" y="42" width="250" height="112" />
+  <text class="text title" x="58" y="78">ThingsBoard 3.6.4</text>
+  <text class="text small" x="58" y="108">JDBC URL</text>
+  <text class="mono" x="58" y="132">jdbc:postgresql://localhost:5432/thingsboard</text>
+
+  <rect class="box db" x="390" y="32" width="285" height="152" />
+  <text class="text title" x="412" y="68">PostgreSQL 15.18</text>
+  <text class="text small" x="412" y="100">Install path</text>
+  <text class="mono" x="412" y="124">D:\softwareCode\postgre</text>
+  <text class="text small" x="412" y="154">Database: thingsboard</text>
+
+  <rect class="box db" x="390" y="232" width="285" height="126" />
+  <text class="text title" x="412" y="268">TimescaleDB 2.27.2</text>
+  <text class="text small" x="412" y="298">Extension files copied into</text>
+  <text class="mono" x="412" y="322">lib\</text>
+  <text class="mono" x="490" y="322">share\extension\</text>
+
+  <rect class="box" x="732" y="54" width="210" height="104" />
+  <text class="text title" x="754" y="90">Data directory</text>
+  <text class="mono" x="754" y="120">D:\softwareCode\postgre\data</text>
+
+  <rect class="box warn" x="732" y="244" width="210" height="104" />
+  <text class="text title" x="754" y="280">Required config</text>
+  <text class="mono" x="754" y="310">shared_preload_libraries</text>
+  <text class="mono" x="754" y="332">= 'timescaledb'</text>
+
+  <path class="arrow" d="M286 98 C326 98 346 98 390 98" />
+  <path class="arrow" d="M532 184 C532 204 532 212 532 232" />
+  <path class="arrow" d="M675 104 C704 104 714 104 732 104" />
+  <path class="arrow" d="M675 296 C704 296 714 296 732 296" />
+
+  <rect class="box" x="36" y="240" width="250" height="118" />
+  <text class="text title" x="58" y="276">Verification</text>
+  <text class="mono" x="58" y="306">SELECT version();</text>
+  <text class="mono" x="58" y="330">SELECT extversion</text>
+  <text class="mono" x="58" y="350">FROM pg_extension;</text>
+
+  <path class="arrow" d="M286 300 C330 300 350 300 390 300" />
+</svg>
