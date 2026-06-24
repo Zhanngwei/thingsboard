@@ -167,8 +167,8 @@ docker-compose up -d
 
 ## 配套文档
 
-- [各模块详细文档](./modules/) - 每个模块的深入分析
-- [架构流程图](./diagrams/architecture-flow.html) - 可视化系统架构
-- [数据流转图](./diagrams/canvas-dataflow.html) - 数据流转可视化
-- [学习指南](./diagrams/learning-guide.html) - 交互式学习指南
-- [Mermaid图表](./diagrams/mermaid-diagrams.html) - UML/时序图/流程图
+- [各模块详细文档](tb-modules/) - 每个模块的深入分析
+- [架构流程图](tb-diagrams/architecture-flow.html) - 可视化系统架构
+- [数据流转图](tb-diagrams/canvas-dataflow.html) - 数据流转可视化
+- [学习指南](tb-diagrams/learning-guide.html) - 交互式学习指南
+- [Mermaid图表](tb-diagrams/mermaid-diagrams.html) - UML/时序图/流程图
