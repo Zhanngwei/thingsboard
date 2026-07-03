@@ -17,8 +17,37 @@ package org.thingsboard.rule.engine.api.sms;
 
 import org.thingsboard.server.common.data.sms.config.SmsProviderConfiguration;
 
+/**
+ * 中文说明：
+ * 1. 职责：根据短信供应商配置创建对应的 {@link SmsSender}。
+ * 2. 所属模块：属于 ThingsBoard Rule Engine API 的短信供应商工厂层。
+ * 3. 协作对象：与 {@link SmsSender}、SmsProviderConfiguration 和 SmsService 实现协作。
+ * 4. 生命周期：由 Spring 实现类长期存在，在短信配置加载或刷新时被调用。
+ * 5. 设计原因：创建具体供应商客户端需要解析配置，使用工厂避免 SmsService 直接依赖每个供应商构造细节。
+ * 6. 设计模式：Factory，集中封装 SmsSender 实例创建逻辑。
+ * 7. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor、数据库；创建出的实现会调用外部短信服务并被 Rule Engine 间接使用。
+ */
 public interface SmsSenderFactory {
 
+    /**
+     * 中文说明：
+     * 1. 方法职责：按供应商配置创建短信发送器。
+     * 2. 输入参数：config 是短信供应商配置，来源于租户或系统短信配置。
+     * 3. 返回值：可发送短信的 SmsSender 实例。
+     * 4. 调用时机：短信服务初始化、配置刷新或测试配置时调用。
+     * 5. 调用方：SmsService 实现和短信配置测试流程。
+     * 6. 使用流程：属于短信外部客户端创建流程。
+     * 7. 线程安全：接口无状态，具体工厂实现应保证配置解析和实例创建并发安全。
+     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；生成的发送器服务 Rule Engine 短信流程。
+     */
     SmsSender createSmsSender(SmsProviderConfiguration config);
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：根据短信配置创建供应商发送器。
+ * 2. 核心流程：SmsService 传入 SmsProviderConfiguration，工厂选择并返回对应 SmsSender。
+ * 3. 关键依赖：SmsProviderConfiguration、SmsSender 和具体供应商适配实现。
+ * 4. 学习重点：Factory 模式把供应商选择和构造逻辑从业务发送流程中剥离。
+ */

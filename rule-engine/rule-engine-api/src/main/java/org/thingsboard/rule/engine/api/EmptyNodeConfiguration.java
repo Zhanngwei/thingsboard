@@ -17,13 +17,45 @@ package org.thingsboard.rule.engine.api;
 
 import lombok.Data;
 
+/**
+ * 中文说明：
+ * 1. 职责：表示没有业务参数的规则节点配置对象，同时保留配置版本字段用于后续兼容升级。
+ * 2. 所属模块：属于 ThingsBoard Rule Engine API 的节点配置抽象层，被具体规则节点作为默认配置模型复用。
+ * 3. 协作对象：与 {@link NodeConfiguration}、节点注解中的配置类型以及 Rule Engine 节点初始化流程协作。
+ * 4. 生命周期：由规则节点初始化或配置反序列化流程创建，随单个节点配置实例存在，不持有运行期资源。
+ * 5. 设计原因：空配置节点仍需要统一实现配置接口，避免每个无配置节点重复声明一个占位配置类。
+ * 6. 技术关联：本类本身不直接涉及事务、缓存、MQTT、Actor 通信、数据库；只作为 Rule Engine 配置模型参与节点生命周期。
+ */
 @Data
 public class EmptyNodeConfiguration implements NodeConfiguration<EmptyNodeConfiguration> {
 
+    /**
+     * 中文说明：保存该空配置的版本号，数据来源于节点配置 JSON 或默认对象；生命周期与配置对象一致。
+     * 设计为字段是为了兼容 Rule Engine 配置升级机制，而不是把版本散落在节点实现中。
+     */
     private int version;
 
+    /**
+     * 中文说明：
+     * 1. 方法职责：创建一个新的空配置实例作为规则节点默认配置。
+     * 2. 输入参数：无。
+     * 3. 返回值：新的 {@link EmptyNodeConfiguration}，供节点定义或 UI 默认配置使用。
+     * 4. 调用时机：Rule Engine 加载节点定义、生成默认配置或反序列化失败回退时调用。
+     * 5. 调用方：节点配置解析流程、规则节点元数据构建流程。
+     * 6. 使用流程：属于 Rule Engine 节点配置初始化流程。
+     * 7. 线程安全：方法无共享可变状态，线程安全。
+     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不涉及事务、缓存、MQTT、Actor 通信和数据库；直接服务 Rule Engine 配置流程。
+     */
     @Override
     public EmptyNodeConfiguration defaultConfiguration() {
         return new EmptyNodeConfiguration();
     }
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：为无参数规则节点提供统一的默认配置对象。
+ * 2. 核心流程：Rule Engine 需要默认配置时调用 defaultConfiguration 创建新实例。
+ * 3. 关键依赖：NodeConfiguration 配置接口和节点配置反序列化流程。
+ * 4. 学习重点：即使节点没有业务参数，也通过统一配置接口接入 Rule Engine 生命周期。
+ */

@@ -21,9 +21,30 @@ import lombok.Data;
 /**
  * Created by ashvayka on 19.01.18.
  */
+/**
+ * 中文说明：
+ * 1. 职责：包装规则节点配置的原始 JSON 数据，作为节点初始化时的统一配置输入。
+ * 2. 所属模块：属于 ThingsBoard Rule Engine API 的节点配置包装层。
+ * 3. 协作对象：与 {@link TbNode#init(TbContext, TbNodeConfiguration)}、{@link org.thingsboard.rule.engine.api.util.TbNodeUtils#convert} 和具体 NodeConfiguration 协作。
+ * 4. 生命周期：由规则节点运行时在节点初始化或配置升级时创建，随节点配置加载过程存在。
+ * 5. 设计原因：Rule Engine 存储的是 JSON 配置，先用统一包装对象传递，再由具体节点转换成强类型配置。
+ * 6. 技术关联：本类本身不直接涉及事务、缓存、MQTT、Actor、数据库；直接参与 Rule Engine 节点初始化流程。
+ */
 @Data
 public final class TbNodeConfiguration {
 
+    /**
+     * 中文说明：保存节点配置的 JSON 树，来源于规则节点持久化配置或升级后的配置；生命周期与本包装对象一致。
+     * 设计为 final 字段是为了保证初始化流程中配置输入不可被替换。
+     */
     private final JsonNode data;
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：作为规则节点原始 JSON 配置的统一包装对象。
+ * 2. 核心流程：Rule Engine 读取节点配置 JSON，包装为 TbNodeConfiguration，节点再转换成强类型配置。
+ * 3. 关键依赖：JsonNode、TbNode.init、TbNodeUtils.convert 和具体 NodeConfiguration。
+ * 4. 学习重点：Rule Engine 用统一 JSON 包装保持配置存储灵活，再在节点边界做类型转换。
+ */
