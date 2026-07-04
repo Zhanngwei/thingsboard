@@ -1,0 +1,188 @@
+# Thingsboard Server Queue components 模块调用链分析
+
+> 生成范围：`common/queue`  
+> Maven artifact：`queue`  
+> packaging：`jar`  
+> 分析方式：静态扫描 POM、Java 注解、入口方法、关键技术触点和类关系；不是运行时 trace。
+
+## 完整流程图
+
+```mermaid
+flowchart TD
+    A["① 最先调用<br/>application、transport、dao、rule-engine、monitoring、msa 和测试模块通过依赖最先调用 common"]
+    B["② 调用原因<br/>需要共享数据模型、队列接口、缓存接口、Actor API、transport API、脚本 API 或工具类"]
+    C["③ 调用之前<br/>上游模块已经处在具体业务流程中，需要复用稳定的公共契约或 DTO"]
+    D["模块入口<br/>queue"]
+    E["⑤ 数据变化<br/>数据主要在 DTO、消息、接口参数、缓存 key、队列 payload 和工具返回值之间保持类型化表达"]
+    F{"技术触点判定"}
+    G["⑥ 数据库<br/>DB 间接/否"]
+    H["⑦ Actor<br/>Actor 间接/否"]
+    I["⑧ MQTT<br/>MQTT 间接/否"]
+    J["⑨ Kafka<br/>Kafka 是"]
+    K["⑩ Rule Engine<br/>Rule Engine 间接/否"]
+    L["④ 调用之后<br/>公共模型或接口被上游继续传递到 DAO、Actor、队列、Transport 或 Rule Engine"]
+    A --> B --> C --> D --> E --> F
+    F --> G
+    F --> H
+    F --> I
+    F --> J
+    F --> K
+    G --> L
+    H --> L
+    I --> L
+    J --> L
+    K --> L
+```
+
+
+## 十项调用链问题
+
+| 问题 | 模块级结论 |
+| --- | --- |
+| ① 谁最先调用这里？ | application、transport、dao、rule-engine、monitoring、msa 和测试模块通过依赖最先调用 common |
+| ② 为什么会调用？ | 需要共享数据模型、队列接口、缓存接口、Actor API、transport API、脚本 API 或工具类 |
+| ③ 调用之前发生了什么？ | 上游模块已经处在具体业务流程中，需要复用稳定的公共契约或 DTO |
+| ④ 调用之后发生什么？ | 公共模型或接口被上游继续传递到 DAO、Actor、队列、Transport 或 Rule Engine |
+| ⑤ 数据如何变化？ | 数据主要在 DTO、消息、接口参数、缓存 key、队列 payload 和工具返回值之间保持类型化表达 |
+| ⑥ 对数据库进行了哪些操作？ | 否，未发现直接操作证据；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。 |
+| ⑦ 是否发送 Actor 消息？ | 否，未发现直接操作证据；未发现直接 Actor API 调用，但可能通过服务端消息模型间接进入 Actor。 |
+| ⑧ 是否发送 MQTT 消息？ | 否，未发现直接操作证据；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。 |
+| ⑨ 是否写入 Kafka？ | 是，发现直接操作证据；直接操作证据：发现 Kafka producer/template/listener/queue producer 操作模式。关键词触点 1487 处仅作为辅助线索。 |
+| ⑩ 是否写入 Rule Engine？ | 否，未发现直接操作证据；未发现直接 Rule Engine 写入，但消息可能在下游规则链中继续处理。 |
+
+## 入口证据
+
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusQueueConfigs.java`
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusSettings.java`
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/discovery/DefaultTbServiceInfoProvider.java`
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerStatisticConfig.java`
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerStatsService.java`
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerStatsService.java`
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaSettings.java`
+- Spring Component 组件入口: `common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaTopicConfigs.java`
+- Spring Component 组件入口: 其余 44 处入口省略
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/discovery/DummyDiscoveryService.java`
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java`
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/discovery/TopicService.java`
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/discovery/ZkDiscoveryService.java`
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/environment/EnvironmentLogService.java`
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/notification/DefaultNotificationDeduplicationService.java`
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/notification/RemoteNotificationRuleProcessor.java`
+- Spring Service 业务服务入口: `common/queue/src/main/java/org/thingsboard/server/queue/provider/TbCoreQueueProducerProvider.java`
+- Spring Service 业务服务入口: 其余 4 处入口省略
+- 定时任务入口: `common/queue/src/main/java/org/thingsboard/server/queue/provider/InMemoryMonolithQueueFactory.java`
+- 测试框架入口: `common/queue/src/test/java/org/thingsboard/server/queue/common/DefaultTbQueueRequestTemplateTest.java`
+- 测试框架入口: `common/queue/src/test/java/org/thingsboard/server/queue/discovery/QueueKeyTest.java`
+- 测试框架入口: `common/queue/src/test/java/org/thingsboard/server/queue/discovery/ZkDiscoveryServiceTest.java`
+- 测试框架入口: `common/queue/src/test/java/org/thingsboard/server/queue/kafka/TbKafkaProducerTemplateTest.java`
+- 测试框架入口: `common/queue/src/test/java/org/thingsboard/server/queue/kafka/TbKafkaSettingsTest.java`
+- 测试框架入口: `common/queue/src/test/java/org/thingsboard/server/queue/memory/DefaultInMemoryStorageTest.java`
+- 测试框架入口: `common/queue/src/test/java/org/thingsboard/server/queue/util/PropertyUtilsTest.java`
+
+
+## 静态关键词统计（不等同于实际发送/写入）
+
+- database: 14 处静态触点；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。
+- actor: 0 处静态触点；未发现直接 Actor API 调用，但可能通过服务端消息模型间接进入 Actor。
+- mqtt: 0 处静态触点；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。
+- kafka: 1487 处静态触点；直接操作证据：发现 Kafka producer/template/listener/queue producer 操作模式。关键词触点 1487 处仅作为辅助线索。
+- rule_engine: 819 处静态触点；未发现直接 Rule Engine 写入，但消息可能在下游规则链中继续处理。
+- cache: 89 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 89 处仅作为辅助线索。
+- queue: 8254 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 8254 处仅作为辅助线索。
+- rest: 0 处静态触点；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。
+- websocket: 369 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 369 处仅作为辅助线索。
+- transport: 1519 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 1519 处仅作为辅助线索。
+
+## 调用前后数据流
+
+1. 调用前：上游模块已经处在具体业务流程中，需要复用稳定的公共契约或 DTO
+2. 模块入口：`queue` 通过入口类、依赖 API、构建聚合或子模块暴露能力。
+3. 模块内转换：数据主要在 DTO、消息、接口参数、缓存 key、队列 payload 和工具返回值之间保持类型化表达
+4. 调用后：公共模型或接口被上游继续传递到 DAO、Actor、队列、Transport 或 Rule Engine
+5. 数据库/Actor/MQTT/Kafka/Rule Engine 这些动作若没有直接触点，通常发生在依赖的 `application`、`dao`、`common/queue`、`common/transport` 或 `rule-engine` 模块中。
+
+## 子模块与依赖
+
+### 子模块
+
+- 无子模块。
+
+
+### 主要依赖
+
+- `org.thingsboard.common:data`
+- `org.thingsboard.common:util`
+- `org.thingsboard.common:message`
+- `org.thingsboard.common:stats`
+- `org.thingsboard.common:cluster-api`
+- `org.apache.kafka:kafka-clients`
+- `com.amazonaws:aws-java-sdk-sqs`
+- `com.google.cloud:google-cloud-pubsub`
+- `com.microsoft.azure:azure-servicebus`
+- `com.rabbitmq:amqp-client`
+- `org.springframework:spring-context-support`
+- `org.springframework.boot:spring-boot-autoconfigure`
+- `com.google.guava:guava`
+- `com.google.code.gson:gson`
+- `org.apache.commons:commons-lang3`
+- `org.slf4j:slf4j-api`
+- `org.slf4j:log4j-over-slf4j`
+- `ch.qos.logback:logback-core`
+- `ch.qos.logback:logback-classic`
+- `com.google.protobuf:protobuf-java`
+- `org.apache.curator:curator-recipes`
+- `org.springframework.boot:spring-boot-starter-test`
+- `org.junit.vintage:junit-vintage-engine`
+- `org.awaitility:awaitility`
+
+
+## 关键类型样本
+
+- `RuleEngineTbQueueAdminFactory` (class, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `TbServiceBusAdmin` (class, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusConsumerTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusProducerTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusQueueConfigs` (class, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusQueueConfigs.java`)
+- `TbServiceBusSettings` (class, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusSettings.java`)
+- `AbstractParallelTbQueueConsumerTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractParallelTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueTemplate.java`)
+- `AsyncCallbackTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/AsyncCallbackTemplate.java`)
+- `DefaultTbQueueMsg` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueMsg.java`)
+- `DefaultTbQueueMsgHeaders` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueMsgHeaders.java`)
+- `DefaultTbQueueRequestTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueRequestTemplate.java`)
+- `ResponseMetaData` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueRequestTemplate.java`)
+- `DefaultTbQueueResponseTemplate` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueResponseTemplate.java`)
+- `MultipleTbQueueCallbackWrapper` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/MultipleTbQueueCallbackWrapper.java`)
+- `MultipleTbQueueTbMsgCallbackWrapper` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/MultipleTbQueueTbMsgCallbackWrapper.java`)
+- `SimpleTbQueueCallback` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/SimpleTbQueueCallback.java`)
+- `TbProtoJsQueueMsg` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/TbProtoJsQueueMsg.java`)
+- `TbProtoQueueMsg` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/TbProtoQueueMsg.java`)
+- `TbQueueTbMsgCallbackWrapper` (class, `common/queue/src/main/java/org/thingsboard/server/queue/common/TbQueueTbMsgCallbackWrapper.java`)
+- `ConsistentHashCircle` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/ConsistentHashCircle.java`)
+- `DefaultTbServiceInfoProvider` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/DefaultTbServiceInfoProvider.java`)
+- `DiscoveryService` (interface, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/DiscoveryService.java`)
+- `DummyDiscoveryService` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/DummyDiscoveryService.java`)
+- `HashPartitionService` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java`)
+- `PartitionService` (interface, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `QueueKey` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/QueueKey.java`)
+- `QueueRoutingInfo` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/QueueRoutingInfo.java`)
+- `QueueRoutingInfoService` (interface, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/QueueRoutingInfoService.java`)
+- `TbApplicationEventListener` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/TbApplicationEventListener.java`)
+- `TbServiceInfoProvider` (interface, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/TbServiceInfoProvider.java`)
+- `TenantRoutingInfo` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/TenantRoutingInfo.java`)
+- `TenantRoutingInfoService` (interface, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/TenantRoutingInfoService.java`)
+- `TopicService` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/TopicService.java`)
+- `ZkDiscoveryService` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/ZkDiscoveryService.java`)
+- `ClusterTopologyChangeEvent` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/event/ClusterTopologyChangeEvent.java`)
+- `OtherServiceShutdownEvent` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/event/OtherServiceShutdownEvent.java`)
+- `PartitionChangeEvent` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/event/PartitionChangeEvent.java`)
+- `ServiceListChangedEvent` (class, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/event/ServiceListChangedEvent.java`)
+- 其余 20 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 阅读建议
+
+- 先看“完整流程图”确认模块在全链路中的位置。
+- 再看入口证据判断调用来源是 HTTP、MQTT/Transport、Actor、Kafka、Rule Engine、DAO、测试还是构建聚合。
+- 最后用触点统计区分直接行为和下游间接行为，避免把依赖模块的数据库写入误认为本模块直接写入。

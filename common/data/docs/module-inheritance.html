@@ -1,0 +1,2256 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Common Data 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Common Data 模块继承体系分析
+
+&gt; 生成范围：`common/data`  
+&gt; Maven artifact：`data`  
+&gt; Java 类型数量：667  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>AlarmModificationRequest
+├── «implements» AlarmCreateOrUpdateActiveRequest
+├── «implements» AlarmUpdateRequest
+DeviceCredentialsFilter
+├── «implements» DeviceCredentials
+├── «implements» DeviceTokenCredentials
+├── «implements» DeviceX509Credentials
+EntityFilter
+├── «implements» ApiUsageStateFilter
+├── «implements» AssetTypeFilter
+├── «implements» DeviceTypeFilter
+├── «implements» EdgeTypeFilter
+├── «implements» EntityListFilter
+├── «implements» EntityNameFilter
+├── «implements» EntitySearchQueryFilter
+├── «implements» ├── AssetSearchQueryFilter
+├── «implements» ├── DeviceSearchQueryFilter
+├── «implements» ├── EdgeSearchQueryFilter
+├── «implements» ├── EntityViewSearchQueryFilter
+├── «implements» EntityTypeFilter
+├── «implements» EntityViewTypeFilter
+├── «implements» RelationsQueryFilter
+├── «implements» SingleEntityFilter
+Error
+├── ThingsboardKafkaClientError
+EventFilter
+├── «implements» DebugEventFilter
+├── «implements» ├── RuleChainDebugEventFilter
+├── «implements» ├── RuleNodeDebugEventFilter
+├── «implements» ErrorEventFilter
+├── «implements» LifeCycleEventFilter
+├── «implements» StatisticsEventFilter
+Exception
+├── ThingsboardException
+ExportableEntity
+├── «implements» Asset
+├── «implements» ├── AssetInfo
+├── «implements» AssetProfile
+├── «implements» Customer
+├── «implements» Dashboard
+├── «implements» ├── HomeDashboard
+├── «implements» Device
+├── «implements» ├── DeviceInfo
+├── «implements» DeviceProfile
+├── «implements» EntityView
+├── «implements» ├── EntityViewInfo
+├── «implements» NotificationRule
+├── «implements» ├── NotificationRuleInfo
+├── «implements» NotificationTarget
+├── «implements» NotificationTemplate
+├── «implements» RuleChain
+├── «implements» TbResourceInfo
+├── «implements» ├── TbResource
+├── «implements» WidgetTypeDetails
+├── «implements» WidgetsBundle
+HasAdditionalInfo
+├── «implements» BaseDataWithAdditionalInfo
+├── «implements» ├── Asset
+├── «implements» ├── ├── AssetInfo
+├── «implements» ├── Device
+├── «implements» ├── ├── DeviceInfo
+├── «implements» ├── Edge
+├── «implements» ├── ├── EdgeInfo
+├── «implements» ├── EntityView
+├── «implements» ├── ├── EntityViewInfo
+├── «implements» ├── OAuth2ClientRegistrationTemplate
+├── «implements» ├── OAuth2Registration
+├── «implements» ├── OtaPackageInfo
+├── «implements» ├── ├── OtaPackage
+├── «implements» ├── ├── SaveOtaPackageInfoRequest
+├── «implements» ├── Queue
+├── «implements» ├── RuleChain
+├── «implements» ├── RuleNode
+├── «implements» ├── User
+HasCustomerId
+├── «implements» Alarm
+├── «implements» ├── AlarmInfo
+├── «implements» ├── ├── AlarmData
+├── «implements» Asset
+├── «implements» ├── AssetInfo
+├── «implements» Device
+├── «implements» ├── DeviceInfo
+├── «implements» Edge
+├── «implements» ├── EdgeInfo
+├── «implements» EntityView
+├── «implements» ├── EntityViewInfo
+├── «implements» User
+HasName
+├── «implements» Alarm
+├── «implements» ├── AlarmInfo
+├── «implements» ├── ├── AlarmData
+├── «implements» AlarmComment
+├── «implements» ├── AlarmCommentInfo
+├── «implements» AssetProfile
+├── «implements» BaseWidgetType
+├── «implements» ├── WidgetType
+├── «implements» ├── ├── WidgetTypeDetails
+├── «implements» ├── WidgetTypeInfo
+├── «implements» DashboardInfo
+├── «implements» ├── Dashboard
+├── «implements» ├── ├── HomeDashboard
+├── «implements» DeviceProfile
+├── «implements» EntityInfo
+├── «implements» ├── AssetProfileInfo
+├── «implements» ├── DeviceProfileInfo
+├── «implements» EntityView
+├── «implements» ├── EntityViewInfo
+├── HasEmail
+├── ├── «implements» ContactBased
+├── ├── «implements» ├── Customer
+├── ├── «implements» ├── Tenant
+├── ├── «implements» ├── ├── TenantInfo
+├── HasImage
+├── ├── «implements» AssetProfile
+├── ├── «implements» DashboardInfo
+├── ├── «implements» ├── Dashboard
+├── ├── «implements» ├── ├── HomeDashboard
+├── ├── «implements» DeviceProfile
+├── ├── «implements» WidgetTypeDetails
+├── ├── «implements» WidgetsBundle
+├── HasLabel
+├── ├── «implements» Asset
+├── ├── «implements» ├── AssetInfo
+├── ├── «implements» Device
+├── ├── «implements» ├── DeviceInfo
+├── ├── «implements» Edge
+├── ├── «implements» ├── EdgeInfo
+├── «implements» NotificationRequest
+├── «implements» ├── NotificationRequestInfo
+├── «implements» NotificationRule
+├── «implements» ├── NotificationRuleInfo
+├── «implements» NotificationTarget
+├── «implements» NotificationTemplate
+├── «implements» OAuth2ClientRegistrationTemplate
+├── «implements» OAuth2Registration
+├── «implements» OtaPackageInfo
+├── «implements» ├── OtaPackage
+├── «implements» ├── SaveOtaPackageInfoRequest
+├── «implements» Queue
+├── «implements» RuleChain
+├── «implements» RuleNode
+├── «implements» TbResourceInfo
+├── «implements» ├── TbResource
+├── «implements» TenantProfile
+├── «implements» User
+├── «implements» WidgetTypeDetails
+├── «implements» WidgetsBundle
+HasOtaPackage
+├── «implements» Device
+├── «implements» ├── DeviceInfo
+├── «implements» DeviceProfile
+HasRuleEngineProfile
+├── «implements» AssetProfile
+├── «implements» DeviceProfile
+HasSubject
+├── «implements» EmailDeliveryMethodNotificationTemplate
+├── «implements» MicrosoftTeamsDeliveryMethodNotificationTemplate
+├── «implements» MobileAppDeliveryMethodNotificationTemplate
+├── «implements» WebDeliveryMethodNotificationTemplate
+HasTenantId
+├── «implements» AdminSettings
+├── «implements» Alarm
+├── «implements» ├── AlarmInfo
+├── «implements» ├── ├── AlarmData
+├── «implements» ApiUsageState
+├── «implements» Asset
+├── «implements» ├── AssetInfo
+├── «implements» AssetProfile
+├── «implements» BaseWidgetType
+├── «implements» ├── WidgetType
+├── «implements» ├── ├── WidgetTypeDetails
+├── «implements» ├── WidgetTypeInfo
+├── «implements» Customer
+├── «implements» DashboardInfo
+├── «implements» ├── Dashboard
+├── «implements» ├── ├── HomeDashboard
+├── «implements» Device
+├── «implements» ├── DeviceInfo
+├── «implements» DeviceIdInfo
+├── «implements» DeviceProfile
+├── «implements» Edge
+├── «implements» ├── EdgeInfo
+├── «implements» EntityAlarm
+├── «implements» EntityView
+├── «implements» ├── EntityViewInfo
+├── HasImage
+├── ├── «implements» AssetProfile
+├── ├── «implements» DashboardInfo
+├── ├── «implements» ├── Dashboard
+├── ├── «implements» ├── ├── HomeDashboard
+├── ├── «implements» DeviceProfile
+├── ├── «implements» WidgetTypeDetails
+├── ├── «implements» WidgetsBundle
+├── «implements» NotificationRequest
+├── «implements» ├── NotificationRequestInfo
+├── «implements» NotificationRule
+├── «implements» ├── NotificationRuleInfo
+├── «implements» NotificationTarget
+├── «implements» NotificationTemplate
+├── «implements» OtaPackageInfo
+├── «implements» ├── OtaPackage
+├── «implements» ├── SaveOtaPackageInfoRequest
+├── «implements» Queue
+├── «implements» Rpc
+├── «implements» RuleChain
+├── «implements» TbResourceInfo
+├── «implements» ├── TbResource
+├── «implements» Tenant
+├── «implements» ├── TenantInfo
+├── «implements» User
+├── «implements» WidgetTypeDetails
+├── «implements» WidgetsBundle
+HasTitle
+├── «implements» AbstractUserDashboardInfo
+├── «implements» ├── LastVisitedDashboardInfo
+├── «implements» ├── StarredDashboardInfo
+├── «implements» Customer
+├── «implements» DashboardInfo
+├── «implements» ├── Dashboard
+├── «implements» ├── ├── HomeDashboard
+├── «implements» OtaPackageInfo
+├── «implements» ├── OtaPackage
+├── «implements» ├── SaveOtaPackageInfoRequest
+├── «implements» Tenant
+├── «implements» ├── TenantInfo
+├── «implements» WidgetsBundle
+HasUUID
+├── EntityId
+├── ├── «implements» AlarmId
+├── ├── «implements» ApiUsageStateId
+├── ├── «implements» AssetId
+├── ├── «implements» AssetProfileId
+├── ├── «implements» CustomerId
+├── ├── «implements» DashboardId
+├── ├── «implements» DeviceId
+├── ├── «implements» DeviceProfileId
+├── ├── «implements» EdgeId
+├── ├── «implements» EntityViewId
+├── ├── «implements» NotificationId
+├── ├── «implements» NotificationRequestId
+├── ├── «implements» NotificationRuleId
+├── ├── «implements» NotificationTargetId
+├── ├── «implements» NotificationTemplateId
+├── ├── «implements» OtaPackageId
+├── ├── «implements» QueueId
+├── ├── «implements» RpcId
+├── ├── «implements» RuleChainId
+├── ├── «implements» RuleNodeId
+├── ├── «implements» TbResourceId
+├── ├── «implements» TenantId
+├── ├── «implements» TenantProfileId
+├── ├── «implements» UserId
+├── ├── «implements» WidgetTypeId
+├── ├── «implements» WidgetsBundleId
+├── «implements» UUIDBased
+├── «implements» ├── AdminSettingsId
+├── «implements» ├── AlarmCommentId
+├── «implements» ├── AlarmId
+├── «implements» ├── ApiUsageStateId
+├── «implements» ├── AssetId
+├── «implements» ├── AssetProfileId
+├── «implements» ├── AuditLogId
+├── «implements» ├── ComponentDescriptorId
+├── «implements» ├── CustomerId
+├── «implements» ├── DashboardId
+├── «implements» ├── DeviceCredentialsId
+├── «implements» ├── DeviceId
+├── «implements» ├── DeviceProfileId
+├── «implements» ├── EdgeEventId
+├── «implements» ├── EdgeId
+├── «implements» ├── EntityViewId
+├── «implements» ├── EventId
+├── «implements» ├── NodeId
+├── «implements» ├── NotificationId
+├── «implements» ├── NotificationRequestId
+├── «implements» ├── NotificationRuleId
+├── «implements» ├── NotificationTargetId
+├── «implements» ├── NotificationTemplateId
+├── «implements» ├── OAuth2ClientRegistrationTemplateId
+├── «implements» ├── OAuth2DomainId
+├── «implements» ├── OAuth2MobileId
+├── «implements» ├── OAuth2ParamsId
+├── «implements» ├── OAuth2RegistrationId
+├── «implements» ├── OtaPackageId
+├── «implements» ├── QueueId
+├── «implements» ├── RpcId
+├── «implements» ├── RuleChainId
+├── «implements» ├── RuleNodeId
+├── «implements» ├── RuleNodeStateId
+├── «implements» ├── TbResourceId
+├── «implements» ├── TenantId
+├── «implements» ├── TenantProfileId
+├── «implements» ├── UserAuthSettingsId
+├── «implements» ├── UserCredentialsId
+├── «implements» ├── UserId
+├── «implements» ├── WidgetTypeId
+├── «implements» ├── WidgetsBundleId
+HashMap
+├── AutoCommitSettings
+JsonDeserializer
+├── EntityIdDeserializer
+JsonSerializer
+├── EntityIdFieldSerializer
+├── EntityIdSerializer
+LwM2MBootstrapClientCredential
+├── «implements» AbstractLwM2MBootstrapClientCredentialWithKeys
+├── «implements» ├── PSKBootstrapClientCredential
+├── «implements» ├── RPKBootstrapClientCredential
+├── «implements» ├── X509BootstrapClientCredential
+├── «implements» NoSecBootstrapClientCredential
+LwM2MClientCredential
+├── «implements» AbstractLwM2MClientCredential
+├── «implements» ├── AbstractLwM2MClientSecurityCredential
+├── «implements» ├── ├── PSKClientCredential
+├── «implements» ├── ├── RPKClientCredential
+├── «implements» ├── ├── X509ClientCredential
+├── «implements» ├── NoSecClientCredential
+NotificationInfo
+├── RuleOriginatedNotificationInfo
+├── ├── «implements» AlarmAssignmentNotificationInfo
+├── ├── «implements» AlarmCommentNotificationInfo
+├── ├── «implements» AlarmNotificationInfo
+├── ├── «implements» ApiUsageLimitNotificationInfo
+├── ├── «implements» DeviceActivityNotificationInfo
+├── ├── «implements» EdgeCommunicationFailureNotificationInfo
+├── ├── «implements» EdgeConnectionNotificationInfo
+├── ├── «implements» EntitiesLimitNotificationInfo
+├── ├── «implements» EntityActionNotificationInfo
+├── ├── «implements» NewPlatformVersionNotificationInfo
+├── ├── «implements» RateLimitsNotificationInfo
+├── ├── «implements» RuleEngineComponentLifecycleEventNotificationInfo
+├── ├── «implements» RuleEngineOriginatedNotificationInfo
+NotificationRecipient
+├── «implements» MicrosoftTeamsNotificationTargetConfig
+├── «implements» SlackConversation
+├── «implements» User
+Object/外部框架
+├── AbstractLwM2MBootstrapClientCredentialWithKeys
+├── ├── PSKBootstrapClientCredential
+├── ├── RPKBootstrapClientCredential
+├── ├── X509BootstrapClientCredential
+├── AbstractLwM2MClientCredential
+├── ├── AbstractLwM2MClientSecurityCredential
+├── ├── ├── PSKClientCredential
+├── ├── ├── RPKClientCredential
+├── ├── ├── X509ClientCredential
+├── ├── NoSecClientCredential
+├── AbstractUserDashboardInfo
+├── ├── LastVisitedDashboardInfo
+├── ├── StarredDashboardInfo
+├── AccountNotificationSettings
+├── AccountTwoFaSettings
+├── ActionTypeTest
+├── AffectedTenantAdministratorsFilter
+├── AffectedUserFilter
+├── AggregationParams
+├── AlarmApiCallResult
+├── AlarmAssignee
+├── AlarmAssigneeUpdate
+├── AlarmAssignmentNotificationInfo
+├── AlarmAssignmentNotificationRuleTriggerConfig
+├── AlarmAssignmentTrigger
+├── AlarmCommentNotificationInfo
+├── AlarmCommentNotificationRuleTriggerConfig
+├── AlarmCommentTrigger
+├── AlarmCondition
+├── AlarmConditionFilter
+├── AlarmConditionFilterKey
+├── AlarmCreateOrUpdateActiveRequest
+├── AlarmNotificationInfo
+├── AlarmNotificationRuleTriggerConfig
+├── AlarmPropagationInfo
+├── AlarmQuery
+├── AlarmQueryV2
+├── AlarmRule
+├── AlarmStatusFilter
+├── AlarmTrigger
+├── AlarmUpdateRequest
+├── AllUsersFilter
+├── AllowCreateNewDevicesDeviceProfileProvisionConfiguration
+├── AnyTimeSchedule
+├── ApiUsageLimitNotificationInfo
+├── ApiUsageLimitNotificationRuleTriggerConfig
+├── ApiUsageLimitTrigger
+├── ApiUsageRecordState
+├── ApiUsageStateFilter
+├── AssetSearchQuery
+├── AssetTypeFilter
+├── AttributeExportData
+├── AttributeKey
+├── AttributesEntityView
+├── AwsSnsSmsProviderConfiguration
+├── BackupCodeTwoFaProviderConfig
+├── BaseAttributeKvEntry
+├── BaseData
+├── ├── AdminSettings
+├── ├── Alarm
+├── ├── ├── AlarmInfo
+├── ├── ├── ├── AlarmData
+├── ├── AlarmComment
+├── ├── ├── AlarmCommentInfo
+├── ├── ApiUsageState
+├── ├── AssetProfile
+├── ├── AuditLog
+├── ├── BaseWidgetType
+├── ├── ├── WidgetType
+├── ├── ├── ├── WidgetTypeDetails
+├── ├── ├── WidgetTypeInfo
+├── ├── ComponentDescriptor
+├── ├── DashboardInfo
+├── ├── ├── Dashboard
+├── ├── ├── ├── HomeDashboard
+├── ├── DeviceCredentials
+├── ├── DeviceProfile
+├── ├── EdgeEvent
+├── ├── Event
+├── ├── ├── ErrorEvent
+├── ├── ├── LifecycleEvent
+├── ├── ├── RuleChainDebugEvent
+├── ├── ├── RuleNodeDebugEvent
+├── ├── ├── StatisticsEvent
+├── ├── EventInfo
+├── ├── Notification
+├── ├── NotificationRequest
+├── ├── ├── NotificationRequestInfo
+├── ├── NotificationRule
+├── ├── ├── NotificationRuleInfo
+├── ├── NotificationTarget
+├── ├── NotificationTemplate
+├── ├── OAuth2Domain
+├── ├── OAuth2Mobile
+├── ├── OAuth2Params
+├── ├── Rpc
+├── ├── RuleNodeState
+├── ├── TbResourceInfo
+├── ├── ├── TbResource
+├── ├── TenantProfile
+├── ├── UserAuthSettings
+├── ├── UserCredentials
+├── ├── WidgetsBundle
+├── BaseDataWithAdditionalInfo
+├── ├── Asset
+├── ├── ├── AssetInfo
+├── ├── Device
+├── ├── ├── DeviceInfo
+├── ├── Edge
+├── ├── ├── EdgeInfo
+├── ├── EntityView
+├── ├── ├── EntityViewInfo
+├── ├── OAuth2ClientRegistrationTemplate
+├── ├── OAuth2Registration
+├── ├── OtaPackageInfo
+├── ├── ├── OtaPackage
+├── ├── ├── SaveOtaPackageInfoRequest
+├── ├── Queue
+├── ├── RuleChain
+├── ├── RuleNode
+├── ├── User
+├── BasePageDataIterable
+├── BaseTsKvQuery
+├── ├── BaseDeleteTsKvQuery
+├── ├── BaseReadTsKvQuery
+├── BasicKvEntry
+├── ├── BooleanDataEntry
+├── ├── DoubleDataEntry
+├── ├── JsonDataEntry
+├── ├── LongDataEntry
+├── ├── StringDataEntry
+├── BasicMqttCredentials
+├── BasicTsKvEntry
+├── ├── AggTsKvEntry
+├── BooleanFilterPredicate
+├── BranchInfo
+├── BulkImportRequest
+├── BulkImportResult
+├── Button
+├── CacheConstants
+├── CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration
+├── ClaimRequest
+├── ClearRule
+├── CoapDeviceProfileTransportConfiguration
+├── CollectionsUtil
+├── ColumnMapping
+├── ComparisonTsValue
+├── ComplexFilterPredicate
+├── ContactBased
+├── ├── Customer
+├── ├── Tenant
+├── ├── ├── TenantInfo
+├── CustomTimeSchedule
+├── CustomTimeScheduleItem
+├── CustomerUsersFilter
+├── DataConstants
+├── DebugEventFilter
+├── ├── RuleChainDebugEventFilter
+├── ├── RuleNodeDebugEventFilter
+├── DefaultCoapDeviceTypeConfiguration
+├── DefaultDeviceConfiguration
+├── DefaultDeviceProfileConfiguration
+├── DefaultDeviceProfileTransportConfiguration
+├── DefaultDeviceTransportConfiguration
+├── DefaultRuleChainCreateRequest
+├── DefaultTenantProfileConfiguration
+├── DeliveryMethodNotificationTemplate
+├── ├── EmailDeliveryMethodNotificationTemplate
+├── ├── MicrosoftTeamsDeliveryMethodNotificationTemplate
+├── ├── MobileAppDeliveryMethodNotificationTemplate
+├── ├── SlackDeliveryMethodNotificationTemplate
+├── ├── SmsDeliveryMethodNotificationTemplate
+├── ├── WebDeliveryMethodNotificationTemplate
+├── DeviceActivityNotificationInfo
+├── DeviceActivityNotificationRuleTriggerConfig
+├── DeviceActivityTrigger
+├── DeviceData
+├── DeviceIdInfo
+├── DeviceInfoFilter
+├── DeviceProfileAlarm
+├── DeviceProfileData
+├── DeviceSearchQuery
+├── DeviceTokenCredentials
+├── DeviceTypeFilter
+├── DeviceX509Credentials
+├── DisabledDeviceProfileProvisionConfiguration
+├── DurationAlarmConditionSpec
+├── DynamicProtoUtils
+├── DynamicProtoUtilsTest
+├── DynamicValue
+├── EdgeCommunicationFailureNotificationInfo
+├── EdgeCommunicationFailureNotificationRuleTriggerConfig
+├── EdgeCommunicationFailureTrigger
+├── EdgeConnectionNotificationInfo
+├── EdgeConnectionNotificationRuleTriggerConfig
+├── EdgeConnectionTrigger
+├── EdgeInstructions
+├── EdgeSearchQuery
+├── EdgeTypeFilter
+├── EdgeUpgradeInfo
+├── EdgeUpgradeMessage
+├── EdgeUtils
+├── EfentoCoapDeviceTypeConfiguration
+├── EntitiesLimitNotificationInfo
+├── EntitiesLimitNotificationRuleTriggerConfig
+├── EntitiesLimitTrigger
+├── EntityActionNotificationInfo
+├── EntityActionNotificationRuleTriggerConfig
+├── EntityActionTrigger
+├── EntityAlarm
+├── EntityCountQuery
+├── ├── AbstractDataQuery
+├── ├── ├── AlarmDataQuery
+├── ├── ├── EntityDataQuery
+├── ├── AlarmCountQuery
+├── EntityData
+├── EntityDataDiff
+├── EntityDataInfo
+├── EntityDataPageLink
+├── ├── AlarmDataPageLink
+├── EntityDataSortOrder
+├── EntityExportData
+├── ├── DeviceExportData
+├── ├── RuleChainExportData
+├── ├── WidgetTypeExportData
+├── ├── WidgetsBundleExportData
+├── EntityExportSettings
+├── EntityFieldsData
+├── EntityIdFactory
+├── EntityIdTest
+├── EntityImportResult
+├── EntityImportSettings
+├── EntityInfo
+├── ├── AssetProfileInfo
+├── ├── DeviceProfileInfo
+├── EntityKey
+├── EntityListFilter
+├── EntityLoadError
+├── EntityNameFilter
+├── EntityRelation
+├── ├── EntityRelationInfo
+├── EntityRelationsQuery
+├── EntitySearchQueryFilter
+├── ├── AssetSearchQueryFilter
+├── ├── DeviceSearchQueryFilter
+├── ├── EdgeSearchQueryFilter
+├── ├── EntityViewSearchQueryFilter
+├── EntitySubtype
+├── EntityTypeFilter
+├── EntityTypeLoadResult
+├── EntityTypeTest
+├── EntityVersion
+├── EntityVersionsDiff
+├── EntityViewSearchQuery
+├── EntityViewTypeFilter
+├── ErrorEventFilter
+├── FSTUtils
+├── FeaturesInfo
+├── FilterPredicateValue
+├── HomeDashboardInfo
+├── IdBased
+├── ImageDescriptor
+├── ImageExportData
+├── JsonTransportPayloadConfiguration
+├── JwtPair
+├── JwtSettings
+├── KeyFilter
+├── LifeCycleEventFilter
+├── LwM2MBootstrapClientCredentials
+├── LwM2MDeviceCredentials
+├── LwM2MServerSecurityConfig
+├── ├── AbstractLwM2MBootstrapServerCredential
+├── ├── ├── NoSecLwM2MBootstrapServerCredential
+├── ├── ├── PSKLwM2MBootstrapServerCredential
+├── ├── ├── RPKLwM2MBootstrapServerCredential
+├── ├── ├── X509LwM2MBootstrapServerCredential
+├── ├── LwM2MServerSecurityConfigDefault
+├── LwM2mInstance
+├── LwM2mObject
+├── LwM2mResourceObserve
+├── Lwm2mDeviceProfileTransportConfiguration
+├── Mapping
+├── MobileAppNotificationDeliveryMethodConfig
+├── MobileSessionInfo
+├── MqttDeviceProfileTransportConfiguration
+├── MqttDeviceTransportConfiguration
+├── MqttTopics
+├── MultipleMappingsSnmpCommunicationConfig
+├── ├── RepeatingQueryingSnmpCommunicationConfig
+├── ├── ├── ClientAttributesQueryingSnmpCommunicationConfig
+├── ├── ├── TelemetryQueryingSnmpCommunicationConfig
+├── ├── SharedAttributesSettingSnmpCommunicationConfig
+├── ├── ToDeviceRpcRequestSnmpCommunicationConfig
+├── ├── ToServerRpcRequestSnmpCommunicationConfig
+├── NameLabelAndCustomerDetails
+├── NewPlatformVersionNotificationInfo
+├── NewPlatformVersionNotificationRuleTriggerConfig
+├── NewPlatformVersionTrigger
+├── NoSecBootstrapClientCredential
+├── NodeConnectionInfo
+├── NotificationPref
+├── NotificationRequestConfig
+├── NotificationRequestPreview
+├── NotificationRequestStats
+├── NotificationRuleConfig
+├── NotificationRuleRecipientsConfig
+├── ├── DefaultNotificationRuleRecipientsConfig
+├── ├── EscalatedNotificationRuleRecipientsConfig
+├── NotificationSettings
+├── NotificationTargetConfig
+├── ├── MicrosoftTeamsNotificationTargetConfig
+├── ├── PlatformUsersNotificationTargetConfig
+├── ├── SlackNotificationTargetConfig
+├── NotificationTemplateConfig
+├── NumericFilterPredicate
+├── OAuth2BasicMapperConfig
+├── OAuth2ClientInfo
+├── OAuth2CustomMapperConfig
+├── OAuth2DomainInfo
+├── OAuth2Info
+├── OAuth2MapperConfig
+├── OAuth2MobileInfo
+├── OAuth2ParamsInfo
+├── OAuth2RegistrationInfo
+├── ObjectAttributes
+├── OriginatorEntityOwnerUsersFilter
+├── OtaPackageUtil
+├── OtpBasedTwoFaProviderConfig
+├── ├── EmailTwoFaProviderConfig
+├── ├── SmsTwoFaProviderConfig
+├── PageData
+├── PageDataIterable
+├── PageDataIterableByTenant
+├── PageDataIterableByTenantIdEntityId
+├── PageLink
+├── ├── TimePageLink
+├── PlatformTwoFaSettings
+├── PowerSavingConfiguration
+├── ├── CoapDeviceTransportConfiguration
+├── ├── Lwm2mDeviceTransportConfiguration
+├── ├── OtherConfiguration
+├── ProcessingStrategy
+├── ProtoTransportPayloadConfiguration
+├── ProvisionDeviceCredentialsData
+├── ProvisionDeviceProfileCredentials
+├── RateLimitsNotificationInfo
+├── RateLimitsNotificationRuleTriggerConfig
+├── RateLimitsTrigger
+├── ReadTsKvQueryResult
+├── ReflectionUtils
+├── RelationEntityTypeFilter
+├── RelationsQueryFilter
+├── RelationsSearchParameters
+├── RepeatingAlarmConditionSpec
+├── RepositorySettings
+├── RepositorySettingsInfo
+├── ResourceUtils
+├── RpcStatusTest
+├── RuleChainConnectionInfo
+├── RuleChainData
+├── RuleChainImportResult
+├── RuleChainMetaData
+├── RuleChainOutputLabelsUsage
+├── RuleChainUpdateResult
+├── RuleEngineComponentLifecycleEventNotificationInfo
+├── RuleEngineComponentLifecycleEventNotificationRuleTriggerConfig
+├── RuleEngineComponentLifecycleEventTrigger
+├── RuleEngineOriginatedNotificationInfo
+├── RuleNodeUpdateResult
+├── SaveDeviceWithCredentialsRequest
+├── SecuritySettings
+├── ShortCustomerInfo
+├── SimpleAlarmConditionSpec
+├── SingleEntityFilter
+├── SlackConversation
+├── SlackNotificationDeliveryMethodConfig
+├── SmppSmsProviderConfiguration
+├── SnmpDeviceProfileTransportConfiguration
+├── SnmpDeviceTransportConfiguration
+├── SnmpMapping
+├── SortOrder
+├── SpecificTimeSchedule
+├── StatisticsEventFilter
+├── StringFilterPredicate
+├── StringUtils
+├── StringUtilsTest
+├── SubmitStrategy
+├── SystemAdministratorsFilter
+├── SystemInfo
+├── SystemInfoData
+├── SystemParams
+├── TbDDFFileParser
+├── TbImageDeleteResult
+├── TbMsgTypeTest
+├── TbNodeConnectionType
+├── TbPair
+├── TbProperty
+├── TbResourceInfoFilter
+├── TelemetryEntityView
+├── TelemetryMappingConfiguration
+├── TemplatableValue
+├── TemplateUtils
+├── TenantAdministratorsFilter
+├── TenantProfileData
+├── TenantProfileQueueConfiguration
+├── TestSmsRequest
+├── ToDeviceRpcRequestBody
+├── TotpTwoFaProviderConfig
+├── TsKvEntryAggWrapper
+├── TsKvLatestRemovingResult
+├── TsValue
+├── TwilioSmsProviderConfiguration
+├── TwoFaAccountConfig
+├── ├── BackupCodeTwoFaAccountConfig
+├── ├── OtpBasedTwoFaAccountConfig
+├── ├── ├── EmailTwoFaAccountConfig
+├── ├── ├── SmsTwoFaAccountConfig
+├── ├── TotpTwoFaAccountConfig
+├── TypeCastUtil
+├── UUIDBased
+├── ├── AdminSettingsId
+├── ├── AlarmCommentId
+├── ├── AlarmId
+├── ├── ApiUsageStateId
+├── ├── AssetId
+├── ├── AssetProfileId
+├── ├── AuditLogId
+├── ├── ComponentDescriptorId
+├── ├── CustomerId
+├── ├── DashboardId
+├── ├── DeviceCredentialsId
+├── ├── DeviceId
+├── ├── DeviceProfileId
+├── ├── EdgeEventId
+├── ├── EdgeId
+├── ├── EntityViewId
+├── ├── EventId
+├── ├── NodeId
+├── ├── NotificationId
+├── ├── NotificationRequestId
+├── ├── NotificationRuleId
+├── ├── NotificationTargetId
+├── ├── NotificationTemplateId
+├── ├── OAuth2ClientRegistrationTemplateId
+├── ├── OAuth2DomainId
+├── ├── OAuth2MobileId
+├── ├── OAuth2ParamsId
+├── ├── OAuth2RegistrationId
+├── ├── OtaPackageId
+├── ├── QueueId
+├── ├── RpcId
+├── ├── RuleChainId
+├── ├── RuleNodeId
+├── ├── RuleNodeStateId
+├── ├── TbResourceId
+├── ├── TenantId
+├── ├── TenantProfileId
+├── ├── UserAuthSettingsId
+├── ├── UserCredentialsId
+├── ├── UserId
+├── ├── WidgetTypeId
+├── ├── WidgetsBundleId
+├── UUIDConverter
+├── UUIDConverterTest
+├── UpdateMessage
+├── UsageInfo
+├── UserAuthDataChangedEvent
+├── ├── UserCredentialsInvalidationEvent
+├── ├── UserSessionInvalidationEvent
+├── UserDashboardsInfo
+├── UserEmailInfo
+├── UserListFilter
+├── UserMobileInfo
+├── UserNotificationSettings
+├── UserPasswordPolicy
+├── UserSettings
+├── UserSettingsCompositeKey
+├── VcUtils
+├── VersionCreateConfig
+├── ├── AutoVersionCreateConfig
+├── ├── EntityTypeVersionCreateConfig
+├── VersionCreateRequest
+├── ├── ComplexVersionCreateRequest
+├── ├── SingleEntityVersionCreateRequest
+├── VersionCreationResult
+├── VersionLoadConfig
+├── ├── EntityTypeVersionLoadConfig
+├── VersionLoadRequest
+├── ├── EntityTypeVersionLoadRequest
+├── ├── SingleEntityVersionLoadRequest
+├── VersionLoadResult
+├── VersionedEntityInfo
+├── WidgetsBundleWidget
+├── X509CertificateChainProvisionConfiguration
+├── path
+RuntimeException
+├── AbstractRateLimitException
+├── ├── ApiUsageLimitsExceededException
+├── AlreadySentException
+├── TenantNotFoundException
+├── TenantProfileNotFoundException
+Serializable
+├── «implements» AbstractUserDashboardInfo
+├── «implements» ├── LastVisitedDashboardInfo
+├── «implements» ├── StarredDashboardInfo
+├── «implements» AlarmApiCallResult
+├── «implements» AlarmAssignee
+├── «implements» AlarmAssigneeUpdate
+├── «implements» AlarmCondition
+├── «implements» AlarmConditionFilter
+├── «implements» AlarmConditionFilterKey
+├── AlarmConditionSpec
+├── ├── «implements» DurationAlarmConditionSpec
+├── ├── «implements» RepeatingAlarmConditionSpec
+├── ├── «implements» SimpleAlarmConditionSpec
+├── «implements» AlarmRule
+├── AlarmSchedule
+├── ├── «implements» AnyTimeSchedule
+├── ├── «implements» CustomTimeSchedule
+├── ├── «implements» SpecificTimeSchedule
+├── «implements» ApiUsageRecordState
+├── «implements» AttributeKey
+├── «implements» AttributesEntityView
+├── «implements» BaseData
+├── «implements» ├── AdminSettings
+├── «implements» ├── Alarm
+├── «implements» ├── ├── AlarmInfo
+├── «implements» ├── ├── ├── AlarmData
+├── «implements» ├── AlarmComment
+├── «implements» ├── ├── AlarmCommentInfo
+├── «implements» ├── ApiUsageState
+├── «implements» ├── AssetProfile
+├── «implements» ├── AuditLog
+├── «implements» ├── BaseWidgetType
+├── «implements» ├── ├── WidgetType
+├── «implements» ├── ├── ├── WidgetTypeDetails
+├── «implements» ├── ├── WidgetTypeInfo
+├── «implements» ├── ComponentDescriptor
+├── «implements» ├── DashboardInfo
+├── «implements» ├── ├── Dashboard
+├── «implements» ├── ├── ├── HomeDashboard
+├── «implements» ├── DeviceCredentials
+├── «implements» ├── DeviceProfile
+├── «implements» ├── EdgeEvent
+├── «implements» ├── Event
+├── «implements» ├── ├── ErrorEvent
+├── «implements» ├── ├── LifecycleEvent
+├── «implements» ├── ├── RuleChainDebugEvent
+├── «implements» ├── ├── RuleNodeDebugEvent
+├── «implements» ├── ├── StatisticsEvent
+├── «implements» ├── EventInfo
+├── «implements» ├── Notification
+├── «implements» ├── NotificationRequest
+├── «implements» ├── ├── NotificationRequestInfo
+├── «implements» ├── NotificationRule
+├── «implements» ├── ├── NotificationRuleInfo
+├── «implements» ├── NotificationTarget
+├── «implements» ├── NotificationTemplate
+├── «implements» ├── OAuth2Domain
+├── «implements» ├── OAuth2Mobile
+├── «implements» ├── OAuth2Params
+├── «implements» ├── Rpc
+├── «implements» ├── RuleNodeState
+├── «implements» ├── TbResourceInfo
+├── «implements» ├── ├── TbResource
+├── «implements» ├── TenantProfile
+├── «implements» ├── UserAuthSettings
+├── «implements» ├── UserCredentials
+├── «implements» ├── WidgetsBundle
+├── «implements» ClearRule
+├── CoapDeviceTypeConfiguration
+├── ├── «implements» DefaultCoapDeviceTypeConfiguration
+├── ├── «implements» EfentoCoapDeviceTypeConfiguration
+├── «implements» ComponentLifecycleEvent
+├── «implements» CustomTimeScheduleItem
+├── «implements» DefaultRuleChainCreateRequest
+├── DeviceConfiguration
+├── ├── «implements» DefaultDeviceConfiguration
+├── «implements» DeviceData
+├── «implements» DeviceIdInfo
+├── «implements» DeviceProfileAlarm
+├── DeviceProfileConfiguration
+├── ├── «implements» DefaultDeviceProfileConfiguration
+├── «implements» DeviceProfileData
+├── DeviceProfileProvisionConfiguration
+├── ├── «implements» AllowCreateNewDevicesDeviceProfileProvisionConfiguration
+├── ├── «implements» CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration
+├── ├── «implements» DisabledDeviceProfileProvisionConfiguration
+├── ├── «implements» X509CertificateChainProvisionConfiguration
+├── DeviceProfileTransportConfiguration
+├── ├── «implements» CoapDeviceProfileTransportConfiguration
+├── ├── «implements» DefaultDeviceProfileTransportConfiguration
+├── ├── «implements» Lwm2mDeviceProfileTransportConfiguration
+├── ├── «implements» MqttDeviceProfileTransportConfiguration
+├── ├── «implements» SnmpDeviceProfileTransportConfiguration
+├── DeviceTransportConfiguration
+├── ├── «implements» CoapDeviceTransportConfiguration
+├── ├── «implements» DefaultDeviceTransportConfiguration
+├── ├── «implements» Lwm2mDeviceTransportConfiguration
+├── ├── «implements» MqttDeviceTransportConfiguration
+├── ├── «implements» SnmpDeviceTransportConfiguration
+├── «implements» DynamicValue
+├── «implements» EdgeUpgradeMessage
+├── EntityId
+├── ├── «implements» AlarmId
+├── ├── «implements» ApiUsageStateId
+├── ├── «implements» AssetId
+├── ├── «implements» AssetProfileId
+├── ├── «implements» CustomerId
+├── ├── «implements» DashboardId
+├── ├── «implements» DeviceId
+├── ├── «implements» DeviceProfileId
+├── ├── «implements» EdgeId
+├── ├── «implements» EntityViewId
+├── ├── «implements» NotificationId
+├── ├── «implements» NotificationRequestId
+├── ├── «implements» NotificationRuleId
+├── ├── «implements» NotificationTargetId
+├── ├── «implements» NotificationTemplateId
+├── ├── «implements» OtaPackageId
+├── ├── «implements» QueueId
+├── ├── «implements» RpcId
+├── ├── «implements» RuleChainId
+├── ├── «implements» RuleNodeId
+├── ├── «implements» TbResourceId
+├── ├── «implements» TenantId
+├── ├── «implements» TenantProfileId
+├── ├── «implements» UserId
+├── ├── «implements» WidgetTypeId
+├── ├── «implements» WidgetsBundleId
+├── «implements» EntityKey
+├── «implements» EntityLoadError
+├── «implements» EntityRelation
+├── «implements» ├── EntityRelationInfo
+├── «implements» EntitySubtype
+├── «implements» EntityTypeLoadResult
+├── «implements» EntityVersion
+├── «implements» FilterPredicateValue
+├── HasId
+├── ├── «implements» EntityInfo
+├── ├── «implements» ├── AssetProfileInfo
+├── ├── «implements» ├── DeviceProfileInfo
+├── ├── «implements» UserEmailInfo
+├── JwtToken
+├── «implements» KeyFilter
+├── KeyFilterPredicate
+├── ├── «implements» ComplexFilterPredicate
+├── ├── SimpleKeyFilterPredicate
+├── ├── ├── «implements» BooleanFilterPredicate
+├── ├── ├── «implements» NumericFilterPredicate
+├── ├── ├── «implements» StringFilterPredicate
+├── KvEntry
+├── ├── AttributeKvEntry
+├── ├── ├── «implements» BaseAttributeKvEntry
+├── ├── «implements» BasicKvEntry
+├── ├── «implements» ├── BooleanDataEntry
+├── ├── «implements» ├── DoubleDataEntry
+├── ├── «implements» ├── JsonDataEntry
+├── ├── «implements» ├── LongDataEntry
+├── ├── «implements» ├── StringDataEntry
+├── ├── TsKvEntry
+├── ├── ├── «implements» BasicTsKvEntry
+├── ├── ├── «implements» ├── AggTsKvEntry
+├── «implements» LastVisitedDashboardInfo
+├── LwM2MBootstrapServerCredential
+├── ├── «implements» AbstractLwM2MBootstrapServerCredential
+├── ├── «implements» ├── NoSecLwM2MBootstrapServerCredential
+├── ├── «implements» ├── PSKLwM2MBootstrapServerCredential
+├── ├── «implements» ├── RPKLwM2MBootstrapServerCredential
+├── ├── «implements» ├── X509LwM2MBootstrapServerCredential
+├── NotificationDeliveryMethodConfig
+├── ├── «implements» MobileAppNotificationDeliveryMethodConfig
+├── ├── «implements» SlackNotificationDeliveryMethodConfig
+├── «implements» NotificationRule
+├── «implements» ├── NotificationRuleInfo
+├── «implements» NotificationRuleConfig
+├── «implements» NotificationRuleRecipientsConfig
+├── «implements» ├── DefaultNotificationRuleRecipientsConfig
+├── «implements» ├── EscalatedNotificationRuleRecipientsConfig
+├── NotificationRuleTrigger
+├── ├── «implements» AlarmAssignmentTrigger
+├── ├── «implements» AlarmCommentTrigger
+├── ├── «implements» AlarmTrigger
+├── ├── «implements» ApiUsageLimitTrigger
+├── ├── «implements» DeviceActivityTrigger
+├── ├── «implements» EdgeCommunicationFailureTrigger
+├── ├── «implements» EdgeConnectionTrigger
+├── ├── «implements» EntitiesLimitTrigger
+├── ├── «implements» EntityActionTrigger
+├── ├── «implements» NewPlatformVersionTrigger
+├── ├── «implements» RateLimitsTrigger
+├── ├── «implements» RuleEngineComponentLifecycleEventTrigger
+├── NotificationRuleTriggerConfig
+├── ├── «implements» AlarmAssignmentNotificationRuleTriggerConfig
+├── ├── «implements» AlarmCommentNotificationRuleTriggerConfig
+├── ├── «implements» AlarmNotificationRuleTriggerConfig
+├── ├── «implements» ApiUsageLimitNotificationRuleTriggerConfig
+├── ├── «implements» DeviceActivityNotificationRuleTriggerConfig
+├── ├── «implements» EdgeCommunicationFailureNotificationRuleTriggerConfig
+├── ├── «implements» EdgeConnectionNotificationRuleTriggerConfig
+├── ├── «implements» EntitiesLimitNotificationRuleTriggerConfig
+├── ├── «implements» EntityActionNotificationRuleTriggerConfig
+├── ├── «implements» NewPlatformVersionNotificationRuleTriggerConfig
+├── ├── «implements» RateLimitsNotificationRuleTriggerConfig
+├── ├── «implements» RuleEngineComponentLifecycleEventNotificationRuleTriggerConfig
+├── «implements» NotificationSettings
+├── «implements» ObjectAttributes
+├── «implements» PageData
+├── «implements» PowerSavingConfiguration
+├── «implements» ├── CoapDeviceTransportConfiguration
+├── «implements» ├── Lwm2mDeviceTransportConfiguration
+├── «implements» ├── OtherConfiguration
+├── «implements» ProcessingStrategy
+├── «implements» RepositorySettings
+├── «implements» SecuritySettings
+├── SnmpCommunicationConfig
+├── ├── «implements» MultipleMappingsSnmpCommunicationConfig
+├── ├── «implements» ├── RepeatingQueryingSnmpCommunicationConfig
+├── ├── «implements» ├── ├── ClientAttributesQueryingSnmpCommunicationConfig
+├── ├── «implements» ├── ├── TelemetryQueryingSnmpCommunicationConfig
+├── ├── «implements» ├── SharedAttributesSettingSnmpCommunicationConfig
+├── ├── «implements» ├── ToDeviceRpcRequestSnmpCommunicationConfig
+├── ├── «implements» ├── ToServerRpcRequestSnmpCommunicationConfig
+├── «implements» SnmpMapping
+├── «implements» StarredDashboardInfo
+├── «implements» SubmitStrategy
+├── «implements» TelemetryEntityView
+├── «implements» TelemetryMappingConfiguration
+├── TenantProfileConfiguration
+├── ├── «implements» DefaultTenantProfileConfiguration
+├── «implements» TenantProfileData
+├── «implements» TenantProfileQueueConfiguration
+├── «implements» ToDeviceRpcRequestBody
+├── TransportPayloadTypeConfiguration
+├── ├── «implements» JsonTransportPayloadConfiguration
+├── ├── «implements» ProtoTransportPayloadConfiguration
+├── «implements» TwoFaAccountConfig
+├── «implements» ├── BackupCodeTwoFaAccountConfig
+├── «implements» ├── OtpBasedTwoFaAccountConfig
+├── «implements» ├── ├── EmailTwoFaAccountConfig
+├── «implements» ├── ├── SmsTwoFaAccountConfig
+├── «implements» ├── TotpTwoFaAccountConfig
+├── «implements» UUIDBased
+├── «implements» ├── AdminSettingsId
+├── «implements» ├── AlarmCommentId
+├── «implements» ├── AlarmId
+├── «implements» ├── ApiUsageStateId
+├── «implements» ├── AssetId
+├── «implements» ├── AssetProfileId
+├── «implements» ├── AuditLogId
+├── «implements» ├── ComponentDescriptorId
+├── «implements» ├── CustomerId
+├── «implements» ├── DashboardId
+├── «implements» ├── DeviceCredentialsId
+├── «implements» ├── DeviceId
+├── «implements» ├── DeviceProfileId
+├── «implements» ├── EdgeEventId
+├── «implements» ├── EdgeId
+├── «implements» ├── EntityViewId
+├── «implements» ├── EventId
+├── «implements» ├── NodeId
+├── «implements» ├── NotificationId
+├── «implements» ├── NotificationRequestId
+├── «implements» ├── NotificationRuleId
+├── «implements» ├── NotificationTargetId
+├── «implements» ├── NotificationTemplateId
+├── «implements» ├── OAuth2ClientRegistrationTemplateId
+├── «implements» ├── OAuth2DomainId
+├── «implements» ├── OAuth2MobileId
+├── «implements» ├── OAuth2ParamsId
+├── «implements» ├── OAuth2RegistrationId
+├── «implements» ├── OtaPackageId
+├── «implements» ├── QueueId
+├── «implements» ├── RpcId
+├── «implements» ├── RuleChainId
+├── «implements» ├── RuleNodeId
+├── «implements» ├── RuleNodeStateId
+├── «implements» ├── TbResourceId
+├── «implements» ├── TenantId
+├── «implements» ├── TenantProfileId
+├── «implements» ├── UserAuthSettingsId
+├── «implements» ├── UserCredentialsId
+├── «implements» ├── UserId
+├── «implements» ├── WidgetTypeId
+├── «implements» ├── WidgetsBundleId
+├── «implements» UpdateMessage
+├── «implements» UserAuthDataChangedEvent
+├── «implements» ├── UserCredentialsInvalidationEvent
+├── «implements» ├── UserSessionInvalidationEvent
+├── «implements» UserDashboardsInfo
+├── «implements» UserPasswordPolicy
+├── «implements» UserSettings
+├── «implements» UserSettingsCompositeKey
+├── «implements» VersionCreateConfig
+├── «implements» ├── AutoVersionCreateConfig
+├── «implements» ├── EntityTypeVersionCreateConfig
+├── «implements» VersionCreationResult
+├── «implements» VersionLoadResult
+SmsProviderConfiguration
+├── «implements» AwsSnsSmsProviderConfiguration
+├── «implements» SmppSmsProviderConfiguration
+├── «implements» TwilioSmsProviderConfiguration
+TsKvQuery
+├── «implements» BaseTsKvQuery
+├── «implements» ├── BaseDeleteTsKvQuery
+├── «implements» ├── BaseReadTsKvQuery
+├── DeleteTsKvQuery
+├── ├── «implements» BaseDeleteTsKvQuery
+├── ReadTsKvQuery
+├── ├── «implements» BaseReadTsKvQuery
+TwoFaProviderConfig
+├── «implements» BackupCodeTwoFaProviderConfig
+├── «implements» OtpBasedTwoFaProviderConfig
+├── «implements» ├── EmailTwoFaProviderConfig
+├── «implements» ├── SmsTwoFaProviderConfig
+├── «implements» TotpTwoFaProviderConfig
+UsersFilter
+├── «implements» AffectedTenantAdministratorsFilter
+├── «implements» AffectedUserFilter
+├── «implements» AllUsersFilter
+├── «implements» CustomerUsersFilter
+├── «implements» OriginatorEntityOwnerUsersFilter
+├── «implements» SystemAdministratorsFilter
+├── «implements» TenantAdministratorsFilter
+├── «implements» UserListFilter</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    BaseData_p0[&quot;BaseData&quot;] --&gt;|extends| AdminSettings_c0[&quot;AdminSettings&quot;]
+    HasTenantId_p1[&quot;HasTenantId&quot;] --&gt;|implements| AdminSettings_c1[&quot;AdminSettings&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| ApiUsageRecordState_c2[&quot;ApiUsageRecordState&quot;]
+    Serializable_p3[&quot;Serializable&quot;] --&gt;|implements| ApiUsageRecordState_c3[&quot;ApiUsageRecordState&quot;]
+    BaseData_p4[&quot;BaseData&quot;] --&gt;|extends| ApiUsageState_c4[&quot;ApiUsageState&quot;]
+    HasTenantId_p5[&quot;HasTenantId&quot;] --&gt;|implements| ApiUsageState_c5[&quot;ApiUsageState&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| BaseData_c6[&quot;BaseData&quot;]
+    Serializable_p7[&quot;Serializable&quot;] --&gt;|implements| BaseData_c7[&quot;BaseData&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| BaseDataWithAdditionalInfo_c8[&quot;BaseDataWithAdditionalInfo&quot;]
+    HasAdditionalInfo_p9[&quot;HasAdditionalInfo&quot;] --&gt;|implements| BaseDataWithAdditionalInfo_c9[&quot;BaseDataWithAdditionalInfo&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| CacheConstants_c10[&quot;CacheConstants&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| ClaimRequest_c11[&quot;ClaimRequest&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| ContactBased_c12[&quot;ContactBased&quot;]
+    HasEmail_p13[&quot;HasEmail&quot;] --&gt;|implements| ContactBased_c13[&quot;ContactBased&quot;]
+    ContactBased_p14[&quot;ContactBased&quot;] --&gt;|extends| Customer_c14[&quot;Customer&quot;]
+    HasTenantId_p15[&quot;HasTenantId&quot;] --&gt;|implements| Customer_c15[&quot;Customer&quot;]
+    ExportableEntity_p16[&quot;ExportableEntity&quot;] --&gt;|implements| Customer_c16[&quot;Customer&quot;]
+    HasTitle_p17[&quot;HasTitle&quot;] --&gt;|implements| Customer_c17[&quot;Customer&quot;]
+    DashboardInfo_p18[&quot;DashboardInfo&quot;] --&gt;|extends| Dashboard_c18[&quot;Dashboard&quot;]
+    ExportableEntity_p19[&quot;ExportableEntity&quot;] --&gt;|implements| Dashboard_c19[&quot;Dashboard&quot;]
+    BaseData_p20[&quot;BaseData&quot;] --&gt;|extends| DashboardInfo_c20[&quot;DashboardInfo&quot;]
+    HasName_p21[&quot;HasName&quot;] --&gt;|implements| DashboardInfo_c21[&quot;DashboardInfo&quot;]
+    HasTenantId_p22[&quot;HasTenantId&quot;] --&gt;|implements| DashboardInfo_c22[&quot;DashboardInfo&quot;]
+    HasTitle_p23[&quot;HasTitle&quot;] --&gt;|implements| DashboardInfo_c23[&quot;DashboardInfo&quot;]
+    HasImage_p24[&quot;HasImage&quot;] --&gt;|implements| DashboardInfo_c24[&quot;DashboardInfo&quot;]
+    Object______p25[&quot;Object/外部框架&quot;] --&gt;|extends| DataConstants_c25[&quot;DataConstants&quot;]
+    BaseDataWithAdditionalInfo_p26[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| Device_c26[&quot;Device&quot;]
+    HasLabel_p27[&quot;HasLabel&quot;] --&gt;|implements| Device_c27[&quot;Device&quot;]
+    HasTenantId_p28[&quot;HasTenantId&quot;] --&gt;|implements| Device_c28[&quot;Device&quot;]
+    HasCustomerId_p29[&quot;HasCustomerId&quot;] --&gt;|implements| Device_c29[&quot;Device&quot;]
+    HasOtaPackage_p30[&quot;HasOtaPackage&quot;] --&gt;|implements| Device_c30[&quot;Device&quot;]
+    ExportableEntity_p31[&quot;ExportableEntity&quot;] --&gt;|implements| Device_c31[&quot;Device&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceIdInfo_c32[&quot;DeviceIdInfo&quot;]
+    Serializable_p33[&quot;Serializable&quot;] --&gt;|implements| DeviceIdInfo_c33[&quot;DeviceIdInfo&quot;]
+    HasTenantId_p34[&quot;HasTenantId&quot;] --&gt;|implements| DeviceIdInfo_c34[&quot;DeviceIdInfo&quot;]
+    Device_p35[&quot;Device&quot;] --&gt;|extends| DeviceInfo_c35[&quot;DeviceInfo&quot;]
+    Object______p36[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceInfoFilter_c36[&quot;DeviceInfoFilter&quot;]
+    BaseData_p37[&quot;BaseData&quot;] --&gt;|extends| DeviceProfile_c37[&quot;DeviceProfile&quot;]
+    HasName_p38[&quot;HasName&quot;] --&gt;|implements| DeviceProfile_c38[&quot;DeviceProfile&quot;]
+    HasTenantId_p39[&quot;HasTenantId&quot;] --&gt;|implements| DeviceProfile_c39[&quot;DeviceProfile&quot;]
+    HasOtaPackage_p40[&quot;HasOtaPackage&quot;] --&gt;|implements| DeviceProfile_c40[&quot;DeviceProfile&quot;]
+    HasRuleEngineProfile_p41[&quot;HasRuleEngineProfile&quot;] --&gt;|implements| DeviceProfile_c41[&quot;DeviceProfile&quot;]
+    ExportableEntity_p42[&quot;ExportableEntity&quot;] --&gt;|implements| DeviceProfile_c42[&quot;DeviceProfile&quot;]
+    HasImage_p43[&quot;HasImage&quot;] --&gt;|implements| DeviceProfile_c43[&quot;DeviceProfile&quot;]
+    EntityInfo_p44[&quot;EntityInfo&quot;] --&gt;|extends| DeviceProfileInfo_c44[&quot;DeviceProfileInfo&quot;]
+    Object______p45[&quot;Object/外部框架&quot;] --&gt;|extends| DynamicProtoUtils_c45[&quot;DynamicProtoUtils&quot;]
+    Object______p46[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeUpgradeInfo_c46[&quot;EdgeUpgradeInfo&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeUpgradeMessage_c47[&quot;EdgeUpgradeMessage&quot;]
+    Serializable_p48[&quot;Serializable&quot;] --&gt;|implements| EdgeUpgradeMessage_c48[&quot;EdgeUpgradeMessage&quot;]
+    Object______p49[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeUtils_c49[&quot;EdgeUtils&quot;]
+    Object______p50[&quot;Object/外部框架&quot;] --&gt;|extends| EntityFieldsData_c50[&quot;EntityFieldsData&quot;]
+    JsonSerializer_p51[&quot;JsonSerializer&quot;] --&gt;|extends| EntityIdFieldSerializer_c51[&quot;EntityIdFieldSerializer&quot;]
+    Object______p52[&quot;Object/外部框架&quot;] --&gt;|extends| EntityInfo_c52[&quot;EntityInfo&quot;]
+    HasId_p53[&quot;HasId&quot;] --&gt;|implements| EntityInfo_c53[&quot;EntityInfo&quot;]
+    HasName_p54[&quot;HasName&quot;] --&gt;|implements| EntityInfo_c54[&quot;EntityInfo&quot;]
+    Object______p55[&quot;Object/外部框架&quot;] --&gt;|extends| EntitySubtype_c55[&quot;EntitySubtype&quot;]
+    Serializable_p56[&quot;Serializable&quot;] --&gt;|implements| EntitySubtype_c56[&quot;EntitySubtype&quot;]
+    BaseDataWithAdditionalInfo_p57[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| EntityView_c57[&quot;EntityView&quot;]
+    HasName_p58[&quot;HasName&quot;] --&gt;|implements| EntityView_c58[&quot;EntityView&quot;]
+    HasTenantId_p59[&quot;HasTenantId&quot;] --&gt;|implements| EntityView_c59[&quot;EntityView&quot;]
+    HasCustomerId_p60[&quot;HasCustomerId&quot;] --&gt;|implements| EntityView_c60[&quot;EntityView&quot;]
+    ExportableEntity_p61[&quot;ExportableEntity&quot;] --&gt;|implements| EntityView_c61[&quot;EntityView&quot;]
+    EntityView_p62[&quot;EntityView&quot;] --&gt;|extends| EntityViewInfo_c62[&quot;EntityViewInfo&quot;]
+    BaseData_p63[&quot;BaseData&quot;] --&gt;|extends| EventInfo_c63[&quot;EventInfo&quot;]
+    Object______p64[&quot;Object/外部框架&quot;] --&gt;|extends| FSTUtils_c64[&quot;FSTUtils&quot;]
+    Object______p65[&quot;Object/外部框架&quot;] --&gt;|extends| FeaturesInfo_c65[&quot;FeaturesInfo&quot;]
+    HasName_p66[&quot;HasName&quot;] --&gt;|extends| HasEmail_c66[&quot;HasEmail&quot;]
+    HasTenantId_p67[&quot;HasTenantId&quot;] --&gt;|extends| HasImage_c67[&quot;HasImage&quot;]
+    HasName_p68[&quot;HasName&quot;] --&gt;|extends| HasImage_c68[&quot;HasImage&quot;]
+    HasName_p69[&quot;HasName&quot;] --&gt;|extends| HasLabel_c69[&quot;HasLabel&quot;]
+    Dashboard_p70[&quot;Dashboard&quot;] --&gt;|extends| HomeDashboard_c70[&quot;HomeDashboard&quot;]
+    Object______p71[&quot;Object/外部框架&quot;] --&gt;|extends| HomeDashboardInfo_c71[&quot;HomeDashboardInfo&quot;]
+    Object______p72[&quot;Object/外部框架&quot;] --&gt;|extends| ImageDescriptor_c72[&quot;ImageDescriptor&quot;]
+    Object______p73[&quot;Object/外部框架&quot;] --&gt;|extends| ImageExportData_c73[&quot;ImageExportData&quot;]
+    OtaPackageInfo_p74[&quot;OtaPackageInfo&quot;] --&gt;|extends| OtaPackage_c74[&quot;OtaPackage&quot;]
+    BaseDataWithAdditionalInfo_p75[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| OtaPackageInfo_c75[&quot;OtaPackageInfo&quot;]
+    HasName_p76[&quot;HasName&quot;] --&gt;|implements| OtaPackageInfo_c76[&quot;OtaPackageInfo&quot;]
+    HasTenantId_p77[&quot;HasTenantId&quot;] --&gt;|implements| OtaPackageInfo_c77[&quot;OtaPackageInfo&quot;]
+    HasTitle_p78[&quot;HasTitle&quot;] --&gt;|implements| OtaPackageInfo_c78[&quot;OtaPackageInfo&quot;]
+    Object______p79[&quot;Object/外部框架&quot;] --&gt;|extends| ResourceUtils_c79[&quot;ResourceUtils&quot;]
+    Object______p80[&quot;Object/外部框架&quot;] --&gt;|extends| path_c80[&quot;path&quot;]
+    Object______p81[&quot;Object/外部框架&quot;] --&gt;|extends| SaveDeviceWithCredentialsRequest_c81[&quot;SaveDeviceWithCredentialsRequest&quot;]
+    OtaPackageInfo_p82[&quot;OtaPackageInfo&quot;] --&gt;|extends| SaveOtaPackageInfoRequest_c82[&quot;SaveOtaPackageInfoRequest&quot;]
+    Object______p83[&quot;Object/外部框架&quot;] --&gt;|extends| ShortCustomerInfo_c83[&quot;ShortCustomerInfo&quot;]
+    Object______p84[&quot;Object/外部框架&quot;] --&gt;|extends| StringUtils_c84[&quot;StringUtils&quot;]
+    Object______p85[&quot;Object/外部框架&quot;] --&gt;|extends| SystemInfo_c85[&quot;SystemInfo&quot;]
+    Object______p86[&quot;Object/外部框架&quot;] --&gt;|extends| SystemInfoData_c86[&quot;SystemInfoData&quot;]
+    Object______p87[&quot;Object/外部框架&quot;] --&gt;|extends| SystemParams_c87[&quot;SystemParams&quot;]
+    Object______p88[&quot;Object/外部框架&quot;] --&gt;|extends| TbImageDeleteResult_c88[&quot;TbImageDeleteResult&quot;]
+    Object______p89[&quot;Object/外部框架&quot;] --&gt;|extends| TbProperty_c89[&quot;TbProperty&quot;]
+    TbResourceInfo_p90[&quot;TbResourceInfo&quot;] --&gt;|extends| TbResource_c90[&quot;TbResource&quot;]
+    BaseData_p91[&quot;BaseData&quot;] --&gt;|extends| TbResourceInfo_c91[&quot;TbResourceInfo&quot;]
+    HasName_p92[&quot;HasName&quot;] --&gt;|implements| TbResourceInfo_c92[&quot;TbResourceInfo&quot;]
+    HasTenantId_p93[&quot;HasTenantId&quot;] --&gt;|implements| TbResourceInfo_c93[&quot;TbResourceInfo&quot;]
+    ExportableEntity_p94[&quot;ExportableEntity&quot;] --&gt;|implements| TbResourceInfo_c94[&quot;TbResourceInfo&quot;]
+    Object______p95[&quot;Object/外部框架&quot;] --&gt;|extends| TbResourceInfoFilter_c95[&quot;TbResourceInfoFilter&quot;]
+    ContactBased_p96[&quot;ContactBased&quot;] --&gt;|extends| Tenant_c96[&quot;Tenant&quot;]
+    HasTenantId_p97[&quot;HasTenantId&quot;] --&gt;|implements| Tenant_c97[&quot;Tenant&quot;]
+    HasTitle_p98[&quot;HasTitle&quot;] --&gt;|implements| Tenant_c98[&quot;Tenant&quot;]
+    Tenant_p99[&quot;Tenant&quot;] --&gt;|extends| TenantInfo_c99[&quot;TenantInfo&quot;]
+    BaseData_p100[&quot;BaseData&quot;] --&gt;|extends| TenantProfile_c100[&quot;TenantProfile&quot;]
+    HasName_p101[&quot;HasName&quot;] --&gt;|implements| TenantProfile_c101[&quot;TenantProfile&quot;]
+    Object______p102[&quot;Object/外部框架&quot;] --&gt;|extends| UUIDConverter_c102[&quot;UUIDConverter&quot;]
+    Object______p103[&quot;Object/外部框架&quot;] --&gt;|extends| UpdateMessage_c103[&quot;UpdateMessage&quot;]
+    Serializable_p104[&quot;Serializable&quot;] --&gt;|implements| UpdateMessage_c104[&quot;UpdateMessage&quot;]
+    Object______p105[&quot;Object/外部框架&quot;] --&gt;|extends| UsageInfo_c105[&quot;UsageInfo&quot;]
+    BaseDataWithAdditionalInfo_p106[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| User_c106[&quot;User&quot;]
+    HasName_p107[&quot;HasName&quot;] --&gt;|implements| User_c107[&quot;User&quot;]
+    HasTenantId_p108[&quot;HasTenantId&quot;] --&gt;|implements| User_c108[&quot;User&quot;]
+    HasCustomerId_p109[&quot;HasCustomerId&quot;] --&gt;|implements| User_c109[&quot;User&quot;]
+    NotificationRecipient_p110[&quot;NotificationRecipient&quot;] --&gt;|implements| User_c110[&quot;User&quot;]
+    Object______p111[&quot;Object/外部框架&quot;] --&gt;|extends| UserEmailInfo_c111[&quot;UserEmailInfo&quot;]
+    HasId_p112[&quot;HasId&quot;] --&gt;|implements| UserEmailInfo_c112[&quot;UserEmailInfo&quot;]
+    BaseData_p113[&quot;BaseData&quot;] --&gt;|extends| Alarm_c113[&quot;Alarm&quot;]
+    HasName_p114[&quot;HasName&quot;] --&gt;|implements| Alarm_c114[&quot;Alarm&quot;]
+    HasTenantId_p115[&quot;HasTenantId&quot;] --&gt;|implements| Alarm_c115[&quot;Alarm&quot;]
+    HasCustomerId_p116[&quot;HasCustomerId&quot;] --&gt;|implements| Alarm_c116[&quot;Alarm&quot;]
+    Object______p117[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmApiCallResult_c117[&quot;AlarmApiCallResult&quot;]
+    Serializable_p118[&quot;Serializable&quot;] --&gt;|implements| AlarmApiCallResult_c118[&quot;AlarmApiCallResult&quot;]
+    Object______p119[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmAssignee_c119[&quot;AlarmAssignee&quot;]
+    Serializable_p120[&quot;Serializable&quot;] --&gt;|implements| AlarmAssignee_c120[&quot;AlarmAssignee&quot;]
+    Object______p121[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmAssigneeUpdate_c121[&quot;AlarmAssigneeUpdate&quot;]
+    Serializable_p122[&quot;Serializable&quot;] --&gt;|implements| AlarmAssigneeUpdate_c122[&quot;AlarmAssigneeUpdate&quot;]
+    BaseData_p123[&quot;BaseData&quot;] --&gt;|extends| AlarmComment_c123[&quot;AlarmComment&quot;]
+    HasName_p124[&quot;HasName&quot;] --&gt;|implements| AlarmComment_c124[&quot;AlarmComment&quot;]
+    AlarmComment_p125[&quot;AlarmComment&quot;] --&gt;|extends| AlarmCommentInfo_c125[&quot;AlarmCommentInfo&quot;]
+    Object______p126[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmCreateOrUpdateActiveRequest_c126[&quot;AlarmCreateOrUpdateActiveRequest&quot;]
+    AlarmModificationRequest_p127[&quot;AlarmModificationRequest&quot;] --&gt;|implements| AlarmCreateOrUpdateActiveRequest_c127[&quot;AlarmCreateOrUpdateActiveRequest&quot;]
+    Alarm_p128[&quot;Alarm&quot;] --&gt;|extends| AlarmInfo_c128[&quot;AlarmInfo&quot;]
+    Object______p129[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmPropagationInfo_c129[&quot;AlarmPropagationInfo&quot;]
+    Object______p130[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmQuery_c130[&quot;AlarmQuery&quot;]
+    Object______p131[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmQueryV2_c131[&quot;AlarmQueryV2&quot;]
+    Object______p132[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmStatusFilter_c132[&quot;AlarmStatusFilter&quot;]
+    Object______p133[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmUpdateRequest_c133[&quot;AlarmUpdateRequest&quot;]
+    AlarmModificationRequest_p134[&quot;AlarmModificationRequest&quot;] --&gt;|implements| AlarmUpdateRequest_c134[&quot;AlarmUpdateRequest&quot;]
+    Object______p135[&quot;Object/外部框架&quot;] --&gt;|extends| EntityAlarm_c135[&quot;EntityAlarm&quot;]
+    HasTenantId_p136[&quot;HasTenantId&quot;] --&gt;|implements| EntityAlarm_c136[&quot;EntityAlarm&quot;]
+    BaseDataWithAdditionalInfo_p137[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| Asset_c137[&quot;Asset&quot;]
+    HasLabel_p138[&quot;HasLabel&quot;] --&gt;|implements| Asset_c138[&quot;Asset&quot;]
+    HasTenantId_p139[&quot;HasTenantId&quot;] --&gt;|implements| Asset_c139[&quot;Asset&quot;]
+    HasCustomerId_p140[&quot;HasCustomerId&quot;] --&gt;|implements| Asset_c140[&quot;Asset&quot;]
+    ExportableEntity_p141[&quot;ExportableEntity&quot;] --&gt;|implements| Asset_c141[&quot;Asset&quot;]
+    Asset_p142[&quot;Asset&quot;] --&gt;|extends| AssetInfo_c142[&quot;AssetInfo&quot;]
+    BaseData_p143[&quot;BaseData&quot;] --&gt;|extends| AssetProfile_c143[&quot;AssetProfile&quot;]
+    HasName_p144[&quot;HasName&quot;] --&gt;|implements| AssetProfile_c144[&quot;AssetProfile&quot;]
+    HasTenantId_p145[&quot;HasTenantId&quot;] --&gt;|implements| AssetProfile_c145[&quot;AssetProfile&quot;]
+    HasRuleEngineProfile_p146[&quot;HasRuleEngineProfile&quot;] --&gt;|implements| AssetProfile_c146[&quot;AssetProfile&quot;]
+    ExportableEntity_p147[&quot;ExportableEntity&quot;] --&gt;|implements| AssetProfile_c147[&quot;AssetProfile&quot;]
+    HasImage_p148[&quot;HasImage&quot;] --&gt;|implements| AssetProfile_c148[&quot;AssetProfile&quot;]
+    EntityInfo_p149[&quot;EntityInfo&quot;] --&gt;|extends| AssetProfileInfo_c149[&quot;AssetProfileInfo&quot;]
+    Object______p150[&quot;Object/外部框架&quot;] --&gt;|extends| AssetSearchQuery_c150[&quot;AssetSearchQuery&quot;]
+    BaseData_p151[&quot;BaseData&quot;] --&gt;|extends| AuditLog_c151[&quot;AuditLog&quot;]
+    Object______p152[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceSearchQuery_c152[&quot;DeviceSearchQuery&quot;]
+    Object______p153[&quot;Object/外部框架&quot;] --&gt;|extends| BasicMqttCredentials_c153[&quot;BasicMqttCredentials&quot;]
+    Object______p154[&quot;Object/外部框架&quot;] --&gt;|extends| ProvisionDeviceCredentialsData_c154[&quot;ProvisionDeviceCredentialsData&quot;]
+    Object______p155[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractLwM2MBootstrapClientCredentialWithKeys_c155[&quot;AbstractLwM2MBootstrapClientCredentialWithKeys&quot;]
+    LwM2MBootstrapClientCredential_p156[&quot;LwM2MBootstrapClientCredential&quot;] --&gt;|implements| AbstractLwM2MBootstrapClientCredentialWithKeys_c156[&quot;AbstractLwM2MBootstrapClientCredentialWithKeys&quot;]
+    Object______p157[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractLwM2MClientCredential_c157[&quot;AbstractLwM2MClientCredential&quot;]
+    LwM2MClientCredential_p158[&quot;LwM2MClientCredential&quot;] --&gt;|implements| AbstractLwM2MClientCredential_c158[&quot;AbstractLwM2MClientCredential&quot;]
+    AbstractLwM2MClientCredential_p159[&quot;AbstractLwM2MClientCredential&quot;] --&gt;|extends| AbstractLwM2MClientSecurityCredential_c159[&quot;AbstractLwM2MClientSecurityCredential&quot;]
+    Object______p160[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MBootstrapClientCredentials_c160[&quot;LwM2MBootstrapClientCredentials&quot;]
+    Object______p161[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MDeviceCredentials_c161[&quot;LwM2MDeviceCredentials&quot;]
+    Object______p162[&quot;Object/外部框架&quot;] --&gt;|extends| NoSecBootstrapClientCredential_c162[&quot;NoSecBootstrapClientCredential&quot;]
+    LwM2MBootstrapClientCredential_p163[&quot;LwM2MBootstrapClientCredential&quot;] --&gt;|implements| NoSecBootstrapClientCredential_c163[&quot;NoSecBootstrapClientCredential&quot;]
+    AbstractLwM2MClientCredential_p164[&quot;AbstractLwM2MClientCredential&quot;] --&gt;|extends| NoSecClientCredential_c164[&quot;NoSecClientCredential&quot;]
+    AbstractLwM2MBootstrapClientCredentialWithKeys_p165[&quot;AbstractLwM2MBootstrapClientCredentialWithKeys&quot;] --&gt;|extends| PSKBootstrapClientCredential_c165[&quot;PSKBootstrapClientCredential&quot;]
+    AbstractLwM2MClientSecurityCredential_p166[&quot;AbstractLwM2MClientSecurityCredential&quot;] --&gt;|extends| PSKClientCredential_c166[&quot;PSKClientCredential&quot;]
+    AbstractLwM2MBootstrapClientCredentialWithKeys_p167[&quot;AbstractLwM2MBootstrapClientCredentialWithKeys&quot;] --&gt;|extends| RPKBootstrapClientCredential_c167[&quot;RPKBootstrapClientCredential&quot;]
+    AbstractLwM2MClientSecurityCredential_p168[&quot;AbstractLwM2MClientSecurityCredential&quot;] --&gt;|extends| RPKClientCredential_c168[&quot;RPKClientCredential&quot;]
+    AbstractLwM2MBootstrapClientCredentialWithKeys_p169[&quot;AbstractLwM2MBootstrapClientCredentialWithKeys&quot;] --&gt;|extends| X509BootstrapClientCredential_c169[&quot;X509BootstrapClientCredential&quot;]
+    AbstractLwM2MClientSecurityCredential_p170[&quot;AbstractLwM2MClientSecurityCredential&quot;] --&gt;|extends| X509ClientCredential_c170[&quot;X509ClientCredential&quot;]
+    PowerSavingConfiguration_p171[&quot;PowerSavingConfiguration&quot;] --&gt;|extends| CoapDeviceTransportConfiguration_c171[&quot;CoapDeviceTransportConfiguration&quot;]
+    DeviceTransportConfiguration_p172[&quot;DeviceTransportConfiguration&quot;] --&gt;|implements| CoapDeviceTransportConfiguration_c172[&quot;CoapDeviceTransportConfiguration&quot;]
+    Object______p173[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultDeviceConfiguration_c173[&quot;DefaultDeviceConfiguration&quot;]
+    DeviceConfiguration_p174[&quot;DeviceConfiguration&quot;] --&gt;|implements| DefaultDeviceConfiguration_c174[&quot;DefaultDeviceConfiguration&quot;]
+    Object______p175[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultDeviceTransportConfiguration_c175[&quot;DefaultDeviceTransportConfiguration&quot;]
+    DeviceTransportConfiguration_p176[&quot;DeviceTransportConfiguration&quot;] --&gt;|implements| DefaultDeviceTransportConfiguration_c176[&quot;DefaultDeviceTransportConfiguration&quot;]
+    Serializable_p177[&quot;Serializable&quot;] --&gt;|extends| DeviceConfiguration_c177[&quot;DeviceConfiguration&quot;]
+    Object______p178[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceData_c178[&quot;DeviceData&quot;]
+    Serializable_p179[&quot;Serializable&quot;] --&gt;|implements| DeviceData_c179[&quot;DeviceData&quot;]
+    Serializable_p180[&quot;Serializable&quot;] --&gt;|extends| DeviceTransportConfiguration_c180[&quot;DeviceTransportConfiguration&quot;]
+    PowerSavingConfiguration_p181[&quot;PowerSavingConfiguration&quot;] --&gt;|extends| Lwm2mDeviceTransportConfiguration_c181[&quot;Lwm2mDeviceTransportConfiguration&quot;]
+    DeviceTransportConfiguration_p182[&quot;DeviceTransportConfiguration&quot;] --&gt;|implements| Lwm2mDeviceTransportConfiguration_c182[&quot;Lwm2mDeviceTransportConfiguration&quot;]
+    Object______p183[&quot;Object/外部框架&quot;] --&gt;|extends| MqttDeviceTransportConfiguration_c183[&quot;MqttDeviceTransportConfiguration&quot;]
+    DeviceTransportConfiguration_p184[&quot;DeviceTransportConfiguration&quot;] --&gt;|implements| MqttDeviceTransportConfiguration_c184[&quot;MqttDeviceTransportConfiguration&quot;]
+    Object______p185[&quot;Object/外部框架&quot;] --&gt;|extends| PowerSavingConfiguration_c185[&quot;PowerSavingConfiguration&quot;]
+    Serializable_p186[&quot;Serializable&quot;] --&gt;|implements| PowerSavingConfiguration_c186[&quot;PowerSavingConfiguration&quot;]
+    Object______p187[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpDeviceTransportConfiguration_c187[&quot;SnmpDeviceTransportConfiguration&quot;]
+    DeviceTransportConfiguration_p188[&quot;DeviceTransportConfiguration&quot;] --&gt;|implements| SnmpDeviceTransportConfiguration_c188[&quot;SnmpDeviceTransportConfiguration&quot;]
+    Object______p189[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmCondition_c189[&quot;AlarmCondition&quot;]
+    Serializable_p190[&quot;Serializable&quot;] --&gt;|implements| AlarmCondition_c190[&quot;AlarmCondition&quot;]
+    Object______p191[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmConditionFilter_c191[&quot;AlarmConditionFilter&quot;]
+    Serializable_p192[&quot;Serializable&quot;] --&gt;|implements| AlarmConditionFilter_c192[&quot;AlarmConditionFilter&quot;]
+    Object______p193[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmConditionFilterKey_c193[&quot;AlarmConditionFilterKey&quot;]
+    Serializable_p194[&quot;Serializable&quot;] --&gt;|implements| AlarmConditionFilterKey_c194[&quot;AlarmConditionFilterKey&quot;]
+    Serializable_p195[&quot;Serializable&quot;] --&gt;|extends| AlarmConditionSpec_c195[&quot;AlarmConditionSpec&quot;]
+    Object______p196[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmRule_c196[&quot;AlarmRule&quot;]
+    Serializable_p197[&quot;Serializable&quot;] --&gt;|implements| AlarmRule_c197[&quot;AlarmRule&quot;]
+    Serializable_p198[&quot;Serializable&quot;] --&gt;|extends| AlarmSchedule_c198[&quot;AlarmSchedule&quot;]
+    Object______p199[&quot;Object/外部框架&quot;] --&gt;|extends| AllowCreateNewDevicesDeviceProfileProvisionConfiguration_c199[&quot;AllowCreateNewDevicesDeviceProfileProvisionConfiguration&quot;]
+    DeviceProfileProvisionConfiguration_p200[&quot;DeviceProfileProvisionConfiguration&quot;] --&gt;|implements| AllowCreateNewDevicesDeviceProfileProvisionConfiguration_c200[&quot;AllowCreateNewDevicesDeviceProfileProvisionConfiguration&quot;]
+    Object______p201[&quot;Object/外部框架&quot;] --&gt;|extends| AnyTimeSchedule_c201[&quot;AnyTimeSchedule&quot;]
+    AlarmSchedule_p202[&quot;AlarmSchedule&quot;] --&gt;|implements| AnyTimeSchedule_c202[&quot;AnyTimeSchedule&quot;]
+    Object______p203[&quot;Object/外部框架&quot;] --&gt;|extends| CheckPreProvisionedDevicesDeviceProfileProvisionConfiguratio_c203[&quot;CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration&quot;]
+    DeviceProfileProvisionConfiguration_p204[&quot;DeviceProfileProvisionConfiguration&quot;] --&gt;|implements| CheckPreProvisionedDevicesDeviceProfileProvisionConfiguratio_c204[&quot;CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration&quot;]
+    Object______p205[&quot;Object/外部框架&quot;] --&gt;|extends| CoapDeviceProfileTransportConfiguration_c205[&quot;CoapDeviceProfileTransportConfiguration&quot;]
+    DeviceProfileTransportConfiguration_p206[&quot;DeviceProfileTransportConfiguration&quot;] --&gt;|implements| CoapDeviceProfileTransportConfiguration_c206[&quot;CoapDeviceProfileTransportConfiguration&quot;]
+    Serializable_p207[&quot;Serializable&quot;] --&gt;|extends| CoapDeviceTypeConfiguration_c207[&quot;CoapDeviceTypeConfiguration&quot;]
+    Object______p208[&quot;Object/外部框架&quot;] --&gt;|extends| CustomTimeSchedule_c208[&quot;CustomTimeSchedule&quot;]
+    AlarmSchedule_p209[&quot;AlarmSchedule&quot;] --&gt;|implements| CustomTimeSchedule_c209[&quot;CustomTimeSchedule&quot;]
+    Object______p210[&quot;Object/外部框架&quot;] --&gt;|extends| CustomTimeScheduleItem_c210[&quot;CustomTimeScheduleItem&quot;]
+    Serializable_p211[&quot;Serializable&quot;] --&gt;|implements| CustomTimeScheduleItem_c211[&quot;CustomTimeScheduleItem&quot;]
+    Object______p212[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultCoapDeviceTypeConfiguration_c212[&quot;DefaultCoapDeviceTypeConfiguration&quot;]
+    CoapDeviceTypeConfiguration_p213[&quot;CoapDeviceTypeConfiguration&quot;] --&gt;|implements| DefaultCoapDeviceTypeConfiguration_c213[&quot;DefaultCoapDeviceTypeConfiguration&quot;]
+    Object______p214[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultDeviceProfileConfiguration_c214[&quot;DefaultDeviceProfileConfiguration&quot;]
+    DeviceProfileConfiguration_p215[&quot;DeviceProfileConfiguration&quot;] --&gt;|implements| DefaultDeviceProfileConfiguration_c215[&quot;DefaultDeviceProfileConfiguration&quot;]
+    Object______p216[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultDeviceProfileTransportConfiguration_c216[&quot;DefaultDeviceProfileTransportConfiguration&quot;]
+    DeviceProfileTransportConfiguration_p217[&quot;DeviceProfileTransportConfiguration&quot;] --&gt;|implements| DefaultDeviceProfileTransportConfiguration_c217[&quot;DefaultDeviceProfileTransportConfiguration&quot;]
+    Object______p218[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProfileAlarm_c218[&quot;DeviceProfileAlarm&quot;]
+    Serializable_p219[&quot;Serializable&quot;] --&gt;|implements| DeviceProfileAlarm_c219[&quot;DeviceProfileAlarm&quot;]
+    Serializable_p220[&quot;Serializable&quot;] --&gt;|extends| DeviceProfileConfiguration_c220[&quot;DeviceProfileConfiguration&quot;]
+    Object______p221[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProfileData_c221[&quot;DeviceProfileData&quot;]
+    Serializable_p222[&quot;Serializable&quot;] --&gt;|implements| DeviceProfileData_c222[&quot;DeviceProfileData&quot;]
+    Serializable_p223[&quot;Serializable&quot;] --&gt;|extends| DeviceProfileProvisionConfiguration_c223[&quot;DeviceProfileProvisionConfiguration&quot;]
+    Serializable_p224[&quot;Serializable&quot;] --&gt;|extends| DeviceProfileTransportConfiguration_c224[&quot;DeviceProfileTransportConfiguration&quot;]
+    Object______p225[&quot;Object/外部框架&quot;] --&gt;|extends| DisabledDeviceProfileProvisionConfiguration_c225[&quot;DisabledDeviceProfileProvisionConfiguration&quot;]
+    DeviceProfileProvisionConfiguration_p226[&quot;DeviceProfileProvisionConfiguration&quot;] --&gt;|implements| DisabledDeviceProfileProvisionConfiguration_c226[&quot;DisabledDeviceProfileProvisionConfiguration&quot;]
+    Object______p227[&quot;Object/外部框架&quot;] --&gt;|extends| DurationAlarmConditionSpec_c227[&quot;DurationAlarmConditionSpec&quot;]
+    AlarmConditionSpec_p228[&quot;AlarmConditionSpec&quot;] --&gt;|implements| DurationAlarmConditionSpec_c228[&quot;DurationAlarmConditionSpec&quot;]
+    Object______p229[&quot;Object/外部框架&quot;] --&gt;|extends| EfentoCoapDeviceTypeConfiguration_c229[&quot;EfentoCoapDeviceTypeConfiguration&quot;]
+    CoapDeviceTypeConfiguration_p230[&quot;CoapDeviceTypeConfiguration&quot;] --&gt;|implements| EfentoCoapDeviceTypeConfiguration_c230[&quot;EfentoCoapDeviceTypeConfiguration&quot;]
+    Object______p231[&quot;Object/外部框架&quot;] --&gt;|extends| JsonTransportPayloadConfiguration_c231[&quot;JsonTransportPayloadConfiguration&quot;]
+    TransportPayloadTypeConfiguration_p232[&quot;TransportPayloadTypeConfiguration&quot;] --&gt;|implements| JsonTransportPayloadConfiguration_c232[&quot;JsonTransportPayloadConfiguration&quot;]
+    Object______p233[&quot;Object/外部框架&quot;] --&gt;|extends| Lwm2mDeviceProfileTransportConfiguration_c233[&quot;Lwm2mDeviceProfileTransportConfiguration&quot;]
+    DeviceProfileTransportConfiguration_p234[&quot;DeviceProfileTransportConfiguration&quot;] --&gt;|implements| Lwm2mDeviceProfileTransportConfiguration_c234[&quot;Lwm2mDeviceProfileTransportConfiguration&quot;]
+    Object______p235[&quot;Object/外部框架&quot;] --&gt;|extends| MqttDeviceProfileTransportConfiguration_c235[&quot;MqttDeviceProfileTransportConfiguration&quot;]
+    DeviceProfileTransportConfiguration_p236[&quot;DeviceProfileTransportConfiguration&quot;] --&gt;|implements| MqttDeviceProfileTransportConfiguration_c236[&quot;MqttDeviceProfileTransportConfiguration&quot;]
+    Object______p237[&quot;Object/外部框架&quot;] --&gt;|extends| MqttTopics_c237[&quot;MqttTopics&quot;]
+    Object______p238[&quot;Object/外部框架&quot;] --&gt;|extends| ProtoTransportPayloadConfiguration_c238[&quot;ProtoTransportPayloadConfiguration&quot;]
+    TransportPayloadTypeConfiguration_p239[&quot;TransportPayloadTypeConfiguration&quot;] --&gt;|implements| ProtoTransportPayloadConfiguration_c239[&quot;ProtoTransportPayloadConfiguration&quot;]
+    Object______p240[&quot;Object/外部框架&quot;] --&gt;|extends| ProvisionDeviceProfileCredentials_c240[&quot;ProvisionDeviceProfileCredentials&quot;]
+    Object______p241[&quot;Object/外部框架&quot;] --&gt;|extends| RepeatingAlarmConditionSpec_c241[&quot;RepeatingAlarmConditionSpec&quot;]
+    AlarmConditionSpec_p242[&quot;AlarmConditionSpec&quot;] --&gt;|implements| RepeatingAlarmConditionSpec_c242[&quot;RepeatingAlarmConditionSpec&quot;]
+    Object______p243[&quot;Object/外部框架&quot;] --&gt;|extends| SimpleAlarmConditionSpec_c243[&quot;SimpleAlarmConditionSpec&quot;]
+    AlarmConditionSpec_p244[&quot;AlarmConditionSpec&quot;] --&gt;|implements| SimpleAlarmConditionSpec_c244[&quot;SimpleAlarmConditionSpec&quot;]
+    Object______p245[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpDeviceProfileTransportConfiguration_c245[&quot;SnmpDeviceProfileTransportConfiguration&quot;]
+    DeviceProfileTransportConfiguration_p246[&quot;DeviceProfileTransportConfiguration&quot;] --&gt;|implements| SnmpDeviceProfileTransportConfiguration_c246[&quot;SnmpDeviceProfileTransportConfiguration&quot;]
+    Object______p247[&quot;Object/外部框架&quot;] --&gt;|extends| SpecificTimeSchedule_c247[&quot;SpecificTimeSchedule&quot;]
+    AlarmSchedule_p248[&quot;AlarmSchedule&quot;] --&gt;|implements| SpecificTimeSchedule_c248[&quot;SpecificTimeSchedule&quot;]
+    Serializable_p249[&quot;Serializable&quot;] --&gt;|extends| TransportPayloadTypeConfiguration_c249[&quot;TransportPayloadTypeConfiguration&quot;]
+    Object______p250[&quot;Object/外部框架&quot;] --&gt;|extends| X509CertificateChainProvisionConfiguration_c250[&quot;X509CertificateChainProvisionConfiguration&quot;]
+    DeviceProfileProvisionConfiguration_p251[&quot;DeviceProfileProvisionConfiguration&quot;] --&gt;|implements| X509CertificateChainProvisionConfiguration_c251[&quot;X509CertificateChainProvisionConfiguration&quot;]
+    Object______p252[&quot;Object/外部框架&quot;] --&gt;|extends| ObjectAttributes_c252[&quot;ObjectAttributes&quot;]
+    Serializable_p253[&quot;Serializable&quot;] --&gt;|implements| ObjectAttributes_c253[&quot;ObjectAttributes&quot;]
+    PowerSavingConfiguration_p254[&quot;PowerSavingConfiguration&quot;] --&gt;|extends| OtherConfiguration_c254[&quot;OtherConfiguration&quot;]
+    Object______p255[&quot;Object/外部框架&quot;] --&gt;|extends| TelemetryMappingConfiguration_c255[&quot;TelemetryMappingConfiguration&quot;]
+    Serializable_p256[&quot;Serializable&quot;] --&gt;|implements| TelemetryMappingConfiguration_c256[&quot;TelemetryMappingConfiguration&quot;]
+    LwM2MServerSecurityConfig_p257[&quot;LwM2MServerSecurityConfig&quot;] --&gt;|extends| AbstractLwM2MBootstrapServerCredential_c257[&quot;AbstractLwM2MBootstrapServerCredential&quot;]
+    LwM2MBootstrapServerCredential_p258[&quot;LwM2MBootstrapServerCredential&quot;] --&gt;|implements| AbstractLwM2MBootstrapServerCredential_c258[&quot;AbstractLwM2MBootstrapServerCredential&quot;]
+    Serializable_p259[&quot;Serializable&quot;] --&gt;|extends| LwM2MBootstrapServerCredential_c259[&quot;LwM2MBootstrapServerCredential&quot;]
+    Object______p260[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MServerSecurityConfig_c260[&quot;LwM2MServerSecurityConfig&quot;]
+    LwM2MServerSecurityConfig_p261[&quot;LwM2MServerSecurityConfig&quot;] --&gt;|extends| LwM2MServerSecurityConfigDefault_c261[&quot;LwM2MServerSecurityConfigDefault&quot;]
+    AbstractLwM2MBootstrapServerCredential_p262[&quot;AbstractLwM2MBootstrapServerCredential&quot;] --&gt;|extends| NoSecLwM2MBootstrapServerCredential_c262[&quot;NoSecLwM2MBootstrapServerCredential&quot;]
+    AbstractLwM2MBootstrapServerCredential_p263[&quot;AbstractLwM2MBootstrapServerCredential&quot;] --&gt;|extends| PSKLwM2MBootstrapServerCredential_c263[&quot;PSKLwM2MBootstrapServerCredential&quot;]
+    AbstractLwM2MBootstrapServerCredential_p264[&quot;AbstractLwM2MBootstrapServerCredential&quot;] --&gt;|extends| RPKLwM2MBootstrapServerCredential_c264[&quot;RPKLwM2MBootstrapServerCredential&quot;]
+    AbstractLwM2MBootstrapServerCredential_p265[&quot;AbstractLwM2MBootstrapServerCredential&quot;] --&gt;|extends| X509LwM2MBootstrapServerCredential_c265[&quot;X509LwM2MBootstrapServerCredential&quot;]
+    BaseDataWithAdditionalInfo_p266[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| Edge_c266[&quot;Edge&quot;]
+    HasLabel_p267[&quot;HasLabel&quot;] --&gt;|implements| Edge_c267[&quot;Edge&quot;]
+    HasTenantId_p268[&quot;HasTenantId&quot;] --&gt;|implements| Edge_c268[&quot;Edge&quot;]
+    HasCustomerId_p269[&quot;HasCustomerId&quot;] --&gt;|implements| Edge_c269[&quot;Edge&quot;]
+    BaseData_p270[&quot;BaseData&quot;] --&gt;|extends| EdgeEvent_c270[&quot;EdgeEvent&quot;]
+    Edge_p271[&quot;Edge&quot;] --&gt;|extends| EdgeInfo_c271[&quot;EdgeInfo&quot;]
+    Object______p272[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeInstructions_c272[&quot;EdgeInstructions&quot;]
+    Object______p273[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeSearchQuery_c273[&quot;EdgeSearchQuery&quot;]
+    Object______p274[&quot;Object/外部框架&quot;] --&gt;|extends| EntityViewSearchQuery_c274[&quot;EntityViewSearchQuery&quot;]
+    Object______p275[&quot;Object/外部框架&quot;] --&gt;|extends| DebugEventFilter_c275[&quot;DebugEventFilter&quot;]
+    EventFilter_p276[&quot;EventFilter&quot;] --&gt;|implements| DebugEventFilter_c276[&quot;DebugEventFilter&quot;]
+    Event_p277[&quot;Event&quot;] --&gt;|extends| ErrorEvent_c277[&quot;ErrorEvent&quot;]
+    Object______p278[&quot;Object/外部框架&quot;] --&gt;|extends| ErrorEventFilter_c278[&quot;ErrorEventFilter&quot;]
+    EventFilter_p279[&quot;EventFilter&quot;] --&gt;|implements| ErrorEventFilter_c279[&quot;ErrorEventFilter&quot;]
+    BaseData_p280[&quot;BaseData&quot;] --&gt;|extends| Event_c280[&quot;Event&quot;]
+    Object______p281[&quot;Object/外部框架&quot;] --&gt;|extends| LifeCycleEventFilter_c281[&quot;LifeCycleEventFilter&quot;]
+    EventFilter_p282[&quot;EventFilter&quot;] --&gt;|implements| LifeCycleEventFilter_c282[&quot;LifeCycleEventFilter&quot;]
+    Event_p283[&quot;Event&quot;] --&gt;|extends| LifecycleEvent_c283[&quot;LifecycleEvent&quot;]
+    Event_p284[&quot;Event&quot;] --&gt;|extends| RuleChainDebugEvent_c284[&quot;RuleChainDebugEvent&quot;]
+    DebugEventFilter_p285[&quot;DebugEventFilter&quot;] --&gt;|extends| RuleChainDebugEventFilter_c285[&quot;RuleChainDebugEventFilter&quot;]
+    Event_p286[&quot;Event&quot;] --&gt;|extends| RuleNodeDebugEvent_c286[&quot;RuleNodeDebugEvent&quot;]
+    DebugEventFilter_p287[&quot;DebugEventFilter&quot;] --&gt;|extends| RuleNodeDebugEventFilter_c287[&quot;RuleNodeDebugEventFilter&quot;]
+    Event_p288[&quot;Event&quot;] --&gt;|extends| StatisticsEvent_c288[&quot;StatisticsEvent&quot;]
+    Object______p289[&quot;Object/外部框架&quot;] --&gt;|extends| StatisticsEventFilter_c289[&quot;StatisticsEventFilter&quot;]
+    EventFilter_p290[&quot;EventFilter&quot;] --&gt;|implements| StatisticsEventFilter_c290[&quot;StatisticsEventFilter&quot;]
+    RuntimeException_p291[&quot;RuntimeException&quot;] --&gt;|extends| AbstractRateLimitException_c291[&quot;AbstractRateLimitException&quot;]
+    AbstractRateLimitException_p292[&quot;AbstractRateLimitException&quot;] --&gt;|extends| ApiUsageLimitsExceededException_c292[&quot;ApiUsageLimitsExceededException&quot;]
+    RuntimeException_p293[&quot;RuntimeException&quot;] --&gt;|extends| TenantNotFoundException_c293[&quot;TenantNotFoundException&quot;]
+    RuntimeException_p294[&quot;RuntimeException&quot;] --&gt;|extends| TenantProfileNotFoundException_c294[&quot;TenantProfileNotFoundException&quot;]
+    Exception_p295[&quot;Exception&quot;] --&gt;|extends| ThingsboardException_c295[&quot;ThingsboardException&quot;]
+    Error_p296[&quot;Error&quot;] --&gt;|extends| ThingsboardKafkaClientError_c296[&quot;ThingsboardKafkaClientError&quot;]
+    UUIDBased_p297[&quot;UUIDBased&quot;] --&gt;|extends| AdminSettingsId_c297[&quot;AdminSettingsId&quot;]
+    UUIDBased_p298[&quot;UUIDBased&quot;] --&gt;|extends| AlarmCommentId_c298[&quot;AlarmCommentId&quot;]
+    UUIDBased_p299[&quot;UUIDBased&quot;] --&gt;|extends| AlarmId_c299[&quot;AlarmId&quot;]
+    EntityId_p300[&quot;EntityId&quot;] --&gt;|implements| AlarmId_c300[&quot;AlarmId&quot;]
+    UUIDBased_p301[&quot;UUIDBased&quot;] --&gt;|extends| ApiUsageStateId_c301[&quot;ApiUsageStateId&quot;]
+    EntityId_p302[&quot;EntityId&quot;] --&gt;|implements| ApiUsageStateId_c302[&quot;ApiUsageStateId&quot;]
+    UUIDBased_p303[&quot;UUIDBased&quot;] --&gt;|extends| AssetId_c303[&quot;AssetId&quot;]
+    EntityId_p304[&quot;EntityId&quot;] --&gt;|implements| AssetId_c304[&quot;AssetId&quot;]
+    UUIDBased_p305[&quot;UUIDBased&quot;] --&gt;|extends| AssetProfileId_c305[&quot;AssetProfileId&quot;]
+    EntityId_p306[&quot;EntityId&quot;] --&gt;|implements| AssetProfileId_c306[&quot;AssetProfileId&quot;]
+    UUIDBased_p307[&quot;UUIDBased&quot;] --&gt;|extends| AuditLogId_c307[&quot;AuditLogId&quot;]
+    UUIDBased_p308[&quot;UUIDBased&quot;] --&gt;|extends| ComponentDescriptorId_c308[&quot;ComponentDescriptorId&quot;]
+    UUIDBased_p309[&quot;UUIDBased&quot;] --&gt;|extends| CustomerId_c309[&quot;CustomerId&quot;]
+    EntityId_p310[&quot;EntityId&quot;] --&gt;|implements| CustomerId_c310[&quot;CustomerId&quot;]
+    UUIDBased_p311[&quot;UUIDBased&quot;] --&gt;|extends| DashboardId_c311[&quot;DashboardId&quot;]
+    EntityId_p312[&quot;EntityId&quot;] --&gt;|implements| DashboardId_c312[&quot;DashboardId&quot;]
+    UUIDBased_p313[&quot;UUIDBased&quot;] --&gt;|extends| DeviceCredentialsId_c313[&quot;DeviceCredentialsId&quot;]
+    UUIDBased_p314[&quot;UUIDBased&quot;] --&gt;|extends| DeviceId_c314[&quot;DeviceId&quot;]
+    EntityId_p315[&quot;EntityId&quot;] --&gt;|implements| DeviceId_c315[&quot;DeviceId&quot;]
+    UUIDBased_p316[&quot;UUIDBased&quot;] --&gt;|extends| DeviceProfileId_c316[&quot;DeviceProfileId&quot;]
+    EntityId_p317[&quot;EntityId&quot;] --&gt;|implements| DeviceProfileId_c317[&quot;DeviceProfileId&quot;]
+    UUIDBased_p318[&quot;UUIDBased&quot;] --&gt;|extends| EdgeEventId_c318[&quot;EdgeEventId&quot;]
+    UUIDBased_p319[&quot;UUIDBased&quot;] --&gt;|extends| EdgeId_c319[&quot;EdgeId&quot;]
+    EntityId_p320[&quot;EntityId&quot;] --&gt;|implements| EdgeId_c320[&quot;EdgeId&quot;]
+    HasUUID_p321[&quot;HasUUID&quot;] --&gt;|extends| EntityId_c321[&quot;EntityId&quot;]
+    Serializable_p322[&quot;Serializable&quot;] --&gt;|extends| EntityId_c322[&quot;EntityId&quot;]
+    JsonDeserializer_p323[&quot;JsonDeserializer&quot;] --&gt;|extends| EntityIdDeserializer_c323[&quot;EntityIdDeserializer&quot;]
+    Object______p324[&quot;Object/外部框架&quot;] --&gt;|extends| EntityIdFactory_c324[&quot;EntityIdFactory&quot;]
+    JsonSerializer_p325[&quot;JsonSerializer&quot;] --&gt;|extends| EntityIdSerializer_c325[&quot;EntityIdSerializer&quot;]
+    UUIDBased_p326[&quot;UUIDBased&quot;] --&gt;|extends| EntityViewId_c326[&quot;EntityViewId&quot;]
+    EntityId_p327[&quot;EntityId&quot;] --&gt;|implements| EntityViewId_c327[&quot;EntityViewId&quot;]
+    UUIDBased_p328[&quot;UUIDBased&quot;] --&gt;|extends| EventId_c328[&quot;EventId&quot;]
+    Serializable_p329[&quot;Serializable&quot;] --&gt;|extends| HasId_c329[&quot;HasId&quot;]
+    Object______p330[&quot;Object/外部框架&quot;] --&gt;|extends| IdBased_c330[&quot;IdBased&quot;]
+    Object______p331[&quot;Object/外部框架&quot;] --&gt;|extends| NameLabelAndCustomerDetails_c331[&quot;NameLabelAndCustomerDetails&quot;]
+    UUIDBased_p332[&quot;UUIDBased&quot;] --&gt;|extends| NodeId_c332[&quot;NodeId&quot;]
+    UUIDBased_p333[&quot;UUIDBased&quot;] --&gt;|extends| NotificationId_c333[&quot;NotificationId&quot;]
+    EntityId_p334[&quot;EntityId&quot;] --&gt;|implements| NotificationId_c334[&quot;NotificationId&quot;]
+    UUIDBased_p335[&quot;UUIDBased&quot;] --&gt;|extends| NotificationRequestId_c335[&quot;NotificationRequestId&quot;]
+    EntityId_p336[&quot;EntityId&quot;] --&gt;|implements| NotificationRequestId_c336[&quot;NotificationRequestId&quot;]
+    UUIDBased_p337[&quot;UUIDBased&quot;] --&gt;|extends| NotificationRuleId_c337[&quot;NotificationRuleId&quot;]
+    EntityId_p338[&quot;EntityId&quot;] --&gt;|implements| NotificationRuleId_c338[&quot;NotificationRuleId&quot;]
+    UUIDBased_p339[&quot;UUIDBased&quot;] --&gt;|extends| NotificationTargetId_c339[&quot;NotificationTargetId&quot;]
+    EntityId_p340[&quot;EntityId&quot;] --&gt;|implements| NotificationTargetId_c340[&quot;NotificationTargetId&quot;]
+    UUIDBased_p341[&quot;UUIDBased&quot;] --&gt;|extends| NotificationTemplateId_c341[&quot;NotificationTemplateId&quot;]
+    EntityId_p342[&quot;EntityId&quot;] --&gt;|implements| NotificationTemplateId_c342[&quot;NotificationTemplateId&quot;]
+    UUIDBased_p343[&quot;UUIDBased&quot;] --&gt;|extends| OAuth2ClientRegistrationTemplateId_c343[&quot;OAuth2ClientRegistrationTemplateId&quot;]
+    UUIDBased_p344[&quot;UUIDBased&quot;] --&gt;|extends| OAuth2DomainId_c344[&quot;OAuth2DomainId&quot;]
+    UUIDBased_p345[&quot;UUIDBased&quot;] --&gt;|extends| OAuth2MobileId_c345[&quot;OAuth2MobileId&quot;]
+    UUIDBased_p346[&quot;UUIDBased&quot;] --&gt;|extends| OAuth2ParamsId_c346[&quot;OAuth2ParamsId&quot;]
+    UUIDBased_p347[&quot;UUIDBased&quot;] --&gt;|extends| OAuth2RegistrationId_c347[&quot;OAuth2RegistrationId&quot;]
+    UUIDBased_p348[&quot;UUIDBased&quot;] --&gt;|extends| OtaPackageId_c348[&quot;OtaPackageId&quot;]
+    EntityId_p349[&quot;EntityId&quot;] --&gt;|implements| OtaPackageId_c349[&quot;OtaPackageId&quot;]
+    UUIDBased_p350[&quot;UUIDBased&quot;] --&gt;|extends| QueueId_c350[&quot;QueueId&quot;]
+    EntityId_p351[&quot;EntityId&quot;] --&gt;|implements| QueueId_c351[&quot;QueueId&quot;]
+    UUIDBased_p352[&quot;UUIDBased&quot;] --&gt;|extends| RpcId_c352[&quot;RpcId&quot;]
+    EntityId_p353[&quot;EntityId&quot;] --&gt;|implements| RpcId_c353[&quot;RpcId&quot;]
+    UUIDBased_p354[&quot;UUIDBased&quot;] --&gt;|extends| RuleChainId_c354[&quot;RuleChainId&quot;]
+    EntityId_p355[&quot;EntityId&quot;] --&gt;|implements| RuleChainId_c355[&quot;RuleChainId&quot;]
+    UUIDBased_p356[&quot;UUIDBased&quot;] --&gt;|extends| RuleNodeId_c356[&quot;RuleNodeId&quot;]
+    EntityId_p357[&quot;EntityId&quot;] --&gt;|implements| RuleNodeId_c357[&quot;RuleNodeId&quot;]
+    UUIDBased_p358[&quot;UUIDBased&quot;] --&gt;|extends| RuleNodeStateId_c358[&quot;RuleNodeStateId&quot;]
+    UUIDBased_p359[&quot;UUIDBased&quot;] --&gt;|extends| TbResourceId_c359[&quot;TbResourceId&quot;]
+    EntityId_p360[&quot;EntityId&quot;] --&gt;|implements| TbResourceId_c360[&quot;TbResourceId&quot;]
+    UUIDBased_p361[&quot;UUIDBased&quot;] --&gt;|extends| TenantId_c361[&quot;TenantId&quot;]
+    EntityId_p362[&quot;EntityId&quot;] --&gt;|implements| TenantId_c362[&quot;TenantId&quot;]
+    UUIDBased_p363[&quot;UUIDBased&quot;] --&gt;|extends| TenantProfileId_c363[&quot;TenantProfileId&quot;]
+    EntityId_p364[&quot;EntityId&quot;] --&gt;|implements| TenantProfileId_c364[&quot;TenantProfileId&quot;]
+    Object______p365[&quot;Object/外部框架&quot;] --&gt;|extends| UUIDBased_c365[&quot;UUIDBased&quot;]
+    HasUUID_p366[&quot;HasUUID&quot;] --&gt;|implements| UUIDBased_c366[&quot;UUIDBased&quot;]
+    Serializable_p367[&quot;Serializable&quot;] --&gt;|implements| UUIDBased_c367[&quot;UUIDBased&quot;]
+    UUIDBased_p368[&quot;UUIDBased&quot;] --&gt;|extends| UserAuthSettingsId_c368[&quot;UserAuthSettingsId&quot;]
+    UUIDBased_p369[&quot;UUIDBased&quot;] --&gt;|extends| UserCredentialsId_c369[&quot;UserCredentialsId&quot;]
+    UUIDBased_p370[&quot;UUIDBased&quot;] --&gt;|extends| UserId_c370[&quot;UserId&quot;]
+    EntityId_p371[&quot;EntityId&quot;] --&gt;|implements| UserId_c371[&quot;UserId&quot;]
+    UUIDBased_p372[&quot;UUIDBased&quot;] --&gt;|extends| WidgetTypeId_c372[&quot;WidgetTypeId&quot;]
+    EntityId_p373[&quot;EntityId&quot;] --&gt;|implements| WidgetTypeId_c373[&quot;WidgetTypeId&quot;]
+    UUIDBased_p374[&quot;UUIDBased&quot;] --&gt;|extends| WidgetsBundleId_c374[&quot;WidgetsBundleId&quot;]
+    EntityId_p375[&quot;EntityId&quot;] --&gt;|implements| WidgetsBundleId_c375[&quot;WidgetsBundleId&quot;]
+    BasicTsKvEntry_p376[&quot;BasicTsKvEntry&quot;] --&gt;|extends| AggTsKvEntry_c376[&quot;AggTsKvEntry&quot;]
+    Object______p377[&quot;Object/外部框架&quot;] --&gt;|extends| AggregationParams_c377[&quot;AggregationParams&quot;]
+    Object______p378[&quot;Object/外部框架&quot;] --&gt;|extends| AttributeKey_c378[&quot;AttributeKey&quot;]
+    Serializable_p379[&quot;Serializable&quot;] --&gt;|implements| AttributeKey_c379[&quot;AttributeKey&quot;]
+    KvEntry_p380[&quot;KvEntry&quot;] --&gt;|extends| AttributeKvEntry_c380[&quot;AttributeKvEntry&quot;]
+    Object______p381[&quot;Object/外部框架&quot;] --&gt;|extends| BaseAttributeKvEntry_c381[&quot;BaseAttributeKvEntry&quot;]
+    AttributeKvEntry_p382[&quot;AttributeKvEntry&quot;] --&gt;|implements| BaseAttributeKvEntry_c382[&quot;BaseAttributeKvEntry&quot;]
+    BaseTsKvQuery_p383[&quot;BaseTsKvQuery&quot;] --&gt;|extends| BaseDeleteTsKvQuery_c383[&quot;BaseDeleteTsKvQuery&quot;]
+    DeleteTsKvQuery_p384[&quot;DeleteTsKvQuery&quot;] --&gt;|implements| BaseDeleteTsKvQuery_c384[&quot;BaseDeleteTsKvQuery&quot;]
+    BaseTsKvQuery_p385[&quot;BaseTsKvQuery&quot;] --&gt;|extends| BaseReadTsKvQuery_c385[&quot;BaseReadTsKvQuery&quot;]
+    ReadTsKvQuery_p386[&quot;ReadTsKvQuery&quot;] --&gt;|implements| BaseReadTsKvQuery_c386[&quot;BaseReadTsKvQuery&quot;]
+    Object______p387[&quot;Object/外部框架&quot;] --&gt;|extends| BaseTsKvQuery_c387[&quot;BaseTsKvQuery&quot;]
+    TsKvQuery_p388[&quot;TsKvQuery&quot;] --&gt;|implements| BaseTsKvQuery_c388[&quot;BaseTsKvQuery&quot;]
+    Object______p389[&quot;Object/外部框架&quot;] --&gt;|extends| BasicKvEntry_c389[&quot;BasicKvEntry&quot;]
+    KvEntry_p390[&quot;KvEntry&quot;] --&gt;|implements| BasicKvEntry_c390[&quot;BasicKvEntry&quot;]
+    Object______p391[&quot;Object/外部框架&quot;] --&gt;|extends| BasicTsKvEntry_c391[&quot;BasicTsKvEntry&quot;]
+    TsKvEntry_p392[&quot;TsKvEntry&quot;] --&gt;|implements| BasicTsKvEntry_c392[&quot;BasicTsKvEntry&quot;]
+    BasicKvEntry_p393[&quot;BasicKvEntry&quot;] --&gt;|extends| BooleanDataEntry_c393[&quot;BooleanDataEntry&quot;]
+    TsKvQuery_p394[&quot;TsKvQuery&quot;] --&gt;|extends| DeleteTsKvQuery_c394[&quot;DeleteTsKvQuery&quot;]
+    BasicKvEntry_p395[&quot;BasicKvEntry&quot;] --&gt;|extends| DoubleDataEntry_c395[&quot;DoubleDataEntry&quot;]
+    BasicKvEntry_p396[&quot;BasicKvEntry&quot;] --&gt;|extends| JsonDataEntry_c396[&quot;JsonDataEntry&quot;]
+    Serializable_p397[&quot;Serializable&quot;] --&gt;|extends| KvEntry_c397[&quot;KvEntry&quot;]
+    BasicKvEntry_p398[&quot;BasicKvEntry&quot;] --&gt;|extends| LongDataEntry_c398[&quot;LongDataEntry&quot;]
+    TsKvQuery_p399[&quot;TsKvQuery&quot;] --&gt;|extends| ReadTsKvQuery_c399[&quot;ReadTsKvQuery&quot;]
+    Object______p400[&quot;Object/外部框架&quot;] --&gt;|extends| ReadTsKvQueryResult_c400[&quot;ReadTsKvQueryResult&quot;]
+    BasicKvEntry_p401[&quot;BasicKvEntry&quot;] --&gt;|extends| StringDataEntry_c401[&quot;StringDataEntry&quot;]
+    KvEntry_p402[&quot;KvEntry&quot;] --&gt;|extends| TsKvEntry_c402[&quot;TsKvEntry&quot;]
+    Object______p403[&quot;Object/外部框架&quot;] --&gt;|extends| TsKvEntryAggWrapper_c403[&quot;TsKvEntryAggWrapper&quot;]
+    Object______p404[&quot;Object/外部框架&quot;] --&gt;|extends| TsKvLatestRemovingResult_c404[&quot;TsKvLatestRemovingResult&quot;]
+    Object______p405[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mInstance_c405[&quot;LwM2mInstance&quot;]
+    Object______p406[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mObject_c406[&quot;LwM2mObject&quot;]
+    Object______p407[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mResourceObserve_c407[&quot;LwM2mResourceObserve&quot;]
+    Object______p408[&quot;Object/外部框架&quot;] --&gt;|extends| MobileSessionInfo_c408[&quot;MobileSessionInfo&quot;]
+    Object______p409[&quot;Object/外部框架&quot;] --&gt;|extends| UserMobileInfo_c409[&quot;UserMobileInfo&quot;]
+    Object______p410[&quot;Object/外部框架&quot;] --&gt;|extends| TbNodeConnectionType_c410[&quot;TbNodeConnectionType&quot;]
+    RuntimeException_p411[&quot;RuntimeException&quot;] --&gt;|extends| AlreadySentException_c411[&quot;AlreadySentException&quot;]
+    BaseData_p412[&quot;BaseData&quot;] --&gt;|extends| Notification_c412[&quot;Notification&quot;]
+    BaseData_p413[&quot;BaseData&quot;] --&gt;|extends| NotificationRequest_c413[&quot;NotificationRequest&quot;]
+    HasTenantId_p414[&quot;HasTenantId&quot;] --&gt;|implements| NotificationRequest_c414[&quot;NotificationRequest&quot;]
+    HasName_p415[&quot;HasName&quot;] --&gt;|implements| NotificationRequest_c415[&quot;NotificationRequest&quot;]
+    Object______p416[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationRequestConfig_c416[&quot;NotificationRequestConfig&quot;]
+    NotificationRequest_p417[&quot;NotificationRequest&quot;] --&gt;|extends| NotificationRequestInfo_c417[&quot;NotificationRequestInfo&quot;]
+    Object______p418[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationRequestPreview_c418[&quot;NotificationRequestPreview&quot;]
+    Object______p419[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationRequestStats_c419[&quot;NotificationRequestStats&quot;]
+    Object______p420[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmAssignmentNotificationInfo_c420[&quot;AlarmAssignmentNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p421[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| AlarmAssignmentNotificationInfo_c421[&quot;AlarmAssignmentNotificationInfo&quot;]
+    Object______p422[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmCommentNotificationInfo_c422[&quot;AlarmCommentNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p423[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| AlarmCommentNotificationInfo_c423[&quot;AlarmCommentNotificationInfo&quot;]
+    Object______p424[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmNotificationInfo_c424[&quot;AlarmNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p425[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| AlarmNotificationInfo_c425[&quot;AlarmNotificationInfo&quot;]
+    Object______p426[&quot;Object/外部框架&quot;] --&gt;|extends| ApiUsageLimitNotificationInfo_c426[&quot;ApiUsageLimitNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p427[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| ApiUsageLimitNotificationInfo_c427[&quot;ApiUsageLimitNotificationInfo&quot;]
+    Object______p428[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceActivityNotificationInfo_c428[&quot;DeviceActivityNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p429[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| DeviceActivityNotificationInfo_c429[&quot;DeviceActivityNotificationInfo&quot;]
+    Object______p430[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeCommunicationFailureNotificationInfo_c430[&quot;EdgeCommunicationFailureNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p431[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| EdgeCommunicationFailureNotificationInfo_c431[&quot;EdgeCommunicationFailureNotificationInfo&quot;]
+    Object______p432[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeConnectionNotificationInfo_c432[&quot;EdgeConnectionNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p433[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| EdgeConnectionNotificationInfo_c433[&quot;EdgeConnectionNotificationInfo&quot;]
+    Object______p434[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesLimitNotificationInfo_c434[&quot;EntitiesLimitNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p435[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| EntitiesLimitNotificationInfo_c435[&quot;EntitiesLimitNotificationInfo&quot;]
+    Object______p436[&quot;Object/外部框架&quot;] --&gt;|extends| EntityActionNotificationInfo_c436[&quot;EntityActionNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p437[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| EntityActionNotificationInfo_c437[&quot;EntityActionNotificationInfo&quot;]
+    Object______p438[&quot;Object/外部框架&quot;] --&gt;|extends| NewPlatformVersionNotificationInfo_c438[&quot;NewPlatformVersionNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p439[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| NewPlatformVersionNotificationInfo_c439[&quot;NewPlatformVersionNotificationInfo&quot;]
+    Object______p440[&quot;Object/外部框架&quot;] --&gt;|extends| RateLimitsNotificationInfo_c440[&quot;RateLimitsNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p441[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| RateLimitsNotificationInfo_c441[&quot;RateLimitsNotificationInfo&quot;]
+    Object______p442[&quot;Object/外部框架&quot;] --&gt;|extends| RuleEngineComponentLifecycleEventNotificationInfo_c442[&quot;RuleEngineComponentLifecycleEventNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p443[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| RuleEngineComponentLifecycleEventNotificationInfo_c443[&quot;RuleEngineComponentLifecycleEventNotificationInfo&quot;]
+    Object______p444[&quot;Object/外部框架&quot;] --&gt;|extends| RuleEngineOriginatedNotificationInfo_c444[&quot;RuleEngineOriginatedNotificationInfo&quot;]
+    RuleOriginatedNotificationInfo_p445[&quot;RuleOriginatedNotificationInfo&quot;] --&gt;|implements| RuleEngineOriginatedNotificationInfo_c445[&quot;RuleEngineOriginatedNotificationInfo&quot;]
+    NotificationInfo_p446[&quot;NotificationInfo&quot;] --&gt;|extends| RuleOriginatedNotificationInfo_c446[&quot;RuleOriginatedNotificationInfo&quot;]
+    NotificationRuleRecipientsConfig_p447[&quot;NotificationRuleRecipientsConfig&quot;] --&gt;|extends| DefaultNotificationRuleRecipientsConfig_c447[&quot;DefaultNotificationRuleRecipientsConfig&quot;]
+    NotificationRuleRecipientsConfig_p448[&quot;NotificationRuleRecipientsConfig&quot;] --&gt;|extends| EscalatedNotificationRuleRecipientsConfig_c448[&quot;EscalatedNotificationRuleRecipientsConfig&quot;]
+    BaseData_p449[&quot;BaseData&quot;] --&gt;|extends| NotificationRule_c449[&quot;NotificationRule&quot;]
+    HasTenantId_p450[&quot;HasTenantId&quot;] --&gt;|implements| NotificationRule_c450[&quot;NotificationRule&quot;]
+    HasName_p451[&quot;HasName&quot;] --&gt;|implements| NotificationRule_c451[&quot;NotificationRule&quot;]
+    ExportableEntity_p452[&quot;ExportableEntity&quot;] --&gt;|implements| NotificationRule_c452[&quot;NotificationRule&quot;]
+    Serializable_p453[&quot;Serializable&quot;] --&gt;|implements| NotificationRule_c453[&quot;NotificationRule&quot;]
+    Object______p454[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationRuleConfig_c454[&quot;NotificationRuleConfig&quot;]
+    Serializable_p455[&quot;Serializable&quot;] --&gt;|implements| NotificationRuleConfig_c455[&quot;NotificationRuleConfig&quot;]
+    NotificationRule_p456[&quot;NotificationRule&quot;] --&gt;|extends| NotificationRuleInfo_c456[&quot;NotificationRuleInfo&quot;]
+    Object______p457[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationRuleRecipientsConfig_c457[&quot;NotificationRuleRecipientsConfig&quot;]
+    Serializable_p458[&quot;Serializable&quot;] --&gt;|implements| NotificationRuleRecipientsConfig_c458[&quot;NotificationRuleRecipientsConfig&quot;]
+    Object______p459[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmAssignmentTrigger_c459[&quot;AlarmAssignmentTrigger&quot;]
+    NotificationRuleTrigger_p460[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| AlarmAssignmentTrigger_c460[&quot;AlarmAssignmentTrigger&quot;]
+    Object______p461[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmCommentTrigger_c461[&quot;AlarmCommentTrigger&quot;]
+    NotificationRuleTrigger_p462[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| AlarmCommentTrigger_c462[&quot;AlarmCommentTrigger&quot;]
+    Object______p463[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmTrigger_c463[&quot;AlarmTrigger&quot;]
+    NotificationRuleTrigger_p464[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| AlarmTrigger_c464[&quot;AlarmTrigger&quot;]
+    Object______p465[&quot;Object/外部框架&quot;] --&gt;|extends| ApiUsageLimitTrigger_c465[&quot;ApiUsageLimitTrigger&quot;]
+    NotificationRuleTrigger_p466[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| ApiUsageLimitTrigger_c466[&quot;ApiUsageLimitTrigger&quot;]
+    Object______p467[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceActivityTrigger_c467[&quot;DeviceActivityTrigger&quot;]
+    NotificationRuleTrigger_p468[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| DeviceActivityTrigger_c468[&quot;DeviceActivityTrigger&quot;]
+    Object______p469[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeCommunicationFailureTrigger_c469[&quot;EdgeCommunicationFailureTrigger&quot;]
+    NotificationRuleTrigger_p470[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| EdgeCommunicationFailureTrigger_c470[&quot;EdgeCommunicationFailureTrigger&quot;]
+    Object______p471[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeConnectionTrigger_c471[&quot;EdgeConnectionTrigger&quot;]
+    NotificationRuleTrigger_p472[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| EdgeConnectionTrigger_c472[&quot;EdgeConnectionTrigger&quot;]
+    Object______p473[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesLimitTrigger_c473[&quot;EntitiesLimitTrigger&quot;]
+    NotificationRuleTrigger_p474[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| EntitiesLimitTrigger_c474[&quot;EntitiesLimitTrigger&quot;]
+    Object______p475[&quot;Object/外部框架&quot;] --&gt;|extends| EntityActionTrigger_c475[&quot;EntityActionTrigger&quot;]
+    NotificationRuleTrigger_p476[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| EntityActionTrigger_c476[&quot;EntityActionTrigger&quot;]
+    Object______p477[&quot;Object/外部框架&quot;] --&gt;|extends| NewPlatformVersionTrigger_c477[&quot;NewPlatformVersionTrigger&quot;]
+    NotificationRuleTrigger_p478[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| NewPlatformVersionTrigger_c478[&quot;NewPlatformVersionTrigger&quot;]
+    Serializable_p479[&quot;Serializable&quot;] --&gt;|extends| NotificationRuleTrigger_c479[&quot;NotificationRuleTrigger&quot;]
+    Object______p480[&quot;Object/外部框架&quot;] --&gt;|extends| RateLimitsTrigger_c480[&quot;RateLimitsTrigger&quot;]
+    NotificationRuleTrigger_p481[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| RateLimitsTrigger_c481[&quot;RateLimitsTrigger&quot;]
+    Object______p482[&quot;Object/外部框架&quot;] --&gt;|extends| RuleEngineComponentLifecycleEventTrigger_c482[&quot;RuleEngineComponentLifecycleEventTrigger&quot;]
+    NotificationRuleTrigger_p483[&quot;NotificationRuleTrigger&quot;] --&gt;|implements| RuleEngineComponentLifecycleEventTrigger_c483[&quot;RuleEngineComponentLifecycleEventTrigger&quot;]
+    Object______p484[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmAssignmentNotificationRuleTriggerConfig_c484[&quot;AlarmAssignmentNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p485[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| AlarmAssignmentNotificationRuleTriggerConfig_c485[&quot;AlarmAssignmentNotificationRuleTriggerConfig&quot;]
+    Object______p486[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmCommentNotificationRuleTriggerConfig_c486[&quot;AlarmCommentNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p487[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| AlarmCommentNotificationRuleTriggerConfig_c487[&quot;AlarmCommentNotificationRuleTriggerConfig&quot;]
+    Object______p488[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmNotificationRuleTriggerConfig_c488[&quot;AlarmNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p489[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| AlarmNotificationRuleTriggerConfig_c489[&quot;AlarmNotificationRuleTriggerConfig&quot;]
+    Object______p490[&quot;Object/外部框架&quot;] --&gt;|extends| ClearRule_c490[&quot;ClearRule&quot;]
+    Serializable_p491[&quot;Serializable&quot;] --&gt;|implements| ClearRule_c491[&quot;ClearRule&quot;]
+    Object______p492[&quot;Object/外部框架&quot;] --&gt;|extends| ApiUsageLimitNotificationRuleTriggerConfig_c492[&quot;ApiUsageLimitNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p493[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| ApiUsageLimitNotificationRuleTriggerConfig_c493[&quot;ApiUsageLimitNotificationRuleTriggerConfig&quot;]
+    Object______p494[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceActivityNotificationRuleTriggerConfig_c494[&quot;DeviceActivityNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p495[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| DeviceActivityNotificationRuleTriggerConfig_c495[&quot;DeviceActivityNotificationRuleTriggerConfig&quot;]
+    Object______p496[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeCommunicationFailureNotificationRuleTriggerConfig_c496[&quot;EdgeCommunicationFailureNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p497[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| EdgeCommunicationFailureNotificationRuleTriggerConfig_c497[&quot;EdgeCommunicationFailureNotificationRuleTriggerConfig&quot;]
+    Object______p498[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeConnectionNotificationRuleTriggerConfig_c498[&quot;EdgeConnectionNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p499[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| EdgeConnectionNotificationRuleTriggerConfig_c499[&quot;EdgeConnectionNotificationRuleTriggerConfig&quot;]
+    Object______p500[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesLimitNotificationRuleTriggerConfig_c500[&quot;EntitiesLimitNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p501[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| EntitiesLimitNotificationRuleTriggerConfig_c501[&quot;EntitiesLimitNotificationRuleTriggerConfig&quot;]
+    Object______p502[&quot;Object/外部框架&quot;] --&gt;|extends| EntityActionNotificationRuleTriggerConfig_c502[&quot;EntityActionNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p503[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| EntityActionNotificationRuleTriggerConfig_c503[&quot;EntityActionNotificationRuleTriggerConfig&quot;]
+    Object______p504[&quot;Object/外部框架&quot;] --&gt;|extends| NewPlatformVersionNotificationRuleTriggerConfig_c504[&quot;NewPlatformVersionNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p505[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| NewPlatformVersionNotificationRuleTriggerConfig_c505[&quot;NewPlatformVersionNotificationRuleTriggerConfig&quot;]
+    Serializable_p506[&quot;Serializable&quot;] --&gt;|extends| NotificationRuleTriggerConfig_c506[&quot;NotificationRuleTriggerConfig&quot;]
+    Object______p507[&quot;Object/外部框架&quot;] --&gt;|extends| RateLimitsNotificationRuleTriggerConfig_c507[&quot;RateLimitsNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p508[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| RateLimitsNotificationRuleTriggerConfig_c508[&quot;RateLimitsNotificationRuleTriggerConfig&quot;]
+    Object______p509[&quot;Object/外部框架&quot;] --&gt;|extends| RuleEngineComponentLifecycleEventNotificationRuleTriggerConf_c509[&quot;RuleEngineComponentLifecycleEventNotificationRuleTriggerConfig&quot;]
+    NotificationRuleTriggerConfig_p510[&quot;NotificationRuleTriggerConfig&quot;] --&gt;|implements| RuleEngineComponentLifecycleEventNotificationRuleTriggerConf_c510[&quot;RuleEngineComponentLifecycleEventNotificationRuleTriggerConfig&quot;]
+    Object______p511[&quot;Object/外部框架&quot;] --&gt;|extends| AccountNotificationSettings_c511[&quot;AccountNotificationSettings&quot;]
+    Object______p512[&quot;Object/外部框架&quot;] --&gt;|extends| MobileAppNotificationDeliveryMethodConfig_c512[&quot;MobileAppNotificationDeliveryMethodConfig&quot;]
+    NotificationDeliveryMethodConfig_p513[&quot;NotificationDeliveryMethodConfig&quot;] --&gt;|implements| MobileAppNotificationDeliveryMethodConfig_c513[&quot;MobileAppNotificationDeliveryMethodConfig&quot;]
+    Serializable_p514[&quot;Serializable&quot;] --&gt;|extends| NotificationDeliveryMethodConfig_c514[&quot;NotificationDeliveryMethodConfig&quot;]
+    Object______p515[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationSettings_c515[&quot;NotificationSettings&quot;]
+    Serializable_p516[&quot;Serializable&quot;] --&gt;|implements| NotificationSettings_c516[&quot;NotificationSettings&quot;]
+    Object______p517[&quot;Object/外部框架&quot;] --&gt;|extends| SlackNotificationDeliveryMethodConfig_c517[&quot;SlackNotificationDeliveryMethodConfig&quot;]
+    NotificationDeliveryMethodConfig_p518[&quot;NotificationDeliveryMethodConfig&quot;] --&gt;|implements| SlackNotificationDeliveryMethodConfig_c518[&quot;SlackNotificationDeliveryMethodConfig&quot;]
+    Object______p519[&quot;Object/外部框架&quot;] --&gt;|extends| UserNotificationSettings_c519[&quot;UserNotificationSettings&quot;]
+    Object______p520[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationPref_c520[&quot;NotificationPref&quot;]
+    NotificationTargetConfig_p521[&quot;NotificationTargetConfig&quot;] --&gt;|extends| MicrosoftTeamsNotificationTargetConfig_c521[&quot;MicrosoftTeamsNotificationTargetConfig&quot;]
+    NotificationRecipient_p522[&quot;NotificationRecipient&quot;] --&gt;|implements| MicrosoftTeamsNotificationTargetConfig_c522[&quot;MicrosoftTeamsNotificationTargetConfig&quot;]
+    BaseData_p523[&quot;BaseData&quot;] --&gt;|extends| NotificationTarget_c523[&quot;NotificationTarget&quot;]
+    HasTenantId_p524[&quot;HasTenantId&quot;] --&gt;|implements| NotificationTarget_c524[&quot;NotificationTarget&quot;]
+    HasName_p525[&quot;HasName&quot;] --&gt;|implements| NotificationTarget_c525[&quot;NotificationTarget&quot;]
+    ExportableEntity_p526[&quot;ExportableEntity&quot;] --&gt;|implements| NotificationTarget_c526[&quot;NotificationTarget&quot;]
+    Object______p527[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationTargetConfig_c527[&quot;NotificationTargetConfig&quot;]
+    Object______p528[&quot;Object/外部框架&quot;] --&gt;|extends| AffectedTenantAdministratorsFilter_c528[&quot;AffectedTenantAdministratorsFilter&quot;]
+    UsersFilter_p529[&quot;UsersFilter&quot;] --&gt;|implements| AffectedTenantAdministratorsFilter_c529[&quot;AffectedTenantAdministratorsFilter&quot;]
+    Object______p530[&quot;Object/外部框架&quot;] --&gt;|extends| AffectedUserFilter_c530[&quot;AffectedUserFilter&quot;]
+    UsersFilter_p531[&quot;UsersFilter&quot;] --&gt;|implements| AffectedUserFilter_c531[&quot;AffectedUserFilter&quot;]
+    Object______p532[&quot;Object/外部框架&quot;] --&gt;|extends| AllUsersFilter_c532[&quot;AllUsersFilter&quot;]
+    UsersFilter_p533[&quot;UsersFilter&quot;] --&gt;|implements| AllUsersFilter_c533[&quot;AllUsersFilter&quot;]
+    Object______p534[&quot;Object/外部框架&quot;] --&gt;|extends| CustomerUsersFilter_c534[&quot;CustomerUsersFilter&quot;]
+    UsersFilter_p535[&quot;UsersFilter&quot;] --&gt;|implements| CustomerUsersFilter_c535[&quot;CustomerUsersFilter&quot;]
+    Object______p536[&quot;Object/外部框架&quot;] --&gt;|extends| OriginatorEntityOwnerUsersFilter_c536[&quot;OriginatorEntityOwnerUsersFilter&quot;]
+    UsersFilter_p537[&quot;UsersFilter&quot;] --&gt;|implements| OriginatorEntityOwnerUsersFilter_c537[&quot;OriginatorEntityOwnerUsersFilter&quot;]
+    NotificationTargetConfig_p538[&quot;NotificationTargetConfig&quot;] --&gt;|extends| PlatformUsersNotificationTargetConfig_c538[&quot;PlatformUsersNotificationTargetConfig&quot;]
+    Object______p539[&quot;Object/外部框架&quot;] --&gt;|extends| SystemAdministratorsFilter_c539[&quot;SystemAdministratorsFilter&quot;]
+    UsersFilter_p540[&quot;UsersFilter&quot;] --&gt;|implements| SystemAdministratorsFilter_c540[&quot;SystemAdministratorsFilter&quot;]
+    Object______p541[&quot;Object/外部框架&quot;] --&gt;|extends| TenantAdministratorsFilter_c541[&quot;TenantAdministratorsFilter&quot;]
+    UsersFilter_p542[&quot;UsersFilter&quot;] --&gt;|implements| TenantAdministratorsFilter_c542[&quot;TenantAdministratorsFilter&quot;]
+    Object______p543[&quot;Object/外部框架&quot;] --&gt;|extends| UserListFilter_c543[&quot;UserListFilter&quot;]
+    UsersFilter_p544[&quot;UsersFilter&quot;] --&gt;|implements| UserListFilter_c544[&quot;UserListFilter&quot;]
+    Object______p545[&quot;Object/外部框架&quot;] --&gt;|extends| SlackConversation_c545[&quot;SlackConversation&quot;]
+    NotificationRecipient_p546[&quot;NotificationRecipient&quot;] --&gt;|implements| SlackConversation_c546[&quot;SlackConversation&quot;]
+    NotificationTargetConfig_p547[&quot;NotificationTargetConfig&quot;] --&gt;|extends| SlackNotificationTargetConfig_c547[&quot;SlackNotificationTargetConfig&quot;]
+    Object______p548[&quot;Object/外部框架&quot;] --&gt;|extends| DeliveryMethodNotificationTemplate_c548[&quot;DeliveryMethodNotificationTemplate&quot;]
+    DeliveryMethodNotificationTemplate_p549[&quot;DeliveryMethodNotificationTemplate&quot;] --&gt;|extends| EmailDeliveryMethodNotificationTemplate_c549[&quot;EmailDeliveryMethodNotificationTemplate&quot;]
+    HasSubject_p550[&quot;HasSubject&quot;] --&gt;|implements| EmailDeliveryMethodNotificationTemplate_c550[&quot;EmailDeliveryMethodNotificationTemplate&quot;]
+    DeliveryMethodNotificationTemplate_p551[&quot;DeliveryMethodNotificationTemplate&quot;] --&gt;|extends| MicrosoftTeamsDeliveryMethodNotificationTemplate_c551[&quot;MicrosoftTeamsDeliveryMethodNotificationTemplate&quot;]
+    HasSubject_p552[&quot;HasSubject&quot;] --&gt;|implements| MicrosoftTeamsDeliveryMethodNotificationTemplate_c552[&quot;MicrosoftTeamsDeliveryMethodNotificationTemplate&quot;]
+    Object______p553[&quot;Object/外部框架&quot;] --&gt;|extends| Button_c553[&quot;Button&quot;]
+    DeliveryMethodNotificationTemplate_p554[&quot;DeliveryMethodNotificationTemplate&quot;] --&gt;|extends| MobileAppDeliveryMethodNotificationTemplate_c554[&quot;MobileAppDeliveryMethodNotificationTemplate&quot;]
+    HasSubject_p555[&quot;HasSubject&quot;] --&gt;|implements| MobileAppDeliveryMethodNotificationTemplate_c555[&quot;MobileAppDeliveryMethodNotificationTemplate&quot;]
+    BaseData_p556[&quot;BaseData&quot;] --&gt;|extends| NotificationTemplate_c556[&quot;NotificationTemplate&quot;]
+    HasTenantId_p557[&quot;HasTenantId&quot;] --&gt;|implements| NotificationTemplate_c557[&quot;NotificationTemplate&quot;]
+    HasName_p558[&quot;HasName&quot;] --&gt;|implements| NotificationTemplate_c558[&quot;NotificationTemplate&quot;]
+    ExportableEntity_p559[&quot;ExportableEntity&quot;] --&gt;|implements| NotificationTemplate_c559[&quot;NotificationTemplate&quot;]
+    Object______p560[&quot;Object/外部框架&quot;] --&gt;|extends| NotificationTemplateConfig_c560[&quot;NotificationTemplateConfig&quot;]
+    DeliveryMethodNotificationTemplate_p561[&quot;DeliveryMethodNotificationTemplate&quot;] --&gt;|extends| SlackDeliveryMethodNotificationTemplate_c561[&quot;SlackDeliveryMethodNotificationTemplate&quot;]
+    DeliveryMethodNotificationTemplate_p562[&quot;DeliveryMethodNotificationTemplate&quot;] --&gt;|extends| SmsDeliveryMethodNotificationTemplate_c562[&quot;SmsDeliveryMethodNotificationTemplate&quot;]
+    Object______p563[&quot;Object/外部框架&quot;] --&gt;|extends| TemplatableValue_c563[&quot;TemplatableValue&quot;]
+    DeliveryMethodNotificationTemplate_p564[&quot;DeliveryMethodNotificationTemplate&quot;] --&gt;|extends| WebDeliveryMethodNotificationTemplate_c564[&quot;WebDeliveryMethodNotificationTemplate&quot;]
+    HasSubject_p565[&quot;HasSubject&quot;] --&gt;|implements| WebDeliveryMethodNotificationTemplate_c565[&quot;WebDeliveryMethodNotificationTemplate&quot;]
+    Object______p566[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2BasicMapperConfig_c566[&quot;OAuth2BasicMapperConfig&quot;]
+    Object______p567[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2ClientInfo_c567[&quot;OAuth2ClientInfo&quot;]
+    BaseDataWithAdditionalInfo_p568[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| OAuth2ClientRegistrationTemplate_c568[&quot;OAuth2ClientRegistrationTemplate&quot;]
+    HasName_p569[&quot;HasName&quot;] --&gt;|implements| OAuth2ClientRegistrationTemplate_c569[&quot;OAuth2ClientRegistrationTemplate&quot;]
+    Object______p570[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2CustomMapperConfig_c570[&quot;OAuth2CustomMapperConfig&quot;]
+    BaseData_p571[&quot;BaseData&quot;] --&gt;|extends| OAuth2Domain_c571[&quot;OAuth2Domain&quot;]
+    Object______p572[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2DomainInfo_c572[&quot;OAuth2DomainInfo&quot;]
+    Object______p573[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2Info_c573[&quot;OAuth2Info&quot;]
+    Object______p574[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2MapperConfig_c574[&quot;OAuth2MapperConfig&quot;]
+    BaseData_p575[&quot;BaseData&quot;] --&gt;|extends| OAuth2Mobile_c575[&quot;OAuth2Mobile&quot;]
+    Object______p576[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2MobileInfo_c576[&quot;OAuth2MobileInfo&quot;]
+    BaseData_p577[&quot;BaseData&quot;] --&gt;|extends| OAuth2Params_c577[&quot;OAuth2Params&quot;]
+    Object______p578[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2ParamsInfo_c578[&quot;OAuth2ParamsInfo&quot;]
+    BaseDataWithAdditionalInfo_p579[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| OAuth2Registration_c579[&quot;OAuth2Registration&quot;]
+    HasName_p580[&quot;HasName&quot;] --&gt;|implements| OAuth2Registration_c580[&quot;OAuth2Registration&quot;]
+    Object______p581[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2RegistrationInfo_c581[&quot;OAuth2RegistrationInfo&quot;]
+    Object______p582[&quot;Object/外部框架&quot;] --&gt;|extends| AttributesEntityView_c582[&quot;AttributesEntityView&quot;]
+    Serializable_p583[&quot;Serializable&quot;] --&gt;|implements| AttributesEntityView_c583[&quot;AttributesEntityView&quot;]
+    Object______p584[&quot;Object/外部框架&quot;] --&gt;|extends| TelemetryEntityView_c584[&quot;TelemetryEntityView&quot;]
+    Serializable_p585[&quot;Serializable&quot;] --&gt;|implements| TelemetryEntityView_c585[&quot;TelemetryEntityView&quot;]
+    Object______p586[&quot;Object/外部框架&quot;] --&gt;|extends| OtaPackageUtil_c586[&quot;OtaPackageUtil&quot;]
+    Object______p587[&quot;Object/外部框架&quot;] --&gt;|extends| BasePageDataIterable_c587[&quot;BasePageDataIterable&quot;]
+    Object______p588[&quot;Object/外部框架&quot;] --&gt;|extends| PageData_c588[&quot;PageData&quot;]
+    Serializable_p589[&quot;Serializable&quot;] --&gt;|implements| PageData_c589[&quot;PageData&quot;]
+    Object______p590[&quot;Object/外部框架&quot;] --&gt;|extends| PageDataIterable_c590[&quot;PageDataIterable&quot;]
+    Object______p591[&quot;Object/外部框架&quot;] --&gt;|extends| PageDataIterableByTenant_c591[&quot;PageDataIterableByTenant&quot;]
+    Object______p592[&quot;Object/外部框架&quot;] --&gt;|extends| PageDataIterableByTenantIdEntityId_c592[&quot;PageDataIterableByTenantIdEntityId&quot;]
+    Object______p593[&quot;Object/外部框架&quot;] --&gt;|extends| PageLink_c593[&quot;PageLink&quot;]
+    Object______p594[&quot;Object/外部框架&quot;] --&gt;|extends| SortOrder_c594[&quot;SortOrder&quot;]
+    PageLink_p595[&quot;PageLink&quot;] --&gt;|extends| TimePageLink_c595[&quot;TimePageLink&quot;]
+    BaseData_p596[&quot;BaseData&quot;] --&gt;|extends| ComponentDescriptor_c596[&quot;ComponentDescriptor&quot;]
+    Serializable_p597[&quot;Serializable&quot;] --&gt;|implements| ComponentLifecycleEvent_c597[&quot;ComponentLifecycleEvent&quot;]
+    EntityCountQuery_p598[&quot;EntityCountQuery&quot;] --&gt;|extends| AbstractDataQuery_c598[&quot;AbstractDataQuery&quot;]
+    EntityCountQuery_p599[&quot;EntityCountQuery&quot;] --&gt;|extends| AlarmCountQuery_c599[&quot;AlarmCountQuery&quot;]
+    AlarmInfo_p600[&quot;AlarmInfo&quot;] --&gt;|extends| AlarmData_c600[&quot;AlarmData&quot;]
+    EntityDataPageLink_p601[&quot;EntityDataPageLink&quot;] --&gt;|extends| AlarmDataPageLink_c601[&quot;AlarmDataPageLink&quot;]
+    AbstractDataQuery_p602[&quot;AbstractDataQuery&quot;] --&gt;|extends| AlarmDataQuery_c602[&quot;AlarmDataQuery&quot;]
+    Object______p603[&quot;Object/外部框架&quot;] --&gt;|extends| ApiUsageStateFilter_c603[&quot;ApiUsageStateFilter&quot;]
+    EntityFilter_p604[&quot;EntityFilter&quot;] --&gt;|implements| ApiUsageStateFilter_c604[&quot;ApiUsageStateFilter&quot;]
+    EntitySearchQueryFilter_p605[&quot;EntitySearchQueryFilter&quot;] --&gt;|extends| AssetSearchQueryFilter_c605[&quot;AssetSearchQueryFilter&quot;]
+    Object______p606[&quot;Object/外部框架&quot;] --&gt;|extends| AssetTypeFilter_c606[&quot;AssetTypeFilter&quot;]
+    EntityFilter_p607[&quot;EntityFilter&quot;] --&gt;|implements| AssetTypeFilter_c607[&quot;AssetTypeFilter&quot;]
+    Object______p608[&quot;Object/外部框架&quot;] --&gt;|extends| BooleanFilterPredicate_c608[&quot;BooleanFilterPredicate&quot;]
+    SimpleKeyFilterPredicate_p609[&quot;SimpleKeyFilterPredicate&quot;] --&gt;|implements| BooleanFilterPredicate_c609[&quot;BooleanFilterPredicate&quot;]
+    Object______p610[&quot;Object/外部框架&quot;] --&gt;|extends| ComparisonTsValue_c610[&quot;ComparisonTsValue&quot;]
+    Object______p611[&quot;Object/外部框架&quot;] --&gt;|extends| ComplexFilterPredicate_c611[&quot;ComplexFilterPredicate&quot;]
+    KeyFilterPredicate_p612[&quot;KeyFilterPredicate&quot;] --&gt;|implements| ComplexFilterPredicate_c612[&quot;ComplexFilterPredicate&quot;]
+    EntitySearchQueryFilter_p613[&quot;EntitySearchQueryFilter&quot;] --&gt;|extends| DeviceSearchQueryFilter_c613[&quot;DeviceSearchQueryFilter&quot;]
+    Object______p614[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceTypeFilter_c614[&quot;DeviceTypeFilter&quot;]
+    EntityFilter_p615[&quot;EntityFilter&quot;] --&gt;|implements| DeviceTypeFilter_c615[&quot;DeviceTypeFilter&quot;]
+    Object______p616[&quot;Object/外部框架&quot;] --&gt;|extends| DynamicValue_c616[&quot;DynamicValue&quot;]
+    Serializable_p617[&quot;Serializable&quot;] --&gt;|implements| DynamicValue_c617[&quot;DynamicValue&quot;]
+    EntitySearchQueryFilter_p618[&quot;EntitySearchQueryFilter&quot;] --&gt;|extends| EdgeSearchQueryFilter_c618[&quot;EdgeSearchQueryFilter&quot;]
+    Object______p619[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeTypeFilter_c619[&quot;EdgeTypeFilter&quot;]
+    EntityFilter_p620[&quot;EntityFilter&quot;] --&gt;|implements| EdgeTypeFilter_c620[&quot;EdgeTypeFilter&quot;]
+    Object______p621[&quot;Object/外部框架&quot;] --&gt;|extends| EntityCountQuery_c621[&quot;EntityCountQuery&quot;]
+    Object______p622[&quot;Object/外部框架&quot;] --&gt;|extends| EntityData_c622[&quot;EntityData&quot;]
+    Object______p623[&quot;Object/外部框架&quot;] --&gt;|extends| EntityDataPageLink_c623[&quot;EntityDataPageLink&quot;]
+    AbstractDataQuery_p624[&quot;AbstractDataQuery&quot;] --&gt;|extends| EntityDataQuery_c624[&quot;EntityDataQuery&quot;]
+    Object______p625[&quot;Object/外部框架&quot;] --&gt;|extends| EntityDataSortOrder_c625[&quot;EntityDataSortOrder&quot;]
+    Object______p626[&quot;Object/外部框架&quot;] --&gt;|extends| EntityKey_c626[&quot;EntityKey&quot;]
+    Serializable_p627[&quot;Serializable&quot;] --&gt;|implements| EntityKey_c627[&quot;EntityKey&quot;]
+    Object______p628[&quot;Object/外部框架&quot;] --&gt;|extends| EntityListFilter_c628[&quot;EntityListFilter&quot;]
+    EntityFilter_p629[&quot;EntityFilter&quot;] --&gt;|implements| EntityListFilter_c629[&quot;EntityListFilter&quot;]
+    Object______p630[&quot;Object/外部框架&quot;] --&gt;|extends| EntityNameFilter_c630[&quot;EntityNameFilter&quot;]
+    EntityFilter_p631[&quot;EntityFilter&quot;] --&gt;|implements| EntityNameFilter_c631[&quot;EntityNameFilter&quot;]
+    Object______p632[&quot;Object/外部框架&quot;] --&gt;|extends| EntitySearchQueryFilter_c632[&quot;EntitySearchQueryFilter&quot;]
+    EntityFilter_p633[&quot;EntityFilter&quot;] --&gt;|implements| EntitySearchQueryFilter_c633[&quot;EntitySearchQueryFilter&quot;]
+    Object______p634[&quot;Object/外部框架&quot;] --&gt;|extends| EntityTypeFilter_c634[&quot;EntityTypeFilter&quot;]
+    EntityFilter_p635[&quot;EntityFilter&quot;] --&gt;|implements| EntityTypeFilter_c635[&quot;EntityTypeFilter&quot;]
+    EntitySearchQueryFilter_p636[&quot;EntitySearchQueryFilter&quot;] --&gt;|extends| EntityViewSearchQueryFilter_c636[&quot;EntityViewSearchQueryFilter&quot;]
+    Object______p637[&quot;Object/外部框架&quot;] --&gt;|extends| EntityViewTypeFilter_c637[&quot;EntityViewTypeFilter&quot;]
+    EntityFilter_p638[&quot;EntityFilter&quot;] --&gt;|implements| EntityViewTypeFilter_c638[&quot;EntityViewTypeFilter&quot;]
+    Object______p639[&quot;Object/外部框架&quot;] --&gt;|extends| FilterPredicateValue_c639[&quot;FilterPredicateValue&quot;]
+    Serializable_p640[&quot;Serializable&quot;] --&gt;|implements| FilterPredicateValue_c640[&quot;FilterPredicateValue&quot;]
+    Object______p641[&quot;Object/外部框架&quot;] --&gt;|extends| KeyFilter_c641[&quot;KeyFilter&quot;]
+    Serializable_p642[&quot;Serializable&quot;] --&gt;|implements| KeyFilter_c642[&quot;KeyFilter&quot;]
+    Serializable_p643[&quot;Serializable&quot;] --&gt;|extends| KeyFilterPredicate_c643[&quot;KeyFilterPredicate&quot;]
+    Object______p644[&quot;Object/外部框架&quot;] --&gt;|extends| NumericFilterPredicate_c644[&quot;NumericFilterPredicate&quot;]
+    SimpleKeyFilterPredicate_p645[&quot;SimpleKeyFilterPredicate&quot;] --&gt;|implements| NumericFilterPredicate_c645[&quot;NumericFilterPredicate&quot;]
+    Object______p646[&quot;Object/外部框架&quot;] --&gt;|extends| RelationsQueryFilter_c646[&quot;RelationsQueryFilter&quot;]
+    EntityFilter_p647[&quot;EntityFilter&quot;] --&gt;|implements| RelationsQueryFilter_c647[&quot;RelationsQueryFilter&quot;]
+    KeyFilterPredicate_p648[&quot;KeyFilterPredicate&quot;] --&gt;|extends| SimpleKeyFilterPredicate_c648[&quot;SimpleKeyFilterPredicate&quot;]
+    Object______p649[&quot;Object/外部框架&quot;] --&gt;|extends| SingleEntityFilter_c649[&quot;SingleEntityFilter&quot;]
+    EntityFilter_p650[&quot;EntityFilter&quot;] --&gt;|implements| SingleEntityFilter_c650[&quot;SingleEntityFilter&quot;]
+    Object______p651[&quot;Object/外部框架&quot;] --&gt;|extends| StringFilterPredicate_c651[&quot;StringFilterPredicate&quot;]
+    SimpleKeyFilterPredicate_p652[&quot;SimpleKeyFilterPredicate&quot;] --&gt;|implements| StringFilterPredicate_c652[&quot;StringFilterPredicate&quot;]
+    Object______p653[&quot;Object/外部框架&quot;] --&gt;|extends| TsValue_c653[&quot;TsValue&quot;]
+    Object______p654[&quot;Object/外部框架&quot;] --&gt;|extends| ProcessingStrategy_c654[&quot;ProcessingStrategy&quot;]
+    Serializable_p655[&quot;Serializable&quot;] --&gt;|implements| ProcessingStrategy_c655[&quot;ProcessingStrategy&quot;]
+    BaseDataWithAdditionalInfo_p656[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| Queue_c656[&quot;Queue&quot;]
+    HasName_p657[&quot;HasName&quot;] --&gt;|implements| Queue_c657[&quot;Queue&quot;]
+    HasTenantId_p658[&quot;HasTenantId&quot;] --&gt;|implements| Queue_c658[&quot;Queue&quot;]
+    Object______p659[&quot;Object/外部框架&quot;] --&gt;|extends| SubmitStrategy_c659[&quot;SubmitStrategy&quot;]
+    Serializable_p660[&quot;Serializable&quot;] --&gt;|implements| SubmitStrategy_c660[&quot;SubmitStrategy&quot;]
+    Object______p661[&quot;Object/外部框架&quot;] --&gt;|extends| EntityRelation_c661[&quot;EntityRelation&quot;]
+    Serializable_p662[&quot;Serializable&quot;] --&gt;|implements| EntityRelation_c662[&quot;EntityRelation&quot;]
+    EntityRelation_p663[&quot;EntityRelation&quot;] --&gt;|extends| EntityRelationInfo_c663[&quot;EntityRelationInfo&quot;]
+    Object______p664[&quot;Object/外部框架&quot;] --&gt;|extends| EntityRelationsQuery_c664[&quot;EntityRelationsQuery&quot;]
+    Object______p665[&quot;Object/外部框架&quot;] --&gt;|extends| RelationEntityTypeFilter_c665[&quot;RelationEntityTypeFilter&quot;]
+    Object______p666[&quot;Object/外部框架&quot;] --&gt;|extends| RelationsSearchParameters_c666[&quot;RelationsSearchParameters&quot;]
+    BaseData_p667[&quot;BaseData&quot;] --&gt;|extends| Rpc_c667[&quot;Rpc&quot;]
+    HasTenantId_p668[&quot;HasTenantId&quot;] --&gt;|implements| Rpc_c668[&quot;Rpc&quot;]
+    Object______p669[&quot;Object/外部框架&quot;] --&gt;|extends| ToDeviceRpcRequestBody_c669[&quot;ToDeviceRpcRequestBody&quot;]
+    Serializable_p670[&quot;Serializable&quot;] --&gt;|implements| ToDeviceRpcRequestBody_c670[&quot;ToDeviceRpcRequestBody&quot;]
+    Object______p671[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultRuleChainCreateRequest_c671[&quot;DefaultRuleChainCreateRequest&quot;]
+    Serializable_p672[&quot;Serializable&quot;] --&gt;|implements| DefaultRuleChainCreateRequest_c672[&quot;DefaultRuleChainCreateRequest&quot;]
+    Object______p673[&quot;Object/外部框架&quot;] --&gt;|extends| NodeConnectionInfo_c673[&quot;NodeConnectionInfo&quot;]
+    BaseDataWithAdditionalInfo_p674[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| RuleChain_c674[&quot;RuleChain&quot;]
+    HasName_p675[&quot;HasName&quot;] --&gt;|implements| RuleChain_c675[&quot;RuleChain&quot;]
+    HasTenantId_p676[&quot;HasTenantId&quot;] --&gt;|implements| RuleChain_c676[&quot;RuleChain&quot;]
+    ExportableEntity_p677[&quot;ExportableEntity&quot;] --&gt;|implements| RuleChain_c677[&quot;RuleChain&quot;]
+    Object______p678[&quot;Object/外部框架&quot;] --&gt;|extends| RuleChainConnectionInfo_c678[&quot;RuleChainConnectionInfo&quot;]
+    Object______p679[&quot;Object/外部框架&quot;] --&gt;|extends| RuleChainData_c679[&quot;RuleChainData&quot;]
+    Object______p680[&quot;Object/外部框架&quot;] --&gt;|extends| RuleChainImportResult_c680[&quot;RuleChainImportResult&quot;]
+    Object______p681[&quot;Object/外部框架&quot;] --&gt;|extends| RuleChainMetaData_c681[&quot;RuleChainMetaData&quot;]
+    Object______p682[&quot;Object/外部框架&quot;] --&gt;|extends| RuleChainOutputLabelsUsage_c682[&quot;RuleChainOutputLabelsUsage&quot;]
+    Object______p683[&quot;Object/外部框架&quot;] --&gt;|extends| RuleChainUpdateResult_c683[&quot;RuleChainUpdateResult&quot;]
+    BaseDataWithAdditionalInfo_p684[&quot;BaseDataWithAdditionalInfo&quot;] --&gt;|extends| RuleNode_c684[&quot;RuleNode&quot;]
+    HasName_p685[&quot;HasName&quot;] --&gt;|implements| RuleNode_c685[&quot;RuleNode&quot;]
+    BaseData_p686[&quot;BaseData&quot;] --&gt;|extends| RuleNodeState_c686[&quot;RuleNodeState&quot;]
+    Object______p687[&quot;Object/外部框架&quot;] --&gt;|extends| RuleNodeUpdateResult_c687[&quot;RuleNodeUpdateResult&quot;]
+    BaseData_p688[&quot;BaseData&quot;] --&gt;|extends| DeviceCredentials_c688[&quot;DeviceCredentials&quot;]
+    DeviceCredentialsFilter_p689[&quot;DeviceCredentialsFilter&quot;] --&gt;|implements| DeviceCredentials_c689[&quot;DeviceCredentials&quot;]
+    Object______p690[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceTokenCredentials_c690[&quot;DeviceTokenCredentials&quot;]
+    DeviceCredentialsFilter_p691[&quot;DeviceCredentialsFilter&quot;] --&gt;|implements| DeviceTokenCredentials_c691[&quot;DeviceTokenCredentials&quot;]
+    Object______p692[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceX509Credentials_c692[&quot;DeviceX509Credentials&quot;]
+    DeviceCredentialsFilter_p693[&quot;DeviceCredentialsFilter&quot;] --&gt;|implements| DeviceX509Credentials_c693[&quot;DeviceX509Credentials&quot;]
+    BaseData_p694[&quot;BaseData&quot;] --&gt;|extends| UserAuthSettings_c694[&quot;UserAuthSettings&quot;]
+    BaseData_p695[&quot;BaseData&quot;] --&gt;|extends| UserCredentials_c695[&quot;UserCredentials&quot;]
+    Object______p696[&quot;Object/外部框架&quot;] --&gt;|extends| UserAuthDataChangedEvent_c696[&quot;UserAuthDataChangedEvent&quot;]
+    Serializable_p697[&quot;Serializable&quot;] --&gt;|implements| UserAuthDataChangedEvent_c697[&quot;UserAuthDataChangedEvent&quot;]
+    UserAuthDataChangedEvent_p698[&quot;UserAuthDataChangedEvent&quot;] --&gt;|extends| UserCredentialsInvalidationEvent_c698[&quot;UserCredentialsInvalidationEvent&quot;]
+    UserAuthDataChangedEvent_p699[&quot;UserAuthDataChangedEvent&quot;] --&gt;|extends| UserSessionInvalidationEvent_c699[&quot;UserSessionInvalidationEvent&quot;]
+    Object______p700[&quot;Object/外部框架&quot;] --&gt;|extends| JwtPair_c700[&quot;JwtPair&quot;]
+    Object______p701[&quot;Object/外部框架&quot;] --&gt;|extends| JwtSettings_c701[&quot;JwtSettings&quot;]
+    Serializable_p702[&quot;Serializable&quot;] --&gt;|extends| JwtToken_c702[&quot;JwtToken&quot;]
+    Object______p703[&quot;Object/外部框架&quot;] --&gt;|extends| SecuritySettings_c703[&quot;SecuritySettings&quot;]
+    Serializable_p704[&quot;Serializable&quot;] --&gt;|implements| SecuritySettings_c704[&quot;SecuritySettings&quot;]
+    Object______p705[&quot;Object/外部框架&quot;] --&gt;|extends| UserPasswordPolicy_c705[&quot;UserPasswordPolicy&quot;]
+    Serializable_p706[&quot;Serializable&quot;] --&gt;|implements| UserPasswordPolicy_c706[&quot;UserPasswordPolicy&quot;]
+    Object______p707[&quot;Object/外部框架&quot;] --&gt;|extends| PlatformTwoFaSettings_c707[&quot;PlatformTwoFaSettings&quot;]
+    Object______p708[&quot;Object/外部框架&quot;] --&gt;|extends| AccountTwoFaSettings_c708[&quot;AccountTwoFaSettings&quot;]
+    TwoFaAccountConfig_p709[&quot;TwoFaAccountConfig&quot;] --&gt;|extends| BackupCodeTwoFaAccountConfig_c709[&quot;BackupCodeTwoFaAccountConfig&quot;]
+    OtpBasedTwoFaAccountConfig_p710[&quot;OtpBasedTwoFaAccountConfig&quot;] --&gt;|extends| EmailTwoFaAccountConfig_c710[&quot;EmailTwoFaAccountConfig&quot;]
+    TwoFaAccountConfig_p711[&quot;TwoFaAccountConfig&quot;] --&gt;|extends| OtpBasedTwoFaAccountConfig_c711[&quot;OtpBasedTwoFaAccountConfig&quot;]
+    OtpBasedTwoFaAccountConfig_p712[&quot;OtpBasedTwoFaAccountConfig&quot;] --&gt;|extends| SmsTwoFaAccountConfig_c712[&quot;SmsTwoFaAccountConfig&quot;]
+    TwoFaAccountConfig_p713[&quot;TwoFaAccountConfig&quot;] --&gt;|extends| TotpTwoFaAccountConfig_c713[&quot;TotpTwoFaAccountConfig&quot;]
+    Object______p714[&quot;Object/外部框架&quot;] --&gt;|extends| TwoFaAccountConfig_c714[&quot;TwoFaAccountConfig&quot;]
+    Serializable_p715[&quot;Serializable&quot;] --&gt;|implements| TwoFaAccountConfig_c715[&quot;TwoFaAccountConfig&quot;]
+    Object______p716[&quot;Object/外部框架&quot;] --&gt;|extends| BackupCodeTwoFaProviderConfig_c716[&quot;BackupCodeTwoFaProviderConfig&quot;]
+    TwoFaProviderConfig_p717[&quot;TwoFaProviderConfig&quot;] --&gt;|implements| BackupCodeTwoFaProviderConfig_c717[&quot;BackupCodeTwoFaProviderConfig&quot;]
+    OtpBasedTwoFaProviderConfig_p718[&quot;OtpBasedTwoFaProviderConfig&quot;] --&gt;|extends| EmailTwoFaProviderConfig_c718[&quot;EmailTwoFaProviderConfig&quot;]
+    Object______p719[&quot;Object/外部框架&quot;] --&gt;|extends| OtpBasedTwoFaProviderConfig_c719[&quot;OtpBasedTwoFaProviderConfig&quot;]
+    TwoFaProviderConfig_p720[&quot;TwoFaProviderConfig&quot;] --&gt;|implements| OtpBasedTwoFaProviderConfig_c720[&quot;OtpBasedTwoFaProviderConfig&quot;]
+    OtpBasedTwoFaProviderConfig_p721[&quot;OtpBasedTwoFaProviderConfig&quot;] --&gt;|extends| SmsTwoFaProviderConfig_c721[&quot;SmsTwoFaProviderConfig&quot;]
+    Object______p722[&quot;Object/外部框架&quot;] --&gt;|extends| TotpTwoFaProviderConfig_c722[&quot;TotpTwoFaProviderConfig&quot;]
+    TwoFaProviderConfig_p723[&quot;TwoFaProviderConfig&quot;] --&gt;|implements| TotpTwoFaProviderConfig_c723[&quot;TotpTwoFaProviderConfig&quot;]
+    Object______p724[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractUserDashboardInfo_c724[&quot;AbstractUserDashboardInfo&quot;]
+    HasTitle_p725[&quot;HasTitle&quot;] --&gt;|implements| AbstractUserDashboardInfo_c725[&quot;AbstractUserDashboardInfo&quot;]
+    Serializable_p726[&quot;Serializable&quot;] --&gt;|implements| AbstractUserDashboardInfo_c726[&quot;AbstractUserDashboardInfo&quot;]
+    AbstractUserDashboardInfo_p727[&quot;AbstractUserDashboardInfo&quot;] --&gt;|extends| LastVisitedDashboardInfo_c727[&quot;LastVisitedDashboardInfo&quot;]
+    Serializable_p728[&quot;Serializable&quot;] --&gt;|implements| LastVisitedDashboardInfo_c728[&quot;LastVisitedDashboardInfo&quot;]
+    AbstractUserDashboardInfo_p729[&quot;AbstractUserDashboardInfo&quot;] --&gt;|extends| StarredDashboardInfo_c729[&quot;StarredDashboardInfo&quot;]
+    Serializable_p730[&quot;Serializable&quot;] --&gt;|implements| StarredDashboardInfo_c730[&quot;StarredDashboardInfo&quot;]
+    Object______p731[&quot;Object/外部框架&quot;] --&gt;|extends| UserDashboardsInfo_c731[&quot;UserDashboardsInfo&quot;]
+    Serializable_p732[&quot;Serializable&quot;] --&gt;|implements| UserDashboardsInfo_c732[&quot;UserDashboardsInfo&quot;]
+    Object______p733[&quot;Object/外部框架&quot;] --&gt;|extends| UserSettings_c733[&quot;UserSettings&quot;]
+    Serializable_p734[&quot;Serializable&quot;] --&gt;|implements| UserSettings_c734[&quot;UserSettings&quot;]
+    Object______p735[&quot;Object/外部框架&quot;] --&gt;|extends| UserSettingsCompositeKey_c735[&quot;UserSettingsCompositeKey&quot;]
+    Serializable_p736[&quot;Serializable&quot;] --&gt;|implements| UserSettingsCompositeKey_c736[&quot;UserSettingsCompositeKey&quot;]
+    Object______p737[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSnsSmsProviderConfiguration_c737[&quot;AwsSnsSmsProviderConfiguration&quot;]
+    SmsProviderConfiguration_p738[&quot;SmsProviderConfiguration&quot;] --&gt;|implements| AwsSnsSmsProviderConfiguration_c738[&quot;AwsSnsSmsProviderConfiguration&quot;]
+    Object______p739[&quot;Object/外部框架&quot;] --&gt;|extends| SmppSmsProviderConfiguration_c739[&quot;SmppSmsProviderConfiguration&quot;]
+    SmsProviderConfiguration_p740[&quot;SmsProviderConfiguration&quot;] --&gt;|implements| SmppSmsProviderConfiguration_c740[&quot;SmppSmsProviderConfiguration&quot;]
+    Object______p741[&quot;Object/外部框架&quot;] --&gt;|extends| TestSmsRequest_c741[&quot;TestSmsRequest&quot;]
+    Object______p742[&quot;Object/外部框架&quot;] --&gt;|extends| TwilioSmsProviderConfiguration_c742[&quot;TwilioSmsProviderConfiguration&quot;]
+    SmsProviderConfiguration_p743[&quot;SmsProviderConfiguration&quot;] --&gt;|implements| TwilioSmsProviderConfiguration_c743[&quot;TwilioSmsProviderConfiguration&quot;]
+    Object______p744[&quot;Object/外部框架&quot;] --&gt;|extends| AttributeExportData_c744[&quot;AttributeExportData&quot;]
+    EntityExportData_p745[&quot;EntityExportData&quot;] --&gt;|extends| DeviceExportData_c745[&quot;DeviceExportData&quot;]
+    Object______p746[&quot;Object/外部框架&quot;] --&gt;|extends| EntityExportData_c746[&quot;EntityExportData&quot;]
+    Object______p747[&quot;Object/外部框架&quot;] --&gt;|extends| EntityExportSettings_c747[&quot;EntityExportSettings&quot;]
+    Object______p748[&quot;Object/外部框架&quot;] --&gt;|extends| EntityImportResult_c748[&quot;EntityImportResult&quot;]
+    Object______p749[&quot;Object/外部框架&quot;] --&gt;|extends| EntityImportSettings_c749[&quot;EntityImportSettings&quot;]
+    EntityExportData_p750[&quot;EntityExportData&quot;] --&gt;|extends| RuleChainExportData_c750[&quot;RuleChainExportData&quot;]
+    EntityExportData_p751[&quot;EntityExportData&quot;] --&gt;|extends| WidgetTypeExportData_c751[&quot;WidgetTypeExportData&quot;]
+    EntityExportData_p752[&quot;EntityExportData&quot;] --&gt;|extends| WidgetsBundleExportData_c752[&quot;WidgetsBundleExportData&quot;]
+    Object______p753[&quot;Object/外部框架&quot;] --&gt;|extends| BulkImportRequest_c753[&quot;BulkImportRequest&quot;]
+    Object______p754[&quot;Object/外部框架&quot;] --&gt;|extends| Mapping_c754[&quot;Mapping&quot;]
+    Object______p755[&quot;Object/外部框架&quot;] --&gt;|extends| ColumnMapping_c755[&quot;ColumnMapping&quot;]
+    Object______p756[&quot;Object/外部框架&quot;] --&gt;|extends| BulkImportResult_c756[&quot;BulkImportResult&quot;]
+    HashMap_p757[&quot;HashMap&quot;] --&gt;|extends| AutoCommitSettings_c757[&quot;AutoCommitSettings&quot;]
+    Object______p758[&quot;Object/外部框架&quot;] --&gt;|extends| BranchInfo_c758[&quot;BranchInfo&quot;]
+    Object______p759[&quot;Object/外部框架&quot;] --&gt;|extends| EntityDataDiff_c759[&quot;EntityDataDiff&quot;]
+    Object______p760[&quot;Object/外部框架&quot;] --&gt;|extends| EntityDataInfo_c760[&quot;EntityDataInfo&quot;]
+    Object______p761[&quot;Object/外部框架&quot;] --&gt;|extends| EntityLoadError_c761[&quot;EntityLoadError&quot;]
+    Serializable_p762[&quot;Serializable&quot;] --&gt;|implements| EntityLoadError_c762[&quot;EntityLoadError&quot;]
+    Object______p763[&quot;Object/外部框架&quot;] --&gt;|extends| EntityTypeLoadResult_c763[&quot;EntityTypeLoadResult&quot;]
+    Serializable_p764[&quot;Serializable&quot;] --&gt;|implements| EntityTypeLoadResult_c764[&quot;EntityTypeLoadResult&quot;]
+    Object______p765[&quot;Object/外部框架&quot;] --&gt;|extends| EntityVersion_c765[&quot;EntityVersion&quot;]
+    Serializable_p766[&quot;Serializable&quot;] --&gt;|implements| EntityVersion_c766[&quot;EntityVersion&quot;]
+    Object______p767[&quot;Object/外部框架&quot;] --&gt;|extends| EntityVersionsDiff_c767[&quot;EntityVersionsDiff&quot;]
+    Object______p768[&quot;Object/外部框架&quot;] --&gt;|extends| RepositorySettings_c768[&quot;RepositorySettings&quot;]
+    Serializable_p769[&quot;Serializable&quot;] --&gt;|implements| RepositorySettings_c769[&quot;RepositorySettings&quot;]
+    Object______p770[&quot;Object/外部框架&quot;] --&gt;|extends| RepositorySettingsInfo_c770[&quot;RepositorySettingsInfo&quot;]
+    Object______p771[&quot;Object/外部框架&quot;] --&gt;|extends| VcUtils_c771[&quot;VcUtils&quot;]
+    Object______p772[&quot;Object/外部框架&quot;] --&gt;|extends| VersionCreationResult_c772[&quot;VersionCreationResult&quot;]
+    Serializable_p773[&quot;Serializable&quot;] --&gt;|implements| VersionCreationResult_c773[&quot;VersionCreationResult&quot;]
+    Object______p774[&quot;Object/外部框架&quot;] --&gt;|extends| VersionLoadResult_c774[&quot;VersionLoadResult&quot;]
+    Serializable_p775[&quot;Serializable&quot;] --&gt;|implements| VersionLoadResult_c775[&quot;VersionLoadResult&quot;]
+    Object______p776[&quot;Object/外部框架&quot;] --&gt;|extends| VersionedEntityInfo_c776[&quot;VersionedEntityInfo&quot;]
+    VersionCreateConfig_p777[&quot;VersionCreateConfig&quot;] --&gt;|extends| AutoVersionCreateConfig_c777[&quot;AutoVersionCreateConfig&quot;]
+    VersionCreateRequest_p778[&quot;VersionCreateRequest&quot;] --&gt;|extends| ComplexVersionCreateRequest_c778[&quot;ComplexVersionCreateRequest&quot;]
+    VersionCreateConfig_p779[&quot;VersionCreateConfig&quot;] --&gt;|extends| EntityTypeVersionCreateConfig_c779[&quot;EntityTypeVersionCreateConfig&quot;]
+    VersionCreateRequest_p780[&quot;VersionCreateRequest&quot;] --&gt;|extends| SingleEntityVersionCreateRequest_c780[&quot;SingleEntityVersionCreateRequest&quot;]
+    Object______p781[&quot;Object/外部框架&quot;] --&gt;|extends| VersionCreateConfig_c781[&quot;VersionCreateConfig&quot;]
+    Serializable_p782[&quot;Serializable&quot;] --&gt;|implements| VersionCreateConfig_c782[&quot;VersionCreateConfig&quot;]
+    Object______p783[&quot;Object/外部框架&quot;] --&gt;|extends| VersionCreateRequest_c783[&quot;VersionCreateRequest&quot;]
+    VersionLoadConfig_p784[&quot;VersionLoadConfig&quot;] --&gt;|extends| EntityTypeVersionLoadConfig_c784[&quot;EntityTypeVersionLoadConfig&quot;]
+    VersionLoadRequest_p785[&quot;VersionLoadRequest&quot;] --&gt;|extends| EntityTypeVersionLoadRequest_c785[&quot;EntityTypeVersionLoadRequest&quot;]
+    VersionLoadRequest_p786[&quot;VersionLoadRequest&quot;] --&gt;|extends| SingleEntityVersionLoadRequest_c786[&quot;SingleEntityVersionLoadRequest&quot;]
+    Object______p787[&quot;Object/外部框架&quot;] --&gt;|extends| VersionLoadConfig_c787[&quot;VersionLoadConfig&quot;]
+    Object______p788[&quot;Object/外部框架&quot;] --&gt;|extends| VersionLoadRequest_c788[&quot;VersionLoadRequest&quot;]
+    Object______p789[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTenantProfileConfiguration_c789[&quot;DefaultTenantProfileConfiguration&quot;]
+    TenantProfileConfiguration_p790[&quot;TenantProfileConfiguration&quot;] --&gt;|implements| DefaultTenantProfileConfiguration_c790[&quot;DefaultTenantProfileConfiguration&quot;]
+    Serializable_p791[&quot;Serializable&quot;] --&gt;|extends| TenantProfileConfiguration_c791[&quot;TenantProfileConfiguration&quot;]
+    Object______p792[&quot;Object/外部框架&quot;] --&gt;|extends| TenantProfileData_c792[&quot;TenantProfileData&quot;]
+    Serializable_p793[&quot;Serializable&quot;] --&gt;|implements| TenantProfileData_c793[&quot;TenantProfileData&quot;]
+    Object______p794[&quot;Object/外部框架&quot;] --&gt;|extends| TenantProfileQueueConfiguration_c794[&quot;TenantProfileQueueConfiguration&quot;]
+    Serializable_p795[&quot;Serializable&quot;] --&gt;|implements| TenantProfileQueueConfiguration_c795[&quot;TenantProfileQueueConfiguration&quot;]
+    Object______p796[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpMapping_c796[&quot;SnmpMapping&quot;]
+    Serializable_p797[&quot;Serializable&quot;] --&gt;|implements| SnmpMapping_c797[&quot;SnmpMapping&quot;]
+    Object______p798[&quot;Object/外部框架&quot;] --&gt;|extends| MultipleMappingsSnmpCommunicationConfig_c798[&quot;MultipleMappingsSnmpCommunicationConfig&quot;]
+    SnmpCommunicationConfig_p799[&quot;SnmpCommunicationConfig&quot;] --&gt;|implements| MultipleMappingsSnmpCommunicationConfig_c799[&quot;MultipleMappingsSnmpCommunicationConfig&quot;]
+    MultipleMappingsSnmpCommunicationConfig_p800[&quot;MultipleMappingsSnmpCommunicationConfig&quot;] --&gt;|extends| RepeatingQueryingSnmpCommunicationConfig_c800[&quot;RepeatingQueryingSnmpCommunicationConfig&quot;]
+    Serializable_p801[&quot;Serializable&quot;] --&gt;|extends| SnmpCommunicationConfig_c801[&quot;SnmpCommunicationConfig&quot;]
+    MultipleMappingsSnmpCommunicationConfig_p802[&quot;MultipleMappingsSnmpCommunicationConfig&quot;] --&gt;|extends| ToServerRpcRequestSnmpCommunicationConfig_c802[&quot;ToServerRpcRequestSnmpCommunicationConfig&quot;]
+    RepeatingQueryingSnmpCommunicationConfig_p803[&quot;RepeatingQueryingSnmpCommunicationConfig&quot;] --&gt;|extends| ClientAttributesQueryingSnmpCommunicationConfig_c803[&quot;ClientAttributesQueryingSnmpCommunicationConfig&quot;]
+    MultipleMappingsSnmpCommunicationConfig_p804[&quot;MultipleMappingsSnmpCommunicationConfig&quot;] --&gt;|extends| SharedAttributesSettingSnmpCommunicationConfig_c804[&quot;SharedAttributesSettingSnmpCommunicationConfig&quot;]
+    RepeatingQueryingSnmpCommunicationConfig_p805[&quot;RepeatingQueryingSnmpCommunicationConfig&quot;] --&gt;|extends| TelemetryQueryingSnmpCommunicationConfig_c805[&quot;TelemetryQueryingSnmpCommunicationConfig&quot;]
+    MultipleMappingsSnmpCommunicationConfig_p806[&quot;MultipleMappingsSnmpCommunicationConfig&quot;] --&gt;|extends| ToDeviceRpcRequestSnmpCommunicationConfig_c806[&quot;ToDeviceRpcRequestSnmpCommunicationConfig&quot;]
+    Object______p807[&quot;Object/外部框架&quot;] --&gt;|extends| CollectionsUtil_c807[&quot;CollectionsUtil&quot;]
+    Object______p808[&quot;Object/外部框架&quot;] --&gt;|extends| ReflectionUtils_c808[&quot;ReflectionUtils&quot;]
+    Object______p809[&quot;Object/外部框架&quot;] --&gt;|extends| TbDDFFileParser_c809[&quot;TbDDFFileParser&quot;]
+    Object______p810[&quot;Object/外部框架&quot;] --&gt;|extends| TbPair_c810[&quot;TbPair&quot;]
+    Object______p811[&quot;Object/外部框架&quot;] --&gt;|extends| TemplateUtils_c811[&quot;TemplateUtils&quot;]
+    Object______p812[&quot;Object/外部框架&quot;] --&gt;|extends| TypeCastUtil_c812[&quot;TypeCastUtil&quot;]
+    BaseData_p813[&quot;BaseData&quot;] --&gt;|extends| BaseWidgetType_c813[&quot;BaseWidgetType&quot;]
+    HasName_p814[&quot;HasName&quot;] --&gt;|implements| BaseWidgetType_c814[&quot;BaseWidgetType&quot;]
+    HasTenantId_p815[&quot;HasTenantId&quot;] --&gt;|implements| BaseWidgetType_c815[&quot;BaseWidgetType&quot;]
+    BaseWidgetType_p816[&quot;BaseWidgetType&quot;] --&gt;|extends| WidgetType_c816[&quot;WidgetType&quot;]
+    WidgetType_p817[&quot;WidgetType&quot;] --&gt;|extends| WidgetTypeDetails_c817[&quot;WidgetTypeDetails&quot;]
+    HasName_p818[&quot;HasName&quot;] --&gt;|implements| WidgetTypeDetails_c818[&quot;WidgetTypeDetails&quot;]
+    HasTenantId_p819[&quot;HasTenantId&quot;] --&gt;|implements| WidgetTypeDetails_c819[&quot;WidgetTypeDetails&quot;]
+    HasImage_p820[&quot;HasImage&quot;] --&gt;|implements| WidgetTypeDetails_c820[&quot;WidgetTypeDetails&quot;]
+    ExportableEntity_p821[&quot;ExportableEntity&quot;] --&gt;|implements| WidgetTypeDetails_c821[&quot;WidgetTypeDetails&quot;]
+    BaseWidgetType_p822[&quot;BaseWidgetType&quot;] --&gt;|extends| WidgetTypeInfo_c822[&quot;WidgetTypeInfo&quot;]
+    BaseData_p823[&quot;BaseData&quot;] --&gt;|extends| WidgetsBundle_c823[&quot;WidgetsBundle&quot;]
+    HasName_p824[&quot;HasName&quot;] --&gt;|implements| WidgetsBundle_c824[&quot;WidgetsBundle&quot;]
+    HasTenantId_p825[&quot;HasTenantId&quot;] --&gt;|implements| WidgetsBundle_c825[&quot;WidgetsBundle&quot;]
+    ExportableEntity_p826[&quot;ExportableEntity&quot;] --&gt;|implements| WidgetsBundle_c826[&quot;WidgetsBundle&quot;]
+    HasTitle_p827[&quot;HasTitle&quot;] --&gt;|implements| WidgetsBundle_c827[&quot;WidgetsBundle&quot;]
+    HasImage_p828[&quot;HasImage&quot;] --&gt;|implements| WidgetsBundle_c828[&quot;WidgetsBundle&quot;]
+    Object______p829[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetsBundleWidget_c829[&quot;WidgetsBundleWidget&quot;]
+    Object______p830[&quot;Object/外部框架&quot;] --&gt;|extends| DynamicProtoUtilsTest_c830[&quot;DynamicProtoUtilsTest&quot;]
+    Object______p831[&quot;Object/外部框架&quot;] --&gt;|extends| EntityTypeTest_c831[&quot;EntityTypeTest&quot;]
+    Object______p832[&quot;Object/外部框架&quot;] --&gt;|extends| StringUtilsTest_c832[&quot;StringUtilsTest&quot;]
+    Object______p833[&quot;Object/外部框架&quot;] --&gt;|extends| UUIDConverterTest_c833[&quot;UUIDConverterTest&quot;]
+    Object______p834[&quot;Object/外部框架&quot;] --&gt;|extends| ActionTypeTest_c834[&quot;ActionTypeTest&quot;]
+    Object______p835[&quot;Object/外部框架&quot;] --&gt;|extends| EntityIdTest_c835[&quot;EntityIdTest&quot;]
+    Object______p836[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTypeTest_c836[&quot;TbMsgTypeTest&quot;]
+    Object______p837[&quot;Object/外部框架&quot;] --&gt;|extends| RpcStatusTest_c837[&quot;RpcStatusTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `BaseData.ObjectMapper()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.getCreatedTime()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.setCreatedTime()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.hashCode()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.equals()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.toString()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseDataWithAdditionalInfo.getAdditionalInfo()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.getJson()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.setAdditionalInfo()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.equals()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.hashCode()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.ByteArrayInputStream()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `ContactBased.getCountry()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setCountry()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getState()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setState()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getCity()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setCity()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getAddress()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setAddress()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getAddress2()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setAddress2()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getZip()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setZip()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getPhone()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setPhone()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getEmail()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setEmail()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ExportableEntity.setId()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ExportableEntity.java`)
+- `ExportableEntity.getExternalId()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ExportableEntity.java`)
+- `ExportableEntity.setExternalId()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ExportableEntity.java`)
+- `ExportableEntity.getCreatedTime()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ExportableEntity.java`)
+- `ExportableEntity.setCreatedTime()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ExportableEntity.java`)
+- `ExportableEntity.setTenantId()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ExportableEntity.java`)
+- `FstStatsService.incrementEncode()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/FstStatsService.java`)
+- `FstStatsService.incrementDecode()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/FstStatsService.java`)
+- `FstStatsService.recordEncodeTime()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/FstStatsService.java`)
+- `FstStatsService.recordDecodeTime()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/FstStatsService.java`)
+- `HasAdditionalInfo.getAdditionalInfo()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/HasAdditionalInfo.java`)
+
+
+## 哪些方法可以重写
+
+- `AdminSettings.getId()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.getCreatedTime()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.getTenantId()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.setTenantId()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.getKey()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.setKey()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.getJsonValue()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.setJsonValue()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.hashCode()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.equals()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.toString()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `AdminSettings.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `ApiUsageRecordState.getValueAsString()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageRecordState.java`)
+- `ApiUsageRecordState.valueAsString()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageRecordState.java`)
+- `ApiUsageRecordState.getThresholdAsString()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageRecordState.java`)
+- `ApiUsageRecordState.valueAsString()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageRecordState.java`)
+- `ApiUsageState.isTransportEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `ApiUsageState.isReExecEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `ApiUsageState.isDbStorageEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `ApiUsageState.isJsExecEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `ApiUsageState.isTbelExecEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `ApiUsageState.isEmailSendEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `ApiUsageState.isSmsSendEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `ApiUsageState.isAlarmCreationEnabled()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageState.java`)
+- `BaseData.ObjectMapper()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.getCreatedTime()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.setCreatedTime()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.hashCode()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.equals()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.toString()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseDataWithAdditionalInfo.getAdditionalInfo()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.getJson()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.setAdditionalInfo()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.equals()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.hashCode()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.ByteArrayInputStream()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `ContactBased.getCountry()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.setCountry()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+- `ContactBased.getState()` (public, `common/data/src/main/java/org/thingsboard/server/common/data/ContactBased.java`)
+
+
+## 哪些方法必须重写
+
+- `AdminSettings.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/AdminSettings.java`)
+- `ApiUsageRecordState.valueAsString()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageRecordState.java`)
+- `ApiUsageRecordState.valueAsString()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageRecordState.java`)
+- `BaseData.ObjectMapper()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseData.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseData.java`)
+- `BaseDataWithAdditionalInfo.getJson()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `BaseDataWithAdditionalInfo.ByteArrayInputStream()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/BaseDataWithAdditionalInfo.java`)
+- `Customer.getAdditionalInfo()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Customer.java`)
+- `Customer.ShortCustomerInfo()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Customer.java`)
+- `Customer.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Customer.java`)
+- `Dashboard.getChildObjects()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Dashboard.java`)
+- `Dashboard.getChildObjects()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Dashboard.java`)
+- `Dashboard.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Dashboard.java`)
+- `DashboardInfo.ShortCustomerInfo()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DashboardInfo.java`)
+- `DashboardInfo.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DashboardInfo.java`)
+- `Device.ByteArrayInputStream()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Device.java`)
+- `Device.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/Device.java`)
+- `DeviceIdInfo.TenantId()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DeviceIdInfo.java`)
+- `DeviceIdInfo.DeviceId()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DeviceIdInfo.java`)
+- `DeviceProfile.ByteArrayInputStream()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DeviceProfile.java`)
+- `DeviceProfileInfo.TenantId()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DeviceProfileInfo.java`)
+- `DynamicProtoUtils.Location()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.RuntimeException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.RuntimeException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.ProtoParser()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.ProtoParser()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.getEnumElements()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.getMessageTypes()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `DynamicProtoUtils.IllegalArgumentException()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/DynamicProtoUtils.java`)
+- `EdgeUtils.EdgeEvent()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/EdgeUtils.java`)
+- `EdgeUtils.StringBuilder()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/EdgeUtils.java`)
+- `EntityFieldsData.ObjectMapper()` (package, `common/data/src/main/java/org/thingsboard/server/common/data/EntityFieldsData.java`)
+
+
+## 哪些地方使用了多态
+
+- `BaseData` -&gt; `AdminSettings` (extends)
+- `HasTenantId` -&gt; `AdminSettings` (implements)
+- `Object/外部框架` -&gt; `ApiUsageRecordState` (extends)
+- `Serializable` -&gt; `ApiUsageRecordState` (implements)
+- `BaseData` -&gt; `ApiUsageState` (extends)
+- `HasTenantId` -&gt; `ApiUsageState` (implements)
+- `Object/外部框架` -&gt; `BaseData` (extends)
+- `Serializable` -&gt; `BaseData` (implements)
+- `Object/外部框架` -&gt; `BaseDataWithAdditionalInfo` (extends)
+- `HasAdditionalInfo` -&gt; `BaseDataWithAdditionalInfo` (implements)
+- `Object/外部框架` -&gt; `CacheConstants` (extends)
+- `Object/外部框架` -&gt; `ClaimRequest` (extends)
+- `Object/外部框架` -&gt; `ContactBased` (extends)
+- `HasEmail` -&gt; `ContactBased` (implements)
+- `ContactBased` -&gt; `Customer` (extends)
+- `HasTenantId` -&gt; `Customer` (implements)
+- `ExportableEntity` -&gt; `Customer` (implements)
+- `HasTitle` -&gt; `Customer` (implements)
+- `DashboardInfo` -&gt; `Dashboard` (extends)
+- `ExportableEntity` -&gt; `Dashboard` (implements)
+- `BaseData` -&gt; `DashboardInfo` (extends)
+- `HasName` -&gt; `DashboardInfo` (implements)
+- `HasTenantId` -&gt; `DashboardInfo` (implements)
+- `HasTitle` -&gt; `DashboardInfo` (implements)
+- `HasImage` -&gt; `DashboardInfo` (implements)
+- `Object/外部框架` -&gt; `DataConstants` (extends)
+- `BaseDataWithAdditionalInfo` -&gt; `Device` (extends)
+- `HasLabel` -&gt; `Device` (implements)
+- `HasTenantId` -&gt; `Device` (implements)
+- `HasCustomerId` -&gt; `Device` (implements)
+- `HasOtaPackage` -&gt; `Device` (implements)
+- `ExportableEntity` -&gt; `Device` (implements)
+- `Object/外部框架` -&gt; `DeviceIdInfo` (extends)
+- `Serializable` -&gt; `DeviceIdInfo` (implements)
+- `HasTenantId` -&gt; `DeviceIdInfo` (implements)
+- `Device` -&gt; `DeviceInfo` (extends)
+- `Object/外部框架` -&gt; `DeviceInfoFilter` (extends)
+- `BaseData` -&gt; `DeviceProfile` (extends)
+- `HasName` -&gt; `DeviceProfile` (implements)
+- `HasTenantId` -&gt; `DeviceProfile` (implements)
+- 其余 40 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `Error`
+- `Exception`
+- `HashMap`
+- `JsonDeserializer`
+- `JsonSerializer`
+- `Object/外部框架`
+- `RuntimeException`
+- `Serializable`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

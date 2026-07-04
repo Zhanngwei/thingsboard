@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard MQTT Transport Common 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard MQTT Transport Common 模块继承体系分析
+
+&gt; 生成范围：`common/transport/mqtt`  
+&gt; Maven artifact：`mqtt`  
+&gt; Java 类型数量：43  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>AbstractRemoteAddressFilter
+├── IpFilter
+ChannelInboundHandlerAdapter
+├── MqttTransportHandler
+├── ProxyIpFilter
+ChannelInitializer
+├── MqttTransportServerInitializer
+DeviceAwareSessionContext
+├── MqttDeviceAwareSessionContext
+├── ├── AbstractGatewayDeviceSessionContext
+├── ├── ├── GatewayDeviceSessionContext
+├── ├── ├── SparkplugDeviceSessionContext
+├── ├── DeviceSessionCtx
+GenericFutureListener
+├── «implements» MqttTransportHandler
+MqttTopicFilter
+├── «implements» AlwaysTrueTopicFilter
+├── «implements» EqualsTopicFilter
+├── «implements» RegexTopicFilter
+MqttTransportAdaptor
+├── «implements» BackwardCompatibilityAdaptor
+├── «implements» JsonMqttAdaptor
+├── «implements» ProtoMqttAdaptor
+Object/外部框架
+├── AbstractGatewaySessionHandler
+├── ├── GatewaySessionHandler
+├── ├── SparkplugNodeSessionHandler
+├── AlwaysTrueTopicFilter
+├── BackwardCompatibilityAdaptor
+├── DeviceProvisionCallback
+├── EqualsTopicFilter
+├── File
+├── GatewaySessionHandlerTest
+├── JsonMqttAdaptor
+├── MqttSslHandlerProvider
+├── MqttTopicFilterFactory
+├── MqttTopicFilterFactoryTest
+├── MqttTopicMatcher
+├── MqttTransportHandlerTest
+├── MqttTransportService
+├── OtaPackageCallback
+├── ProtoMqttAdaptor
+├── RegexTopicFilter
+├── ReturnCodeResolver
+├── SparkplugMetricUtil
+├── SparkplugRpcRequestHeader
+├── SparkplugRpcResponseBody
+├── SparkplugTopic
+├── SparkplugTopicUtil
+├── ThingsboardMqttX509TrustManager
+SessionMsgListener
+├── «implements» AbstractGatewayDeviceSessionContext
+├── «implements» ├── GatewayDeviceSessionContext
+├── «implements» ├── SparkplugDeviceSessionContext
+├── «implements» MqttTransportHandler
+TbTransportService
+├── «implements» MqttTransportService
+TransportContext
+├── MqttTransportContext
+TransportServiceCallback
+├── «implements» DeviceProvisionCallback
+├── «implements» OtaPackageCallback
+X509TrustManager
+├── «implements» ThingsboardMqttX509TrustManager</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| MqttSslHandlerProvider_c0[&quot;MqttSslHandlerProvider&quot;]
+    Object______p1[&quot;Object/外部框架&quot;] --&gt;|extends| ThingsboardMqttX509TrustManager_c1[&quot;ThingsboardMqttX509TrustManager&quot;]
+    X509TrustManager_p2[&quot;X509TrustManager&quot;] --&gt;|implements| ThingsboardMqttX509TrustManager_c2[&quot;ThingsboardMqttX509TrustManager&quot;]
+    TransportContext_p3[&quot;TransportContext&quot;] --&gt;|extends| MqttTransportContext_c3[&quot;MqttTransportContext&quot;]
+    ChannelInboundHandlerAdapter_p4[&quot;ChannelInboundHandlerAdapter&quot;] --&gt;|extends| MqttTransportHandler_c4[&quot;MqttTransportHandler&quot;]
+    GenericFutureListener_p5[&quot;GenericFutureListener&quot;] --&gt;|implements| MqttTransportHandler_c5[&quot;MqttTransportHandler&quot;]
+    SessionMsgListener_p6[&quot;SessionMsgListener&quot;] --&gt;|implements| MqttTransportHandler_c6[&quot;MqttTransportHandler&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProvisionCallback_c7[&quot;DeviceProvisionCallback&quot;]
+    TransportServiceCallback_p8[&quot;TransportServiceCallback&quot;] --&gt;|implements| DeviceProvisionCallback_c8[&quot;DeviceProvisionCallback&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| OtaPackageCallback_c9[&quot;OtaPackageCallback&quot;]
+    TransportServiceCallback_p10[&quot;TransportServiceCallback&quot;] --&gt;|implements| OtaPackageCallback_c10[&quot;OtaPackageCallback&quot;]
+    ChannelInitializer_p11[&quot;ChannelInitializer&quot;] --&gt;|extends| MqttTransportServerInitializer_c11[&quot;MqttTransportServerInitializer&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| MqttTransportService_c12[&quot;MqttTransportService&quot;]
+    TbTransportService_p13[&quot;TbTransportService&quot;] --&gt;|implements| MqttTransportService_c13[&quot;MqttTransportService&quot;]
+    Object______p14[&quot;Object/外部框架&quot;] --&gt;|extends| BackwardCompatibilityAdaptor_c14[&quot;BackwardCompatibilityAdaptor&quot;]
+    MqttTransportAdaptor_p15[&quot;MqttTransportAdaptor&quot;] --&gt;|implements| BackwardCompatibilityAdaptor_c15[&quot;BackwardCompatibilityAdaptor&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| JsonMqttAdaptor_c16[&quot;JsonMqttAdaptor&quot;]
+    MqttTransportAdaptor_p17[&quot;MqttTransportAdaptor&quot;] --&gt;|implements| JsonMqttAdaptor_c17[&quot;JsonMqttAdaptor&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| ProtoMqttAdaptor_c18[&quot;ProtoMqttAdaptor&quot;]
+    MqttTransportAdaptor_p19[&quot;MqttTransportAdaptor&quot;] --&gt;|implements| ProtoMqttAdaptor_c19[&quot;ProtoMqttAdaptor&quot;]
+    AbstractRemoteAddressFilter_p20[&quot;AbstractRemoteAddressFilter&quot;] --&gt;|extends| IpFilter_c20[&quot;IpFilter&quot;]
+    ChannelInboundHandlerAdapter_p21[&quot;ChannelInboundHandlerAdapter&quot;] --&gt;|extends| ProxyIpFilter_c21[&quot;ProxyIpFilter&quot;]
+    MqttDeviceAwareSessionContext_p22[&quot;MqttDeviceAwareSessionContext&quot;] --&gt;|extends| AbstractGatewayDeviceSessionContext_c22[&quot;AbstractGatewayDeviceSessionContext&quot;]
+    SessionMsgListener_p23[&quot;SessionMsgListener&quot;] --&gt;|implements| AbstractGatewayDeviceSessionContext_c23[&quot;AbstractGatewayDeviceSessionContext&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractGatewaySessionHandler_c24[&quot;AbstractGatewaySessionHandler&quot;]
+    MqttDeviceAwareSessionContext_p25[&quot;MqttDeviceAwareSessionContext&quot;] --&gt;|extends| DeviceSessionCtx_c25[&quot;DeviceSessionCtx&quot;]
+    AbstractGatewayDeviceSessionContext_p26[&quot;AbstractGatewayDeviceSessionContext&quot;] --&gt;|extends| GatewayDeviceSessionContext_c26[&quot;GatewayDeviceSessionContext&quot;]
+    AbstractGatewaySessionHandler_p27[&quot;AbstractGatewaySessionHandler&quot;] --&gt;|extends| GatewaySessionHandler_c27[&quot;GatewaySessionHandler&quot;]
+    DeviceAwareSessionContext_p28[&quot;DeviceAwareSessionContext&quot;] --&gt;|extends| MqttDeviceAwareSessionContext_c28[&quot;MqttDeviceAwareSessionContext&quot;]
+    Object______p29[&quot;Object/外部框架&quot;] --&gt;|extends| MqttTopicMatcher_c29[&quot;MqttTopicMatcher&quot;]
+    AbstractGatewayDeviceSessionContext_p30[&quot;AbstractGatewayDeviceSessionContext&quot;] --&gt;|extends| SparkplugDeviceSessionContext_c30[&quot;SparkplugDeviceSessionContext&quot;]
+    AbstractGatewaySessionHandler_p31[&quot;AbstractGatewaySessionHandler&quot;] --&gt;|extends| SparkplugNodeSessionHandler_c31[&quot;SparkplugNodeSessionHandler&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| AlwaysTrueTopicFilter_c32[&quot;AlwaysTrueTopicFilter&quot;]
+    MqttTopicFilter_p33[&quot;MqttTopicFilter&quot;] --&gt;|implements| AlwaysTrueTopicFilter_c33[&quot;AlwaysTrueTopicFilter&quot;]
+    Object______p34[&quot;Object/外部框架&quot;] --&gt;|extends| EqualsTopicFilter_c34[&quot;EqualsTopicFilter&quot;]
+    MqttTopicFilter_p35[&quot;MqttTopicFilter&quot;] --&gt;|implements| EqualsTopicFilter_c35[&quot;EqualsTopicFilter&quot;]
+    Object______p36[&quot;Object/外部框架&quot;] --&gt;|extends| MqttTopicFilterFactory_c36[&quot;MqttTopicFilterFactory&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| RegexTopicFilter_c37[&quot;RegexTopicFilter&quot;]
+    MqttTopicFilter_p38[&quot;MqttTopicFilter&quot;] --&gt;|implements| RegexTopicFilter_c38[&quot;RegexTopicFilter&quot;]
+    Object______p39[&quot;Object/外部框架&quot;] --&gt;|extends| ReturnCodeResolver_c39[&quot;ReturnCodeResolver&quot;]
+    Object______p40[&quot;Object/外部框架&quot;] --&gt;|extends| SparkplugMetricUtil_c40[&quot;SparkplugMetricUtil&quot;]
+    Object______p41[&quot;Object/外部框架&quot;] --&gt;|extends| File_c41[&quot;File&quot;]
+    Object______p42[&quot;Object/外部框架&quot;] --&gt;|extends| SparkplugRpcRequestHeader_c42[&quot;SparkplugRpcRequestHeader&quot;]
+    Object______p43[&quot;Object/外部框架&quot;] --&gt;|extends| SparkplugRpcResponseBody_c43[&quot;SparkplugRpcResponseBody&quot;]
+    Object______p44[&quot;Object/外部框架&quot;] --&gt;|extends| SparkplugTopic_c44[&quot;SparkplugTopic&quot;]
+    Object______p45[&quot;Object/外部框架&quot;] --&gt;|extends| SparkplugTopicUtil_c45[&quot;SparkplugTopicUtil&quot;]
+    Object______p46[&quot;Object/外部框架&quot;] --&gt;|extends| MqttTransportHandlerTest_c46[&quot;MqttTransportHandlerTest&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| GatewaySessionHandlerTest_c47[&quot;GatewaySessionHandlerTest&quot;]
+    Object______p48[&quot;Object/外部框架&quot;] --&gt;|extends| MqttTopicFilterFactoryTest_c48[&quot;MqttTopicFilterFactoryTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `MqttTransportAdaptor.UnpooledByteBufAllocator()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/adaptors/MqttTransportAdaptor.java`)
+- `MqttTransportAdaptor.createMqttPublishMsg()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/adaptors/MqttTransportAdaptor.java`)
+- `MqttTransportAdaptor.MqttFixedHeader()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/adaptors/MqttTransportAdaptor.java`)
+- `MqttTransportAdaptor.MqttPublishVariableHeader()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/adaptors/MqttTransportAdaptor.java`)
+- `MqttTransportAdaptor.MqttPublishMessage()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/adaptors/MqttTransportAdaptor.java`)
+- `AbstractGatewayDeviceSessionContext.getSessionId()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.nextMsgId()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.onGetAttributesResponse()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.getDeviceInfo()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.onAttributeUpdate()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.getDeviceInfo()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.onToDeviceRpcRequest()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.onRemoteSessionCloseCommand()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.onToServerRpcResponse()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewayDeviceSessionContext.onDeviceDeleted()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java`)
+- `AbstractGatewaySessionHandler.createWeakMap()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onDevicesDisconnect()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onDeviceDeleted()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.getNodeId()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.getSessionId()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.getPayloadAdaptor()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.deregisterSession()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.writeAndFlush()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.nextMsgId()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.isJsonPayloadType()` (protected, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.processOnConnect()` (protected, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onSuccess()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onFailure()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onDeviceConnect()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.ReentrantLock()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.getDeviceCreationFuture()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onSuccess()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onError()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.newDeviceSessionCtx()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.getMsgId()` (protected, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.AdaptorException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.AdaptorException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.processOnDisconnect()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.onSuccess()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+- `AbstractGatewaySessionHandler.JsonSyntaxException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java`)
+
+
+## 哪些方法可以重写
+
+- `MqttSslHandlerProvider.mqttSslCredentials()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.SslCredentialsConfig()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.getSslHandler()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.SslHandler()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.RuntimeException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.ThingsboardMqttX509TrustManager()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.getAcceptedIssuers()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CountDownLatch()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.onSuccess()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.onError()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.mqttSslCredentials()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.SslCredentialsConfig()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.getSslHandler()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.SslHandler()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.RuntimeException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.getAcceptedIssuers()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CountDownLatch()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.onSuccess()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.onError()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttTransportContext.AtomicInteger()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportContext.init()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportContext.channelRegistered()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportContext.channelUnregistered()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportContext.checkAddress()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportContext.onAuthSuccess()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportContext.onAuthFailure()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportHandler.DeviceSessionCtx()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.channelRead()` (public, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getAddress()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.processMqttMsg()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.DeviceProvisionCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.DeviceProvisionCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.MqttMessage()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.enqueueRegularSessionMsg()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+
+
+## 哪些方法必须重写
+
+- `MqttSslHandlerProvider.SslCredentialsConfig()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.SslHandler()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.RuntimeException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.ThingsboardMqttX509TrustManager()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CountDownLatch()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttSslHandlerProvider.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.SslCredentialsConfig()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.SslHandler()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.RuntimeException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CountDownLatch()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `ThingsboardMqttX509TrustManager.CertificateException()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttSslHandlerProvider.java`)
+- `MqttTransportContext.AtomicInteger()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportContext.java`)
+- `MqttTransportHandler.DeviceSessionCtx()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.DeviceProvisionCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.DeviceProvisionCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.MqttMessage()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.MqttMessage()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getMetadata()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+- `MqttTransportHandler.getPubAckCallback()` (package, `common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `MqttSslHandlerProvider` (extends)
+- `Object/外部框架` -&gt; `ThingsboardMqttX509TrustManager` (extends)
+- `X509TrustManager` -&gt; `ThingsboardMqttX509TrustManager` (implements)
+- `TransportContext` -&gt; `MqttTransportContext` (extends)
+- `ChannelInboundHandlerAdapter` -&gt; `MqttTransportHandler` (extends)
+- `GenericFutureListener` -&gt; `MqttTransportHandler` (implements)
+- `SessionMsgListener` -&gt; `MqttTransportHandler` (implements)
+- `Object/外部框架` -&gt; `DeviceProvisionCallback` (extends)
+- `TransportServiceCallback` -&gt; `DeviceProvisionCallback` (implements)
+- `Object/外部框架` -&gt; `OtaPackageCallback` (extends)
+- `TransportServiceCallback` -&gt; `OtaPackageCallback` (implements)
+- `ChannelInitializer` -&gt; `MqttTransportServerInitializer` (extends)
+- `Object/外部框架` -&gt; `MqttTransportService` (extends)
+- `TbTransportService` -&gt; `MqttTransportService` (implements)
+- `Object/外部框架` -&gt; `BackwardCompatibilityAdaptor` (extends)
+- `MqttTransportAdaptor` -&gt; `BackwardCompatibilityAdaptor` (implements)
+- `Object/外部框架` -&gt; `JsonMqttAdaptor` (extends)
+- `MqttTransportAdaptor` -&gt; `JsonMqttAdaptor` (implements)
+- `Object/外部框架` -&gt; `ProtoMqttAdaptor` (extends)
+- `MqttTransportAdaptor` -&gt; `ProtoMqttAdaptor` (implements)
+- `AbstractRemoteAddressFilter` -&gt; `IpFilter` (extends)
+- `ChannelInboundHandlerAdapter` -&gt; `ProxyIpFilter` (extends)
+- `MqttDeviceAwareSessionContext` -&gt; `AbstractGatewayDeviceSessionContext` (extends)
+- `SessionMsgListener` -&gt; `AbstractGatewayDeviceSessionContext` (implements)
+- `Object/外部框架` -&gt; `AbstractGatewaySessionHandler` (extends)
+- `MqttDeviceAwareSessionContext` -&gt; `DeviceSessionCtx` (extends)
+- `AbstractGatewayDeviceSessionContext` -&gt; `GatewayDeviceSessionContext` (extends)
+- `AbstractGatewaySessionHandler` -&gt; `GatewaySessionHandler` (extends)
+- `DeviceAwareSessionContext` -&gt; `MqttDeviceAwareSessionContext` (extends)
+- `Object/外部框架` -&gt; `MqttTopicMatcher` (extends)
+- `AbstractGatewayDeviceSessionContext` -&gt; `SparkplugDeviceSessionContext` (extends)
+- `AbstractGatewaySessionHandler` -&gt; `SparkplugNodeSessionHandler` (extends)
+- `Object/外部框架` -&gt; `AlwaysTrueTopicFilter` (extends)
+- `MqttTopicFilter` -&gt; `AlwaysTrueTopicFilter` (implements)
+- `Object/外部框架` -&gt; `EqualsTopicFilter` (extends)
+- `MqttTopicFilter` -&gt; `EqualsTopicFilter` (implements)
+- `Object/外部框架` -&gt; `MqttTopicFilterFactory` (extends)
+- `Object/外部框架` -&gt; `RegexTopicFilter` (extends)
+- `MqttTopicFilter` -&gt; `RegexTopicFilter` (implements)
+- `Object/外部框架` -&gt; `ReturnCodeResolver` (extends)
+- 其余 9 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `AbstractRemoteAddressFilter`
+- `ChannelInboundHandlerAdapter`
+- `ChannelInitializer`
+- `DeviceAwareSessionContext`
+- `GenericFutureListener`
+- `Object/外部框架`
+- `SessionMsgListener`
+- `TbTransportService`
+- `TransportContext`
+- `TransportServiceCallback`
+- `X509TrustManager`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

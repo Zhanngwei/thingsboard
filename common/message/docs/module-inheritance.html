@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Common Messages 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Common Messages 模块继承体系分析
+
+&gt; 生成范围：`common/message`  
+&gt; Maven artifact：`message`  
+&gt; Java 类型数量：61  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>AbstractRateLimitException
+├── TbRateLimitsException
+Exception
+├── ProcessingTimeoutException
+├── RuleEngineException
+├── ├── RuleNodeException
+├── SessionException
+├── ├── SessionAuthException
+Object/外部框架
+├── ComponentLifecycleMsg
+├── ├── RuleNodeUpdatedMsg
+├── DeviceAttributes
+├── DeviceAttributesEventNotificationMsg
+├── DeviceCredentialsUpdateNotificationMsg
+├── DeviceDeleteMsg
+├── DeviceEdgeUpdateMsg
+├── DeviceMetaData
+├── DeviceNameOrTypeUpdateMsg
+├── EdgeEventUpdateMsg
+├── EncryptionUtil
+├── FromDeviceRpcResponse
+├── FromDeviceRpcResponseActorMsg
+├── FromEdgeSyncResponse
+├── PartitionChangeMsg
+├── RateLimitsTest
+├── RemoveRpcActorMsg
+├── RuleNodeInfo
+├── SchedulerUtils
+├── TbMsg
+├── TbMsgMetaData
+├── TbMsgMetaDataTest
+├── TbMsgProcessingCtx
+├── TbMsgProcessingStackItem
+├── TbMsgProcessingStackItemTest
+├── TbRateLimits
+├── TbRuleEngineActorMsg
+├── ├── QueueToRuleEngineMsg
+├── TimeoutMsg
+├── ├── DeviceActorServerSideRpcTimeoutMsg
+├── ToDeviceRpcRequest
+├── ToDeviceRpcRequestActorMsg
+├── ToEdgeSyncRequest
+├── TopicPartitionInfo
+├── TopicPartitionInfoTest
+Serializable
+├── «implements» FromDeviceRpcResponse
+├── «implements» TbMsg
+├── «implements» TbMsgMetaData
+├── «implements» TbMsgProcessingCtx
+├── «implements» TbMsgProcessingStackItem
+├── ToAllNodesMsg
+├── ├── «implements» ComponentLifecycleMsg
+├── ├── «implements» ├── RuleNodeUpdatedMsg
+├── ├── EdgeSessionMsg
+├── ├── ├── «implements» EdgeEventUpdateMsg
+├── ├── ├── «implements» FromEdgeSyncResponse
+├── ├── ├── «implements» ToEdgeSyncRequest
+├── ToDeviceActorNotificationMsg
+├── ├── «implements» DeviceAttributesEventNotificationMsg
+├── ├── «implements» DeviceCredentialsUpdateNotificationMsg
+├── ├── «implements» DeviceDeleteMsg
+├── ├── «implements» DeviceEdgeUpdateMsg
+├── ├── «implements» DeviceNameOrTypeUpdateMsg
+├── ├── «implements» FromDeviceRpcResponseActorMsg
+├── ├── «implements» RemoveRpcActorMsg
+├── ├── «implements» ToDeviceRpcRequestActorMsg
+├── «implements» ToDeviceRpcRequest
+TbActorMsg
+├── DeviceAwareMsg
+├── ├── ToDeviceActorNotificationMsg
+├── ├── ├── «implements» DeviceAttributesEventNotificationMsg
+├── ├── ├── «implements» DeviceCredentialsUpdateNotificationMsg
+├── ├── ├── «implements» DeviceDeleteMsg
+├── ├── ├── «implements» DeviceEdgeUpdateMsg
+├── ├── ├── «implements» DeviceNameOrTypeUpdateMsg
+├── ├── ├── «implements» FromDeviceRpcResponseActorMsg
+├── ├── ├── «implements» RemoveRpcActorMsg
+├── ├── ├── «implements» ToDeviceRpcRequestActorMsg
+├── «implements» PartitionChangeMsg
+├── RuleChainAwareMsg
+├── «implements» TbRuleEngineActorMsg
+├── «implements» ├── QueueToRuleEngineMsg
+├── TenantAwareMsg
+├── ├── «implements» ComponentLifecycleMsg
+├── ├── «implements» ├── RuleNodeUpdatedMsg
+├── ├── EdgeSessionMsg
+├── ├── ├── «implements» EdgeEventUpdateMsg
+├── ├── ├── «implements» FromEdgeSyncResponse
+├── ├── ├── «implements» ToEdgeSyncRequest
+├── ├── ToDeviceActorNotificationMsg
+├── ├── ├── «implements» DeviceAttributesEventNotificationMsg
+├── ├── ├── «implements» DeviceCredentialsUpdateNotificationMsg
+├── ├── ├── «implements» DeviceDeleteMsg
+├── ├── ├── «implements» DeviceEdgeUpdateMsg
+├── ├── ├── «implements» DeviceNameOrTypeUpdateMsg
+├── ├── ├── «implements» FromDeviceRpcResponseActorMsg
+├── ├── ├── «implements» RemoveRpcActorMsg
+├── ├── ├── «implements» ToDeviceRpcRequestActorMsg
+├── «implements» TimeoutMsg
+├── «implements» ├── DeviceActorServerSideRpcTimeoutMsg
+├── ToAllNodesMsg
+├── ├── «implements» ComponentLifecycleMsg
+├── ├── «implements» ├── RuleNodeUpdatedMsg
+├── ├── EdgeSessionMsg
+├── ├── ├── «implements» EdgeEventUpdateMsg
+├── ├── ├── «implements» FromEdgeSyncResponse
+├── ├── ├── «implements» ToEdgeSyncRequest
+├── ToDeviceActorNotificationMsg
+├── ├── «implements» DeviceAttributesEventNotificationMsg
+├── ├── «implements» DeviceCredentialsUpdateNotificationMsg
+├── ├── «implements» DeviceDeleteMsg
+├── ├── «implements» DeviceEdgeUpdateMsg
+├── ├── «implements» DeviceNameOrTypeUpdateMsg
+├── ├── «implements» FromDeviceRpcResponseActorMsg
+├── ├── «implements» RemoveRpcActorMsg
+├── ├── «implements» ToDeviceRpcRequestActorMsg</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| EncryptionUtil_c0[&quot;EncryptionUtil&quot;]
+    Object______p1[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsg_c1[&quot;TbMsg&quot;]
+    Serializable_p2[&quot;Serializable&quot;] --&gt;|implements| TbMsg_c2[&quot;TbMsg&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgMetaData_c3[&quot;TbMsgMetaData&quot;]
+    Serializable_p4[&quot;Serializable&quot;] --&gt;|implements| TbMsgMetaData_c4[&quot;TbMsgMetaData&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgProcessingCtx_c5[&quot;TbMsgProcessingCtx&quot;]
+    Serializable_p6[&quot;Serializable&quot;] --&gt;|implements| TbMsgProcessingCtx_c6[&quot;TbMsgProcessingCtx&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgProcessingStackItem_c7[&quot;TbMsgProcessingStackItem&quot;]
+    Serializable_p8[&quot;Serializable&quot;] --&gt;|implements| TbMsgProcessingStackItem_c8[&quot;TbMsgProcessingStackItem&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| TbRuleEngineActorMsg_c9[&quot;TbRuleEngineActorMsg&quot;]
+    TbActorMsg_p10[&quot;TbActorMsg&quot;] --&gt;|implements| TbRuleEngineActorMsg_c10[&quot;TbRuleEngineActorMsg&quot;]
+    TbActorMsg_p11[&quot;TbActorMsg&quot;] --&gt;|extends| ToDeviceActorNotificationMsg_c11[&quot;ToDeviceActorNotificationMsg&quot;]
+    TenantAwareMsg_p12[&quot;TenantAwareMsg&quot;] --&gt;|extends| ToDeviceActorNotificationMsg_c12[&quot;ToDeviceActorNotificationMsg&quot;]
+    DeviceAwareMsg_p13[&quot;DeviceAwareMsg&quot;] --&gt;|extends| ToDeviceActorNotificationMsg_c13[&quot;ToDeviceActorNotificationMsg&quot;]
+    Serializable_p14[&quot;Serializable&quot;] --&gt;|extends| ToDeviceActorNotificationMsg_c14[&quot;ToDeviceActorNotificationMsg&quot;]
+    TbActorMsg_p15[&quot;TbActorMsg&quot;] --&gt;|extends| DeviceAwareMsg_c15[&quot;DeviceAwareMsg&quot;]
+    TbActorMsg_p16[&quot;TbActorMsg&quot;] --&gt;|extends| RuleChainAwareMsg_c16[&quot;RuleChainAwareMsg&quot;]
+    TbActorMsg_p17[&quot;TbActorMsg&quot;] --&gt;|extends| TenantAwareMsg_c17[&quot;TenantAwareMsg&quot;]
+    Serializable_p18[&quot;Serializable&quot;] --&gt;|extends| ToAllNodesMsg_c18[&quot;ToAllNodesMsg&quot;]
+    TbActorMsg_p19[&quot;TbActorMsg&quot;] --&gt;|extends| ToAllNodesMsg_c19[&quot;ToAllNodesMsg&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeEventUpdateMsg_c20[&quot;EdgeEventUpdateMsg&quot;]
+    EdgeSessionMsg_p21[&quot;EdgeSessionMsg&quot;] --&gt;|implements| EdgeEventUpdateMsg_c21[&quot;EdgeEventUpdateMsg&quot;]
+    TenantAwareMsg_p22[&quot;TenantAwareMsg&quot;] --&gt;|extends| EdgeSessionMsg_c22[&quot;EdgeSessionMsg&quot;]
+    ToAllNodesMsg_p23[&quot;ToAllNodesMsg&quot;] --&gt;|extends| EdgeSessionMsg_c23[&quot;EdgeSessionMsg&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| FromEdgeSyncResponse_c24[&quot;FromEdgeSyncResponse&quot;]
+    EdgeSessionMsg_p25[&quot;EdgeSessionMsg&quot;] --&gt;|implements| FromEdgeSyncResponse_c25[&quot;FromEdgeSyncResponse&quot;]
+    Object______p26[&quot;Object/外部框架&quot;] --&gt;|extends| ToEdgeSyncRequest_c26[&quot;ToEdgeSyncRequest&quot;]
+    EdgeSessionMsg_p27[&quot;EdgeSessionMsg&quot;] --&gt;|implements| ToEdgeSyncRequest_c27[&quot;ToEdgeSyncRequest&quot;]
+    Object______p28[&quot;Object/外部框架&quot;] --&gt;|extends| ComponentLifecycleMsg_c28[&quot;ComponentLifecycleMsg&quot;]
+    TenantAwareMsg_p29[&quot;TenantAwareMsg&quot;] --&gt;|implements| ComponentLifecycleMsg_c29[&quot;ComponentLifecycleMsg&quot;]
+    ToAllNodesMsg_p30[&quot;ToAllNodesMsg&quot;] --&gt;|implements| ComponentLifecycleMsg_c30[&quot;ComponentLifecycleMsg&quot;]
+    ComponentLifecycleMsg_p31[&quot;ComponentLifecycleMsg&quot;] --&gt;|extends| RuleNodeUpdatedMsg_c31[&quot;RuleNodeUpdatedMsg&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| PartitionChangeMsg_c32[&quot;PartitionChangeMsg&quot;]
+    TbActorMsg_p33[&quot;TbActorMsg&quot;] --&gt;|implements| PartitionChangeMsg_c33[&quot;PartitionChangeMsg&quot;]
+    TbRuleEngineActorMsg_p34[&quot;TbRuleEngineActorMsg&quot;] --&gt;|extends| QueueToRuleEngineMsg_c34[&quot;QueueToRuleEngineMsg&quot;]
+    Exception_p35[&quot;Exception&quot;] --&gt;|extends| RuleEngineException_c35[&quot;RuleEngineException&quot;]
+    RuleEngineException_p36[&quot;RuleEngineException&quot;] --&gt;|extends| RuleNodeException_c36[&quot;RuleNodeException&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| RuleNodeInfo_c37[&quot;RuleNodeInfo&quot;]
+    Object______p38[&quot;Object/外部框架&quot;] --&gt;|extends| TopicPartitionInfo_c38[&quot;TopicPartitionInfo&quot;]
+    Object______p39[&quot;Object/外部框架&quot;] --&gt;|extends| FromDeviceRpcResponse_c39[&quot;FromDeviceRpcResponse&quot;]
+    Serializable_p40[&quot;Serializable&quot;] --&gt;|implements| FromDeviceRpcResponse_c40[&quot;FromDeviceRpcResponse&quot;]
+    Object______p41[&quot;Object/外部框架&quot;] --&gt;|extends| FromDeviceRpcResponseActorMsg_c41[&quot;FromDeviceRpcResponseActorMsg&quot;]
+    ToDeviceActorNotificationMsg_p42[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| FromDeviceRpcResponseActorMsg_c42[&quot;FromDeviceRpcResponseActorMsg&quot;]
+    Object______p43[&quot;Object/外部框架&quot;] --&gt;|extends| RemoveRpcActorMsg_c43[&quot;RemoveRpcActorMsg&quot;]
+    ToDeviceActorNotificationMsg_p44[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| RemoveRpcActorMsg_c44[&quot;RemoveRpcActorMsg&quot;]
+    Object______p45[&quot;Object/外部框架&quot;] --&gt;|extends| ToDeviceRpcRequest_c45[&quot;ToDeviceRpcRequest&quot;]
+    Serializable_p46[&quot;Serializable&quot;] --&gt;|implements| ToDeviceRpcRequest_c46[&quot;ToDeviceRpcRequest&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| ToDeviceRpcRequestActorMsg_c47[&quot;ToDeviceRpcRequestActorMsg&quot;]
+    ToDeviceActorNotificationMsg_p48[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| ToDeviceRpcRequestActorMsg_c48[&quot;ToDeviceRpcRequestActorMsg&quot;]
+    Object______p49[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceAttributes_c49[&quot;DeviceAttributes&quot;]
+    Object______p50[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceAttributesEventNotificationMsg_c50[&quot;DeviceAttributesEventNotificationMsg&quot;]
+    ToDeviceActorNotificationMsg_p51[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| DeviceAttributesEventNotificationMsg_c51[&quot;DeviceAttributesEventNotificationMsg&quot;]
+    Object______p52[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceCredentialsUpdateNotificationMsg_c52[&quot;DeviceCredentialsUpdateNotificationMsg&quot;]
+    ToDeviceActorNotificationMsg_p53[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| DeviceCredentialsUpdateNotificationMsg_c53[&quot;DeviceCredentialsUpdateNotificationMsg&quot;]
+    Object______p54[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceDeleteMsg_c54[&quot;DeviceDeleteMsg&quot;]
+    ToDeviceActorNotificationMsg_p55[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| DeviceDeleteMsg_c55[&quot;DeviceDeleteMsg&quot;]
+    Object______p56[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceEdgeUpdateMsg_c56[&quot;DeviceEdgeUpdateMsg&quot;]
+    ToDeviceActorNotificationMsg_p57[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| DeviceEdgeUpdateMsg_c57[&quot;DeviceEdgeUpdateMsg&quot;]
+    Object______p58[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceMetaData_c58[&quot;DeviceMetaData&quot;]
+    Object______p59[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceNameOrTypeUpdateMsg_c59[&quot;DeviceNameOrTypeUpdateMsg&quot;]
+    ToDeviceActorNotificationMsg_p60[&quot;ToDeviceActorNotificationMsg&quot;] --&gt;|implements| DeviceNameOrTypeUpdateMsg_c60[&quot;DeviceNameOrTypeUpdateMsg&quot;]
+    Exception_p61[&quot;Exception&quot;] --&gt;|extends| ProcessingTimeoutException_c61[&quot;ProcessingTimeoutException&quot;]
+    SessionException_p62[&quot;SessionException&quot;] --&gt;|extends| SessionAuthException_c62[&quot;SessionAuthException&quot;]
+    Exception_p63[&quot;Exception&quot;] --&gt;|extends| SessionException_c63[&quot;SessionException&quot;]
+    TimeoutMsg_p64[&quot;TimeoutMsg&quot;] --&gt;|extends| DeviceActorServerSideRpcTimeoutMsg_c64[&quot;DeviceActorServerSideRpcTimeoutMsg&quot;]
+    Object______p65[&quot;Object/外部框架&quot;] --&gt;|extends| TimeoutMsg_c65[&quot;TimeoutMsg&quot;]
+    TbActorMsg_p66[&quot;TbActorMsg&quot;] --&gt;|implements| TimeoutMsg_c66[&quot;TimeoutMsg&quot;]
+    Object______p67[&quot;Object/外部框架&quot;] --&gt;|extends| SchedulerUtils_c67[&quot;SchedulerUtils&quot;]
+    Object______p68[&quot;Object/外部框架&quot;] --&gt;|extends| TbRateLimits_c68[&quot;TbRateLimits&quot;]
+    AbstractRateLimitException_p69[&quot;AbstractRateLimitException&quot;] --&gt;|extends| TbRateLimitsException_c69[&quot;TbRateLimitsException&quot;]
+    Object______p70[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgMetaDataTest_c70[&quot;TbMsgMetaDataTest&quot;]
+    Object______p71[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgProcessingStackItemTest_c71[&quot;TbMsgProcessingStackItemTest&quot;]
+    Object______p72[&quot;Object/外部框架&quot;] --&gt;|extends| TopicPartitionInfoTest_c72[&quot;TopicPartitionInfoTest&quot;]
+    Object______p73[&quot;Object/外部框架&quot;] --&gt;|extends| RateLimitsTest_c73[&quot;RateLimitsTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `TbActorError.isUnrecoverable()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorError.java`)
+- `TbActorMsg.getMsgType()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorMsg.java`)
+- `TbActorMsg.onTbActorStopped()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorMsg.java`)
+- `CustomerAwareMsg.getCustomerId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/CustomerAwareMsg.java`)
+- `DeviceAwareMsg.getDeviceId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/DeviceAwareMsg.java`)
+- `NodeAwareMsg.getNodeId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/NodeAwareMsg.java`)
+- `RuleChainAwareMsg.getRuleChainId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/RuleChainAwareMsg.java`)
+- `RuleChainAwareMsg.getMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/RuleChainAwareMsg.java`)
+- `TenantAwareMsg.getTenantId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/TenantAwareMsg.java`)
+- `NotificationRuleProcessor.process()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/notification/NotificationRuleProcessor.java`)
+- `ComponentLifecycleListener.onComponentLifecycleMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/plugin/ComponentLifecycleListener.java`)
+- `TbCallback.onSuccess()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbCallback.java`)
+- `TbCallback.onFailure()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbCallback.java`)
+- `TbCallback.onSuccess()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbCallback.java`)
+- `TbCallback.onFailure()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbCallback.java`)
+- `TbMsgCallback.onSuccess()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+- `TbMsgCallback.onFailure()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+- `TbMsgCallback.onSuccess()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+- `TbMsgCallback.onFailure()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+- `TbMsgCallback.onRateLimit()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+- `TbMsgCallback.isMsgValid()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+- `TbMsgCallback.onProcessingStart()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+- `TbMsgCallback.onProcessingEnd()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbMsgCallback.java`)
+
+
+## 哪些方法可以重写
+
+- `EncryptionUtil.SHA3Digest()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/EncryptionUtil.java`)
+- `EncryptionUtil.StringBuilder()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/EncryptionUtil.java`)
+- `EncryptionUtil.getSha3Hash()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/EncryptionUtil.java`)
+- `TbActorError.isUnrecoverable()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorError.java`)
+- `TbActorMsg.getMsgType()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorMsg.java`)
+- `TbActorMsg.onTbActorStopped()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorMsg.java`)
+- `TbMsg.getAndIncrementRuleNodeCounter()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.CustomerId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.TbMsgProcessingCtx()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.TbMsgMetaData()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.UUID()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.CustomerId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.RuleChainId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.RuleNodeId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.TbMsgProcessingCtx()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.IllegalStateException()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.copyWithRuleChainId()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.copyWithRuleChainId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.copyWithRuleChainId()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.copyWithRuleNodeId()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.copyWithNewCtx()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.getCallback()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.pushToStack()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.popFormStack()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.isValid()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.getCallback()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.getMetaDataTs()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.isTypeOf()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.isTypeOneOf()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsgMetaData.getValue()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsgMetaData.java`)
+- `TbMsgMetaData.putValue()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsgMetaData.java`)
+- `TbMsgMetaData.values()` (public, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsgMetaData.java`)
+
+
+## 哪些方法必须重写
+
+- `EncryptionUtil.SHA3Digest()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/EncryptionUtil.java`)
+- `EncryptionUtil.StringBuilder()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/EncryptionUtil.java`)
+- `EncryptionUtil.getSha3Hash()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/EncryptionUtil.java`)
+- `TbActorError.isUnrecoverable()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorError.java`)
+- `TbActorMsg.getMsgType()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorMsg.java`)
+- `TbActorMsg.onTbActorStopped()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbActorMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.newMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.CustomerId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.TbMsgProcessingCtx()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.TbMsgMetaData()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.UUID()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.CustomerId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.RuleChainId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.RuleNodeId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.TbMsgProcessingCtx()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.IllegalStateException()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.copyWithRuleChainId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsg.getCallback()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java`)
+- `TbMsgProcessingCtx.AtomicInteger()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsgProcessingCtx.java`)
+- `TbMsgProcessingCtx.TbMsgProcessingStackItem()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/TbMsgProcessingCtx.java`)
+- `CustomerAwareMsg.getCustomerId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/CustomerAwareMsg.java`)
+- `DeviceAwareMsg.getDeviceId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/DeviceAwareMsg.java`)
+- `NodeAwareMsg.getNodeId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/NodeAwareMsg.java`)
+- `RuleChainAwareMsg.getRuleChainId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/RuleChainAwareMsg.java`)
+- `RuleChainAwareMsg.getMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/RuleChainAwareMsg.java`)
+- `TenantAwareMsg.getTenantId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/aware/TenantAwareMsg.java`)
+- `NotificationRuleProcessor.process()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/notification/NotificationRuleProcessor.java`)
+- `ComponentLifecycleListener.onComponentLifecycleMsg()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/plugin/ComponentLifecycleListener.java`)
+- `QueueToRuleEngineMsg.RuleEngineException()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/QueueToRuleEngineMsg.java`)
+- `RuleEngineException.ObjectMapper()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/RuleEngineException.java`)
+- `RuleEngineException.RuntimeException()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/RuleEngineException.java`)
+- `RuleNodeException.RuleChainId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/RuleNodeException.java`)
+- `RuleNodeException.RuleNodeId()` (package, `common/message/src/main/java/org/thingsboard/server/common/msg/queue/RuleNodeException.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `EncryptionUtil` (extends)
+- `Object/外部框架` -&gt; `TbMsg` (extends)
+- `Serializable` -&gt; `TbMsg` (implements)
+- `Object/外部框架` -&gt; `TbMsgMetaData` (extends)
+- `Serializable` -&gt; `TbMsgMetaData` (implements)
+- `Object/外部框架` -&gt; `TbMsgProcessingCtx` (extends)
+- `Serializable` -&gt; `TbMsgProcessingCtx` (implements)
+- `Object/外部框架` -&gt; `TbMsgProcessingStackItem` (extends)
+- `Serializable` -&gt; `TbMsgProcessingStackItem` (implements)
+- `Object/外部框架` -&gt; `TbRuleEngineActorMsg` (extends)
+- `TbActorMsg` -&gt; `TbRuleEngineActorMsg` (implements)
+- `TbActorMsg` -&gt; `ToDeviceActorNotificationMsg` (extends)
+- `TenantAwareMsg` -&gt; `ToDeviceActorNotificationMsg` (extends)
+- `DeviceAwareMsg` -&gt; `ToDeviceActorNotificationMsg` (extends)
+- `Serializable` -&gt; `ToDeviceActorNotificationMsg` (extends)
+- `TbActorMsg` -&gt; `DeviceAwareMsg` (extends)
+- `TbActorMsg` -&gt; `RuleChainAwareMsg` (extends)
+- `TbActorMsg` -&gt; `TenantAwareMsg` (extends)
+- `Serializable` -&gt; `ToAllNodesMsg` (extends)
+- `TbActorMsg` -&gt; `ToAllNodesMsg` (extends)
+- `Object/外部框架` -&gt; `EdgeEventUpdateMsg` (extends)
+- `EdgeSessionMsg` -&gt; `EdgeEventUpdateMsg` (implements)
+- `TenantAwareMsg` -&gt; `EdgeSessionMsg` (extends)
+- `ToAllNodesMsg` -&gt; `EdgeSessionMsg` (extends)
+- `Object/外部框架` -&gt; `FromEdgeSyncResponse` (extends)
+- `EdgeSessionMsg` -&gt; `FromEdgeSyncResponse` (implements)
+- `Object/外部框架` -&gt; `ToEdgeSyncRequest` (extends)
+- `EdgeSessionMsg` -&gt; `ToEdgeSyncRequest` (implements)
+- `Object/外部框架` -&gt; `ComponentLifecycleMsg` (extends)
+- `TenantAwareMsg` -&gt; `ComponentLifecycleMsg` (implements)
+- `ToAllNodesMsg` -&gt; `ComponentLifecycleMsg` (implements)
+- `ComponentLifecycleMsg` -&gt; `RuleNodeUpdatedMsg` (extends)
+- `Object/外部框架` -&gt; `PartitionChangeMsg` (extends)
+- `TbActorMsg` -&gt; `PartitionChangeMsg` (implements)
+- `TbRuleEngineActorMsg` -&gt; `QueueToRuleEngineMsg` (extends)
+- `Exception` -&gt; `RuleEngineException` (extends)
+- `RuleEngineException` -&gt; `RuleNodeException` (extends)
+- `Object/外部框架` -&gt; `RuleNodeInfo` (extends)
+- `Object/外部框架` -&gt; `TopicPartitionInfo` (extends)
+- `Object/外部框架` -&gt; `FromDeviceRpcResponse` (extends)
+- 其余 34 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `AbstractRateLimitException`
+- `Exception`
+- `Object/外部框架`
+- `Serializable`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

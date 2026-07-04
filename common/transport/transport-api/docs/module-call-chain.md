@@ -1,0 +1,186 @@
+# Thingsboard Server Common Transport components 模块调用链分析
+
+> 生成范围：`common/transport/transport-api`  
+> Maven artifact：`transport-api`  
+> packaging：`jar`  
+> 分析方式：静态扫描 POM、Java 注解、入口方法、关键技术触点和类关系；不是运行时 trace。
+
+## 完整流程图
+
+```mermaid
+flowchart TD
+    A["① 最先调用<br/>设备、网关、协议客户端、Docker/系统服务或 Spring Boot main 最先进入 transport 模块"]
+    B["② 调用原因<br/>需要把 MQTT/HTTP/CoAP/LwM2M/SNMP 等协议消息接入 ThingsBoard"]
+    C["③ 调用之前<br/>客户端已经建立 TCP/HTTP/UDP/DTLS 等连接并携带设备凭据、主题、payload 或 RPC 响应"]
+    D["模块入口<br/>transport-api"]
+    E["⑤ 数据变化<br/>协议 payload 被解码为遥测、属性、RPC、订阅或会话事件，并附加租户/设备/会话上下文"]
+    F{"技术触点判定"}
+    G["⑥ 数据库<br/>DB 间接/否"]
+    H["⑦ Actor<br/>Actor 间接/否"]
+    I["⑧ MQTT<br/>MQTT 是"]
+    J["⑨ Kafka<br/>Kafka 间接/否"]
+    K["⑩ Rule Engine<br/>Rule Engine 间接/否"]
+    L["④ 调用之后<br/>协议消息被转换为 common transport 消息，进入队列/Actor/Rule Engine/DAO 后续链路"]
+    A --> B --> C --> D --> E --> F
+    F --> G
+    F --> H
+    F --> I
+    F --> J
+    F --> K
+    G --> L
+    H --> L
+    I --> L
+    J --> L
+    K --> L
+```
+
+
+## 十项调用链问题
+
+| 问题 | 模块级结论 |
+| --- | --- |
+| ① 谁最先调用这里？ | 设备、网关、协议客户端、Docker/系统服务或 Spring Boot main 最先进入 transport 模块 |
+| ② 为什么会调用？ | 需要把 MQTT/HTTP/CoAP/LwM2M/SNMP 等协议消息接入 ThingsBoard |
+| ③ 调用之前发生了什么？ | 客户端已经建立 TCP/HTTP/UDP/DTLS 等连接并携带设备凭据、主题、payload 或 RPC 响应 |
+| ④ 调用之后发生什么？ | 协议消息被转换为 common transport 消息，进入队列/Actor/Rule Engine/DAO 后续链路 |
+| ⑤ 数据如何变化？ | 协议 payload 被解码为遥测、属性、RPC、订阅或会话事件，并附加租户/设备/会话上下文 |
+| ⑥ 对数据库进行了哪些操作？ | 否，未发现直接操作证据；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。 |
+| ⑦ 是否发送 Actor 消息？ | 否，未发现直接操作证据；未发现直接 Actor API 调用，但可能通过服务端消息模型间接进入 Actor。 |
+| ⑧ 是否发送 MQTT 消息？ | 是，发现直接操作证据；直接操作证据：发现 MQTT client/handler/publish/subscribe/writeAndFlush 等操作模式。关键词触点 30 处仅作为辅助线索。 |
+| ⑨ 是否写入 Kafka？ | 否，未发现直接操作证据；未发现直接 Kafka API 调用，但可能通过 common queue 抽象间接写入 Kafka。 |
+| ⑩ 是否写入 Rule Engine？ | 否，未发现直接操作证据；未发现直接 Rule Engine 写入，但消息可能在下游规则链中继续处理。 |
+
+## 入口证据
+
+- Spring Component 组件入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/SslCredentialsWebServerCustomizer.java`
+- Spring Component 组件入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportDeviceProfileCache.java`
+- Spring Component 组件入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportResourceCache.java`
+- Spring Component 组件入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportResourceCache.java`
+- Spring Component 组件入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportTenantProfileCache.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultEntityLimitsCache.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- Spring Service 业务服务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/TransportQueueRoutingInfoService.java`
+- Spring Service 业务服务入口: 其余 1 处入口省略
+- 定时任务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- 定时任务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- 定时任务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- 定时任务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- 定时任务入口: `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java`
+- 测试框架入口: `common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/activity/strategy/ActivityStrategyTypeTest.java`
+- 测试框架入口: `common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/activity/strategy/AllEventsActivityStrategyTest.java`
+- 测试框架入口: `common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/activity/strategy/FirstAndLastEventActivityStrategyTest.java`
+- 测试框架入口: `common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/activity/strategy/FirstEventActivityStrategyTest.java`
+- 测试框架入口: `common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/activity/strategy/LastEventActivityStrategyTest.java`
+- 测试框架入口: `common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/service/TransportActivityManagerTest.java`
+
+
+## 静态关键词统计（不等同于实际发送/写入）
+
+- database: 73 处静态触点；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。
+- actor: 0 处静态触点；未发现直接 Actor API 调用，但可能通过服务端消息模型间接进入 Actor。
+- mqtt: 30 处静态触点；直接操作证据：发现 MQTT client/handler/publish/subscribe/writeAndFlush 等操作模式。关键词触点 30 处仅作为辅助线索。
+- kafka: 24 处静态触点；未发现直接 Kafka API 调用，但可能通过 common queue 抽象间接写入 Kafka。
+- rule_engine: 338 处静态触点；未发现直接 Rule Engine 写入，但消息可能在下游规则链中继续处理。
+- cache: 274 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 274 处仅作为辅助线索。
+- queue: 1111 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 1111 处仅作为辅助线索。
+- rest: 0 处静态触点；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。
+- websocket: 2537 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 2537 处仅作为辅助线索。
+- transport: 3053 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 3053 处仅作为辅助线索。
+
+## 调用前后数据流
+
+1. 调用前：客户端已经建立 TCP/HTTP/UDP/DTLS 等连接并携带设备凭据、主题、payload 或 RPC 响应
+2. 模块入口：`transport-api` 通过入口类、依赖 API、构建聚合或子模块暴露能力。
+3. 模块内转换：协议 payload 被解码为遥测、属性、RPC、订阅或会话事件，并附加租户/设备/会话上下文
+4. 调用后：协议消息被转换为 common transport 消息，进入队列/Actor/Rule Engine/DAO 后续链路
+5. 数据库/Actor/MQTT/Kafka/Rule Engine 这些动作若没有直接触点，通常发生在依赖的 `application`、`dao`、`common/queue`、`common/transport` 或 `rule-engine` 模块中。
+
+## 子模块与依赖
+
+### 子模块
+
+- 无子模块。
+
+
+### 主要依赖
+
+- `org.thingsboard.common:queue`
+- `org.thingsboard.common:stats`
+- `org.thingsboard.common:data`
+- `org.thingsboard.common:message`
+- `org.thingsboard.common:cache`
+- `org.thingsboard.common:util`
+- `com.google.code.gson:gson`
+- `org.slf4j:slf4j-api`
+- `org.slf4j:log4j-over-slf4j`
+- `ch.qos.logback:logback-core`
+- `ch.qos.logback:logback-classic`
+- `org.springframework.boot:spring-boot-starter-test`
+- `org.junit.vintage:junit-vintage-engine`
+- `org.awaitility:awaitility`
+- `org.springframework:spring-context`
+- `org.springframework.boot:spring-boot-starter-web`
+- `com.google.guava:guava`
+- `org.apache.commons:commons-lang3`
+- `com.google.protobuf:protobuf-java`
+- `org.eclipse.leshan:leshan-core`
+- `org.eclipse.leshan:leshan-server-cf`
+- `org.bouncycastle:bcprov-jdk15on`
+- `org.bouncycastle:bcpkix-jdk15on`
+
+
+## 关键类型样本
+
+- `DeviceDeletedEvent` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/DeviceDeletedEvent.java`)
+- `DeviceProfileUpdatedEvent` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/DeviceProfileUpdatedEvent.java`)
+- `DeviceUpdatedEvent` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/DeviceUpdatedEvent.java`)
+- `SessionMsgListener` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `TransportAdaptor` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportAdaptor.java`)
+- `TransportContext` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportDeviceProfileCache` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportResourceCache` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportService` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportServiceCallback` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportServiceCallback.java`)
+- `TransportTenantProfileCache` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportTenantProfileCache.java`)
+- `AbstractActivityManager` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/AbstractActivityManager.java`)
+- `ActivityStateWrapper` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/AbstractActivityManager.java`)
+- `ActivityManager` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/ActivityManager.java`)
+- `ActivityReportCallback` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/ActivityReportCallback.java`)
+- `ActivityState` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/ActivityState.java`)
+- `ActivityStrategy` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/strategy/ActivityStrategy.java`)
+- `ActivityStrategyType` (enum, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/strategy/ActivityStrategyType.java`)
+- `AllEventsActivityStrategy` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/strategy/AllEventsActivityStrategy.java`)
+- `FirstAndLastEventActivityStrategy` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/strategy/FirstAndLastEventActivityStrategy.java`)
+- `FirstEventActivityStrategy` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/strategy/FirstEventActivityStrategy.java`)
+- `LastEventActivityStrategy` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/strategy/LastEventActivityStrategy.java`)
+- `DeviceAuthResult` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/DeviceAuthResult.java`)
+- `DeviceAuthService` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/DeviceAuthService.java`)
+- `DeviceProfileAware` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/DeviceProfileAware.java`)
+- `GetOrCreateDeviceFromGatewayResponse` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/GetOrCreateDeviceFromGatewayResponse.java`)
+- `SessionInfoCreator` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/SessionInfoCreator.java`)
+- `TransportDeviceInfo` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/TransportDeviceInfo.java`)
+- `ValidateDeviceCredentialsResponse` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/ValidateDeviceCredentialsResponse.java`)
+- `AbstractSslCredentials` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/AbstractSslCredentials.java`)
+- `KeystoreSslCredentials` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/KeystoreSslCredentials.java`)
+- `PemSslCredentials` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/PemSslCredentials.java`)
+- `SslCredentials` (interface, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/SslCredentials.java`)
+- `SslCredentialsConfig` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/SslCredentialsConfig.java`)
+- `SslCredentialsType` (enum, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/SslCredentialsType.java`)
+- `SslCredentialsWebServerCustomizer` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/config/ssl/SslCredentialsWebServerCustomizer.java`)
+- `DefaultEntityLimitsCache` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultEntityLimitsCache.java`)
+- `DefaultTransportRateLimitService` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java`)
+- `DummyTransportRateLimit` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DummyTransportRateLimit.java`)
+- `EntityLimitKey` (class, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/EntityLimitKey.java`)
+- 其余 20 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 阅读建议
+
+- 先看“完整流程图”确认模块在全链路中的位置。
+- 再看入口证据判断调用来源是 HTTP、MQTT/Transport、Actor、Kafka、Rule Engine、DAO、测试还是构建聚合。
+- 最后用触点统计区分直接行为和下游间接行为，避免把依赖模块的数据库写入误认为本模块直接写入。

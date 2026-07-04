@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Script invoke API 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Script invoke API 模块继承体系分析
+
+&gt; 生成范围：`common/script/script-api`  
+&gt; Maven artifact：`script-api`  
+&gt; Java 类型数量：26  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>Cloneable
+├── «implements» TbDate
+Object/外部框架
+├── AbstractScriptInvokeService
+├── ├── AbstractJsInvokeService
+├── ├── ├── NashornJsInvokeService
+├── ├── DefaultTbelInvokeService
+├── BlockedScriptInfo
+├── DateTimeFormatOptions
+├── JsScriptInfo
+├── RuleNodeScriptFactory
+├── ScriptStatCallback
+├── TbDate
+├── TbDateConstructorTest
+├── TbDateTest
+├── TbDateTestEntity
+├── TbJson
+├── TbScriptExecutionTask
+├── ├── JsScriptExecutionTask
+├── ├── TbelScriptExecutionTask
+├── TbUtils
+├── TbUtilsTest
+├── TbelScript
+RuntimeException
+├── TbScriptException
+ScriptInvokeService
+├── «implements» AbstractScriptInvokeService
+├── «implements» ├── AbstractJsInvokeService
+├── «implements» ├── ├── NashornJsInvokeService
+├── «implements» ├── DefaultTbelInvokeService
+├── JsInvokeService
+├── ├── «implements» AbstractJsInvokeService
+├── ├── «implements» ├── NashornJsInvokeService
+├── TbelInvokeService
+├── ├── «implements» DefaultTbelInvokeService
+Serializable
+├── «implements» TbDate</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractScriptInvokeService_c0[&quot;AbstractScriptInvokeService&quot;]
+    ScriptInvokeService_p1[&quot;ScriptInvokeService&quot;] --&gt;|implements| AbstractScriptInvokeService_c1[&quot;AbstractScriptInvokeService&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| BlockedScriptInfo_c2[&quot;BlockedScriptInfo&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| RuleNodeScriptFactory_c3[&quot;RuleNodeScriptFactory&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| ScriptStatCallback_c4[&quot;ScriptStatCallback&quot;]
+    RuntimeException_p5[&quot;RuntimeException&quot;] --&gt;|extends| TbScriptException_c5[&quot;TbScriptException&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| TbScriptExecutionTask_c6[&quot;TbScriptExecutionTask&quot;]
+    AbstractScriptInvokeService_p7[&quot;AbstractScriptInvokeService&quot;] --&gt;|extends| AbstractJsInvokeService_c7[&quot;AbstractJsInvokeService&quot;]
+    JsInvokeService_p8[&quot;JsInvokeService&quot;] --&gt;|implements| AbstractJsInvokeService_c8[&quot;AbstractJsInvokeService&quot;]
+    ScriptInvokeService_p9[&quot;ScriptInvokeService&quot;] --&gt;|extends| JsInvokeService_c9[&quot;JsInvokeService&quot;]
+    TbScriptExecutionTask_p10[&quot;TbScriptExecutionTask&quot;] --&gt;|extends| JsScriptExecutionTask_c10[&quot;JsScriptExecutionTask&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| JsScriptInfo_c11[&quot;JsScriptInfo&quot;]
+    AbstractJsInvokeService_p12[&quot;AbstractJsInvokeService&quot;] --&gt;|extends| NashornJsInvokeService_c12[&quot;NashornJsInvokeService&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| DateTimeFormatOptions_c13[&quot;DateTimeFormatOptions&quot;]
+    AbstractScriptInvokeService_p14[&quot;AbstractScriptInvokeService&quot;] --&gt;|extends| DefaultTbelInvokeService_c14[&quot;DefaultTbelInvokeService&quot;]
+    TbelInvokeService_p15[&quot;TbelInvokeService&quot;] --&gt;|implements| DefaultTbelInvokeService_c15[&quot;DefaultTbelInvokeService&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| TbDate_c16[&quot;TbDate&quot;]
+    Serializable_p17[&quot;Serializable&quot;] --&gt;|implements| TbDate_c17[&quot;TbDate&quot;]
+    Cloneable_p18[&quot;Cloneable&quot;] --&gt;|implements| TbDate_c18[&quot;TbDate&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| TbJson_c19[&quot;TbJson&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| TbUtils_c20[&quot;TbUtils&quot;]
+    ScriptInvokeService_p21[&quot;ScriptInvokeService&quot;] --&gt;|extends| TbelInvokeService_c21[&quot;TbelInvokeService&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| TbelScript_c22[&quot;TbelScript&quot;]
+    TbScriptExecutionTask_p23[&quot;TbScriptExecutionTask&quot;] --&gt;|extends| TbelScriptExecutionTask_c23[&quot;TbelScriptExecutionTask&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| TbDateConstructorTest_c24[&quot;TbDateConstructorTest&quot;]
+    Object______p25[&quot;Object/外部框架&quot;] --&gt;|extends| TbDateTest_c25[&quot;TbDateTest&quot;]
+    Object______p26[&quot;Object/外部框架&quot;] --&gt;|extends| TbDateTestEntity_c26[&quot;TbDateTestEntity&quot;]
+    Object______p27[&quot;Object/外部框架&quot;] --&gt;|extends| TbUtilsTest_c27[&quot;TbUtilsTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxEvalRequestsTimeout()` (protected, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxScriptBodySize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxTotalArgsSize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxResultSize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxBlackListDurationSec()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxErrors()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isStatsEnabled()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getStatsName()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getCallbackExecutor()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isScriptPresent()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isExecEnabled()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.reportExecution()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.doEvalScript()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.doInvokeFunction()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.init()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.stop()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.printStats()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.eval()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.withTimeoutAndStatsCallback()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.invokeScript()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TbScriptException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TbScriptException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.withTimeoutAndStatsCallback()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getCallbackExecutor()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.BlockedScriptInfo()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TimeoutException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.release()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+
+
+## 哪些方法可以重写
+
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxEvalRequestsTimeout()` (protected, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxScriptBodySize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxTotalArgsSize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxResultSize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxBlackListDurationSec()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxErrors()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isStatsEnabled()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getStatsName()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getCallbackExecutor()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isScriptPresent()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isExecEnabled()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.reportExecution()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.doEvalScript()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.doInvokeFunction()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.init()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.stop()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.printStats()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.eval()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.withTimeoutAndStatsCallback()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.invokeScript()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TbScriptException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TbScriptException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.withTimeoutAndStatsCallback()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getCallbackExecutor()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.BlockedScriptInfo()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TimeoutException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.release()` (public, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+
+
+## 哪些方法必须重写
+
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxScriptBodySize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxTotalArgsSize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxResultSize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxBlackListDurationSec()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxErrors()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isStatsEnabled()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getStatsName()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getCallbackExecutor()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isScriptPresent()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.isExecEnabled()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.reportExecution()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.doEvalScript()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.doInvokeFunction()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.withTimeoutAndStatsCallback()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TbScriptException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxInvokeRequestsTimeout()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TbScriptException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.withTimeoutAndStatsCallback()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.error()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getCallbackExecutor()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.BlockedScriptInfo()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.TimeoutException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.getMaxTotalArgsSize()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `AbstractScriptInvokeService.RuntimeException()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/AbstractScriptInvokeService.java`)
+- `BlockedScriptInfo.AtomicInteger()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/BlockedScriptInfo.java`)
+- `ScriptInvokeService.eval()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/ScriptInvokeService.java`)
+- `ScriptInvokeService.invokeScript()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/ScriptInvokeService.java`)
+- `ScriptInvokeService.release()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/ScriptInvokeService.java`)
+- `ScriptInvokeService.getLanguage()` (package, `common/script/script-api/src/main/java/org/thingsboard/script/api/ScriptInvokeService.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `AbstractScriptInvokeService` (extends)
+- `ScriptInvokeService` -&gt; `AbstractScriptInvokeService` (implements)
+- `Object/外部框架` -&gt; `BlockedScriptInfo` (extends)
+- `Object/外部框架` -&gt; `RuleNodeScriptFactory` (extends)
+- `Object/外部框架` -&gt; `ScriptStatCallback` (extends)
+- `RuntimeException` -&gt; `TbScriptException` (extends)
+- `Object/外部框架` -&gt; `TbScriptExecutionTask` (extends)
+- `AbstractScriptInvokeService` -&gt; `AbstractJsInvokeService` (extends)
+- `JsInvokeService` -&gt; `AbstractJsInvokeService` (implements)
+- `ScriptInvokeService` -&gt; `JsInvokeService` (extends)
+- `TbScriptExecutionTask` -&gt; `JsScriptExecutionTask` (extends)
+- `Object/外部框架` -&gt; `JsScriptInfo` (extends)
+- `AbstractJsInvokeService` -&gt; `NashornJsInvokeService` (extends)
+- `Object/外部框架` -&gt; `DateTimeFormatOptions` (extends)
+- `AbstractScriptInvokeService` -&gt; `DefaultTbelInvokeService` (extends)
+- `TbelInvokeService` -&gt; `DefaultTbelInvokeService` (implements)
+- `Object/外部框架` -&gt; `TbDate` (extends)
+- `Serializable` -&gt; `TbDate` (implements)
+- `Cloneable` -&gt; `TbDate` (implements)
+- `Object/外部框架` -&gt; `TbJson` (extends)
+- `Object/外部框架` -&gt; `TbUtils` (extends)
+- `ScriptInvokeService` -&gt; `TbelInvokeService` (extends)
+- `Object/外部框架` -&gt; `TbelScript` (extends)
+- `TbScriptExecutionTask` -&gt; `TbelScriptExecutionTask` (extends)
+- `Object/外部框架` -&gt; `TbDateConstructorTest` (extends)
+- `Object/外部框架` -&gt; `TbDateTest` (extends)
+- `Object/外部框架` -&gt; `TbDateTestEntity` (extends)
+- `Object/外部框架` -&gt; `TbUtilsTest` (extends)
+
+
+## 外部父类/接口
+
+- `Cloneable`
+- `Object/外部框架`
+- `RuntimeException`
+- `Serializable`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

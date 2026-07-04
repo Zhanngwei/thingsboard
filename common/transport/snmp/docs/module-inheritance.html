@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard SNMP Transport Common 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard SNMP Transport Common 模块继承体系分析
+
+&gt; 生成范围：`common/transport/snmp`  
+&gt; Maven artifact：`snmp`  
+&gt; Java 类型数量：18  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>BaseAgent
+├── SnmpDeviceSimulatorV2
+├── SnmpDeviceSimulatorV3
+CommandResponder
+├── «implements» SnmpTransportService
+DeviceAwareSessionContext
+├── DeviceSessionContext
+Object/外部框架
+├── PduService
+├── ProtoTransportEntityService
+├── RequestContext
+├── ScheduledTask
+├── SnmpAuthService
+├── SnmpTestV2
+├── SnmpTestV3
+├── SnmpTransportBalancingService
+├── SnmpTransportService
+ResponseListener
+├── «implements» DeviceSessionContext
+SessionMsgListener
+├── «implements» DeviceSessionContext
+TbApplicationEvent
+├── SnmpTransportListChangedEvent
+TbApplicationEventListener
+├── ServiceListChangedEventListener
+├── SnmpTransportListChangedEventListener
+TbTransportService
+├── «implements» SnmpTransportService
+TransportContext
+├── SnmpTransportContext</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    TransportContext_p0[&quot;TransportContext&quot;] --&gt;|extends| SnmpTransportContext_c0[&quot;SnmpTransportContext&quot;]
+    TbApplicationEventListener_p1[&quot;TbApplicationEventListener&quot;] --&gt;|extends| ServiceListChangedEventListener_c1[&quot;ServiceListChangedEventListener&quot;]
+    TbApplicationEvent_p2[&quot;TbApplicationEvent&quot;] --&gt;|extends| SnmpTransportListChangedEvent_c2[&quot;SnmpTransportListChangedEvent&quot;]
+    TbApplicationEventListener_p3[&quot;TbApplicationEventListener&quot;] --&gt;|extends| SnmpTransportListChangedEventListener_c3[&quot;SnmpTransportListChangedEventListener&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| PduService_c4[&quot;PduService&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| ProtoTransportEntityService_c5[&quot;ProtoTransportEntityService&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpAuthService_c6[&quot;SnmpAuthService&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpTransportBalancingService_c7[&quot;SnmpTransportBalancingService&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpTransportService_c8[&quot;SnmpTransportService&quot;]
+    TbTransportService_p9[&quot;TbTransportService&quot;] --&gt;|implements| SnmpTransportService_c9[&quot;SnmpTransportService&quot;]
+    CommandResponder_p10[&quot;CommandResponder&quot;] --&gt;|implements| SnmpTransportService_c10[&quot;SnmpTransportService&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| RequestContext_c11[&quot;RequestContext&quot;]
+    DeviceAwareSessionContext_p12[&quot;DeviceAwareSessionContext&quot;] --&gt;|extends| DeviceSessionContext_c12[&quot;DeviceSessionContext&quot;]
+    SessionMsgListener_p13[&quot;SessionMsgListener&quot;] --&gt;|implements| DeviceSessionContext_c13[&quot;DeviceSessionContext&quot;]
+    ResponseListener_p14[&quot;ResponseListener&quot;] --&gt;|implements| DeviceSessionContext_c14[&quot;DeviceSessionContext&quot;]
+    Object______p15[&quot;Object/外部框架&quot;] --&gt;|extends| ScheduledTask_c15[&quot;ScheduledTask&quot;]
+    BaseAgent_p16[&quot;BaseAgent&quot;] --&gt;|extends| SnmpDeviceSimulatorV2_c16[&quot;SnmpDeviceSimulatorV2&quot;]
+    BaseAgent_p17[&quot;BaseAgent&quot;] --&gt;|extends| SnmpDeviceSimulatorV3_c17[&quot;SnmpDeviceSimulatorV3&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpTestV2_c18[&quot;SnmpTestV2&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| SnmpTestV3_c19[&quot;SnmpTestV3&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `ResponseDataMapper.stop()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.DefaultUdpTransportMapping()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.DefaultTcpTransportMapping()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.Snmp()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.USM()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.createQueryingTasks()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.ScheduledTask()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.sendRequest()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.cancelQueryingTasks()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.sendRequest()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.sendRequest()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.onAttributeUpdate()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.onToDeviceRpcRequest()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.processResponseEvent()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.RuntimeException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.RuntimeException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.processPdu()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalStateException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.JsonObject()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.getName()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.shutdown()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.RequestContext()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.map()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseDataMapper.process()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.stop()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.DefaultUdpTransportMapping()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.DefaultTcpTransportMapping()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.Snmp()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.USM()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.createQueryingTasks()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.ScheduledTask()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+- `ResponseProcessor.sendRequest()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+
+
+## 哪些方法可以重写
+
+- `SnmpTransportContext.fetchDevicesAndEstablishSessions()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.DeviceId()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.onSuccess()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.onError()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.onDeviceUpdatedOrCreated()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.onDeviceDeleted()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.onDeviceProfileUpdated()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.onSnmpTransportListChanged()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportContext.getSessions()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `ServiceListChangedEventListener.onTbApplicationEvent()` (protected, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/event/ServiceListChangedEventListener.java`)
+- `SnmpTransportListChangedEvent.Object()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/event/SnmpTransportListChangedEvent.java`)
+- `SnmpTransportListChangedEventListener.onTbApplicationEvent()` (protected, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/event/SnmpTransportListChangedEventListener.java`)
+- `PduService.createPdus()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.VariableBinding()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.VariableBinding()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.createSingleVariablePdu()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.VariableBinding()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.Integer32()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.PDU()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.ScopedPDU()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.UnsupportedOperationException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.processPdus()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OID()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.JsonObject()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.processPdus()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.processValue()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `ProtoTransportEntityService.getDeviceById()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.DeviceProfileId()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.Device()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.IllegalStateException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.DeviceData()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.getDeviceCredentialsByDeviceId()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.getSnmpDevicesIds()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `SnmpAuthService.setUpSnmpTarget()` (public, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.CommunityTarget()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+
+
+## 哪些方法必须重写
+
+- `SnmpTransportContext.DeviceId()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/SnmpTransportContext.java`)
+- `SnmpTransportListChangedEvent.Object()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/event/SnmpTransportListChangedEvent.java`)
+- `PduService.VariableBinding()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.VariableBinding()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.VariableBinding()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.Integer32()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.PDU()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.ScopedPDU()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.UnsupportedOperationException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.OID()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.JsonObject()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `PduService.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/PduService.java`)
+- `ProtoTransportEntityService.DeviceProfileId()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.Device()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.IllegalStateException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.DeviceData()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `ProtoTransportEntityService.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/ProtoTransportEntityService.java`)
+- `SnmpAuthService.CommunityTarget()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.CommunityTarget()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OID()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OID()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.UserTarget()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.UnsupportedOperationException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.IllegalArgumentException()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpAuthService.OctetString()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpAuthService.java`)
+- `SnmpTransportBalancingService.SnmpTransportListChangedEvent()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportBalancingService.java`)
+- `SnmpTransportService.DefaultUdpTransportMapping()` (package, `common/transport/snmp/src/main/java/org/thingsboard/server/transport/snmp/service/SnmpTransportService.java`)
+
+
+## 哪些地方使用了多态
+
+- `TransportContext` -&gt; `SnmpTransportContext` (extends)
+- `TbApplicationEventListener` -&gt; `ServiceListChangedEventListener` (extends)
+- `TbApplicationEvent` -&gt; `SnmpTransportListChangedEvent` (extends)
+- `TbApplicationEventListener` -&gt; `SnmpTransportListChangedEventListener` (extends)
+- `Object/外部框架` -&gt; `PduService` (extends)
+- `Object/外部框架` -&gt; `ProtoTransportEntityService` (extends)
+- `Object/外部框架` -&gt; `SnmpAuthService` (extends)
+- `Object/外部框架` -&gt; `SnmpTransportBalancingService` (extends)
+- `Object/外部框架` -&gt; `SnmpTransportService` (extends)
+- `TbTransportService` -&gt; `SnmpTransportService` (implements)
+- `CommandResponder` -&gt; `SnmpTransportService` (implements)
+- `Object/外部框架` -&gt; `RequestContext` (extends)
+- `DeviceAwareSessionContext` -&gt; `DeviceSessionContext` (extends)
+- `SessionMsgListener` -&gt; `DeviceSessionContext` (implements)
+- `ResponseListener` -&gt; `DeviceSessionContext` (implements)
+- `Object/外部框架` -&gt; `ScheduledTask` (extends)
+- `BaseAgent` -&gt; `SnmpDeviceSimulatorV2` (extends)
+- `BaseAgent` -&gt; `SnmpDeviceSimulatorV3` (extends)
+- `Object/外部框架` -&gt; `SnmpTestV2` (extends)
+- `Object/外部框架` -&gt; `SnmpTestV3` (extends)
+
+
+## 外部父类/接口
+
+- `BaseAgent`
+- `CommandResponder`
+- `DeviceAwareSessionContext`
+- `Object/外部框架`
+- `ResponseListener`
+- `SessionMsgListener`
+- `TbApplicationEvent`
+- `TbApplicationEventListener`
+- `TbTransportService`
+- `TransportContext`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

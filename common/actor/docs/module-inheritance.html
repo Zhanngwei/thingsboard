@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Actor system 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Actor system 模块继承体系分析
+
+&gt; 生成范围：`common/actor`  
+&gt; Maven artifact：`actor`  
+&gt; Java 类型数量：30  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>Exception
+├── TbActorException
+Object/外部框架
+├── AbstractTbActor
+├── ├── TestRootActor
+├── ├── ├── FailedToInitActor
+├── ├── ├── SlowCreateActor
+├── ├── ├── SlowInitActor
+├── ActorSystemTest
+├── ActorTestCtx
+├── DefaultTbActorSystem
+├── Dispatcher
+├── FailedToInitActorCreator
+├── InitFailureStrategy
+├── IntTbActorMsg
+├── ProcessFailureStrategy
+├── SlowCreateActorCreator
+├── SlowInitActorCreator
+├── TbActorMailbox
+├── TbActorSystemSettings
+├── TbEntityActorId
+├── TbStringActorId
+├── TestRootActorCreator
+RuntimeException
+├── TbActorNotRegisteredException
+├── TbRuleNodeUpdateException
+TbActor
+├── «implements» AbstractTbActor
+├── «implements» ├── TestRootActor
+├── «implements» ├── ├── FailedToInitActor
+├── «implements» ├── ├── SlowCreateActor
+├── «implements» ├── ├── SlowInitActor
+TbActorCreator
+├── «implements» FailedToInitActorCreator
+├── «implements» SlowCreateActorCreator
+├── «implements» SlowInitActorCreator
+├── «implements» TestRootActorCreator
+TbActorId
+├── «implements» TbEntityActorId
+├── «implements» TbStringActorId
+TbActorMsg
+├── «implements» IntTbActorMsg
+TbActorRef
+├── TbActorCtx
+├── ├── «implements» TbActorMailbox
+TbActorSystem
+├── «implements» DefaultTbActorSystem</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractTbActor_c0[&quot;AbstractTbActor&quot;]
+    TbActor_p1[&quot;TbActor&quot;] --&gt;|implements| AbstractTbActor_c1[&quot;AbstractTbActor&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbActorSystem_c2[&quot;DefaultTbActorSystem&quot;]
+    TbActorSystem_p3[&quot;TbActorSystem&quot;] --&gt;|implements| DefaultTbActorSystem_c3[&quot;DefaultTbActorSystem&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| Dispatcher_c4[&quot;Dispatcher&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| InitFailureStrategy_c5[&quot;InitFailureStrategy&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| ProcessFailureStrategy_c6[&quot;ProcessFailureStrategy&quot;]
+    TbActorRef_p7[&quot;TbActorRef&quot;] --&gt;|extends| TbActorCtx_c7[&quot;TbActorCtx&quot;]
+    Exception_p8[&quot;Exception&quot;] --&gt;|extends| TbActorException_c8[&quot;TbActorException&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| TbActorMailbox_c9[&quot;TbActorMailbox&quot;]
+    TbActorCtx_p10[&quot;TbActorCtx&quot;] --&gt;|implements| TbActorMailbox_c10[&quot;TbActorMailbox&quot;]
+    RuntimeException_p11[&quot;RuntimeException&quot;] --&gt;|extends| TbActorNotRegisteredException_c11[&quot;TbActorNotRegisteredException&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| TbActorSystemSettings_c12[&quot;TbActorSystemSettings&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| TbEntityActorId_c13[&quot;TbEntityActorId&quot;]
+    TbActorId_p14[&quot;TbActorId&quot;] --&gt;|implements| TbEntityActorId_c14[&quot;TbEntityActorId&quot;]
+    RuntimeException_p15[&quot;RuntimeException&quot;] --&gt;|extends| TbRuleNodeUpdateException_c15[&quot;TbRuleNodeUpdateException&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| TbStringActorId_c16[&quot;TbStringActorId&quot;]
+    TbActorId_p17[&quot;TbActorId&quot;] --&gt;|implements| TbStringActorId_c17[&quot;TbStringActorId&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| ActorSystemTest_c18[&quot;ActorSystemTest&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| ActorTestCtx_c19[&quot;ActorTestCtx&quot;]
+    TestRootActor_p20[&quot;TestRootActor&quot;] --&gt;|extends| FailedToInitActor_c20[&quot;FailedToInitActor&quot;]
+    Object______p21[&quot;Object/外部框架&quot;] --&gt;|extends| FailedToInitActorCreator_c21[&quot;FailedToInitActorCreator&quot;]
+    TbActorCreator_p22[&quot;TbActorCreator&quot;] --&gt;|implements| FailedToInitActorCreator_c22[&quot;FailedToInitActorCreator&quot;]
+    Object______p23[&quot;Object/外部框架&quot;] --&gt;|extends| IntTbActorMsg_c23[&quot;IntTbActorMsg&quot;]
+    TbActorMsg_p24[&quot;TbActorMsg&quot;] --&gt;|implements| IntTbActorMsg_c24[&quot;IntTbActorMsg&quot;]
+    TestRootActor_p25[&quot;TestRootActor&quot;] --&gt;|extends| SlowCreateActor_c25[&quot;SlowCreateActor&quot;]
+    Object______p26[&quot;Object/外部框架&quot;] --&gt;|extends| SlowCreateActorCreator_c26[&quot;SlowCreateActorCreator&quot;]
+    TbActorCreator_p27[&quot;TbActorCreator&quot;] --&gt;|implements| SlowCreateActorCreator_c27[&quot;SlowCreateActorCreator&quot;]
+    TestRootActor_p28[&quot;TestRootActor&quot;] --&gt;|extends| SlowInitActor_c28[&quot;SlowInitActor&quot;]
+    Object______p29[&quot;Object/外部框架&quot;] --&gt;|extends| SlowInitActorCreator_c29[&quot;SlowInitActorCreator&quot;]
+    TbActorCreator_p30[&quot;TbActorCreator&quot;] --&gt;|implements| SlowInitActorCreator_c30[&quot;SlowInitActorCreator&quot;]
+    AbstractTbActor_p31[&quot;AbstractTbActor&quot;] --&gt;|extends| TestRootActor_c31[&quot;TestRootActor&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| TestRootActorCreator_c32[&quot;TestRootActorCreator&quot;]
+    TbActorCreator_p33[&quot;TbActorCreator&quot;] --&gt;|implements| TestRootActorCreator_c33[&quot;TestRootActorCreator&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `AbstractTbActor.getActorRef()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/AbstractTbActor.java`)
+- `JsInvokeStats.incrementRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.reset()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `TbActor.process()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.getActorRef()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.onInitFailure()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.onProcessFailure()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActorCreator.createActorId()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCreator.java`)
+- `TbActorCreator.createActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCreator.java`)
+- `TbActorCtx.getSelf()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.getParentRef()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.tell()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.stop()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.getOrCreateChildActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildrenByType()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.filterChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorId.getEntityType()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorId.java`)
+- `TbActorRef.getActorId()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorRef.java`)
+- `TbActorRef.tell()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorRef.java`)
+- `TbActorRef.tellWithHighPriority()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorRef.java`)
+- `TbActorSystem.getScheduler()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.createDispatcher()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.destroyDispatcher()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.getActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.createRootActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.createChildActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.tell()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.tellWithHighPriority()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+- `TbActorSystem.stop()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorSystem.java`)
+
+
+## 哪些方法可以重写
+
+- `AbstractTbActor.getActorRef()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/AbstractTbActor.java`)
+- `DefaultTbActorSystem.createDispatcher()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.Dispatcher()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.RuntimeException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.destroyDispatcher()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.RuntimeException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.getActor()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.createRootActor()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.createActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.createChildActor()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.createActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.RuntimeException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.ReentrantLock()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.TbActorNotRegisteredException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.TbActorMailbox()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.tellWithHighPriority()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.tell()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.TbActorNotRegisteredException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.broadcastToChildren()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.broadcastToChildren()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.broadcastToChildren()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.filterChildren()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.stop()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.stop()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.stop()` (public, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `JsInvokeStats.incrementRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.reset()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `TbActor.process()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.getActorRef()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.onInitFailure()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.onProcessFailure()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActorCreator.createActorId()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCreator.java`)
+
+
+## 哪些方法必须重写
+
+- `DefaultTbActorSystem.Dispatcher()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.RuntimeException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.RuntimeException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.createActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.createActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.RuntimeException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.ReentrantLock()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.TbActorNotRegisteredException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.TbActorMailbox()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `DefaultTbActorSystem.TbActorNotRegisteredException()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/DefaultTbActorSystem.java`)
+- `JsInvokeStats.incrementRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.incrementFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getRequests()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getResponses()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.getFailures()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `JsInvokeStats.reset()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/JsInvokeStats.java`)
+- `TbActor.process()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.getActorRef()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.onInitFailure()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActor.onProcessFailure()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java`)
+- `TbActorCreator.createActorId()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCreator.java`)
+- `TbActorCreator.createActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCreator.java`)
+- `TbActorCtx.getSelf()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.getParentRef()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.tell()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.stop()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.getOrCreateChildActor()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildrenByType()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.broadcastToChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorCtx.filterChildren()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorCtx.java`)
+- `TbActorId.getEntityType()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorId.java`)
+- `TbActorMailbox.AtomicBoolean()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java`)
+- `TbActorMailbox.AtomicBoolean()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java`)
+- `TbActorMailbox.AtomicBoolean()` (package, `common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `AbstractTbActor` (extends)
+- `TbActor` -&gt; `AbstractTbActor` (implements)
+- `Object/外部框架` -&gt; `DefaultTbActorSystem` (extends)
+- `TbActorSystem` -&gt; `DefaultTbActorSystem` (implements)
+- `Object/外部框架` -&gt; `Dispatcher` (extends)
+- `Object/外部框架` -&gt; `InitFailureStrategy` (extends)
+- `Object/外部框架` -&gt; `ProcessFailureStrategy` (extends)
+- `TbActorRef` -&gt; `TbActorCtx` (extends)
+- `Exception` -&gt; `TbActorException` (extends)
+- `Object/外部框架` -&gt; `TbActorMailbox` (extends)
+- `TbActorCtx` -&gt; `TbActorMailbox` (implements)
+- `RuntimeException` -&gt; `TbActorNotRegisteredException` (extends)
+- `Object/外部框架` -&gt; `TbActorSystemSettings` (extends)
+- `Object/外部框架` -&gt; `TbEntityActorId` (extends)
+- `TbActorId` -&gt; `TbEntityActorId` (implements)
+- `RuntimeException` -&gt; `TbRuleNodeUpdateException` (extends)
+- `Object/外部框架` -&gt; `TbStringActorId` (extends)
+- `TbActorId` -&gt; `TbStringActorId` (implements)
+- `Object/外部框架` -&gt; `ActorSystemTest` (extends)
+- `Object/外部框架` -&gt; `ActorTestCtx` (extends)
+- `TestRootActor` -&gt; `FailedToInitActor` (extends)
+- `Object/外部框架` -&gt; `FailedToInitActorCreator` (extends)
+- `TbActorCreator` -&gt; `FailedToInitActorCreator` (implements)
+- `Object/外部框架` -&gt; `IntTbActorMsg` (extends)
+- `TbActorMsg` -&gt; `IntTbActorMsg` (implements)
+- `TestRootActor` -&gt; `SlowCreateActor` (extends)
+- `Object/外部框架` -&gt; `SlowCreateActorCreator` (extends)
+- `TbActorCreator` -&gt; `SlowCreateActorCreator` (implements)
+- `TestRootActor` -&gt; `SlowInitActor` (extends)
+- `Object/外部框架` -&gt; `SlowInitActorCreator` (extends)
+- `TbActorCreator` -&gt; `SlowInitActorCreator` (implements)
+- `AbstractTbActor` -&gt; `TestRootActor` (extends)
+- `Object/外部框架` -&gt; `TestRootActorCreator` (extends)
+- `TbActorCreator` -&gt; `TestRootActorCreator` (implements)
+
+
+## 外部父类/接口
+
+- `Exception`
+- `Object/外部框架`
+- `RuntimeException`
+- `TbActorMsg`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

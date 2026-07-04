@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Common Transport components 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Common Transport components 模块继承体系分析
+
+&gt; 生成范围：`common/transport/transport-api`  
+&gt; Maven artifact：`transport-api`  
+&gt; Java 类型数量：75  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>ActivityStrategy
+├── «implements» AllEventsActivityStrategy
+├── «implements» FirstAndLastEventActivityStrategy
+├── «implements» FirstEventActivityStrategy
+├── «implements» LastEventActivityStrategy
+DeviceProfileAware
+├── «implements» GetOrCreateDeviceFromGatewayResponse
+├── «implements» ValidateDeviceCredentialsResponse
+EntityLimitsCache
+├── «implements» DefaultEntityLimitsCache
+Object/外部框架
+├── AbstractActivityManager
+├── ├── TransportActivityManager
+├── ├── ├── DefaultTransportService
+├── AbstractSslCredentials
+├── ├── KeystoreSslCredentials
+├── ├── PemSslCredentials
+├── ActivityState
+├── ActivityStateWrapper
+├── ActivityStrategyTypeTest
+├── AllEventsActivityStrategy
+├── AllEventsActivityStrategyTest
+├── ApiStatsProxyCallback
+├── DefaultEntityLimitsCache
+├── DefaultTransportDeviceProfileCache
+├── DefaultTransportRateLimitService
+├── DefaultTransportResourceCache
+├── DefaultTransportTenantProfileCache
+├── DeviceAuthResult
+├── DeviceAwareSessionContext
+├── DeviceUpdatedEvent
+├── DummyTransportRateLimit
+├── EntityLimitKey
+├── EntityTransportRateLimits
+├── FirstAndLastEventActivityStrategy
+├── FirstAndLastEventActivityStrategyTest
+├── FirstEventActivityStrategy
+├── FirstEventActivityStrategyTest
+├── GetOrCreateDeviceFromGatewayResponse
+├── InetAddressRateLimitStats
+├── JsonUtils
+├── LastEventActivityStrategy
+├── LastEventActivityStrategyTest
+├── MsgPackCallback
+├── ResourceCompositeKey
+├── RpcRequestMetadata
+├── SessionInfoCreator
+├── SessionMetaData
+├── SimpleTransportRateLimit
+├── SslCredentialsConfig
+├── SslCredentialsWebServerCustomizer
+├── SslUtil
+├── StatsCallback
+├── TenantProfileUpdateResult
+├── ToRuleEngineMsgEncoder
+├── ToTransportMsgResponseDecoder
+├── TransportActivityManagerTest
+├── TransportApiRequestEncoder
+├── TransportApiResponseDecoder
+├── TransportContext
+├── TransportDeviceInfo
+├── TransportQueueRoutingInfoService
+├── TransportTbQueueCallback
+├── TransportTenantRoutingInfoService
+├── ValidateDeviceCredentialsResponse
+QueueRoutingInfoService
+├── «implements» TransportQueueRoutingInfoService
+Serializable
+├── «implements» TransportDeviceInfo
+├── «implements» ValidateDeviceCredentialsResponse
+SessionContext
+├── «implements» DeviceAwareSessionContext
+SslCredentials
+├── «implements» AbstractSslCredentials
+├── «implements» ├── KeystoreSslCredentials
+├── «implements» ├── PemSslCredentials
+TbApplicationEvent
+├── DeviceDeletedEvent
+├── DeviceProfileUpdatedEvent
+TbKafkaDecoder
+├── «implements» ToTransportMsgResponseDecoder
+├── «implements» TransportApiResponseDecoder
+TbKafkaEncoder
+├── «implements» ToRuleEngineMsgEncoder
+├── «implements» TransportApiRequestEncoder
+TbQueueCallback
+├── «implements» MsgPackCallback
+├── «implements» StatsCallback
+├── «implements» TransportTbQueueCallback
+TenantRoutingInfoService
+├── «implements» TransportTenantRoutingInfoService
+TransportDeviceProfileCache
+├── «implements» DefaultTransportDeviceProfileCache
+TransportRateLimit
+├── «implements» DummyTransportRateLimit
+├── «implements» SimpleTransportRateLimit
+TransportRateLimitService
+├── «implements» DefaultTransportRateLimitService
+TransportResourceCache
+├── «implements» DefaultTransportResourceCache
+TransportService
+├── «implements» DefaultTransportService
+├── «implements» TransportActivityManager
+├── «implements» ├── DefaultTransportService
+TransportTenantProfileCache
+├── «implements» DefaultTransportTenantProfileCache
+WebServerFactoryCustomizer
+├── «implements» SslCredentialsWebServerCustomizer</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    TbApplicationEvent_p0[&quot;TbApplicationEvent&quot;] --&gt;|extends| DeviceDeletedEvent_c0[&quot;DeviceDeletedEvent&quot;]
+    TbApplicationEvent_p1[&quot;TbApplicationEvent&quot;] --&gt;|extends| DeviceProfileUpdatedEvent_c1[&quot;DeviceProfileUpdatedEvent&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceUpdatedEvent_c2[&quot;DeviceUpdatedEvent&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| TransportContext_c3[&quot;TransportContext&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractActivityManager_c4[&quot;AbstractActivityManager&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| ActivityStateWrapper_c5[&quot;ActivityStateWrapper&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| ActivityState_c6[&quot;ActivityState&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| AllEventsActivityStrategy_c7[&quot;AllEventsActivityStrategy&quot;]
+    ActivityStrategy_p8[&quot;ActivityStrategy&quot;] --&gt;|implements| AllEventsActivityStrategy_c8[&quot;AllEventsActivityStrategy&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| FirstAndLastEventActivityStrategy_c9[&quot;FirstAndLastEventActivityStrategy&quot;]
+    ActivityStrategy_p10[&quot;ActivityStrategy&quot;] --&gt;|implements| FirstAndLastEventActivityStrategy_c10[&quot;FirstAndLastEventActivityStrategy&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| FirstEventActivityStrategy_c11[&quot;FirstEventActivityStrategy&quot;]
+    ActivityStrategy_p12[&quot;ActivityStrategy&quot;] --&gt;|implements| FirstEventActivityStrategy_c12[&quot;FirstEventActivityStrategy&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| LastEventActivityStrategy_c13[&quot;LastEventActivityStrategy&quot;]
+    ActivityStrategy_p14[&quot;ActivityStrategy&quot;] --&gt;|implements| LastEventActivityStrategy_c14[&quot;LastEventActivityStrategy&quot;]
+    Object______p15[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceAuthResult_c15[&quot;DeviceAuthResult&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| GetOrCreateDeviceFromGatewayResponse_c16[&quot;GetOrCreateDeviceFromGatewayResponse&quot;]
+    DeviceProfileAware_p17[&quot;DeviceProfileAware&quot;] --&gt;|implements| GetOrCreateDeviceFromGatewayResponse_c17[&quot;GetOrCreateDeviceFromGatewayResponse&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| SessionInfoCreator_c18[&quot;SessionInfoCreator&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| TransportDeviceInfo_c19[&quot;TransportDeviceInfo&quot;]
+    Serializable_p20[&quot;Serializable&quot;] --&gt;|implements| TransportDeviceInfo_c20[&quot;TransportDeviceInfo&quot;]
+    Object______p21[&quot;Object/外部框架&quot;] --&gt;|extends| ValidateDeviceCredentialsResponse_c21[&quot;ValidateDeviceCredentialsResponse&quot;]
+    DeviceProfileAware_p22[&quot;DeviceProfileAware&quot;] --&gt;|implements| ValidateDeviceCredentialsResponse_c22[&quot;ValidateDeviceCredentialsResponse&quot;]
+    Serializable_p23[&quot;Serializable&quot;] --&gt;|implements| ValidateDeviceCredentialsResponse_c23[&quot;ValidateDeviceCredentialsResponse&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractSslCredentials_c24[&quot;AbstractSslCredentials&quot;]
+    SslCredentials_p25[&quot;SslCredentials&quot;] --&gt;|implements| AbstractSslCredentials_c25[&quot;AbstractSslCredentials&quot;]
+    AbstractSslCredentials_p26[&quot;AbstractSslCredentials&quot;] --&gt;|extends| KeystoreSslCredentials_c26[&quot;KeystoreSslCredentials&quot;]
+    AbstractSslCredentials_p27[&quot;AbstractSslCredentials&quot;] --&gt;|extends| PemSslCredentials_c27[&quot;PemSslCredentials&quot;]
+    Object______p28[&quot;Object/外部框架&quot;] --&gt;|extends| SslCredentialsConfig_c28[&quot;SslCredentialsConfig&quot;]
+    Object______p29[&quot;Object/外部框架&quot;] --&gt;|extends| SslCredentialsWebServerCustomizer_c29[&quot;SslCredentialsWebServerCustomizer&quot;]
+    WebServerFactoryCustomizer_p30[&quot;WebServerFactoryCustomizer&quot;] --&gt;|implements| SslCredentialsWebServerCustomizer_c30[&quot;SslCredentialsWebServerCustomizer&quot;]
+    Object______p31[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultEntityLimitsCache_c31[&quot;DefaultEntityLimitsCache&quot;]
+    EntityLimitsCache_p32[&quot;EntityLimitsCache&quot;] --&gt;|implements| DefaultEntityLimitsCache_c32[&quot;DefaultEntityLimitsCache&quot;]
+    Object______p33[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTransportRateLimitService_c33[&quot;DefaultTransportRateLimitService&quot;]
+    TransportRateLimitService_p34[&quot;TransportRateLimitService&quot;] --&gt;|implements| DefaultTransportRateLimitService_c34[&quot;DefaultTransportRateLimitService&quot;]
+    Object______p35[&quot;Object/外部框架&quot;] --&gt;|extends| DummyTransportRateLimit_c35[&quot;DummyTransportRateLimit&quot;]
+    TransportRateLimit_p36[&quot;TransportRateLimit&quot;] --&gt;|implements| DummyTransportRateLimit_c36[&quot;DummyTransportRateLimit&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| EntityLimitKey_c37[&quot;EntityLimitKey&quot;]
+    Object______p38[&quot;Object/外部框架&quot;] --&gt;|extends| EntityTransportRateLimits_c38[&quot;EntityTransportRateLimits&quot;]
+    Object______p39[&quot;Object/外部框架&quot;] --&gt;|extends| InetAddressRateLimitStats_c39[&quot;InetAddressRateLimitStats&quot;]
+    Object______p40[&quot;Object/外部框架&quot;] --&gt;|extends| SimpleTransportRateLimit_c40[&quot;SimpleTransportRateLimit&quot;]
+    TransportRateLimit_p41[&quot;TransportRateLimit&quot;] --&gt;|implements| SimpleTransportRateLimit_c41[&quot;SimpleTransportRateLimit&quot;]
+    Object______p42[&quot;Object/外部框架&quot;] --&gt;|extends| TenantProfileUpdateResult_c42[&quot;TenantProfileUpdateResult&quot;]
+    Object______p43[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTransportDeviceProfileCache_c43[&quot;DefaultTransportDeviceProfileCache&quot;]
+    TransportDeviceProfileCache_p44[&quot;TransportDeviceProfileCache&quot;] --&gt;|implements| DefaultTransportDeviceProfileCache_c44[&quot;DefaultTransportDeviceProfileCache&quot;]
+    Object______p45[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTransportResourceCache_c45[&quot;DefaultTransportResourceCache&quot;]
+    TransportResourceCache_p46[&quot;TransportResourceCache&quot;] --&gt;|implements| DefaultTransportResourceCache_c46[&quot;DefaultTransportResourceCache&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| ResourceCompositeKey_c47[&quot;ResourceCompositeKey&quot;]
+    TransportActivityManager_p48[&quot;TransportActivityManager&quot;] --&gt;|extends| DefaultTransportService_c48[&quot;DefaultTransportService&quot;]
+    TransportService_p49[&quot;TransportService&quot;] --&gt;|implements| DefaultTransportService_c49[&quot;DefaultTransportService&quot;]
+    Object______p50[&quot;Object/外部框架&quot;] --&gt;|extends| TransportTbQueueCallback_c50[&quot;TransportTbQueueCallback&quot;]
+    TbQueueCallback_p51[&quot;TbQueueCallback&quot;] --&gt;|implements| TransportTbQueueCallback_c51[&quot;TransportTbQueueCallback&quot;]
+    Object______p52[&quot;Object/外部框架&quot;] --&gt;|extends| StatsCallback_c52[&quot;StatsCallback&quot;]
+    TbQueueCallback_p53[&quot;TbQueueCallback&quot;] --&gt;|implements| StatsCallback_c53[&quot;StatsCallback&quot;]
+    Object______p54[&quot;Object/外部框架&quot;] --&gt;|extends| MsgPackCallback_c54[&quot;MsgPackCallback&quot;]
+    TbQueueCallback_p55[&quot;TbQueueCallback&quot;] --&gt;|implements| MsgPackCallback_c55[&quot;MsgPackCallback&quot;]
+    Object______p56[&quot;Object/外部框架&quot;] --&gt;|extends| ApiStatsProxyCallback_c56[&quot;ApiStatsProxyCallback&quot;]
+    Object______p57[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTransportTenantProfileCache_c57[&quot;DefaultTransportTenantProfileCache&quot;]
+    TransportTenantProfileCache_p58[&quot;TransportTenantProfileCache&quot;] --&gt;|implements| DefaultTransportTenantProfileCache_c58[&quot;DefaultTransportTenantProfileCache&quot;]
+    Object______p59[&quot;Object/外部框架&quot;] --&gt;|extends| RpcRequestMetadata_c59[&quot;RpcRequestMetadata&quot;]
+    Object______p60[&quot;Object/外部框架&quot;] --&gt;|extends| SessionMetaData_c60[&quot;SessionMetaData&quot;]
+    Object______p61[&quot;Object/外部框架&quot;] --&gt;|extends| ToRuleEngineMsgEncoder_c61[&quot;ToRuleEngineMsgEncoder&quot;]
+    TbKafkaEncoder_p62[&quot;TbKafkaEncoder&quot;] --&gt;|implements| ToRuleEngineMsgEncoder_c62[&quot;ToRuleEngineMsgEncoder&quot;]
+    Object______p63[&quot;Object/外部框架&quot;] --&gt;|extends| ToTransportMsgResponseDecoder_c63[&quot;ToTransportMsgResponseDecoder&quot;]
+    TbKafkaDecoder_p64[&quot;TbKafkaDecoder&quot;] --&gt;|implements| ToTransportMsgResponseDecoder_c64[&quot;ToTransportMsgResponseDecoder&quot;]
+    AbstractActivityManager_p65[&quot;AbstractActivityManager&quot;] --&gt;|extends| TransportActivityManager_c65[&quot;TransportActivityManager&quot;]
+    TransportService_p66[&quot;TransportService&quot;] --&gt;|implements| TransportActivityManager_c66[&quot;TransportActivityManager&quot;]
+    Object______p67[&quot;Object/外部框架&quot;] --&gt;|extends| TransportApiRequestEncoder_c67[&quot;TransportApiRequestEncoder&quot;]
+    TbKafkaEncoder_p68[&quot;TbKafkaEncoder&quot;] --&gt;|implements| TransportApiRequestEncoder_c68[&quot;TransportApiRequestEncoder&quot;]
+    Object______p69[&quot;Object/外部框架&quot;] --&gt;|extends| TransportApiResponseDecoder_c69[&quot;TransportApiResponseDecoder&quot;]
+    TbKafkaDecoder_p70[&quot;TbKafkaDecoder&quot;] --&gt;|implements| TransportApiResponseDecoder_c70[&quot;TransportApiResponseDecoder&quot;]
+    Object______p71[&quot;Object/外部框架&quot;] --&gt;|extends| TransportQueueRoutingInfoService_c71[&quot;TransportQueueRoutingInfoService&quot;]
+    QueueRoutingInfoService_p72[&quot;QueueRoutingInfoService&quot;] --&gt;|implements| TransportQueueRoutingInfoService_c72[&quot;TransportQueueRoutingInfoService&quot;]
+    Object______p73[&quot;Object/外部框架&quot;] --&gt;|extends| TransportTenantRoutingInfoService_c73[&quot;TransportTenantRoutingInfoService&quot;]
+    TenantRoutingInfoService_p74[&quot;TenantRoutingInfoService&quot;] --&gt;|implements| TransportTenantRoutingInfoService_c74[&quot;TransportTenantRoutingInfoService&quot;]
+    Object______p75[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceAwareSessionContext_c75[&quot;DeviceAwareSessionContext&quot;]
+    SessionContext_p76[&quot;SessionContext&quot;] --&gt;|implements| DeviceAwareSessionContext_c76[&quot;DeviceAwareSessionContext&quot;]
+    Object______p77[&quot;Object/外部框架&quot;] --&gt;|extends| JsonUtils_c77[&quot;JsonUtils&quot;]
+    Object______p78[&quot;Object/外部框架&quot;] --&gt;|extends| SslUtil_c78[&quot;SslUtil&quot;]
+    Object______p79[&quot;Object/外部框架&quot;] --&gt;|extends| ActivityStrategyTypeTest_c79[&quot;ActivityStrategyTypeTest&quot;]
+    Object______p80[&quot;Object/外部框架&quot;] --&gt;|extends| AllEventsActivityStrategyTest_c80[&quot;AllEventsActivityStrategyTest&quot;]
+    Object______p81[&quot;Object/外部框架&quot;] --&gt;|extends| FirstAndLastEventActivityStrategyTest_c81[&quot;FirstAndLastEventActivityStrategyTest&quot;]
+    Object______p82[&quot;Object/外部框架&quot;] --&gt;|extends| FirstEventActivityStrategyTest_c82[&quot;FirstEventActivityStrategyTest&quot;]
+    Object______p83[&quot;Object/外部框架&quot;] --&gt;|extends| LastEventActivityStrategyTest_c83[&quot;LastEventActivityStrategyTest&quot;]
+    Object______p84[&quot;Object/外部框架&quot;] --&gt;|extends| TransportActivityManagerTest_c84[&quot;TransportActivityManagerTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `SessionMsgListener.onGetAttributesResponse()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onAttributeUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onRemoteSessionCloseCommand()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToDeviceRpcRequest()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToServerRpcResponse()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceDeleted()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onUplinkNotification()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToTransportUpdateCredentials()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceProfileUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onResourceUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onResourceDelete()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `TransportContext.ObjectMapper()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportContext.init()` (public, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportContext.stop()` (public, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportContext.getNodeId()` (public, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportDeviceProfileCache.getOrCreate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.get()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.put()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.put()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.evict()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportResourceCache.get()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportResourceCache.update()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportResourceCache.evict()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportService.getEntityProfile()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getQueueRoutingInfo()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getResource()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getSnmpDevicesIds()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getDevice()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getDeviceCredentials()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.onProfileUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+
+
+## 哪些方法可以重写
+
+- `DeviceDeletedEvent.Object()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/DeviceDeletedEvent.java`)
+- `DeviceProfileUpdatedEvent.Object()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/DeviceProfileUpdatedEvent.java`)
+- `SessionMsgListener.onGetAttributesResponse()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onAttributeUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onRemoteSessionCloseCommand()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToDeviceRpcRequest()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToServerRpcResponse()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceDeleted()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onUplinkNotification()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToTransportUpdateCredentials()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceProfileUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onResourceUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onResourceDelete()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `TransportContext.ObjectMapper()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportContext.init()` (public, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportContext.stop()` (public, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportContext.getNodeId()` (public, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportDeviceProfileCache.getOrCreate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.get()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.put()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.put()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.evict()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportResourceCache.get()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportResourceCache.update()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportResourceCache.evict()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportService.getEntityProfile()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getQueueRoutingInfo()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getResource()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getSnmpDevicesIds()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getDevice()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getDeviceCredentials()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.onProfileUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+
+
+## 哪些方法必须重写
+
+- `DeviceDeletedEvent.Object()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/DeviceDeletedEvent.java`)
+- `DeviceProfileUpdatedEvent.Object()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/DeviceProfileUpdatedEvent.java`)
+- `SessionMsgListener.onGetAttributesResponse()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onAttributeUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onRemoteSessionCloseCommand()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToDeviceRpcRequest()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToServerRpcResponse()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceDeleted()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onUplinkNotification()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onToTransportUpdateCredentials()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceProfileUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onDeviceUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onResourceUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `SessionMsgListener.onResourceDelete()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/SessionMsgListener.java`)
+- `TransportContext.ObjectMapper()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportContext.java`)
+- `TransportDeviceProfileCache.getOrCreate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.get()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.put()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.put()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportDeviceProfileCache.evict()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportDeviceProfileCache.java`)
+- `TransportResourceCache.get()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportResourceCache.update()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportResourceCache.evict()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportResourceCache.java`)
+- `TransportService.getEntityProfile()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getQueueRoutingInfo()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getResource()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getSnmpDevicesIds()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getDevice()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.getDeviceCredentials()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.onProfileUpdate()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+- `TransportService.process()` (package, `common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportService.java`)
+
+
+## 哪些地方使用了多态
+
+- `TbApplicationEvent` -&gt; `DeviceDeletedEvent` (extends)
+- `TbApplicationEvent` -&gt; `DeviceProfileUpdatedEvent` (extends)
+- `Object/外部框架` -&gt; `DeviceUpdatedEvent` (extends)
+- `Object/外部框架` -&gt; `TransportContext` (extends)
+- `Object/外部框架` -&gt; `AbstractActivityManager` (extends)
+- `Object/外部框架` -&gt; `ActivityStateWrapper` (extends)
+- `Object/外部框架` -&gt; `ActivityState` (extends)
+- `Object/外部框架` -&gt; `AllEventsActivityStrategy` (extends)
+- `ActivityStrategy` -&gt; `AllEventsActivityStrategy` (implements)
+- `Object/外部框架` -&gt; `FirstAndLastEventActivityStrategy` (extends)
+- `ActivityStrategy` -&gt; `FirstAndLastEventActivityStrategy` (implements)
+- `Object/外部框架` -&gt; `FirstEventActivityStrategy` (extends)
+- `ActivityStrategy` -&gt; `FirstEventActivityStrategy` (implements)
+- `Object/外部框架` -&gt; `LastEventActivityStrategy` (extends)
+- `ActivityStrategy` -&gt; `LastEventActivityStrategy` (implements)
+- `Object/外部框架` -&gt; `DeviceAuthResult` (extends)
+- `Object/外部框架` -&gt; `GetOrCreateDeviceFromGatewayResponse` (extends)
+- `DeviceProfileAware` -&gt; `GetOrCreateDeviceFromGatewayResponse` (implements)
+- `Object/外部框架` -&gt; `SessionInfoCreator` (extends)
+- `Object/外部框架` -&gt; `TransportDeviceInfo` (extends)
+- `Serializable` -&gt; `TransportDeviceInfo` (implements)
+- `Object/外部框架` -&gt; `ValidateDeviceCredentialsResponse` (extends)
+- `DeviceProfileAware` -&gt; `ValidateDeviceCredentialsResponse` (implements)
+- `Serializable` -&gt; `ValidateDeviceCredentialsResponse` (implements)
+- `Object/外部框架` -&gt; `AbstractSslCredentials` (extends)
+- `SslCredentials` -&gt; `AbstractSslCredentials` (implements)
+- `AbstractSslCredentials` -&gt; `KeystoreSslCredentials` (extends)
+- `AbstractSslCredentials` -&gt; `PemSslCredentials` (extends)
+- `Object/外部框架` -&gt; `SslCredentialsConfig` (extends)
+- `Object/外部框架` -&gt; `SslCredentialsWebServerCustomizer` (extends)
+- `WebServerFactoryCustomizer` -&gt; `SslCredentialsWebServerCustomizer` (implements)
+- `Object/外部框架` -&gt; `DefaultEntityLimitsCache` (extends)
+- `EntityLimitsCache` -&gt; `DefaultEntityLimitsCache` (implements)
+- `Object/外部框架` -&gt; `DefaultTransportRateLimitService` (extends)
+- `TransportRateLimitService` -&gt; `DefaultTransportRateLimitService` (implements)
+- `Object/外部框架` -&gt; `DummyTransportRateLimit` (extends)
+- `TransportRateLimit` -&gt; `DummyTransportRateLimit` (implements)
+- `Object/外部框架` -&gt; `EntityLimitKey` (extends)
+- `Object/外部框架` -&gt; `EntityTransportRateLimits` (extends)
+- `Object/外部框架` -&gt; `InetAddressRateLimitStats` (extends)
+- 其余 40 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `Object/外部框架`
+- `QueueRoutingInfoService`
+- `Serializable`
+- `TbApplicationEvent`
+- `TbKafkaDecoder`
+- `TbKafkaEncoder`
+- `TbQueueCallback`
+- `TenantRoutingInfoService`
+- `WebServerFactoryCustomizer`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

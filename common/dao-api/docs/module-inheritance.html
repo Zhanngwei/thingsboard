@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Common DAO API 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Common DAO API 模块继承体系分析
+
+&gt; 生成范围：`common/dao-api`  
+&gt; Maven artifact：`dao-api`  
+&gt; Java 类型数量：93  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>AsyncResultSet
+├── «implements» TbResultSet
+AsyncTask
+├── «implements» CassandraStatementTask
+CountingIterator
+├── RowIterator
+DbTypeInfoComponent
+├── «implements» DefaultDbTypeInfoComponent
+DefaultDriverContext
+├── GuavaDriverContext
+EntityDaoService
+├── AlarmService
+├── ApiUsageStateService
+├── AssetProfileService
+├── AssetService
+├── CustomerService
+├── DashboardService
+├── DeviceProfileService
+├── DeviceService
+├── EdgeService
+├── EntityViewService
+├── OtaPackageService
+├── QueueService
+├── ResourceService
+├── RpcService
+├── RuleChainService
+├── TenantProfileService
+├── TenantService
+├── UserService
+├── WidgetTypeService
+├── WidgetsBundleService
+ListenableFuture
+├── «implements» TbResultSetFuture
+Object/外部框架
+├── AbstractCassandraCluster
+├── ├── CassandraCluster
+├── ├── CassandraInstallCluster
+├── CassandraDriverOptions
+├── CassandraStatementTask
+├── ClaimData
+├── ClaimResult
+├── DefaultDbTypeInfoComponent
+├── GuavaMultiPageResultSet
+├── GuavaRequestAsyncProcessor
+├── GuavaSessionUtils
+├── OAuth2User
+├── ProvisionRequest
+├── ProvisionResponse
+├── ReclaimResult
+├── TbResultSet
+├── TbResultSetFuture
+ResultSet
+├── «implements» GuavaMultiPageResultSet
+RuntimeException
+├── ProvisionFailedException
+Serializable
+├── «implements» ClaimData
+Session
+├── GuavaSession
+├── ├── «implements» DefaultGuavaSession
+SessionBuilder
+├── GuavaSessionBuilder
+SessionWrapper
+├── DefaultGuavaSession
+SyncCqlSession
+├── GuavaSession
+├── ├── «implements» DefaultGuavaSession</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    EntityDaoService_p0[&quot;EntityDaoService&quot;] --&gt;|extends| AlarmService_c0[&quot;AlarmService&quot;]
+    EntityDaoService_p1[&quot;EntityDaoService&quot;] --&gt;|extends| AssetProfileService_c1[&quot;AssetProfileService&quot;]
+    EntityDaoService_p2[&quot;EntityDaoService&quot;] --&gt;|extends| AssetService_c2[&quot;AssetService&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractCassandraCluster_c3[&quot;AbstractCassandraCluster&quot;]
+    AbstractCassandraCluster_p4[&quot;AbstractCassandraCluster&quot;] --&gt;|extends| CassandraCluster_c4[&quot;CassandraCluster&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraDriverOptions_c5[&quot;CassandraDriverOptions&quot;]
+    AbstractCassandraCluster_p6[&quot;AbstractCassandraCluster&quot;] --&gt;|extends| CassandraInstallCluster_c6[&quot;CassandraInstallCluster&quot;]
+    SessionWrapper_p7[&quot;SessionWrapper&quot;] --&gt;|extends| DefaultGuavaSession_c7[&quot;DefaultGuavaSession&quot;]
+    GuavaSession_p8[&quot;GuavaSession&quot;] --&gt;|implements| DefaultGuavaSession_c8[&quot;DefaultGuavaSession&quot;]
+    DefaultDriverContext_p9[&quot;DefaultDriverContext&quot;] --&gt;|extends| GuavaDriverContext_c9[&quot;GuavaDriverContext&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| GuavaMultiPageResultSet_c10[&quot;GuavaMultiPageResultSet&quot;]
+    ResultSet_p11[&quot;ResultSet&quot;] --&gt;|implements| GuavaMultiPageResultSet_c11[&quot;GuavaMultiPageResultSet&quot;]
+    CountingIterator_p12[&quot;CountingIterator&quot;] --&gt;|extends| RowIterator_c12[&quot;RowIterator&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| GuavaRequestAsyncProcessor_c13[&quot;GuavaRequestAsyncProcessor&quot;]
+    Session_p14[&quot;Session&quot;] --&gt;|extends| GuavaSession_c14[&quot;GuavaSession&quot;]
+    SyncCqlSession_p15[&quot;SyncCqlSession&quot;] --&gt;|extends| GuavaSession_c15[&quot;GuavaSession&quot;]
+    SessionBuilder_p16[&quot;SessionBuilder&quot;] --&gt;|extends| GuavaSessionBuilder_c16[&quot;GuavaSessionBuilder&quot;]
+    Object______p17[&quot;Object/外部框架&quot;] --&gt;|extends| GuavaSessionUtils_c17[&quot;GuavaSessionUtils&quot;]
+    EntityDaoService_p18[&quot;EntityDaoService&quot;] --&gt;|extends| CustomerService_c18[&quot;CustomerService&quot;]
+    EntityDaoService_p19[&quot;EntityDaoService&quot;] --&gt;|extends| DashboardService_c19[&quot;DashboardService&quot;]
+    EntityDaoService_p20[&quot;EntityDaoService&quot;] --&gt;|extends| DeviceProfileService_c20[&quot;DeviceProfileService&quot;]
+    EntityDaoService_p21[&quot;EntityDaoService&quot;] --&gt;|extends| DeviceService_c21[&quot;DeviceService&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| ClaimData_c22[&quot;ClaimData&quot;]
+    Serializable_p23[&quot;Serializable&quot;] --&gt;|implements| ClaimData_c23[&quot;ClaimData&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| ClaimResult_c24[&quot;ClaimResult&quot;]
+    Object______p25[&quot;Object/外部框架&quot;] --&gt;|extends| ReclaimResult_c25[&quot;ReclaimResult&quot;]
+    RuntimeException_p26[&quot;RuntimeException&quot;] --&gt;|extends| ProvisionFailedException_c26[&quot;ProvisionFailedException&quot;]
+    Object______p27[&quot;Object/外部框架&quot;] --&gt;|extends| ProvisionRequest_c27[&quot;ProvisionRequest&quot;]
+    Object______p28[&quot;Object/外部框架&quot;] --&gt;|extends| ProvisionResponse_c28[&quot;ProvisionResponse&quot;]
+    EntityDaoService_p29[&quot;EntityDaoService&quot;] --&gt;|extends| EdgeService_c29[&quot;EdgeService&quot;]
+    EntityDaoService_p30[&quot;EntityDaoService&quot;] --&gt;|extends| EntityViewService_c30[&quot;EntityViewService&quot;]
+    Object______p31[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraStatementTask_c31[&quot;CassandraStatementTask&quot;]
+    AsyncTask_p32[&quot;AsyncTask&quot;] --&gt;|implements| CassandraStatementTask_c32[&quot;CassandraStatementTask&quot;]
+    Object______p33[&quot;Object/外部框架&quot;] --&gt;|extends| TbResultSet_c33[&quot;TbResultSet&quot;]
+    AsyncResultSet_p34[&quot;AsyncResultSet&quot;] --&gt;|implements| TbResultSet_c34[&quot;TbResultSet&quot;]
+    Object______p35[&quot;Object/外部框架&quot;] --&gt;|extends| TbResultSetFuture_c35[&quot;TbResultSetFuture&quot;]
+    ListenableFuture_p36[&quot;ListenableFuture&quot;] --&gt;|implements| TbResultSetFuture_c36[&quot;TbResultSetFuture&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2User_c37[&quot;OAuth2User&quot;]
+    EntityDaoService_p38[&quot;EntityDaoService&quot;] --&gt;|extends| OtaPackageService_c38[&quot;OtaPackageService&quot;]
+    EntityDaoService_p39[&quot;EntityDaoService&quot;] --&gt;|extends| QueueService_c39[&quot;QueueService&quot;]
+    EntityDaoService_p40[&quot;EntityDaoService&quot;] --&gt;|extends| ResourceService_c40[&quot;ResourceService&quot;]
+    EntityDaoService_p41[&quot;EntityDaoService&quot;] --&gt;|extends| RpcService_c41[&quot;RpcService&quot;]
+    EntityDaoService_p42[&quot;EntityDaoService&quot;] --&gt;|extends| RuleChainService_c42[&quot;RuleChainService&quot;]
+    EntityDaoService_p43[&quot;EntityDaoService&quot;] --&gt;|extends| TenantProfileService_c43[&quot;TenantProfileService&quot;]
+    EntityDaoService_p44[&quot;EntityDaoService&quot;] --&gt;|extends| TenantService_c44[&quot;TenantService&quot;]
+    EntityDaoService_p45[&quot;EntityDaoService&quot;] --&gt;|extends| ApiUsageStateService_c45[&quot;ApiUsageStateService&quot;]
+    EntityDaoService_p46[&quot;EntityDaoService&quot;] --&gt;|extends| UserService_c46[&quot;UserService&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultDbTypeInfoComponent_c47[&quot;DefaultDbTypeInfoComponent&quot;]
+    DbTypeInfoComponent_p48[&quot;DbTypeInfoComponent&quot;] --&gt;|implements| DefaultDbTypeInfoComponent_c48[&quot;DefaultDbTypeInfoComponent&quot;]
+    EntityDaoService_p49[&quot;EntityDaoService&quot;] --&gt;|extends| WidgetTypeService_c49[&quot;WidgetTypeService&quot;]
+    EntityDaoService_p50[&quot;EntityDaoService&quot;] --&gt;|extends| WidgetsBundleService_c50[&quot;WidgetsBundleService&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `AlarmCommentService.createOrUpdateAlarmComment()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.saveAlarmComment()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmComments()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmCommentByIdAsync()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmCommentById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmService.createAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.createAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.updateAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.acknowledgeAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.clearAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.assignAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.unassignAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarmTypes()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmByIdAsync()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmInfoById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarms()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findCustomerAlarms()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmsV2()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findCustomerAlarmsV2()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findHighestAlarmSeverity()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findLatestActiveByOriginatorAndType()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmDataByQueryForEntities()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmIdsByAssigneeId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmIdsByOriginatorId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.deleteEntityAlarmRelations()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.deleteEntityAlarmRecordsByTenantId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.countAlarmsByQuery()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmTypesByTenantId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AssetProfileService.findAssetProfileById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileByName()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileByName()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileInfoById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.saveAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.saveAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.deleteAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfiles()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+
+
+## 哪些方法可以重写
+
+- `AlarmCommentService.createOrUpdateAlarmComment()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.saveAlarmComment()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmComments()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmCommentByIdAsync()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmCommentById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmService.createAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.createAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.updateAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.acknowledgeAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.clearAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.assignAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.unassignAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarmTypes()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmByIdAsync()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmInfoById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarms()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findCustomerAlarms()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmsV2()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findCustomerAlarmsV2()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findHighestAlarmSeverity()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findLatestActiveByOriginatorAndType()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmDataByQueryForEntities()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmIdsByAssigneeId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmIdsByOriginatorId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.deleteEntityAlarmRelations()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.deleteEntityAlarmRecordsByTenantId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.countAlarmsByQuery()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmTypesByTenantId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AssetProfileService.findAssetProfileById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileByName()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileByName()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileInfoById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.saveAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.saveAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.deleteAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfiles()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+
+
+## 哪些方法必须重写
+
+- `AlarmCommentService.createOrUpdateAlarmComment()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.saveAlarmComment()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmComments()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmCommentByIdAsync()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmCommentService.findAlarmCommentById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentService.java`)
+- `AlarmService.createAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.createAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.updateAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.acknowledgeAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.clearAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.assignAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.unassignAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarm()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.delAlarmTypes()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmByIdAsync()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmInfoById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarms()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findCustomerAlarms()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmsV2()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findCustomerAlarmsV2()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findHighestAlarmSeverity()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findLatestActiveByOriginatorAndType()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmDataByQueryForEntities()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmIdsByAssigneeId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmIdsByOriginatorId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.deleteEntityAlarmRelations()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.deleteEntityAlarmRecordsByTenantId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.countAlarmsByQuery()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AlarmService.findAlarmTypesByTenantId()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/alarm/AlarmService.java`)
+- `AssetProfileService.findAssetProfileById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileByName()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileByName()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfileInfoById()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.saveAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.saveAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.deleteAssetProfile()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+- `AssetProfileService.findAssetProfiles()` (package, `common/dao-api/src/main/java/org/thingsboard/server/dao/asset/AssetProfileService.java`)
+
+
+## 哪些地方使用了多态
+
+- `EntityDaoService` -&gt; `AlarmService` (extends)
+- `EntityDaoService` -&gt; `AssetProfileService` (extends)
+- `EntityDaoService` -&gt; `AssetService` (extends)
+- `Object/外部框架` -&gt; `AbstractCassandraCluster` (extends)
+- `AbstractCassandraCluster` -&gt; `CassandraCluster` (extends)
+- `Object/外部框架` -&gt; `CassandraDriverOptions` (extends)
+- `AbstractCassandraCluster` -&gt; `CassandraInstallCluster` (extends)
+- `SessionWrapper` -&gt; `DefaultGuavaSession` (extends)
+- `GuavaSession` -&gt; `DefaultGuavaSession` (implements)
+- `DefaultDriverContext` -&gt; `GuavaDriverContext` (extends)
+- `Object/外部框架` -&gt; `GuavaMultiPageResultSet` (extends)
+- `ResultSet` -&gt; `GuavaMultiPageResultSet` (implements)
+- `CountingIterator` -&gt; `RowIterator` (extends)
+- `Object/外部框架` -&gt; `GuavaRequestAsyncProcessor` (extends)
+- `Session` -&gt; `GuavaSession` (extends)
+- `SyncCqlSession` -&gt; `GuavaSession` (extends)
+- `SessionBuilder` -&gt; `GuavaSessionBuilder` (extends)
+- `Object/外部框架` -&gt; `GuavaSessionUtils` (extends)
+- `EntityDaoService` -&gt; `CustomerService` (extends)
+- `EntityDaoService` -&gt; `DashboardService` (extends)
+- `EntityDaoService` -&gt; `DeviceProfileService` (extends)
+- `EntityDaoService` -&gt; `DeviceService` (extends)
+- `Object/外部框架` -&gt; `ClaimData` (extends)
+- `Serializable` -&gt; `ClaimData` (implements)
+- `Object/外部框架` -&gt; `ClaimResult` (extends)
+- `Object/外部框架` -&gt; `ReclaimResult` (extends)
+- `RuntimeException` -&gt; `ProvisionFailedException` (extends)
+- `Object/外部框架` -&gt; `ProvisionRequest` (extends)
+- `Object/外部框架` -&gt; `ProvisionResponse` (extends)
+- `EntityDaoService` -&gt; `EdgeService` (extends)
+- `EntityDaoService` -&gt; `EntityViewService` (extends)
+- `Object/外部框架` -&gt; `CassandraStatementTask` (extends)
+- `AsyncTask` -&gt; `CassandraStatementTask` (implements)
+- `Object/外部框架` -&gt; `TbResultSet` (extends)
+- `AsyncResultSet` -&gt; `TbResultSet` (implements)
+- `Object/外部框架` -&gt; `TbResultSetFuture` (extends)
+- `ListenableFuture` -&gt; `TbResultSetFuture` (implements)
+- `Object/外部框架` -&gt; `OAuth2User` (extends)
+- `EntityDaoService` -&gt; `OtaPackageService` (extends)
+- `EntityDaoService` -&gt; `QueueService` (extends)
+- 其余 11 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `AsyncResultSet`
+- `CountingIterator`
+- `DefaultDriverContext`
+- `ListenableFuture`
+- `Object/外部框架`
+- `ResultSet`
+- `RuntimeException`
+- `Serializable`
+- `Session`
+- `SessionBuilder`
+- `SessionWrapper`
+- `SyncCqlSession`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard CoAP Transport Common 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard CoAP Transport Common 模块继承体系分析
+
+&gt; 生成范围：`common/transport/coap`  
+&gt; Maven artifact：`coap`  
+&gt; Java 类型数量：37  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>CoapClientContext
+├── «implements» DefaultCoapClientContext
+CoapResource
+├── AbstractCoapTransportResource
+├── ├── CoapEfentoTransportResource
+├── ├── CoapTransportResource
+├── ├── OtaPackageTransportResource
+CoapTransportAdaptor
+├── «implements» JsonCoapAdaptor
+├── «implements» ProtoCoapAdaptor
+MessageObserver
+├── «implements» TbCoapMessageObserver
+Object/外部框架
+├── AbstractSyncSessionCallback
+├── ├── GetAttributesSyncSessionCallback
+├── ├── ToServerRpcSyncSessionCallback
+├── CoapAdaptorUtils
+├── CoapDeviceAuthCallback
+├── CoapEfentoCallback
+├── CoapEfentoUtils
+├── CoapNoOpCallback
+├── CoapOkCallback
+├── CoapResourceObserver
+├── CoapSessionListener
+├── CoapTransportResourceTest
+├── CoapTransportService
+├── DefaultCoapClientContext
+├── DeviceProvisionCallback
+├── EfentoCoapAdaptor
+├── EfentoTelemetry
+├── JsonCoapAdaptor
+├── NoSecClient
+├── NoSecObserveClient
+├── OtaPackageCallback
+├── ProtoCoapAdaptor
+├── SecureClientNoAuth
+├── SecureClientX509
+├── TbCoapClientState
+├── TbCoapContentFormatUtil
+├── TbCoapMessageObserver
+├── TbCoapObservationState
+├── TransportConfigurationContainer
+ResourceObserver
+├── «implements» CoapResourceObserver
+SessionMsgListener
+├── «implements» AbstractSyncSessionCallback
+├── «implements» ├── GetAttributesSyncSessionCallback
+├── «implements» ├── ToServerRpcSyncSessionCallback
+├── «implements» CoapSessionListener
+TbTransportService
+├── «implements» CoapTransportService
+TransportContext
+├── CoapTransportContext
+TransportServiceCallback
+├── «implements» CoapDeviceAuthCallback
+├── «implements» CoapEfentoCallback
+├── «implements» CoapNoOpCallback
+├── «implements» CoapOkCallback
+├── «implements» DeviceProvisionCallback
+├── «implements» OtaPackageCallback</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    CoapResource_p0[&quot;CoapResource&quot;] --&gt;|extends| AbstractCoapTransportResource_c0[&quot;AbstractCoapTransportResource&quot;]
+    TransportContext_p1[&quot;TransportContext&quot;] --&gt;|extends| CoapTransportContext_c1[&quot;CoapTransportContext&quot;]
+    AbstractCoapTransportResource_p2[&quot;AbstractCoapTransportResource&quot;] --&gt;|extends| CoapTransportResource_c2[&quot;CoapTransportResource&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProvisionCallback_c3[&quot;DeviceProvisionCallback&quot;]
+    TransportServiceCallback_p4[&quot;TransportServiceCallback&quot;] --&gt;|implements| DeviceProvisionCallback_c4[&quot;DeviceProvisionCallback&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| CoapResourceObserver_c5[&quot;CoapResourceObserver&quot;]
+    ResourceObserver_p6[&quot;ResourceObserver&quot;] --&gt;|implements| CoapResourceObserver_c6[&quot;CoapResourceObserver&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| CoapTransportService_c7[&quot;CoapTransportService&quot;]
+    TbTransportService_p8[&quot;TbTransportService&quot;] --&gt;|implements| CoapTransportService_c8[&quot;CoapTransportService&quot;]
+    AbstractCoapTransportResource_p9[&quot;AbstractCoapTransportResource&quot;] --&gt;|extends| OtaPackageTransportResource_c9[&quot;OtaPackageTransportResource&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| OtaPackageCallback_c10[&quot;OtaPackageCallback&quot;]
+    TransportServiceCallback_p11[&quot;TransportServiceCallback&quot;] --&gt;|implements| OtaPackageCallback_c11[&quot;OtaPackageCallback&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| TbCoapMessageObserver_c12[&quot;TbCoapMessageObserver&quot;]
+    MessageObserver_p13[&quot;MessageObserver&quot;] --&gt;|implements| TbCoapMessageObserver_c13[&quot;TbCoapMessageObserver&quot;]
+    Object______p14[&quot;Object/外部框架&quot;] --&gt;|extends| TransportConfigurationContainer_c14[&quot;TransportConfigurationContainer&quot;]
+    Object______p15[&quot;Object/外部框架&quot;] --&gt;|extends| CoapAdaptorUtils_c15[&quot;CoapAdaptorUtils&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| JsonCoapAdaptor_c16[&quot;JsonCoapAdaptor&quot;]
+    CoapTransportAdaptor_p17[&quot;CoapTransportAdaptor&quot;] --&gt;|implements| JsonCoapAdaptor_c17[&quot;JsonCoapAdaptor&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| ProtoCoapAdaptor_c18[&quot;ProtoCoapAdaptor&quot;]
+    CoapTransportAdaptor_p19[&quot;CoapTransportAdaptor&quot;] --&gt;|implements| ProtoCoapAdaptor_c19[&quot;ProtoCoapAdaptor&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractSyncSessionCallback_c20[&quot;AbstractSyncSessionCallback&quot;]
+    SessionMsgListener_p21[&quot;SessionMsgListener&quot;] --&gt;|implements| AbstractSyncSessionCallback_c21[&quot;AbstractSyncSessionCallback&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| CoapDeviceAuthCallback_c22[&quot;CoapDeviceAuthCallback&quot;]
+    TransportServiceCallback_p23[&quot;TransportServiceCallback&quot;] --&gt;|implements| CoapDeviceAuthCallback_c23[&quot;CoapDeviceAuthCallback&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| CoapEfentoCallback_c24[&quot;CoapEfentoCallback&quot;]
+    TransportServiceCallback_p25[&quot;TransportServiceCallback&quot;] --&gt;|implements| CoapEfentoCallback_c25[&quot;CoapEfentoCallback&quot;]
+    Object______p26[&quot;Object/外部框架&quot;] --&gt;|extends| CoapNoOpCallback_c26[&quot;CoapNoOpCallback&quot;]
+    TransportServiceCallback_p27[&quot;TransportServiceCallback&quot;] --&gt;|implements| CoapNoOpCallback_c27[&quot;CoapNoOpCallback&quot;]
+    Object______p28[&quot;Object/外部框架&quot;] --&gt;|extends| CoapOkCallback_c28[&quot;CoapOkCallback&quot;]
+    TransportServiceCallback_p29[&quot;TransportServiceCallback&quot;] --&gt;|implements| CoapOkCallback_c29[&quot;CoapOkCallback&quot;]
+    AbstractSyncSessionCallback_p30[&quot;AbstractSyncSessionCallback&quot;] --&gt;|extends| GetAttributesSyncSessionCallback_c30[&quot;GetAttributesSyncSessionCallback&quot;]
+    AbstractSyncSessionCallback_p31[&quot;AbstractSyncSessionCallback&quot;] --&gt;|extends| ToServerRpcSyncSessionCallback_c31[&quot;ToServerRpcSyncSessionCallback&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultCoapClientContext_c32[&quot;DefaultCoapClientContext&quot;]
+    CoapClientContext_p33[&quot;CoapClientContext&quot;] --&gt;|implements| DefaultCoapClientContext_c33[&quot;DefaultCoapClientContext&quot;]
+    Object______p34[&quot;Object/外部框架&quot;] --&gt;|extends| CoapSessionListener_c34[&quot;CoapSessionListener&quot;]
+    SessionMsgListener_p35[&quot;SessionMsgListener&quot;] --&gt;|implements| CoapSessionListener_c35[&quot;CoapSessionListener&quot;]
+    Object______p36[&quot;Object/外部框架&quot;] --&gt;|extends| NoSecClient_c36[&quot;NoSecClient&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| NoSecObserveClient_c37[&quot;NoSecObserveClient&quot;]
+    Object______p38[&quot;Object/外部框架&quot;] --&gt;|extends| SecureClientNoAuth_c38[&quot;SecureClientNoAuth&quot;]
+    Object______p39[&quot;Object/外部框架&quot;] --&gt;|extends| SecureClientX509_c39[&quot;SecureClientX509&quot;]
+    Object______p40[&quot;Object/外部框架&quot;] --&gt;|extends| TbCoapClientState_c40[&quot;TbCoapClientState&quot;]
+    Object______p41[&quot;Object/外部框架&quot;] --&gt;|extends| TbCoapContentFormatUtil_c41[&quot;TbCoapContentFormatUtil&quot;]
+    Object______p42[&quot;Object/外部框架&quot;] --&gt;|extends| TbCoapObservationState_c42[&quot;TbCoapObservationState&quot;]
+    AbstractCoapTransportResource_p43[&quot;AbstractCoapTransportResource&quot;] --&gt;|extends| CoapEfentoTransportResource_c43[&quot;CoapEfentoTransportResource&quot;]
+    Object______p44[&quot;Object/外部框架&quot;] --&gt;|extends| EfentoTelemetry_c44[&quot;EfentoTelemetry&quot;]
+    Object______p45[&quot;Object/外部框架&quot;] --&gt;|extends| EfentoCoapAdaptor_c45[&quot;EfentoCoapAdaptor&quot;]
+    Object______p46[&quot;Object/外部框架&quot;] --&gt;|extends| CoapEfentoUtils_c46[&quot;CoapEfentoUtils&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| CoapTransportResourceTest_c47[&quot;CoapTransportResourceTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `AbstractCoapTransportResource.handleGET()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.handlePOST()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.processHandleGet()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.processHandlePost()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.reportSubscriptionInfo()` (protected, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `CoapTransportAdaptor.getContentFormat()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/adaptors/CoapTransportAdaptor.java`)
+- `AbstractSyncSessionCallback.onGetAttributesResponse()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/callback/AbstractSyncSessionCallback.java`)
+- `AbstractSyncSessionCallback.onAttributeUpdate()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/callback/AbstractSyncSessionCallback.java`)
+- `AbstractSyncSessionCallback.onRemoteSessionCloseCommand()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/callback/AbstractSyncSessionCallback.java`)
+- `AbstractSyncSessionCallback.onDeviceDeleted()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/callback/AbstractSyncSessionCallback.java`)
+- `AbstractSyncSessionCallback.onToDeviceRpcRequest()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/callback/AbstractSyncSessionCallback.java`)
+- `AbstractSyncSessionCallback.onToServerRpcResponse()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/callback/AbstractSyncSessionCallback.java`)
+- `AbstractSyncSessionCallback.respond()` (protected, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/callback/AbstractSyncSessionCallback.java`)
+- `CoapClientContext.registerAttributeObservation()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.registerRpcObservation()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.getNotificationCounterByToken()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.getNewSyncSession()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.deregisterAttributeObservation()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.deregisterRpcObservation()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.reportActivity()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.registerObserveRelation()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.deregisterObserveRelation()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+- `CoapClientContext.awake()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/CoapClientContext.java`)
+
+
+## 哪些方法可以重写
+
+- `AbstractCoapTransportResource.handleGET()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.handlePOST()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.processHandleGet()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.processHandlePost()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.reportSubscriptionInfo()` (protected, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `CoapTransportResource.CoapResourceObserver()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.Random()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.checkObserveRelation()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.processHandleGet()` (protected, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.processHandlePost()` (protected, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.AdaptorException()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.DeviceProvisionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapDeviceAuthCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.getTokenFromRequest()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.getTokenFromRequest()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.GetAttributesSyncSessionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapNoOpCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.ToServerRpcSyncSessionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapNoOpCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.UUID()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.DeviceTokenCredentials()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.getFeatureType()` (protected, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.getChild()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.onSuccess()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.onError()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.changedName()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.changedPath()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.addedChild()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.removedChild()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.addedObserveRelation()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.removedObserveRelation()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapTransportResource()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapResourceObserver()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.Random()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.checkObserveRelation()` (public, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.processHandleGet()` (protected, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+
+
+## 哪些方法必须重写
+
+- `AbstractCoapTransportResource.processHandleGet()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `AbstractCoapTransportResource.processHandlePost()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/AbstractCoapTransportResource.java`)
+- `CoapTransportResource.CoapResourceObserver()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.Random()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.AdaptorException()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.DeviceProvisionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapDeviceAuthCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.getTokenFromRequest()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.getTokenFromRequest()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.GetAttributesSyncSessionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapNoOpCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.ToServerRpcSyncSessionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.CoapNoOpCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.UUID()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapTransportResource.DeviceTokenCredentials()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapResourceObserver()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.Random()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.AdaptorException()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapDeviceAuthCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.getTokenFromRequest()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.getTokenFromRequest()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.GetAttributesSyncSessionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapNoOpCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.ToServerRpcSyncSessionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.CoapNoOpCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.UUID()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `DeviceProvisionCallback.DeviceTokenCredentials()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapResourceObserver.Random()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapResourceObserver.AdaptorException()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapResourceObserver.DeviceProvisionCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapResourceObserver.CoapDeviceAuthCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+- `CoapResourceObserver.CoapOkCallback()` (package, `common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java`)
+
+
+## 哪些地方使用了多态
+
+- `CoapResource` -&gt; `AbstractCoapTransportResource` (extends)
+- `TransportContext` -&gt; `CoapTransportContext` (extends)
+- `AbstractCoapTransportResource` -&gt; `CoapTransportResource` (extends)
+- `Object/外部框架` -&gt; `DeviceProvisionCallback` (extends)
+- `TransportServiceCallback` -&gt; `DeviceProvisionCallback` (implements)
+- `Object/外部框架` -&gt; `CoapResourceObserver` (extends)
+- `ResourceObserver` -&gt; `CoapResourceObserver` (implements)
+- `Object/外部框架` -&gt; `CoapTransportService` (extends)
+- `TbTransportService` -&gt; `CoapTransportService` (implements)
+- `AbstractCoapTransportResource` -&gt; `OtaPackageTransportResource` (extends)
+- `Object/外部框架` -&gt; `OtaPackageCallback` (extends)
+- `TransportServiceCallback` -&gt; `OtaPackageCallback` (implements)
+- `Object/外部框架` -&gt; `TbCoapMessageObserver` (extends)
+- `MessageObserver` -&gt; `TbCoapMessageObserver` (implements)
+- `Object/外部框架` -&gt; `TransportConfigurationContainer` (extends)
+- `Object/外部框架` -&gt; `CoapAdaptorUtils` (extends)
+- `Object/外部框架` -&gt; `JsonCoapAdaptor` (extends)
+- `CoapTransportAdaptor` -&gt; `JsonCoapAdaptor` (implements)
+- `Object/外部框架` -&gt; `ProtoCoapAdaptor` (extends)
+- `CoapTransportAdaptor` -&gt; `ProtoCoapAdaptor` (implements)
+- `Object/外部框架` -&gt; `AbstractSyncSessionCallback` (extends)
+- `SessionMsgListener` -&gt; `AbstractSyncSessionCallback` (implements)
+- `Object/外部框架` -&gt; `CoapDeviceAuthCallback` (extends)
+- `TransportServiceCallback` -&gt; `CoapDeviceAuthCallback` (implements)
+- `Object/外部框架` -&gt; `CoapEfentoCallback` (extends)
+- `TransportServiceCallback` -&gt; `CoapEfentoCallback` (implements)
+- `Object/外部框架` -&gt; `CoapNoOpCallback` (extends)
+- `TransportServiceCallback` -&gt; `CoapNoOpCallback` (implements)
+- `Object/外部框架` -&gt; `CoapOkCallback` (extends)
+- `TransportServiceCallback` -&gt; `CoapOkCallback` (implements)
+- `AbstractSyncSessionCallback` -&gt; `GetAttributesSyncSessionCallback` (extends)
+- `AbstractSyncSessionCallback` -&gt; `ToServerRpcSyncSessionCallback` (extends)
+- `Object/外部框架` -&gt; `DefaultCoapClientContext` (extends)
+- `CoapClientContext` -&gt; `DefaultCoapClientContext` (implements)
+- `Object/外部框架` -&gt; `CoapSessionListener` (extends)
+- `SessionMsgListener` -&gt; `CoapSessionListener` (implements)
+- `Object/外部框架` -&gt; `NoSecClient` (extends)
+- `Object/外部框架` -&gt; `NoSecObserveClient` (extends)
+- `Object/外部框架` -&gt; `SecureClientNoAuth` (extends)
+- `Object/外部框架` -&gt; `SecureClientX509` (extends)
+- 其余 8 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `CoapResource`
+- `MessageObserver`
+- `Object/外部框架`
+- `ResourceObserver`
+- `SessionMsgListener`
+- `TbTransportService`
+- `TransportContext`
+- `TransportServiceCallback`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

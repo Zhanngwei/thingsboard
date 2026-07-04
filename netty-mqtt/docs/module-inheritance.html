@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Netty MQTT Client 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Netty MQTT Client 模块继承体系分析
+
+&gt; 生成范围：`netty-mqtt`  
+&gt; Maven artifact：`netty-mqtt`  
+&gt; Java 类型数量：25  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>ChannelInboundHandlerAdapter
+├── MqttPingHandler
+├── MqttTransportHandler
+ChannelInitializer
+├── MqttChannelInitializer
+GenericFutureListener
+├── «implements» MqttTransportHandler
+MqttClient
+├── «implements» MqttClientImpl
+Object/外部框架
+├── Builder
+├── IntegrationTestSuite
+├── MqttClientConfig
+├── MqttClientImpl
+├── MqttConnectResult
+├── MqttIncomingQos2Publish
+├── MqttIntegrationTest
+├── MqttLastWill
+├── MqttPendingHandler
+├── MqttPendingPublish
+├── MqttPendingSubscription
+├── MqttPendingUnsubscription
+├── MqttPingHandlerTest
+├── MqttServer
+├── MqttSubscription
+├── RetransmissionHandler
+RuntimeException
+├── ChannelClosedException
+SimpleChannelInboundHandler
+├── MqttChannelHandler</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    RuntimeException_p0[&quot;RuntimeException&quot;] --&gt;|extends| ChannelClosedException_c0[&quot;ChannelClosedException&quot;]
+    SimpleChannelInboundHandler_p1[&quot;SimpleChannelInboundHandler&quot;] --&gt;|extends| MqttChannelHandler_c1[&quot;MqttChannelHandler&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| MqttClientConfig_c2[&quot;MqttClientConfig&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| MqttClientImpl_c3[&quot;MqttClientImpl&quot;]
+    MqttClient_p4[&quot;MqttClient&quot;] --&gt;|implements| MqttClientImpl_c4[&quot;MqttClientImpl&quot;]
+    ChannelInitializer_p5[&quot;ChannelInitializer&quot;] --&gt;|extends| MqttChannelInitializer_c5[&quot;MqttChannelInitializer&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| MqttConnectResult_c6[&quot;MqttConnectResult&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| MqttIncomingQos2Publish_c7[&quot;MqttIncomingQos2Publish&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| MqttLastWill_c8[&quot;MqttLastWill&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| Builder_c9[&quot;Builder&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| MqttPendingPublish_c10[&quot;MqttPendingPublish&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| MqttPendingSubscription_c11[&quot;MqttPendingSubscription&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| MqttPendingHandler_c12[&quot;MqttPendingHandler&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| MqttPendingUnsubscription_c13[&quot;MqttPendingUnsubscription&quot;]
+    ChannelInboundHandlerAdapter_p14[&quot;ChannelInboundHandlerAdapter&quot;] --&gt;|extends| MqttPingHandler_c14[&quot;MqttPingHandler&quot;]
+    Object______p15[&quot;Object/外部框架&quot;] --&gt;|extends| MqttSubscription_c15[&quot;MqttSubscription&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| RetransmissionHandler_c16[&quot;RetransmissionHandler&quot;]
+    Object______p17[&quot;Object/外部框架&quot;] --&gt;|extends| MqttPingHandlerTest_c17[&quot;MqttPingHandlerTest&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| IntegrationTestSuite_c18[&quot;IntegrationTestSuite&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| MqttIntegrationTest_c19[&quot;MqttIntegrationTest&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| MqttServer_c20[&quot;MqttServer&quot;]
+    ChannelInboundHandlerAdapter_p21[&quot;ChannelInboundHandlerAdapter&quot;] --&gt;|extends| MqttTransportHandler_c21[&quot;MqttTransportHandler&quot;]
+    GenericFutureListener_p22[&quot;GenericFutureListener&quot;] --&gt;|implements| MqttTransportHandler_c22[&quot;MqttTransportHandler&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `MqttClient.connect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.connect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.isConnected()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.reconnect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getEventLoop()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.setEventLoop()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getHandlerExecutor()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.on()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.on()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.once()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.once()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.off()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.off()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getClientConfig()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.MqttClientImpl()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.disconnect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.setCallback()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClientCallback.connectionLost()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClientCallback.java`)
+- `MqttClientCallback.onSuccessfulReconnect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClientCallback.java`)
+- `MqttHandler.onMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttHandler.java`)
+- `PendingOperation.isCanceled()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/PendingOperation.java`)
+
+
+## 哪些方法可以重写
+
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectVariableHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectPayload()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.invokeHandlersForIncomingPublish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.AtomicBoolean()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.onSuccess()` (public, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.onFailure()` (public, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectResult()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectResult()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttSubscription()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttPubAckMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttIncomingQos2Publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.exceptionCaught()` (public, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttClient.connect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.connect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.isConnected()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.reconnect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getEventLoop()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.setEventLoop()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getHandlerExecutor()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.on()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.on()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.once()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.once()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.off()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.off()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getClientConfig()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.MqttClientImpl()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+
+
+## 哪些方法必须重写
+
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectVariableHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectPayload()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.AtomicBoolean()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectResult()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttConnectResult()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttSubscription()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttPubAckMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttIncomingQos2Publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttFixedHeader()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttChannelHandler.MqttMessage()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttChannelHandler.java`)
+- `MqttClient.connect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.connect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.isConnected()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.reconnect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getEventLoop()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.setEventLoop()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getHandlerExecutor()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.on()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.on()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.once()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.once()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.off()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.off()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.publish()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.getClientConfig()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.create()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.MqttClientImpl()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.disconnect()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClient.setCallback()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClient.java`)
+- `MqttClientCallback.connectionLost()` (package, `netty-mqtt/src/main/java/org/thingsboard/mqtt/MqttClientCallback.java`)
+
+
+## 哪些地方使用了多态
+
+- `RuntimeException` -&gt; `ChannelClosedException` (extends)
+- `SimpleChannelInboundHandler` -&gt; `MqttChannelHandler` (extends)
+- `Object/外部框架` -&gt; `MqttClientConfig` (extends)
+- `Object/外部框架` -&gt; `MqttClientImpl` (extends)
+- `MqttClient` -&gt; `MqttClientImpl` (implements)
+- `ChannelInitializer` -&gt; `MqttChannelInitializer` (extends)
+- `Object/外部框架` -&gt; `MqttConnectResult` (extends)
+- `Object/外部框架` -&gt; `MqttIncomingQos2Publish` (extends)
+- `Object/外部框架` -&gt; `MqttLastWill` (extends)
+- `Object/外部框架` -&gt; `Builder` (extends)
+- `Object/外部框架` -&gt; `MqttPendingPublish` (extends)
+- `Object/外部框架` -&gt; `MqttPendingSubscription` (extends)
+- `Object/外部框架` -&gt; `MqttPendingHandler` (extends)
+- `Object/外部框架` -&gt; `MqttPendingUnsubscription` (extends)
+- `ChannelInboundHandlerAdapter` -&gt; `MqttPingHandler` (extends)
+- `Object/外部框架` -&gt; `MqttSubscription` (extends)
+- `Object/外部框架` -&gt; `RetransmissionHandler` (extends)
+- `Object/外部框架` -&gt; `MqttPingHandlerTest` (extends)
+- `Object/外部框架` -&gt; `IntegrationTestSuite` (extends)
+- `Object/外部框架` -&gt; `MqttIntegrationTest` (extends)
+- `Object/外部框架` -&gt; `MqttServer` (extends)
+- `ChannelInboundHandlerAdapter` -&gt; `MqttTransportHandler` (extends)
+- `GenericFutureListener` -&gt; `MqttTransportHandler` (implements)
+
+
+## 外部父类/接口
+
+- `ChannelInboundHandlerAdapter`
+- `ChannelInitializer`
+- `GenericFutureListener`
+- `Object/外部框架`
+- `RuntimeException`
+- `SimpleChannelInboundHandler`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

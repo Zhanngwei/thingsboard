@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Queue components 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Queue components 模块继承体系分析
+
+&gt; 生成范围：`common/queue`  
+&gt; Maven artifact：`queue`  
+&gt; Java 类型数量：145  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>ApplicationEvent
+├── TbApplicationEvent
+├── ├── ClusterTopologyChangeEvent
+├── ├── OtherServiceShutdownEvent
+├── ├── PartitionChangeEvent
+├── ├── ServiceListChangedEvent
+DataDecodingEncodingService
+├── «implements» ProtoWithFSTService
+DiscoveryService
+├── «implements» DummyDiscoveryService
+├── «implements» ZkDiscoveryService
+InMemoryStorage
+├── «implements» DefaultInMemoryStorage
+NotificationDeduplicationService
+├── «implements» DefaultNotificationDeduplicationService
+NotificationRuleProcessor
+├── «implements» RemoteNotificationRuleProcessor
+Object/外部框架
+├── AbstractParallelTbQueueConsumerTemplate
+├── AbstractTbQueueConsumerTemplate
+├── AbstractTbQueueTemplate
+├── AsyncCallbackTemplate
+├── AwsSqsMonolithQueueFactory
+├── AwsSqsMsgWrapper
+├── AwsSqsTbCoreQueueFactory
+├── AwsSqsTbQueueMsgMetadata
+├── AwsSqsTbRuleEngineQueueFactory
+├── AwsSqsTbVersionControlQueueFactory
+├── AwsSqsTransportQueueFactory
+├── ConsistentHashCircle
+├── DefaultInMemoryStorage
+├── DefaultInMemoryStorageTest
+├── DefaultNotificationDeduplicationService
+├── DefaultSchedulerComponent
+├── DefaultTbApiUsageReportClient
+├── DefaultTbQueueMsg
+├── DefaultTbQueueMsgHeaders
+├── DefaultTbQueueRequestTemplate
+├── DefaultTbQueueRequestTemplateTest
+├── DefaultTbQueueResponseTemplate
+├── DefaultTbServiceInfoProvider
+├── DummyDiscoveryService
+├── EnvironmentLogService
+├── GroupTopicStats
+├── HashPartitionService
+├── InMemoryMonolithQueueFactory
+├── InMemoryTbQueueConsumer
+├── InMemoryTbQueueProducer
+├── InMemoryTbTransportQueueFactory
+├── KafkaMonolithQueueFactory
+├── KafkaTbCoreQueueFactory
+├── KafkaTbQueueMsg
+├── KafkaTbQueueMsgMetadata
+├── KafkaTbRuleEngineQueueFactory
+├── KafkaTbTransportQueueFactory
+├── KafkaTbVersionControlQueueFactory
+├── MultipleTbQueueCallbackWrapper
+├── MultipleTbQueueTbMsgCallbackWrapper
+├── ParentEntity
+├── PropertyUtils
+├── PropertyUtilsTest
+├── ProtoWithFSTService
+├── PubSubMonolithQueueFactory
+├── PubSubTbCoreQueueFactory
+├── PubSubTbRuleEngineQueueFactory
+├── PubSubTbVersionControlQueueFactory
+├── PubSubTransportQueueFactory
+├── QueueKey
+├── QueueKeyTest
+├── QueueRoutingInfo
+├── RabbitMqMonolithQueueFactory
+├── RabbitMqTbCoreQueueFactory
+├── RabbitMqTbRuleEngineQueueFactory
+├── RabbitMqTbVersionControlQueueFactory
+├── RabbitMqTransportQueueFactory
+├── RemoteNotificationRuleProcessor
+├── ReportLevel
+├── ResponseMetaData
+├── RuleEngineTbQueueAdminFactory
+├── ServiceBusMonolithQueueFactory
+├── ServiceBusTbCoreQueueFactory
+├── ServiceBusTbRuleEngineQueueFactory
+├── ServiceBusTbVersionControlQueueFactory
+├── ServiceBusTransportQueueFactory
+├── SimpleTbQueueCallback
+├── TbApplicationEventListener
+├── TbAwsSqsAdmin
+├── TbAwsSqsConsumerTemplate
+├── TbAwsSqsProducerTemplate
+├── TbAwsSqsQueueAttributes
+├── TbAwsSqsSettings
+├── TbCoreQueueProducerProvider
+├── TbKafkaAdmin
+├── TbKafkaConsumerStatisticConfig
+├── TbKafkaConsumerStatsService
+├── TbKafkaConsumerTemplate
+├── TbKafkaProducerTemplate
+├── TbKafkaProducerTemplateTest
+├── TbKafkaSettings
+├── TbKafkaSettingsTest
+├── TbKafkaTopicConfigs
+├── TbProtoJsQueueMsg
+├── TbProtoQueueMsg
+├── TbPubSubAdmin
+├── TbPubSubConsumerTemplate
+├── TbPubSubProducerTemplate
+├── TbPubSubSettings
+├── TbPubSubSubscriptionSettings
+├── TbQueueCoreSettings
+├── TbQueueRemoteJsInvokeSettings
+├── TbQueueRuleEngineSettings
+├── TbQueueTbMsgCallbackWrapper
+├── TbQueueTransportApiSettings
+├── TbQueueTransportNotificationSettings
+├── TbQueueVersionControlSettings
+├── TbRabbitMqAdmin
+├── TbRabbitMqConsumerTemplate
+├── TbRabbitMqProducerTemplate
+├── TbRabbitMqQueueArguments
+├── TbRabbitMqSettings
+├── TbRuleEngineProducerProvider
+├── TbServiceBusAdmin
+├── TbServiceBusConsumerTemplate
+├── TbServiceBusProducerTemplate
+├── TbServiceBusQueueConfigs
+├── TbServiceBusSettings
+├── TbTransportQueueProducerProvider
+├── TbVersionControlProducerProvider
+├── TenantRoutingInfo
+├── TopicService
+├── ZkDiscoveryService
+├── ZkDiscoveryServiceTest
+PartitionService
+├── «implements» HashPartitionService
+PathChildrenCacheListener
+├── «implements» ZkDiscoveryService
+SchedulerComponent
+├── «implements» DefaultSchedulerComponent
+TbApiUsageReportClient
+├── «implements» DefaultTbApiUsageReportClient
+TbQueueAdmin
+├── «implements» TbAwsSqsAdmin
+├── «implements» TbKafkaAdmin
+├── «implements» TbPubSubAdmin
+├── «implements» TbRabbitMqAdmin
+├── «implements» TbServiceBusAdmin
+TbQueueCallback
+├── «implements» MultipleTbQueueCallbackWrapper
+├── «implements» MultipleTbQueueTbMsgCallbackWrapper
+├── «implements» SimpleTbQueueCallback
+├── «implements» TbQueueTbMsgCallbackWrapper
+TbQueueMsg
+├── «implements» DefaultTbQueueMsg
+├── «implements» KafkaTbQueueMsg
+├── «implements» TbProtoQueueMsg
+TbQueueMsgHeaders
+├── «implements» DefaultTbQueueMsgHeaders
+TbQueueMsgMetadata
+├── «implements» AwsSqsTbQueueMsgMetadata
+├── «implements» KafkaTbQueueMsgMetadata
+TbQueueProducerProvider
+├── «implements» TbCoreQueueProducerProvider
+├── «implements» TbRuleEngineProducerProvider
+├── «implements» TbTransportQueueProducerProvider
+├── «implements» TbVersionControlProducerProvider
+TbServiceInfoProvider
+├── «implements» DefaultTbServiceInfoProvider
+TbUsageStatsClientQueueFactory
+├── TbCoreQueueFactory
+├── ├── «implements» AwsSqsMonolithQueueFactory
+├── ├── «implements» AwsSqsTbCoreQueueFactory
+├── ├── «implements» InMemoryMonolithQueueFactory
+├── ├── «implements» KafkaMonolithQueueFactory
+├── ├── «implements» KafkaTbCoreQueueFactory
+├── ├── «implements» PubSubMonolithQueueFactory
+├── ├── «implements» PubSubTbCoreQueueFactory
+├── ├── «implements» RabbitMqMonolithQueueFactory
+├── ├── «implements» RabbitMqTbCoreQueueFactory
+├── ├── «implements» ServiceBusMonolithQueueFactory
+├── ├── «implements» ServiceBusTbCoreQueueFactory
+├── TbRuleEngineQueueFactory
+├── ├── «implements» AwsSqsMonolithQueueFactory
+├── ├── «implements» AwsSqsTbRuleEngineQueueFactory
+├── ├── «implements» InMemoryMonolithQueueFactory
+├── ├── «implements» KafkaMonolithQueueFactory
+├── ├── «implements» KafkaTbRuleEngineQueueFactory
+├── ├── «implements» PubSubMonolithQueueFactory
+├── ├── «implements» PubSubTbRuleEngineQueueFactory
+├── ├── «implements» RabbitMqMonolithQueueFactory
+├── ├── «implements» RabbitMqTbRuleEngineQueueFactory
+├── ├── «implements» ServiceBusMonolithQueueFactory
+├── ├── «implements» ServiceBusTbRuleEngineQueueFactory
+├── TbTransportQueueFactory
+├── ├── «implements» AwsSqsTransportQueueFactory
+├── ├── «implements» InMemoryTbTransportQueueFactory
+├── ├── «implements» KafkaTbTransportQueueFactory
+├── ├── «implements» PubSubTransportQueueFactory
+├── ├── «implements» RabbitMqTransportQueueFactory
+├── ├── «implements» ServiceBusTransportQueueFactory
+├── TbVersionControlQueueFactory
+├── ├── «implements» AwsSqsMonolithQueueFactory
+├── ├── «implements» AwsSqsTbVersionControlQueueFactory
+├── ├── «implements» InMemoryMonolithQueueFactory
+├── ├── «implements» KafkaMonolithQueueFactory
+├── ├── «implements» KafkaTbVersionControlQueueFactory
+├── ├── «implements» PubSubMonolithQueueFactory
+├── ├── «implements» PubSubTbVersionControlQueueFactory
+├── ├── «implements» RabbitMqMonolithQueueFactory
+├── ├── «implements» RabbitMqTbVersionControlQueueFactory
+├── ├── «implements» ServiceBusMonolithQueueFactory
+├── ├── «implements» ServiceBusTbVersionControlQueueFactory</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| RuleEngineTbQueueAdminFactory_c0[&quot;RuleEngineTbQueueAdminFactory&quot;]
+    Object______p1[&quot;Object/外部框架&quot;] --&gt;|extends| TbServiceBusAdmin_c1[&quot;TbServiceBusAdmin&quot;]
+    TbQueueAdmin_p2[&quot;TbQueueAdmin&quot;] --&gt;|implements| TbServiceBusAdmin_c2[&quot;TbServiceBusAdmin&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| TbServiceBusConsumerTemplate_c3[&quot;TbServiceBusConsumerTemplate&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| TbServiceBusProducerTemplate_c4[&quot;TbServiceBusProducerTemplate&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| TbServiceBusQueueConfigs_c5[&quot;TbServiceBusQueueConfigs&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| TbServiceBusSettings_c6[&quot;TbServiceBusSettings&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractParallelTbQueueConsumerTemplate_c7[&quot;AbstractParallelTbQueueConsumerTemplate&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractTbQueueConsumerTemplate_c8[&quot;AbstractTbQueueConsumerTemplate&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractTbQueueTemplate_c9[&quot;AbstractTbQueueTemplate&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| AsyncCallbackTemplate_c10[&quot;AsyncCallbackTemplate&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbQueueMsg_c11[&quot;DefaultTbQueueMsg&quot;]
+    TbQueueMsg_p12[&quot;TbQueueMsg&quot;] --&gt;|implements| DefaultTbQueueMsg_c12[&quot;DefaultTbQueueMsg&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbQueueMsgHeaders_c13[&quot;DefaultTbQueueMsgHeaders&quot;]
+    TbQueueMsgHeaders_p14[&quot;TbQueueMsgHeaders&quot;] --&gt;|implements| DefaultTbQueueMsgHeaders_c14[&quot;DefaultTbQueueMsgHeaders&quot;]
+    Object______p15[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbQueueRequestTemplate_c15[&quot;DefaultTbQueueRequestTemplate&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| ResponseMetaData_c16[&quot;ResponseMetaData&quot;]
+    Object______p17[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbQueueResponseTemplate_c17[&quot;DefaultTbQueueResponseTemplate&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| MultipleTbQueueCallbackWrapper_c18[&quot;MultipleTbQueueCallbackWrapper&quot;]
+    TbQueueCallback_p19[&quot;TbQueueCallback&quot;] --&gt;|implements| MultipleTbQueueCallbackWrapper_c19[&quot;MultipleTbQueueCallbackWrapper&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| MultipleTbQueueTbMsgCallbackWrapper_c20[&quot;MultipleTbQueueTbMsgCallbackWrapper&quot;]
+    TbQueueCallback_p21[&quot;TbQueueCallback&quot;] --&gt;|implements| MultipleTbQueueTbMsgCallbackWrapper_c21[&quot;MultipleTbQueueTbMsgCallbackWrapper&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| SimpleTbQueueCallback_c22[&quot;SimpleTbQueueCallback&quot;]
+    TbQueueCallback_p23[&quot;TbQueueCallback&quot;] --&gt;|implements| SimpleTbQueueCallback_c23[&quot;SimpleTbQueueCallback&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| TbProtoJsQueueMsg_c24[&quot;TbProtoJsQueueMsg&quot;]
+    Object______p25[&quot;Object/外部框架&quot;] --&gt;|extends| TbProtoQueueMsg_c25[&quot;TbProtoQueueMsg&quot;]
+    TbQueueMsg_p26[&quot;TbQueueMsg&quot;] --&gt;|implements| TbProtoQueueMsg_c26[&quot;TbProtoQueueMsg&quot;]
+    Object______p27[&quot;Object/外部框架&quot;] --&gt;|extends| TbQueueTbMsgCallbackWrapper_c27[&quot;TbQueueTbMsgCallbackWrapper&quot;]
+    TbQueueCallback_p28[&quot;TbQueueCallback&quot;] --&gt;|implements| TbQueueTbMsgCallbackWrapper_c28[&quot;TbQueueTbMsgCallbackWrapper&quot;]
+    Object______p29[&quot;Object/外部框架&quot;] --&gt;|extends| ConsistentHashCircle_c29[&quot;ConsistentHashCircle&quot;]
+    Object______p30[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbServiceInfoProvider_c30[&quot;DefaultTbServiceInfoProvider&quot;]
+    TbServiceInfoProvider_p31[&quot;TbServiceInfoProvider&quot;] --&gt;|implements| DefaultTbServiceInfoProvider_c31[&quot;DefaultTbServiceInfoProvider&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| DummyDiscoveryService_c32[&quot;DummyDiscoveryService&quot;]
+    DiscoveryService_p33[&quot;DiscoveryService&quot;] --&gt;|implements| DummyDiscoveryService_c33[&quot;DummyDiscoveryService&quot;]
+    Object______p34[&quot;Object/外部框架&quot;] --&gt;|extends| HashPartitionService_c34[&quot;HashPartitionService&quot;]
+    PartitionService_p35[&quot;PartitionService&quot;] --&gt;|implements| HashPartitionService_c35[&quot;HashPartitionService&quot;]
+    Object______p36[&quot;Object/外部框架&quot;] --&gt;|extends| QueueKey_c36[&quot;QueueKey&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| QueueRoutingInfo_c37[&quot;QueueRoutingInfo&quot;]
+    Object______p38[&quot;Object/外部框架&quot;] --&gt;|extends| TbApplicationEventListener_c38[&quot;TbApplicationEventListener&quot;]
+    Object______p39[&quot;Object/外部框架&quot;] --&gt;|extends| TenantRoutingInfo_c39[&quot;TenantRoutingInfo&quot;]
+    Object______p40[&quot;Object/外部框架&quot;] --&gt;|extends| TopicService_c40[&quot;TopicService&quot;]
+    Object______p41[&quot;Object/外部框架&quot;] --&gt;|extends| ZkDiscoveryService_c41[&quot;ZkDiscoveryService&quot;]
+    DiscoveryService_p42[&quot;DiscoveryService&quot;] --&gt;|implements| ZkDiscoveryService_c42[&quot;ZkDiscoveryService&quot;]
+    PathChildrenCacheListener_p43[&quot;PathChildrenCacheListener&quot;] --&gt;|implements| ZkDiscoveryService_c43[&quot;ZkDiscoveryService&quot;]
+    TbApplicationEvent_p44[&quot;TbApplicationEvent&quot;] --&gt;|extends| ClusterTopologyChangeEvent_c44[&quot;ClusterTopologyChangeEvent&quot;]
+    TbApplicationEvent_p45[&quot;TbApplicationEvent&quot;] --&gt;|extends| OtherServiceShutdownEvent_c45[&quot;OtherServiceShutdownEvent&quot;]
+    TbApplicationEvent_p46[&quot;TbApplicationEvent&quot;] --&gt;|extends| PartitionChangeEvent_c46[&quot;PartitionChangeEvent&quot;]
+    TbApplicationEvent_p47[&quot;TbApplicationEvent&quot;] --&gt;|extends| ServiceListChangedEvent_c47[&quot;ServiceListChangedEvent&quot;]
+    ApplicationEvent_p48[&quot;ApplicationEvent&quot;] --&gt;|extends| TbApplicationEvent_c48[&quot;TbApplicationEvent&quot;]
+    Object______p49[&quot;Object/外部框架&quot;] --&gt;|extends| EnvironmentLogService_c49[&quot;EnvironmentLogService&quot;]
+    Object______p50[&quot;Object/外部框架&quot;] --&gt;|extends| KafkaTbQueueMsg_c50[&quot;KafkaTbQueueMsg&quot;]
+    TbQueueMsg_p51[&quot;TbQueueMsg&quot;] --&gt;|implements| KafkaTbQueueMsg_c51[&quot;KafkaTbQueueMsg&quot;]
+    Object______p52[&quot;Object/外部框架&quot;] --&gt;|extends| KafkaTbQueueMsgMetadata_c52[&quot;KafkaTbQueueMsgMetadata&quot;]
+    TbQueueMsgMetadata_p53[&quot;TbQueueMsgMetadata&quot;] --&gt;|implements| KafkaTbQueueMsgMetadata_c53[&quot;KafkaTbQueueMsgMetadata&quot;]
+    Object______p54[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaAdmin_c54[&quot;TbKafkaAdmin&quot;]
+    TbQueueAdmin_p55[&quot;TbQueueAdmin&quot;] --&gt;|implements| TbKafkaAdmin_c55[&quot;TbKafkaAdmin&quot;]
+    Object______p56[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaConsumerStatisticConfig_c56[&quot;TbKafkaConsumerStatisticConfig&quot;]
+    Object______p57[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaConsumerStatsService_c57[&quot;TbKafkaConsumerStatsService&quot;]
+    Object______p58[&quot;Object/外部框架&quot;] --&gt;|extends| GroupTopicStats_c58[&quot;GroupTopicStats&quot;]
+    Object______p59[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaConsumerTemplate_c59[&quot;TbKafkaConsumerTemplate&quot;]
+    Object______p60[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaProducerTemplate_c60[&quot;TbKafkaProducerTemplate&quot;]
+    Object______p61[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaSettings_c61[&quot;TbKafkaSettings&quot;]
+    Object______p62[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaTopicConfigs_c62[&quot;TbKafkaTopicConfigs&quot;]
+    Object______p63[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultInMemoryStorage_c63[&quot;DefaultInMemoryStorage&quot;]
+    InMemoryStorage_p64[&quot;InMemoryStorage&quot;] --&gt;|implements| DefaultInMemoryStorage_c64[&quot;DefaultInMemoryStorage&quot;]
+    Object______p65[&quot;Object/外部框架&quot;] --&gt;|extends| InMemoryTbQueueConsumer_c65[&quot;InMemoryTbQueueConsumer&quot;]
+    Object______p66[&quot;Object/外部框架&quot;] --&gt;|extends| InMemoryTbQueueProducer_c66[&quot;InMemoryTbQueueProducer&quot;]
+    Object______p67[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultNotificationDeduplicationService_c67[&quot;DefaultNotificationDeduplicationService&quot;]
+    NotificationDeduplicationService_p68[&quot;NotificationDeduplicationService&quot;] --&gt;|implements| DefaultNotificationDeduplicationService_c68[&quot;DefaultNotificationDeduplicationService&quot;]
+    Object______p69[&quot;Object/外部框架&quot;] --&gt;|extends| RemoteNotificationRuleProcessor_c69[&quot;RemoteNotificationRuleProcessor&quot;]
+    NotificationRuleProcessor_p70[&quot;NotificationRuleProcessor&quot;] --&gt;|implements| RemoteNotificationRuleProcessor_c70[&quot;RemoteNotificationRuleProcessor&quot;]
+    Object______p71[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSqsMonolithQueueFactory_c71[&quot;AwsSqsMonolithQueueFactory&quot;]
+    TbCoreQueueFactory_p72[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| AwsSqsMonolithQueueFactory_c72[&quot;AwsSqsMonolithQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p73[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| AwsSqsMonolithQueueFactory_c73[&quot;AwsSqsMonolithQueueFactory&quot;]
+    TbVersionControlQueueFactory_p74[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| AwsSqsMonolithQueueFactory_c74[&quot;AwsSqsMonolithQueueFactory&quot;]
+    Object______p75[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSqsTbCoreQueueFactory_c75[&quot;AwsSqsTbCoreQueueFactory&quot;]
+    TbCoreQueueFactory_p76[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| AwsSqsTbCoreQueueFactory_c76[&quot;AwsSqsTbCoreQueueFactory&quot;]
+    Object______p77[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSqsTbRuleEngineQueueFactory_c77[&quot;AwsSqsTbRuleEngineQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p78[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| AwsSqsTbRuleEngineQueueFactory_c78[&quot;AwsSqsTbRuleEngineQueueFactory&quot;]
+    Object______p79[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSqsTbVersionControlQueueFactory_c79[&quot;AwsSqsTbVersionControlQueueFactory&quot;]
+    TbVersionControlQueueFactory_p80[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| AwsSqsTbVersionControlQueueFactory_c80[&quot;AwsSqsTbVersionControlQueueFactory&quot;]
+    Object______p81[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSqsTransportQueueFactory_c81[&quot;AwsSqsTransportQueueFactory&quot;]
+    TbTransportQueueFactory_p82[&quot;TbTransportQueueFactory&quot;] --&gt;|implements| AwsSqsTransportQueueFactory_c82[&quot;AwsSqsTransportQueueFactory&quot;]
+    Object______p83[&quot;Object/外部框架&quot;] --&gt;|extends| InMemoryMonolithQueueFactory_c83[&quot;InMemoryMonolithQueueFactory&quot;]
+    TbCoreQueueFactory_p84[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| InMemoryMonolithQueueFactory_c84[&quot;InMemoryMonolithQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p85[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| InMemoryMonolithQueueFactory_c85[&quot;InMemoryMonolithQueueFactory&quot;]
+    TbVersionControlQueueFactory_p86[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| InMemoryMonolithQueueFactory_c86[&quot;InMemoryMonolithQueueFactory&quot;]
+    Object______p87[&quot;Object/外部框架&quot;] --&gt;|extends| InMemoryTbTransportQueueFactory_c87[&quot;InMemoryTbTransportQueueFactory&quot;]
+    TbTransportQueueFactory_p88[&quot;TbTransportQueueFactory&quot;] --&gt;|implements| InMemoryTbTransportQueueFactory_c88[&quot;InMemoryTbTransportQueueFactory&quot;]
+    Object______p89[&quot;Object/外部框架&quot;] --&gt;|extends| KafkaMonolithQueueFactory_c89[&quot;KafkaMonolithQueueFactory&quot;]
+    TbCoreQueueFactory_p90[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| KafkaMonolithQueueFactory_c90[&quot;KafkaMonolithQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p91[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| KafkaMonolithQueueFactory_c91[&quot;KafkaMonolithQueueFactory&quot;]
+    TbVersionControlQueueFactory_p92[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| KafkaMonolithQueueFactory_c92[&quot;KafkaMonolithQueueFactory&quot;]
+    Object______p93[&quot;Object/外部框架&quot;] --&gt;|extends| KafkaTbCoreQueueFactory_c93[&quot;KafkaTbCoreQueueFactory&quot;]
+    TbCoreQueueFactory_p94[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| KafkaTbCoreQueueFactory_c94[&quot;KafkaTbCoreQueueFactory&quot;]
+    Object______p95[&quot;Object/外部框架&quot;] --&gt;|extends| KafkaTbRuleEngineQueueFactory_c95[&quot;KafkaTbRuleEngineQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p96[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| KafkaTbRuleEngineQueueFactory_c96[&quot;KafkaTbRuleEngineQueueFactory&quot;]
+    Object______p97[&quot;Object/外部框架&quot;] --&gt;|extends| KafkaTbTransportQueueFactory_c97[&quot;KafkaTbTransportQueueFactory&quot;]
+    TbTransportQueueFactory_p98[&quot;TbTransportQueueFactory&quot;] --&gt;|implements| KafkaTbTransportQueueFactory_c98[&quot;KafkaTbTransportQueueFactory&quot;]
+    Object______p99[&quot;Object/外部框架&quot;] --&gt;|extends| KafkaTbVersionControlQueueFactory_c99[&quot;KafkaTbVersionControlQueueFactory&quot;]
+    TbVersionControlQueueFactory_p100[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| KafkaTbVersionControlQueueFactory_c100[&quot;KafkaTbVersionControlQueueFactory&quot;]
+    Object______p101[&quot;Object/外部框架&quot;] --&gt;|extends| PubSubMonolithQueueFactory_c101[&quot;PubSubMonolithQueueFactory&quot;]
+    TbCoreQueueFactory_p102[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| PubSubMonolithQueueFactory_c102[&quot;PubSubMonolithQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p103[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| PubSubMonolithQueueFactory_c103[&quot;PubSubMonolithQueueFactory&quot;]
+    TbVersionControlQueueFactory_p104[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| PubSubMonolithQueueFactory_c104[&quot;PubSubMonolithQueueFactory&quot;]
+    Object______p105[&quot;Object/外部框架&quot;] --&gt;|extends| PubSubTbCoreQueueFactory_c105[&quot;PubSubTbCoreQueueFactory&quot;]
+    TbCoreQueueFactory_p106[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| PubSubTbCoreQueueFactory_c106[&quot;PubSubTbCoreQueueFactory&quot;]
+    Object______p107[&quot;Object/外部框架&quot;] --&gt;|extends| PubSubTbRuleEngineQueueFactory_c107[&quot;PubSubTbRuleEngineQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p108[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| PubSubTbRuleEngineQueueFactory_c108[&quot;PubSubTbRuleEngineQueueFactory&quot;]
+    Object______p109[&quot;Object/外部框架&quot;] --&gt;|extends| PubSubTbVersionControlQueueFactory_c109[&quot;PubSubTbVersionControlQueueFactory&quot;]
+    TbVersionControlQueueFactory_p110[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| PubSubTbVersionControlQueueFactory_c110[&quot;PubSubTbVersionControlQueueFactory&quot;]
+    Object______p111[&quot;Object/外部框架&quot;] --&gt;|extends| PubSubTransportQueueFactory_c111[&quot;PubSubTransportQueueFactory&quot;]
+    TbTransportQueueFactory_p112[&quot;TbTransportQueueFactory&quot;] --&gt;|implements| PubSubTransportQueueFactory_c112[&quot;PubSubTransportQueueFactory&quot;]
+    Object______p113[&quot;Object/外部框架&quot;] --&gt;|extends| RabbitMqMonolithQueueFactory_c113[&quot;RabbitMqMonolithQueueFactory&quot;]
+    TbCoreQueueFactory_p114[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| RabbitMqMonolithQueueFactory_c114[&quot;RabbitMqMonolithQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p115[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| RabbitMqMonolithQueueFactory_c115[&quot;RabbitMqMonolithQueueFactory&quot;]
+    TbVersionControlQueueFactory_p116[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| RabbitMqMonolithQueueFactory_c116[&quot;RabbitMqMonolithQueueFactory&quot;]
+    Object______p117[&quot;Object/外部框架&quot;] --&gt;|extends| RabbitMqTbCoreQueueFactory_c117[&quot;RabbitMqTbCoreQueueFactory&quot;]
+    TbCoreQueueFactory_p118[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| RabbitMqTbCoreQueueFactory_c118[&quot;RabbitMqTbCoreQueueFactory&quot;]
+    Object______p119[&quot;Object/外部框架&quot;] --&gt;|extends| RabbitMqTbRuleEngineQueueFactory_c119[&quot;RabbitMqTbRuleEngineQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p120[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| RabbitMqTbRuleEngineQueueFactory_c120[&quot;RabbitMqTbRuleEngineQueueFactory&quot;]
+    Object______p121[&quot;Object/外部框架&quot;] --&gt;|extends| RabbitMqTbVersionControlQueueFactory_c121[&quot;RabbitMqTbVersionControlQueueFactory&quot;]
+    TbVersionControlQueueFactory_p122[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| RabbitMqTbVersionControlQueueFactory_c122[&quot;RabbitMqTbVersionControlQueueFactory&quot;]
+    Object______p123[&quot;Object/外部框架&quot;] --&gt;|extends| RabbitMqTransportQueueFactory_c123[&quot;RabbitMqTransportQueueFactory&quot;]
+    TbTransportQueueFactory_p124[&quot;TbTransportQueueFactory&quot;] --&gt;|implements| RabbitMqTransportQueueFactory_c124[&quot;RabbitMqTransportQueueFactory&quot;]
+    Object______p125[&quot;Object/外部框架&quot;] --&gt;|extends| ServiceBusMonolithQueueFactory_c125[&quot;ServiceBusMonolithQueueFactory&quot;]
+    TbCoreQueueFactory_p126[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| ServiceBusMonolithQueueFactory_c126[&quot;ServiceBusMonolithQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p127[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| ServiceBusMonolithQueueFactory_c127[&quot;ServiceBusMonolithQueueFactory&quot;]
+    TbVersionControlQueueFactory_p128[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| ServiceBusMonolithQueueFactory_c128[&quot;ServiceBusMonolithQueueFactory&quot;]
+    Object______p129[&quot;Object/外部框架&quot;] --&gt;|extends| ServiceBusTbCoreQueueFactory_c129[&quot;ServiceBusTbCoreQueueFactory&quot;]
+    TbCoreQueueFactory_p130[&quot;TbCoreQueueFactory&quot;] --&gt;|implements| ServiceBusTbCoreQueueFactory_c130[&quot;ServiceBusTbCoreQueueFactory&quot;]
+    Object______p131[&quot;Object/外部框架&quot;] --&gt;|extends| ServiceBusTbRuleEngineQueueFactory_c131[&quot;ServiceBusTbRuleEngineQueueFactory&quot;]
+    TbRuleEngineQueueFactory_p132[&quot;TbRuleEngineQueueFactory&quot;] --&gt;|implements| ServiceBusTbRuleEngineQueueFactory_c132[&quot;ServiceBusTbRuleEngineQueueFactory&quot;]
+    Object______p133[&quot;Object/外部框架&quot;] --&gt;|extends| ServiceBusTbVersionControlQueueFactory_c133[&quot;ServiceBusTbVersionControlQueueFactory&quot;]
+    TbVersionControlQueueFactory_p134[&quot;TbVersionControlQueueFactory&quot;] --&gt;|implements| ServiceBusTbVersionControlQueueFactory_c134[&quot;ServiceBusTbVersionControlQueueFactory&quot;]
+    Object______p135[&quot;Object/外部框架&quot;] --&gt;|extends| ServiceBusTransportQueueFactory_c135[&quot;ServiceBusTransportQueueFactory&quot;]
+    TbTransportQueueFactory_p136[&quot;TbTransportQueueFactory&quot;] --&gt;|implements| ServiceBusTransportQueueFactory_c136[&quot;ServiceBusTransportQueueFactory&quot;]
+    TbUsageStatsClientQueueFactory_p137[&quot;TbUsageStatsClientQueueFactory&quot;] --&gt;|extends| TbCoreQueueFactory_c137[&quot;TbCoreQueueFactory&quot;]
+    Object______p138[&quot;Object/外部框架&quot;] --&gt;|extends| TbCoreQueueProducerProvider_c138[&quot;TbCoreQueueProducerProvider&quot;]
+    TbQueueProducerProvider_p139[&quot;TbQueueProducerProvider&quot;] --&gt;|implements| TbCoreQueueProducerProvider_c139[&quot;TbCoreQueueProducerProvider&quot;]
+    Object______p140[&quot;Object/外部框架&quot;] --&gt;|extends| TbRuleEngineProducerProvider_c140[&quot;TbRuleEngineProducerProvider&quot;]
+    TbQueueProducerProvider_p141[&quot;TbQueueProducerProvider&quot;] --&gt;|implements| TbRuleEngineProducerProvider_c141[&quot;TbRuleEngineProducerProvider&quot;]
+    TbUsageStatsClientQueueFactory_p142[&quot;TbUsageStatsClientQueueFactory&quot;] --&gt;|extends| TbRuleEngineQueueFactory_c142[&quot;TbRuleEngineQueueFactory&quot;]
+    TbUsageStatsClientQueueFactory_p143[&quot;TbUsageStatsClientQueueFactory&quot;] --&gt;|extends| TbTransportQueueFactory_c143[&quot;TbTransportQueueFactory&quot;]
+    Object______p144[&quot;Object/外部框架&quot;] --&gt;|extends| TbTransportQueueProducerProvider_c144[&quot;TbTransportQueueProducerProvider&quot;]
+    TbQueueProducerProvider_p145[&quot;TbQueueProducerProvider&quot;] --&gt;|implements| TbTransportQueueProducerProvider_c145[&quot;TbTransportQueueProducerProvider&quot;]
+    Object______p146[&quot;Object/外部框架&quot;] --&gt;|extends| TbVersionControlProducerProvider_c146[&quot;TbVersionControlProducerProvider&quot;]
+    TbQueueProducerProvider_p147[&quot;TbQueueProducerProvider&quot;] --&gt;|implements| TbVersionControlProducerProvider_c147[&quot;TbVersionControlProducerProvider&quot;]
+    TbUsageStatsClientQueueFactory_p148[&quot;TbUsageStatsClientQueueFactory&quot;] --&gt;|extends| TbVersionControlQueueFactory_c148[&quot;TbVersionControlQueueFactory&quot;]
+    Object______p149[&quot;Object/外部框架&quot;] --&gt;|extends| TbPubSubAdmin_c149[&quot;TbPubSubAdmin&quot;]
+    TbQueueAdmin_p150[&quot;TbQueueAdmin&quot;] --&gt;|implements| TbPubSubAdmin_c150[&quot;TbPubSubAdmin&quot;]
+    Object______p151[&quot;Object/外部框架&quot;] --&gt;|extends| TbPubSubConsumerTemplate_c151[&quot;TbPubSubConsumerTemplate&quot;]
+    Object______p152[&quot;Object/外部框架&quot;] --&gt;|extends| TbPubSubProducerTemplate_c152[&quot;TbPubSubProducerTemplate&quot;]
+    Object______p153[&quot;Object/外部框架&quot;] --&gt;|extends| TbPubSubSettings_c153[&quot;TbPubSubSettings&quot;]
+    Object______p154[&quot;Object/外部框架&quot;] --&gt;|extends| TbPubSubSubscriptionSettings_c154[&quot;TbPubSubSubscriptionSettings&quot;]
+    Object______p155[&quot;Object/外部框架&quot;] --&gt;|extends| TbRabbitMqAdmin_c155[&quot;TbRabbitMqAdmin&quot;]
+    TbQueueAdmin_p156[&quot;TbQueueAdmin&quot;] --&gt;|implements| TbRabbitMqAdmin_c156[&quot;TbRabbitMqAdmin&quot;]
+    Object______p157[&quot;Object/外部框架&quot;] --&gt;|extends| TbRabbitMqConsumerTemplate_c157[&quot;TbRabbitMqConsumerTemplate&quot;]
+    Object______p158[&quot;Object/外部框架&quot;] --&gt;|extends| TbRabbitMqProducerTemplate_c158[&quot;TbRabbitMqProducerTemplate&quot;]
+    Object______p159[&quot;Object/外部框架&quot;] --&gt;|extends| TbRabbitMqQueueArguments_c159[&quot;TbRabbitMqQueueArguments&quot;]
+    Object______p160[&quot;Object/外部框架&quot;] --&gt;|extends| TbRabbitMqSettings_c160[&quot;TbRabbitMqSettings&quot;]
+    Object______p161[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultSchedulerComponent_c161[&quot;DefaultSchedulerComponent&quot;]
+    SchedulerComponent_p162[&quot;SchedulerComponent&quot;] --&gt;|implements| DefaultSchedulerComponent_c162[&quot;DefaultSchedulerComponent&quot;]
+    Object______p163[&quot;Object/外部框架&quot;] --&gt;|extends| TbQueueCoreSettings_c163[&quot;TbQueueCoreSettings&quot;]
+    Object______p164[&quot;Object/外部框架&quot;] --&gt;|extends| TbQueueRemoteJsInvokeSettings_c164[&quot;TbQueueRemoteJsInvokeSettings&quot;]
+    Object______p165[&quot;Object/外部框架&quot;] --&gt;|extends| TbQueueRuleEngineSettings_c165[&quot;TbQueueRuleEngineSettings&quot;]
+    Object______p166[&quot;Object/外部框架&quot;] --&gt;|extends| TbQueueTransportApiSettings_c166[&quot;TbQueueTransportApiSettings&quot;]
+    Object______p167[&quot;Object/外部框架&quot;] --&gt;|extends| TbQueueTransportNotificationSettings_c167[&quot;TbQueueTransportNotificationSettings&quot;]
+    Object______p168[&quot;Object/外部框架&quot;] --&gt;|extends| TbQueueVersionControlSettings_c168[&quot;TbQueueVersionControlSettings&quot;]
+    Object______p169[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSqsTbQueueMsgMetadata_c169[&quot;AwsSqsTbQueueMsgMetadata&quot;]
+    TbQueueMsgMetadata_p170[&quot;TbQueueMsgMetadata&quot;] --&gt;|implements| AwsSqsTbQueueMsgMetadata_c170[&quot;AwsSqsTbQueueMsgMetadata&quot;]
+    Object______p171[&quot;Object/外部框架&quot;] --&gt;|extends| TbAwsSqsAdmin_c171[&quot;TbAwsSqsAdmin&quot;]
+    TbQueueAdmin_p172[&quot;TbQueueAdmin&quot;] --&gt;|implements| TbAwsSqsAdmin_c172[&quot;TbAwsSqsAdmin&quot;]
+    Object______p173[&quot;Object/外部框架&quot;] --&gt;|extends| TbAwsSqsConsumerTemplate_c173[&quot;TbAwsSqsConsumerTemplate&quot;]
+    Object______p174[&quot;Object/外部框架&quot;] --&gt;|extends| AwsSqsMsgWrapper_c174[&quot;AwsSqsMsgWrapper&quot;]
+    Object______p175[&quot;Object/外部框架&quot;] --&gt;|extends| TbAwsSqsProducerTemplate_c175[&quot;TbAwsSqsProducerTemplate&quot;]
+    Object______p176[&quot;Object/外部框架&quot;] --&gt;|extends| TbAwsSqsQueueAttributes_c176[&quot;TbAwsSqsQueueAttributes&quot;]
+    Object______p177[&quot;Object/外部框架&quot;] --&gt;|extends| TbAwsSqsSettings_c177[&quot;TbAwsSqsSettings&quot;]
+    Object______p178[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbApiUsageReportClient_c178[&quot;DefaultTbApiUsageReportClient&quot;]
+    TbApiUsageReportClient_p179[&quot;TbApiUsageReportClient&quot;] --&gt;|implements| DefaultTbApiUsageReportClient_c179[&quot;DefaultTbApiUsageReportClient&quot;]
+    Object______p180[&quot;Object/外部框架&quot;] --&gt;|extends| ReportLevel_c180[&quot;ReportLevel&quot;]
+    Object______p181[&quot;Object/外部框架&quot;] --&gt;|extends| ParentEntity_c181[&quot;ParentEntity&quot;]
+    Object______p182[&quot;Object/外部框架&quot;] --&gt;|extends| PropertyUtils_c182[&quot;PropertyUtils&quot;]
+    Object______p183[&quot;Object/外部框架&quot;] --&gt;|extends| ProtoWithFSTService_c183[&quot;ProtoWithFSTService&quot;]
+    DataDecodingEncodingService_p184[&quot;DataDecodingEncodingService&quot;] --&gt;|implements| ProtoWithFSTService_c184[&quot;ProtoWithFSTService&quot;]
+    Object______p185[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbQueueRequestTemplateTest_c185[&quot;DefaultTbQueueRequestTemplateTest&quot;]
+    Object______p186[&quot;Object/外部框架&quot;] --&gt;|extends| QueueKeyTest_c186[&quot;QueueKeyTest&quot;]
+    Object______p187[&quot;Object/外部框架&quot;] --&gt;|extends| ZkDiscoveryServiceTest_c187[&quot;ZkDiscoveryServiceTest&quot;]
+    Object______p188[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaProducerTemplateTest_c188[&quot;TbKafkaProducerTemplateTest&quot;]
+    Object______p189[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaSettingsTest_c189[&quot;TbKafkaSettingsTest&quot;]
+    Object______p190[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultInMemoryStorageTest_c190[&quot;DefaultInMemoryStorageTest&quot;]
+    Object______p191[&quot;Object/外部框架&quot;] --&gt;|extends| PropertyUtilsTest_c191[&quot;PropertyUtilsTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `AbstractParallelTbQueueConsumerTemplate.initNewExecutor()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractParallelTbQueueConsumerTemplate.java`)
+- `AbstractParallelTbQueueConsumerTemplate.shutdownExecutor()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractParallelTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.ReentrantLock()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.subscribe()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.TopicPartitionInfo()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.subscribe()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.poll()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.emptyList()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.sleepAndReturnEmpty()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.sleepAndReturnEmpty()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.decodeRecords()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.decodeRecords()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.sleepAndReturnEmpty()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.emptyList()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.commit()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.stop()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.unsubscribe()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.isStopped()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doPoll()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doSubscribe()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doCommit()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doUnsubscribe()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.getFullTopicNames()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.isLongPollingSupported()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `DiscoveryService.getOtherServers()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/DiscoveryService.java`)
+- `DiscoveryService.isMonolith()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/DiscoveryService.java`)
+- `PartitionService.resolve()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.resolve()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.isMyPartition()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.getMyPartitions()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.recalculatePartitions()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.getAllServiceIds()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.getAllServices()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.getOtherServices()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.resolvePartitionIndex()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+- `PartitionService.evictTenantInfo()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/discovery/PartitionService.java`)
+
+
+## 哪些方法可以重写
+
+- `RuleEngineTbQueueAdminFactory.createKafkaAdmin()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbKafkaAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.createAwsSqsAdmin()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbAwsSqsAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.createPubSubAdmin()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbPubSubAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.createRabbitMqAdmin()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbRabbitMqAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.createServiceBusAdmin()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbServiceBusAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.createInMemoryAdmin()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbQueueAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.createTopicIfNotExists()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.deleteTopic()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.destroy()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `TbServiceBusAdmin.ConnectionStringBuilder()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.ManagementClient()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.createTopicIfNotExists()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.QueueDescription()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.deleteTopic()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.destroy()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusConsumerTemplate.Gson()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.doPoll()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.fromList()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.doSubscribe()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.doCommit()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.doUnsubscribe()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.SettleModePair()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.ConnectionStringBuilder()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.String()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusProducerTemplate.Gson()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.init()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.getDefaultTopic()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.send()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.Message()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.stop()` (public, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.ConnectionStringBuilder()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.QueueClient()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+
+
+## 哪些方法必须重写
+
+- `RuleEngineTbQueueAdminFactory.TbKafkaAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbAwsSqsAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbPubSubAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbRabbitMqAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `RuleEngineTbQueueAdminFactory.TbServiceBusAdmin()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/RuleEngineTbQueueAdminFactory.java`)
+- `TbServiceBusAdmin.ConnectionStringBuilder()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.ManagementClient()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusAdmin.QueueDescription()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusAdmin.java`)
+- `TbServiceBusConsumerTemplate.Gson()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.fromList()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.SettleModePair()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.ConnectionStringBuilder()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusConsumerTemplate.String()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java`)
+- `TbServiceBusProducerTemplate.Gson()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.Message()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.ConnectionStringBuilder()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.QueueClient()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `TbServiceBusProducerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusProducerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.ReentrantLock()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.TopicPartitionInfo()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.emptyList()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.sleepAndReturnEmpty()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.sleepAndReturnEmpty()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.decodeRecords()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.emptyList()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.RuntimeException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doPoll()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doSubscribe()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doCommit()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueConsumerTemplate.doUnsubscribe()` (protected, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java`)
+- `AbstractTbQueueTemplate.UUID()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueTemplate.java`)
+- `AbstractTbQueueTemplate.String()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueTemplate.java`)
+- `DefaultTbQueueMsg.DefaultTbQueueMsgHeaders()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueMsg.java`)
+- `DefaultTbQueueRequestTemplate.ReentrantLock()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueRequestTemplate.java`)
+- `DefaultTbQueueRequestTemplate.TimeoutException()` (package, `common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueRequestTemplate.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `RuleEngineTbQueueAdminFactory` (extends)
+- `Object/外部框架` -&gt; `TbServiceBusAdmin` (extends)
+- `TbQueueAdmin` -&gt; `TbServiceBusAdmin` (implements)
+- `Object/外部框架` -&gt; `TbServiceBusConsumerTemplate` (extends)
+- `Object/外部框架` -&gt; `TbServiceBusProducerTemplate` (extends)
+- `Object/外部框架` -&gt; `TbServiceBusQueueConfigs` (extends)
+- `Object/外部框架` -&gt; `TbServiceBusSettings` (extends)
+- `Object/外部框架` -&gt; `AbstractParallelTbQueueConsumerTemplate` (extends)
+- `Object/外部框架` -&gt; `AbstractTbQueueConsumerTemplate` (extends)
+- `Object/外部框架` -&gt; `AbstractTbQueueTemplate` (extends)
+- `Object/外部框架` -&gt; `AsyncCallbackTemplate` (extends)
+- `Object/外部框架` -&gt; `DefaultTbQueueMsg` (extends)
+- `TbQueueMsg` -&gt; `DefaultTbQueueMsg` (implements)
+- `Object/外部框架` -&gt; `DefaultTbQueueMsgHeaders` (extends)
+- `TbQueueMsgHeaders` -&gt; `DefaultTbQueueMsgHeaders` (implements)
+- `Object/外部框架` -&gt; `DefaultTbQueueRequestTemplate` (extends)
+- `Object/外部框架` -&gt; `ResponseMetaData` (extends)
+- `Object/外部框架` -&gt; `DefaultTbQueueResponseTemplate` (extends)
+- `Object/外部框架` -&gt; `MultipleTbQueueCallbackWrapper` (extends)
+- `TbQueueCallback` -&gt; `MultipleTbQueueCallbackWrapper` (implements)
+- `Object/外部框架` -&gt; `MultipleTbQueueTbMsgCallbackWrapper` (extends)
+- `TbQueueCallback` -&gt; `MultipleTbQueueTbMsgCallbackWrapper` (implements)
+- `Object/外部框架` -&gt; `SimpleTbQueueCallback` (extends)
+- `TbQueueCallback` -&gt; `SimpleTbQueueCallback` (implements)
+- `Object/外部框架` -&gt; `TbProtoJsQueueMsg` (extends)
+- `Object/外部框架` -&gt; `TbProtoQueueMsg` (extends)
+- `TbQueueMsg` -&gt; `TbProtoQueueMsg` (implements)
+- `Object/外部框架` -&gt; `TbQueueTbMsgCallbackWrapper` (extends)
+- `TbQueueCallback` -&gt; `TbQueueTbMsgCallbackWrapper` (implements)
+- `Object/外部框架` -&gt; `ConsistentHashCircle` (extends)
+- `Object/外部框架` -&gt; `DefaultTbServiceInfoProvider` (extends)
+- `TbServiceInfoProvider` -&gt; `DefaultTbServiceInfoProvider` (implements)
+- `Object/外部框架` -&gt; `DummyDiscoveryService` (extends)
+- `DiscoveryService` -&gt; `DummyDiscoveryService` (implements)
+- `Object/外部框架` -&gt; `HashPartitionService` (extends)
+- `PartitionService` -&gt; `HashPartitionService` (implements)
+- `Object/外部框架` -&gt; `QueueKey` (extends)
+- `Object/外部框架` -&gt; `QueueRoutingInfo` (extends)
+- `Object/外部框架` -&gt; `TbApplicationEventListener` (extends)
+- `Object/外部框架` -&gt; `TenantRoutingInfo` (extends)
+- 其余 40 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `ApplicationEvent`
+- `NotificationRuleProcessor`
+- `Object/外部框架`
+- `PathChildrenCacheListener`
+- `TbApiUsageReportClient`
+- `TbQueueAdmin`
+- `TbQueueCallback`
+- `TbQueueMsg`
+- `TbQueueMsgHeaders`
+- `TbQueueMsgMetadata`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

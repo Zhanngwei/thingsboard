@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Common Cache 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Common Cache 模块继承体系分析
+
+&gt; 生成范围：`common/cache`  
+&gt; Maven artifact：`cache`  
+&gt; Java 类型数量：35  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>Object/外部框架
+├── CacheSpecs
+├── CacheSpecsMap
+├── CacheSpecsMapTest
+├── CaffeineOtaPackageCache
+├── CaffeineTbCacheTransaction
+├── CaffeineTbTransactionalCache
+├── ├── DeviceCaffeineCache
+├── ├── ResourceInfoCaffeineCache
+├── ├── UsersSessionInvalidationCaffeineCache
+├── DefaultRateLimitService
+├── DeviceCacheEvictEvent
+├── DeviceCacheKey
+├── RateLimitKey
+├── RedisOtaPackageDataCache
+├── RedisTbCacheTransaction
+├── RedisTbTransactionalCache
+├── ├── DeviceRedisCache
+├── ├── ResourceInfoRedisCache
+├── ├── UsersSessionInvalidationRedisCache
+├── ResourceInfoCacheKey
+├── ResourceInfoEvictEvent
+├── SimpleTbCacheValueWrapper
+├── TBRedisCacheConfiguration
+├── ├── TBRedisClusterConfiguration
+├── ├── TBRedisSentinelConfiguration
+├── ├── TBRedisStandaloneConfiguration
+├── TbCaffeineCacheConfiguration
+├── TbFSTRedisSerializer
+OtaPackageDataCache
+├── «implements» CaffeineOtaPackageCache
+├── «implements» RedisOtaPackageDataCache
+RateLimitService
+├── «implements» DefaultRateLimitService
+Serializable
+├── «implements» DeviceCacheKey
+├── «implements» ResourceInfoCacheKey</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| CacheSpecs_c0[&quot;CacheSpecs&quot;]
+    Object______p1[&quot;Object/外部框架&quot;] --&gt;|extends| CacheSpecsMap_c1[&quot;CacheSpecsMap&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| CaffeineTbCacheTransaction_c2[&quot;CaffeineTbCacheTransaction&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| CaffeineTbTransactionalCache_c3[&quot;CaffeineTbTransactionalCache&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| RedisTbCacheTransaction_c4[&quot;RedisTbCacheTransaction&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| RedisTbTransactionalCache_c5[&quot;RedisTbTransactionalCache&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| SimpleTbCacheValueWrapper_c6[&quot;SimpleTbCacheValueWrapper&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| TBRedisCacheConfiguration_c7[&quot;TBRedisCacheConfiguration&quot;]
+    TBRedisCacheConfiguration_p8[&quot;TBRedisCacheConfiguration&quot;] --&gt;|extends| TBRedisClusterConfiguration_c8[&quot;TBRedisClusterConfiguration&quot;]
+    TBRedisCacheConfiguration_p9[&quot;TBRedisCacheConfiguration&quot;] --&gt;|extends| TBRedisSentinelConfiguration_c9[&quot;TBRedisSentinelConfiguration&quot;]
+    TBRedisCacheConfiguration_p10[&quot;TBRedisCacheConfiguration&quot;] --&gt;|extends| TBRedisStandaloneConfiguration_c10[&quot;TBRedisStandaloneConfiguration&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| TbCaffeineCacheConfiguration_c11[&quot;TbCaffeineCacheConfiguration&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| TbFSTRedisSerializer_c12[&quot;TbFSTRedisSerializer&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceCacheEvictEvent_c13[&quot;DeviceCacheEvictEvent&quot;]
+    Object______p14[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceCacheKey_c14[&quot;DeviceCacheKey&quot;]
+    Serializable_p15[&quot;Serializable&quot;] --&gt;|implements| DeviceCacheKey_c15[&quot;DeviceCacheKey&quot;]
+    CaffeineTbTransactionalCache_p16[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| DeviceCaffeineCache_c16[&quot;DeviceCaffeineCache&quot;]
+    RedisTbTransactionalCache_p17[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| DeviceRedisCache_c17[&quot;DeviceRedisCache&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultRateLimitService_c18[&quot;DefaultRateLimitService&quot;]
+    RateLimitService_p19[&quot;RateLimitService&quot;] --&gt;|implements| DefaultRateLimitService_c19[&quot;DefaultRateLimitService&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| RateLimitKey_c20[&quot;RateLimitKey&quot;]
+    Object______p21[&quot;Object/外部框架&quot;] --&gt;|extends| CaffeineOtaPackageCache_c21[&quot;CaffeineOtaPackageCache&quot;]
+    OtaPackageDataCache_p22[&quot;OtaPackageDataCache&quot;] --&gt;|implements| CaffeineOtaPackageCache_c22[&quot;CaffeineOtaPackageCache&quot;]
+    Object______p23[&quot;Object/外部框架&quot;] --&gt;|extends| RedisOtaPackageDataCache_c23[&quot;RedisOtaPackageDataCache&quot;]
+    OtaPackageDataCache_p24[&quot;OtaPackageDataCache&quot;] --&gt;|implements| RedisOtaPackageDataCache_c24[&quot;RedisOtaPackageDataCache&quot;]
+    Object______p25[&quot;Object/外部框架&quot;] --&gt;|extends| ResourceInfoCacheKey_c25[&quot;ResourceInfoCacheKey&quot;]
+    Serializable_p26[&quot;Serializable&quot;] --&gt;|implements| ResourceInfoCacheKey_c26[&quot;ResourceInfoCacheKey&quot;]
+    CaffeineTbTransactionalCache_p27[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| ResourceInfoCaffeineCache_c27[&quot;ResourceInfoCaffeineCache&quot;]
+    Object______p28[&quot;Object/外部框架&quot;] --&gt;|extends| ResourceInfoEvictEvent_c28[&quot;ResourceInfoEvictEvent&quot;]
+    RedisTbTransactionalCache_p29[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| ResourceInfoRedisCache_c29[&quot;ResourceInfoRedisCache&quot;]
+    CaffeineTbTransactionalCache_p30[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| UsersSessionInvalidationCaffeineCache_c30[&quot;UsersSessionInvalidationCaffeineCache&quot;]
+    RedisTbTransactionalCache_p31[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| UsersSessionInvalidationRedisCache_c31[&quot;UsersSessionInvalidationRedisCache&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| CacheSpecsMapTest_c32[&quot;CacheSpecsMapTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `CaffeineTbTransactionalCache.ReentrantLock()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.get()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.put()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.putIfAbsent()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.evictOrPut()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransactionForKey()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransactionForKeys()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.doPutIfAbsent()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.doEvict()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.commit()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.rollback()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.JedisPool()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.get()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.put()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.putIfAbsent()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.evictOrPut()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.getRawValue()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.newTransactionForKey()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.newTransactionForKeys()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.JedisConnection()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.RuntimeException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.IllegalArgumentException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.RuntimeException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.put()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `TBRedisCacheConfiguration.redisConnectionFactory()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.loadFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.loadFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.cacheManager()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.DefaultFormattingConversionService()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.redisTemplate()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.buildPoolConfig()` (protected, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.JedisPoolConfig()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.getNodes()` (protected, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+
+
+## 哪些方法可以重写
+
+- `CacheSpecsMap.replaceTheJWTTokenRefreshExpTime()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CacheSpecsMap.java`)
+- `CaffeineTbCacheTransaction.putIfAbsent()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbCacheTransaction.java`)
+- `CaffeineTbCacheTransaction.commit()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbCacheTransaction.java`)
+- `CaffeineTbCacheTransaction.rollback()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbCacheTransaction.java`)
+- `CaffeineTbTransactionalCache.ReentrantLock()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.get()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.put()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.putIfAbsent()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.evictOrPut()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransactionForKey()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransactionForKeys()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.doPutIfAbsent()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.doEvict()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.commit()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.rollback()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `RedisTbCacheTransaction.putIfAbsent()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbCacheTransaction.java`)
+- `RedisTbCacheTransaction.commit()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbCacheTransaction.java`)
+- `RedisTbCacheTransaction.rollback()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbCacheTransaction.java`)
+- `RedisTbTransactionalCache.JedisPool()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.get()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.put()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.putIfAbsent()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.evict()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.evictOrPut()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.getRawValue()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.newTransactionForKey()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.newTransactionForKeys()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.JedisConnection()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.RuntimeException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.IllegalArgumentException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.RuntimeException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.put()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `SimpleTbCacheValueWrapper.get()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/SimpleTbCacheValueWrapper.java`)
+- `TBRedisCacheConfiguration.redisConnectionFactory()` (public, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+
+
+## 哪些方法必须重写
+
+- `CaffeineTbTransactionalCache.ReentrantLock()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `CaffeineTbTransactionalCache.newTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/CaffeineTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.JedisPool()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.getRawValue()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.JedisConnection()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.RuntimeException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.IllegalArgumentException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `RedisTbTransactionalCache.RuntimeException()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/RedisTbTransactionalCache.java`)
+- `TBRedisCacheConfiguration.loadFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.loadFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.DefaultFormattingConversionService()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.JedisPoolConfig()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisCacheConfiguration.RedisNode()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java`)
+- `TBRedisClusterConfiguration.RedisClusterConfiguration()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisClusterConfiguration.java`)
+- `TBRedisClusterConfiguration.JedisConnectionFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisClusterConfiguration.java`)
+- `TBRedisClusterConfiguration.JedisConnectionFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisClusterConfiguration.java`)
+- `TBRedisSentinelConfiguration.RedisSentinelConfiguration()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisSentinelConfiguration.java`)
+- `TBRedisSentinelConfiguration.JedisConnectionFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisSentinelConfiguration.java`)
+- `TBRedisSentinelConfiguration.JedisConnectionFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisSentinelConfiguration.java`)
+- `TBRedisStandaloneConfiguration.RedisStandaloneConfiguration()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisStandaloneConfiguration.java`)
+- `TBRedisStandaloneConfiguration.JedisConnectionFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisStandaloneConfiguration.java`)
+- `TBRedisStandaloneConfiguration.JedisConnectionFactory()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TBRedisStandaloneConfiguration.java`)
+- `TbCacheTransaction.putIfAbsent()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbCacheTransaction.java`)
+- `TbCacheTransaction.commit()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbCacheTransaction.java`)
+- `TbCacheTransaction.rollback()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbCacheTransaction.java`)
+- `TbCacheValueWrapper.get()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbCacheValueWrapper.java`)
+- `TbCaffeineCacheConfiguration.SimpleCacheManager()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbCaffeineCacheConfiguration.java`)
+- `TbCaffeineCacheConfiguration.CaffeineCache()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbCaffeineCacheConfiguration.java`)
+- `TbTransactionalCache.getCacheName()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.get()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.put()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.putIfAbsent()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.evict()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.evict()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.evictOrPut()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.newTransactionForKey()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.newTransactionForKeys()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.getOrFetchFromDB()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+- `TbTransactionalCache.getAndPutInTransaction()` (package, `common/cache/src/main/java/org/thingsboard/server/cache/TbTransactionalCache.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `CacheSpecs` (extends)
+- `Object/外部框架` -&gt; `CacheSpecsMap` (extends)
+- `Object/外部框架` -&gt; `CaffeineTbCacheTransaction` (extends)
+- `Object/外部框架` -&gt; `CaffeineTbTransactionalCache` (extends)
+- `Object/外部框架` -&gt; `RedisTbCacheTransaction` (extends)
+- `Object/外部框架` -&gt; `RedisTbTransactionalCache` (extends)
+- `Object/外部框架` -&gt; `SimpleTbCacheValueWrapper` (extends)
+- `Object/外部框架` -&gt; `TBRedisCacheConfiguration` (extends)
+- `TBRedisCacheConfiguration` -&gt; `TBRedisClusterConfiguration` (extends)
+- `TBRedisCacheConfiguration` -&gt; `TBRedisSentinelConfiguration` (extends)
+- `TBRedisCacheConfiguration` -&gt; `TBRedisStandaloneConfiguration` (extends)
+- `Object/外部框架` -&gt; `TbCaffeineCacheConfiguration` (extends)
+- `Object/外部框架` -&gt; `TbFSTRedisSerializer` (extends)
+- `Object/外部框架` -&gt; `DeviceCacheEvictEvent` (extends)
+- `Object/外部框架` -&gt; `DeviceCacheKey` (extends)
+- `Serializable` -&gt; `DeviceCacheKey` (implements)
+- `CaffeineTbTransactionalCache` -&gt; `DeviceCaffeineCache` (extends)
+- `RedisTbTransactionalCache` -&gt; `DeviceRedisCache` (extends)
+- `Object/外部框架` -&gt; `DefaultRateLimitService` (extends)
+- `RateLimitService` -&gt; `DefaultRateLimitService` (implements)
+- `Object/外部框架` -&gt; `RateLimitKey` (extends)
+- `Object/外部框架` -&gt; `CaffeineOtaPackageCache` (extends)
+- `OtaPackageDataCache` -&gt; `CaffeineOtaPackageCache` (implements)
+- `Object/外部框架` -&gt; `RedisOtaPackageDataCache` (extends)
+- `OtaPackageDataCache` -&gt; `RedisOtaPackageDataCache` (implements)
+- `Object/外部框架` -&gt; `ResourceInfoCacheKey` (extends)
+- `Serializable` -&gt; `ResourceInfoCacheKey` (implements)
+- `CaffeineTbTransactionalCache` -&gt; `ResourceInfoCaffeineCache` (extends)
+- `Object/外部框架` -&gt; `ResourceInfoEvictEvent` (extends)
+- `RedisTbTransactionalCache` -&gt; `ResourceInfoRedisCache` (extends)
+- `CaffeineTbTransactionalCache` -&gt; `UsersSessionInvalidationCaffeineCache` (extends)
+- `RedisTbTransactionalCache` -&gt; `UsersSessionInvalidationRedisCache` (extends)
+- `Object/外部框架` -&gt; `CacheSpecsMapTest` (extends)
+
+
+## 外部父类/接口
+
+- `Object/外部框架`
+- `Serializable`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ThingsBoard Black Box Tests 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># ThingsBoard Black Box Tests 模块继承体系分析
+
+&gt; 生成范围：`msa/black-box-tests`  
+&gt; Maven artifact：`black-box-tests`  
+&gt; Java 类型数量：119  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>CoapHandler
+├── «implements» TestCoapClientCallback
+IAnnotationTransformer
+├── «implements» RetryTestListener
+IMqttMessageListener
+├── «implements» MqttMessageListener
+IRetryAnalyzer
+├── «implements» RetryAnalyzer
+ITestListener
+├── «implements» TestListener
+MqttHandler
+├── «implements» MqttMessageListener
+Object/外部框架
+├── AbstractBasePage
+├── ├── AlarmDetailsViewElements
+├── ├── ├── AlarmDetailsViewHelper
+├── ├── AssignDeviceTabElements
+├── ├── ├── AssignDeviceTabHelper
+├── ├── CreateDeviceTabElements
+├── ├── ├── CreateDeviceTabHelper
+├── ├── CreateWidgetPopupElements
+├── ├── ├── CreateWidgetPopupHelper
+├── ├── LoginPageElements
+├── ├── ├── LoginPageHelper
+├── ├── OpenRuleChainPageElements
+├── ├── ├── OpenRuleChainPageHelper
+├── ├── OtherPageElements
+├── ├── ├── AlarmDetailsEntityTabElements
+├── ├── ├── ├── AlarmDetailsEntityTabHelper
+├── ├── ├── ├── ├── AlarmWidgetElements
+├── ├── ├── AssetPageElements
+├── ├── ├── ├── AssetPageHelper
+├── ├── ├── OtherPageElementsHelper
+├── ├── ├── ├── CustomerPageElements
+├── ├── ├── ├── ├── CustomerPageHelper
+├── ├── ├── ├── DashboardPageElements
+├── ├── ├── ├── ├── DashboardPageHelper
+├── ├── ├── ├── DevicePageElements
+├── ├── ├── ├── ├── DevicePageHelper
+├── ├── ├── ├── EntityViewPageElements
+├── ├── ├── ├── ├── EntityViewPageHelper
+├── ├── ├── ├── ProfilesPageElements
+├── ├── ├── ├── ├── ProfilesPageHelper
+├── ├── ├── ├── RuleChainsPageElements
+├── ├── ├── ├── ├── RuleChainsPageHelper
+├── ├── SideBarMenuViewElements
+├── ├── ├── SideBarMenuViewHelper
+├── AbstractContainerTest
+├── ├── AbstractDriverBaseTest
+├── ├── ├── AbstractAssignTest
+├── ├── ├── ├── AssignDetailsTabAssignTest
+├── ├── ├── ├── AssignDetailsTabFromCustomerAssignTest
+├── ├── ├── ├── AssignFromAlarmWidgetTest
+├── ├── ├── AbstractDeviceTest
+├── ├── ├── ├── AssignToCustomerTest
+├── ├── ├── ├── CreateDeviceTest
+├── ├── ├── ├── DeleteDeviceTest
+├── ├── ├── ├── DeleteSeveralDevicesTest
+├── ├── ├── ├── DeviceFilterTest
+├── ├── ├── ├── EditDeviceTest
+├── ├── ├── ├── MakeDevicePrivateTest
+├── ├── ├── ├── MakeDevicePublicTest
+├── ├── ├── AbstractRuleChainTest
+├── ├── ├── ├── CreateRuleChainImportTest
+├── ├── ├── ├── CreateRuleChainTest
+├── ├── ├── ├── DeleteRuleChainTest
+├── ├── ├── ├── DeleteSeveralRuleChainsTest
+├── ├── ├── ├── MakeRuleChainRootTest
+├── ├── ├── ├── OpenRuleChainTest
+├── ├── ├── ├── RuleChainEditMenuTest
+├── ├── ├── ├── SearchRuleChainTest
+├── ├── ├── ├── SortByNameTest
+├── ├── ├── ├── SortByTimeTest
+├── ├── ├── AssetProfileEditMenuTest
+├── ├── ├── CreateAssetProfileImportTest
+├── ├── ├── CreateAssetProfileTest
+├── ├── ├── CreateCustomerTest
+├── ├── ├── CreateDeviceProfileImportTest
+├── ├── ├── CreateDeviceProfileTest
+├── ├── ├── CustomerEditMenuTest
+├── ├── ├── DeleteAssetProfileTest
+├── ├── ├── DeleteCustomerTest
+├── ├── ├── DeleteDeviceProfileTest
+├── ├── ├── DeleteSeveralAssetProfilesTest
+├── ├── ├── DeleteSeveralCustomerTest
+├── ├── ├── DeleteSeveralDeviceProfilesTest
+├── ├── ├── DeviceProfileEditMenuTest
+├── ├── ├── MakeAssetProfileDefaultTest
+├── ├── ├── MakeDeviceProfileDefaultTest
+├── ├── ├── ManageCustomersAssetsTest
+├── ├── ├── ManageCustomersDashboardsTest
+├── ├── ├── ManageCustomersDevicesTest
+├── ├── ├── ManageCustomersEdgesTest
+├── ├── ├── ManageCustomersUsersTest
+├── ├── ├── SearchAssetProfileTest
+├── ├── ├── SearchCustomerTest
+├── ├── ├── SearchDeviceProfileTest
+├── ├── ├── SortByNameTest
+├── ├── CoapClientTest
+├── ├── HttpClientTest
+├── ├── MqttClientTest
+├── ├── MqttGatewayClientTest
+├── ├── MqttNodeTest
+├── AttributesResponse
+├── Const
+├── ContainerTestSuite
+├── DataProviderCredential
+├── DevicePrototypes
+├── DockerComposeContainerImpl
+├── DockerComposeExecutor
+├── EntityPrototypes
+├── MqttEvent
+├── MqttMessageListener
+├── RetryAnalyzer
+├── RetryTestListener
+├── SeleniumRemoteWebDriverTest
+├── TestCoapClient
+├── TestCoapClientCallback
+├── TestListener
+├── TestProperties
+├── TestRestClient
+├── ThingsBoardDbInstaller
+├── WsTelemetryResponse
+Serializable
+├── «implements» WsTelemetryResponse
+WebSocketClient
+├── WsClient</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractContainerTest_c0[&quot;AbstractContainerTest&quot;]
+    Object______p1[&quot;Object/外部框架&quot;] --&gt;|extends| ContainerTestSuite_c1[&quot;ContainerTestSuite&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| DockerComposeContainerImpl_c2[&quot;DockerComposeContainerImpl&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| DockerComposeExecutor_c3[&quot;DockerComposeExecutor&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| SeleniumRemoteWebDriverTest_c4[&quot;SeleniumRemoteWebDriverTest&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| TestCoapClient_c5[&quot;TestCoapClient&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| TestCoapClientCallback_c6[&quot;TestCoapClientCallback&quot;]
+    CoapHandler_p7[&quot;CoapHandler&quot;] --&gt;|implements| TestCoapClientCallback_c7[&quot;TestCoapClientCallback&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| TestListener_c8[&quot;TestListener&quot;]
+    ITestListener_p9[&quot;ITestListener&quot;] --&gt;|implements| TestListener_c9[&quot;TestListener&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| TestProperties_c10[&quot;TestProperties&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| TestRestClient_c11[&quot;TestRestClient&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| ThingsBoardDbInstaller_c12[&quot;ThingsBoardDbInstaller&quot;]
+    WebSocketClient_p13[&quot;WebSocketClient&quot;] --&gt;|extends| WsClient_c13[&quot;WsClient&quot;]
+    AbstractContainerTest_p14[&quot;AbstractContainerTest&quot;] --&gt;|extends| CoapClientTest_c14[&quot;CoapClientTest&quot;]
+    AbstractContainerTest_p15[&quot;AbstractContainerTest&quot;] --&gt;|extends| HttpClientTest_c15[&quot;HttpClientTest&quot;]
+    AbstractContainerTest_p16[&quot;AbstractContainerTest&quot;] --&gt;|extends| MqttClientTest_c16[&quot;MqttClientTest&quot;]
+    Object______p17[&quot;Object/外部框架&quot;] --&gt;|extends| MqttMessageListener_c17[&quot;MqttMessageListener&quot;]
+    MqttHandler_p18[&quot;MqttHandler&quot;] --&gt;|implements| MqttMessageListener_c18[&quot;MqttMessageListener&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| MqttEvent_c19[&quot;MqttEvent&quot;]
+    AbstractContainerTest_p20[&quot;AbstractContainerTest&quot;] --&gt;|extends| MqttGatewayClientTest_c20[&quot;MqttGatewayClientTest&quot;]
+    Object______p21[&quot;Object/外部框架&quot;] --&gt;|extends| AttributesResponse_c21[&quot;AttributesResponse&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| WsTelemetryResponse_c22[&quot;WsTelemetryResponse&quot;]
+    Serializable_p23[&quot;Serializable&quot;] --&gt;|implements| WsTelemetryResponse_c23[&quot;WsTelemetryResponse&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| DevicePrototypes_c24[&quot;DevicePrototypes&quot;]
+    AbstractContainerTest_p25[&quot;AbstractContainerTest&quot;] --&gt;|extends| MqttNodeTest_c25[&quot;MqttNodeTest&quot;]
+    IMqttMessageListener_p26[&quot;IMqttMessageListener&quot;] --&gt;|implements| MqttMessageListener_c26[&quot;MqttMessageListener&quot;]
+    Object______p27[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractBasePage_c27[&quot;AbstractBasePage&quot;]
+    AbstractContainerTest_p28[&quot;AbstractContainerTest&quot;] --&gt;|extends| AbstractDriverBaseTest_c28[&quot;AbstractDriverBaseTest&quot;]
+    Object______p29[&quot;Object/外部框架&quot;] --&gt;|extends| RetryAnalyzer_c29[&quot;RetryAnalyzer&quot;]
+    IRetryAnalyzer_p30[&quot;IRetryAnalyzer&quot;] --&gt;|implements| RetryAnalyzer_c30[&quot;RetryAnalyzer&quot;]
+    Object______p31[&quot;Object/外部框架&quot;] --&gt;|extends| RetryTestListener_c31[&quot;RetryTestListener&quot;]
+    IAnnotationTransformer_p32[&quot;IAnnotationTransformer&quot;] --&gt;|implements| RetryTestListener_c32[&quot;RetryTestListener&quot;]
+    OtherPageElements_p33[&quot;OtherPageElements&quot;] --&gt;|extends| AlarmDetailsEntityTabElements_c33[&quot;AlarmDetailsEntityTabElements&quot;]
+    AlarmDetailsEntityTabElements_p34[&quot;AlarmDetailsEntityTabElements&quot;] --&gt;|extends| AlarmDetailsEntityTabHelper_c34[&quot;AlarmDetailsEntityTabHelper&quot;]
+    AbstractBasePage_p35[&quot;AbstractBasePage&quot;] --&gt;|extends| AlarmDetailsViewElements_c35[&quot;AlarmDetailsViewElements&quot;]
+    AlarmDetailsViewElements_p36[&quot;AlarmDetailsViewElements&quot;] --&gt;|extends| AlarmDetailsViewHelper_c36[&quot;AlarmDetailsViewHelper&quot;]
+    AlarmDetailsEntityTabHelper_p37[&quot;AlarmDetailsEntityTabHelper&quot;] --&gt;|extends| AlarmWidgetElements_c37[&quot;AlarmWidgetElements&quot;]
+    OtherPageElements_p38[&quot;OtherPageElements&quot;] --&gt;|extends| AssetPageElements_c38[&quot;AssetPageElements&quot;]
+    AssetPageElements_p39[&quot;AssetPageElements&quot;] --&gt;|extends| AssetPageHelper_c39[&quot;AssetPageHelper&quot;]
+    AbstractBasePage_p40[&quot;AbstractBasePage&quot;] --&gt;|extends| CreateWidgetPopupElements_c40[&quot;CreateWidgetPopupElements&quot;]
+    CreateWidgetPopupElements_p41[&quot;CreateWidgetPopupElements&quot;] --&gt;|extends| CreateWidgetPopupHelper_c41[&quot;CreateWidgetPopupHelper&quot;]
+    OtherPageElementsHelper_p42[&quot;OtherPageElementsHelper&quot;] --&gt;|extends| CustomerPageElements_c42[&quot;CustomerPageElements&quot;]
+    CustomerPageElements_p43[&quot;CustomerPageElements&quot;] --&gt;|extends| CustomerPageHelper_c43[&quot;CustomerPageHelper&quot;]
+    OtherPageElementsHelper_p44[&quot;OtherPageElementsHelper&quot;] --&gt;|extends| DashboardPageElements_c44[&quot;DashboardPageElements&quot;]
+    DashboardPageElements_p45[&quot;DashboardPageElements&quot;] --&gt;|extends| DashboardPageHelper_c45[&quot;DashboardPageHelper&quot;]
+    OtherPageElementsHelper_p46[&quot;OtherPageElementsHelper&quot;] --&gt;|extends| DevicePageElements_c46[&quot;DevicePageElements&quot;]
+    DevicePageElements_p47[&quot;DevicePageElements&quot;] --&gt;|extends| DevicePageHelper_c47[&quot;DevicePageHelper&quot;]
+    OtherPageElementsHelper_p48[&quot;OtherPageElementsHelper&quot;] --&gt;|extends| EntityViewPageElements_c48[&quot;EntityViewPageElements&quot;]
+    EntityViewPageElements_p49[&quot;EntityViewPageElements&quot;] --&gt;|extends| EntityViewPageHelper_c49[&quot;EntityViewPageHelper&quot;]
+    AbstractBasePage_p50[&quot;AbstractBasePage&quot;] --&gt;|extends| LoginPageElements_c50[&quot;LoginPageElements&quot;]
+    LoginPageElements_p51[&quot;LoginPageElements&quot;] --&gt;|extends| LoginPageHelper_c51[&quot;LoginPageHelper&quot;]
+    AbstractBasePage_p52[&quot;AbstractBasePage&quot;] --&gt;|extends| OpenRuleChainPageElements_c52[&quot;OpenRuleChainPageElements&quot;]
+    OpenRuleChainPageElements_p53[&quot;OpenRuleChainPageElements&quot;] --&gt;|extends| OpenRuleChainPageHelper_c53[&quot;OpenRuleChainPageHelper&quot;]
+    AbstractBasePage_p54[&quot;AbstractBasePage&quot;] --&gt;|extends| OtherPageElements_c54[&quot;OtherPageElements&quot;]
+    OtherPageElements_p55[&quot;OtherPageElements&quot;] --&gt;|extends| OtherPageElementsHelper_c55[&quot;OtherPageElementsHelper&quot;]
+    OtherPageElementsHelper_p56[&quot;OtherPageElementsHelper&quot;] --&gt;|extends| ProfilesPageElements_c56[&quot;ProfilesPageElements&quot;]
+    ProfilesPageElements_p57[&quot;ProfilesPageElements&quot;] --&gt;|extends| ProfilesPageHelper_c57[&quot;ProfilesPageHelper&quot;]
+    OtherPageElementsHelper_p58[&quot;OtherPageElementsHelper&quot;] --&gt;|extends| RuleChainsPageElements_c58[&quot;RuleChainsPageElements&quot;]
+    RuleChainsPageElements_p59[&quot;RuleChainsPageElements&quot;] --&gt;|extends| RuleChainsPageHelper_c59[&quot;RuleChainsPageHelper&quot;]
+    AbstractBasePage_p60[&quot;AbstractBasePage&quot;] --&gt;|extends| SideBarMenuViewElements_c60[&quot;SideBarMenuViewElements&quot;]
+    SideBarMenuViewElements_p61[&quot;SideBarMenuViewElements&quot;] --&gt;|extends| SideBarMenuViewHelper_c61[&quot;SideBarMenuViewHelper&quot;]
+    AbstractBasePage_p62[&quot;AbstractBasePage&quot;] --&gt;|extends| AssignDeviceTabElements_c62[&quot;AssignDeviceTabElements&quot;]
+    AssignDeviceTabElements_p63[&quot;AssignDeviceTabElements&quot;] --&gt;|extends| AssignDeviceTabHelper_c63[&quot;AssignDeviceTabHelper&quot;]
+    AbstractBasePage_p64[&quot;AbstractBasePage&quot;] --&gt;|extends| CreateDeviceTabElements_c64[&quot;CreateDeviceTabElements&quot;]
+    CreateDeviceTabElements_p65[&quot;CreateDeviceTabElements&quot;] --&gt;|extends| CreateDeviceTabHelper_c65[&quot;CreateDeviceTabHelper&quot;]
+    AbstractDriverBaseTest_p66[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| AbstractAssignTest_c66[&quot;AbstractAssignTest&quot;]
+    AbstractAssignTest_p67[&quot;AbstractAssignTest&quot;] --&gt;|extends| AssignDetailsTabAssignTest_c67[&quot;AssignDetailsTabAssignTest&quot;]
+    AbstractAssignTest_p68[&quot;AbstractAssignTest&quot;] --&gt;|extends| AssignDetailsTabFromCustomerAssignTest_c68[&quot;AssignDetailsTabFromCustomerAssignTest&quot;]
+    AbstractAssignTest_p69[&quot;AbstractAssignTest&quot;] --&gt;|extends| AssignFromAlarmWidgetTest_c69[&quot;AssignFromAlarmWidgetTest&quot;]
+    AbstractDriverBaseTest_p70[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| AssetProfileEditMenuTest_c70[&quot;AssetProfileEditMenuTest&quot;]
+    AbstractDriverBaseTest_p71[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| CreateAssetProfileImportTest_c71[&quot;CreateAssetProfileImportTest&quot;]
+    AbstractDriverBaseTest_p72[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| CreateAssetProfileTest_c72[&quot;CreateAssetProfileTest&quot;]
+    AbstractDriverBaseTest_p73[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| DeleteAssetProfileTest_c73[&quot;DeleteAssetProfileTest&quot;]
+    AbstractDriverBaseTest_p74[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| DeleteSeveralAssetProfilesTest_c74[&quot;DeleteSeveralAssetProfilesTest&quot;]
+    AbstractDriverBaseTest_p75[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| MakeAssetProfileDefaultTest_c75[&quot;MakeAssetProfileDefaultTest&quot;]
+    AbstractDriverBaseTest_p76[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| SearchAssetProfileTest_c76[&quot;SearchAssetProfileTest&quot;]
+    AbstractDriverBaseTest_p77[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| SortByNameTest_c77[&quot;SortByNameTest&quot;]
+    AbstractDriverBaseTest_p78[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| CreateCustomerTest_c78[&quot;CreateCustomerTest&quot;]
+    AbstractDriverBaseTest_p79[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| CustomerEditMenuTest_c79[&quot;CustomerEditMenuTest&quot;]
+    AbstractDriverBaseTest_p80[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| DeleteCustomerTest_c80[&quot;DeleteCustomerTest&quot;]
+    AbstractDriverBaseTest_p81[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| DeleteSeveralCustomerTest_c81[&quot;DeleteSeveralCustomerTest&quot;]
+    AbstractDriverBaseTest_p82[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| ManageCustomersAssetsTest_c82[&quot;ManageCustomersAssetsTest&quot;]
+    AbstractDriverBaseTest_p83[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| ManageCustomersDashboardsTest_c83[&quot;ManageCustomersDashboardsTest&quot;]
+    AbstractDriverBaseTest_p84[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| ManageCustomersDevicesTest_c84[&quot;ManageCustomersDevicesTest&quot;]
+    AbstractDriverBaseTest_p85[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| ManageCustomersEdgesTest_c85[&quot;ManageCustomersEdgesTest&quot;]
+    AbstractDriverBaseTest_p86[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| ManageCustomersUsersTest_c86[&quot;ManageCustomersUsersTest&quot;]
+    AbstractDriverBaseTest_p87[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| SearchCustomerTest_c87[&quot;SearchCustomerTest&quot;]
+    AbstractDriverBaseTest_p88[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| CreateDeviceProfileImportTest_c88[&quot;CreateDeviceProfileImportTest&quot;]
+    AbstractDriverBaseTest_p89[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| CreateDeviceProfileTest_c89[&quot;CreateDeviceProfileTest&quot;]
+    AbstractDriverBaseTest_p90[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| DeleteDeviceProfileTest_c90[&quot;DeleteDeviceProfileTest&quot;]
+    AbstractDriverBaseTest_p91[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| DeleteSeveralDeviceProfilesTest_c91[&quot;DeleteSeveralDeviceProfilesTest&quot;]
+    AbstractDriverBaseTest_p92[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| DeviceProfileEditMenuTest_c92[&quot;DeviceProfileEditMenuTest&quot;]
+    AbstractDriverBaseTest_p93[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| MakeDeviceProfileDefaultTest_c93[&quot;MakeDeviceProfileDefaultTest&quot;]
+    AbstractDriverBaseTest_p94[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| SearchDeviceProfileTest_c94[&quot;SearchDeviceProfileTest&quot;]
+    AbstractDriverBaseTest_p95[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| AbstractDeviceTest_c95[&quot;AbstractDeviceTest&quot;]
+    AbstractDeviceTest_p96[&quot;AbstractDeviceTest&quot;] --&gt;|extends| AssignToCustomerTest_c96[&quot;AssignToCustomerTest&quot;]
+    AbstractDeviceTest_p97[&quot;AbstractDeviceTest&quot;] --&gt;|extends| CreateDeviceTest_c97[&quot;CreateDeviceTest&quot;]
+    AbstractDeviceTest_p98[&quot;AbstractDeviceTest&quot;] --&gt;|extends| DeleteDeviceTest_c98[&quot;DeleteDeviceTest&quot;]
+    AbstractDeviceTest_p99[&quot;AbstractDeviceTest&quot;] --&gt;|extends| DeleteSeveralDevicesTest_c99[&quot;DeleteSeveralDevicesTest&quot;]
+    AbstractDeviceTest_p100[&quot;AbstractDeviceTest&quot;] --&gt;|extends| DeviceFilterTest_c100[&quot;DeviceFilterTest&quot;]
+    AbstractDeviceTest_p101[&quot;AbstractDeviceTest&quot;] --&gt;|extends| EditDeviceTest_c101[&quot;EditDeviceTest&quot;]
+    AbstractDeviceTest_p102[&quot;AbstractDeviceTest&quot;] --&gt;|extends| MakeDevicePrivateTest_c102[&quot;MakeDevicePrivateTest&quot;]
+    AbstractDeviceTest_p103[&quot;AbstractDeviceTest&quot;] --&gt;|extends| MakeDevicePublicTest_c103[&quot;MakeDevicePublicTest&quot;]
+    AbstractDriverBaseTest_p104[&quot;AbstractDriverBaseTest&quot;] --&gt;|extends| AbstractRuleChainTest_c104[&quot;AbstractRuleChainTest&quot;]
+    AbstractRuleChainTest_p105[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| CreateRuleChainImportTest_c105[&quot;CreateRuleChainImportTest&quot;]
+    AbstractRuleChainTest_p106[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| CreateRuleChainTest_c106[&quot;CreateRuleChainTest&quot;]
+    AbstractRuleChainTest_p107[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| DeleteRuleChainTest_c107[&quot;DeleteRuleChainTest&quot;]
+    AbstractRuleChainTest_p108[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| DeleteSeveralRuleChainsTest_c108[&quot;DeleteSeveralRuleChainsTest&quot;]
+    AbstractRuleChainTest_p109[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| MakeRuleChainRootTest_c109[&quot;MakeRuleChainRootTest&quot;]
+    AbstractRuleChainTest_p110[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| OpenRuleChainTest_c110[&quot;OpenRuleChainTest&quot;]
+    AbstractRuleChainTest_p111[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| RuleChainEditMenuTest_c111[&quot;RuleChainEditMenuTest&quot;]
+    AbstractRuleChainTest_p112[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| SearchRuleChainTest_c112[&quot;SearchRuleChainTest&quot;]
+    AbstractRuleChainTest_p113[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| SortByNameTest_c113[&quot;SortByNameTest&quot;]
+    AbstractRuleChainTest_p114[&quot;AbstractRuleChainTest&quot;] --&gt;|extends| SortByTimeTest_c114[&quot;SortByTimeTest&quot;]
+    Object______p115[&quot;Object/外部框架&quot;] --&gt;|extends| Const_c115[&quot;Const&quot;]
+    Object______p116[&quot;Object/外部框架&quot;] --&gt;|extends| DataProviderCredential_c116[&quot;DataProviderCredential&quot;]
+    Object______p117[&quot;Object/外部框架&quot;] --&gt;|extends| EntityPrototypes_c117[&quot;EntityPrototypes&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `AbstractContainerTest.ObjectMapper()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.beforeSuite()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.TestRestClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.afterSuite()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.WsClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.Random()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.getExpectedLatestValues()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayConnectPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayTelemetryArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayTelemetryArray()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.toString()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.updateDeviceProfileWithProvisioningStrategy()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.AllowCreateNewDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.DisabledDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+
+
+## 哪些方法可以重写
+
+- `AbstractContainerTest.ObjectMapper()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.beforeSuite()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.TestRestClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.afterSuite()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.WsClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.Random()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.getExpectedLatestValues()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayConnectPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayTelemetryArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayTelemetryArray()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.toString()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.updateDeviceProfileWithProvisioningStrategy()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.AllowCreateNewDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.DisabledDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.ObjectMapper()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.beforeSuite()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.TestRestClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.afterSuite()` (public, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.WsClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.Random()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.getExpectedLatestValues()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.createGatewayConnectPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.createGatewayPayload()` (protected, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+
+
+## 哪些方法必须重写
+
+- `AbstractContainerTest.ObjectMapper()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.TestRestClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.WsClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.Random()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.createGatewayTelemetryArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.AllowCreateNewDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `AbstractContainerTest.DisabledDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.ObjectMapper()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.TestRestClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.WsClient()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.Random()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.createGatewayTelemetryArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonArray()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.JsonObject()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.AllowCreateNewDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.CheckPreProvisionedDevicesDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `CmdsType.DisabledDeviceProfileProvisionConfiguration()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/AbstractContainerTest.java`)
+- `ContainerTestSuite.ThingsBoardDbInstaller()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+- `ContainerTestSuite.File()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+- `ContainerTestSuite.File()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+- `ContainerTestSuite.File()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+- `ContainerTestSuite.File()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+- `ContainerTestSuite.File()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+- `ContainerTestSuite.RuntimeException()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+- `ContainerTestSuite.File()` (package, `msa/black-box-tests/src/test/java/org/thingsboard/server/msa/ContainerTestSuite.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `AbstractContainerTest` (extends)
+- `Object/外部框架` -&gt; `ContainerTestSuite` (extends)
+- `Object/外部框架` -&gt; `DockerComposeContainerImpl` (extends)
+- `Object/外部框架` -&gt; `DockerComposeExecutor` (extends)
+- `Object/外部框架` -&gt; `SeleniumRemoteWebDriverTest` (extends)
+- `Object/外部框架` -&gt; `TestCoapClient` (extends)
+- `Object/外部框架` -&gt; `TestCoapClientCallback` (extends)
+- `CoapHandler` -&gt; `TestCoapClientCallback` (implements)
+- `Object/外部框架` -&gt; `TestListener` (extends)
+- `ITestListener` -&gt; `TestListener` (implements)
+- `Object/外部框架` -&gt; `TestProperties` (extends)
+- `Object/外部框架` -&gt; `TestRestClient` (extends)
+- `Object/外部框架` -&gt; `ThingsBoardDbInstaller` (extends)
+- `WebSocketClient` -&gt; `WsClient` (extends)
+- `AbstractContainerTest` -&gt; `CoapClientTest` (extends)
+- `AbstractContainerTest` -&gt; `HttpClientTest` (extends)
+- `AbstractContainerTest` -&gt; `MqttClientTest` (extends)
+- `Object/外部框架` -&gt; `MqttMessageListener` (extends)
+- `MqttHandler` -&gt; `MqttMessageListener` (implements)
+- `Object/外部框架` -&gt; `MqttEvent` (extends)
+- `AbstractContainerTest` -&gt; `MqttGatewayClientTest` (extends)
+- `Object/外部框架` -&gt; `AttributesResponse` (extends)
+- `Object/外部框架` -&gt; `WsTelemetryResponse` (extends)
+- `Serializable` -&gt; `WsTelemetryResponse` (implements)
+- `Object/外部框架` -&gt; `DevicePrototypes` (extends)
+- `AbstractContainerTest` -&gt; `MqttNodeTest` (extends)
+- `IMqttMessageListener` -&gt; `MqttMessageListener` (implements)
+- `Object/外部框架` -&gt; `AbstractBasePage` (extends)
+- `AbstractContainerTest` -&gt; `AbstractDriverBaseTest` (extends)
+- `Object/外部框架` -&gt; `RetryAnalyzer` (extends)
+- `IRetryAnalyzer` -&gt; `RetryAnalyzer` (implements)
+- `Object/外部框架` -&gt; `RetryTestListener` (extends)
+- `IAnnotationTransformer` -&gt; `RetryTestListener` (implements)
+- `OtherPageElements` -&gt; `AlarmDetailsEntityTabElements` (extends)
+- `AlarmDetailsEntityTabElements` -&gt; `AlarmDetailsEntityTabHelper` (extends)
+- `AbstractBasePage` -&gt; `AlarmDetailsViewElements` (extends)
+- `AlarmDetailsViewElements` -&gt; `AlarmDetailsViewHelper` (extends)
+- `AlarmDetailsEntityTabHelper` -&gt; `AlarmWidgetElements` (extends)
+- `OtherPageElements` -&gt; `AssetPageElements` (extends)
+- `AssetPageElements` -&gt; `AssetPageHelper` (extends)
+- 其余 40 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `CoapHandler`
+- `IAnnotationTransformer`
+- `IMqttMessageListener`
+- `IRetryAnalyzer`
+- `ITestListener`
+- `MqttHandler`
+- `Object/外部框架`
+- `Serializable`
+- `WebSocketClient`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

@@ -1,0 +1,217 @@
+# Thingsboard Server DAO Layer 模块调用链分析
+
+> 生成范围：`dao`  
+> Maven artifact：`dao`  
+> packaging：`jar`  
+> 分析方式：静态扫描 POM、Java 注解、入口方法、关键技术触点和类关系；不是运行时 trace。
+
+## 完整流程图
+
+```mermaid
+flowchart TD
+    A["① 最先调用<br/>Service 层、Actor 处理器、Rule Engine 服务和 REST Controller 间接调用 DAO"]
+    B["② 调用原因<br/>需要持久化或查询租户、设备、资产、遥测、属性、告警、规则链等 ThingsBoard 数据"]
+    C["③ 调用之前<br/>上游已完成权限校验、租户上下文确定、DTO 到实体的转换和事务边界选择"]
+    D["模块入口<br/>dao"]
+    E["⑤ 数据变化<br/>DTO/实体 ID/查询条件变成 SQL/Cassandra/Timeseries 查询，结果再变成 common data 模型"]
+    F{"技术触点判定"}
+    G["⑥ 数据库<br/>DB 是"]
+    H["⑦ Actor<br/>Actor 间接/否"]
+    I["⑧ MQTT<br/>MQTT 间接/否"]
+    J["⑨ Kafka<br/>Kafka 间接/否"]
+    K["⑩ Rule Engine<br/>Rule Engine 间接/否"]
+    L["④ 调用之后<br/>数据库结果被映射回实体/分页结果，缓存可能失效或更新，并返回给上游业务流程"]
+    A --> B --> C --> D --> E --> F
+    F --> G
+    F --> H
+    F --> I
+    F --> J
+    F --> K
+    G --> L
+    H --> L
+    I --> L
+    J --> L
+    K --> L
+```
+
+
+## 十项调用链问题
+
+| 问题 | 模块级结论 |
+| --- | --- |
+| ① 谁最先调用这里？ | Service 层、Actor 处理器、Rule Engine 服务和 REST Controller 间接调用 DAO |
+| ② 为什么会调用？ | 需要持久化或查询租户、设备、资产、遥测、属性、告警、规则链等 ThingsBoard 数据 |
+| ③ 调用之前发生了什么？ | 上游已完成权限校验、租户上下文确定、DTO 到实体的转换和事务边界选择 |
+| ④ 调用之后发生什么？ | 数据库结果被映射回实体/分页结果，缓存可能失效或更新，并返回给上游业务流程 |
+| ⑤ 数据如何变化？ | DTO/实体 ID/查询条件变成 SQL/Cassandra/Timeseries 查询，结果再变成 common data 模型 |
+| ⑥ 对数据库进行了哪些操作？ | 是，发现直接操作证据；直接操作证据：发现 Repository/JPA/Cassandra/JDBC/SSTable 或 DAO 模块操作模式。关键词触点 16947 处仅作为辅助线索。 |
+| ⑦ 是否发送 Actor 消息？ | 否，未发现直接操作证据；未发现直接 Actor API 调用，但可能通过服务端消息模型间接进入 Actor。 |
+| ⑧ 是否发送 MQTT 消息？ | 否，未发现直接操作证据；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。 |
+| ⑨ 是否写入 Kafka？ | 否，未发现直接操作证据；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。 |
+| ⑩ 是否写入 Rule Engine？ | 否，未发现直接操作证据；未发现直接 Rule Engine 写入，但消息可能在下游规则链中继续处理。 |
+
+## 入口证据
+
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java`
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/attributes/SqlAttributesInsertRepository.java`
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/component/SqlComponentDescriptorInsertRepository.java`
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/device/DefaultNativeDeviceRepository.java`
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/edge/EdgeEventInsertRepository.java`
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/event/EventInsertRepository.java`
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/event/SqlEventCleanupRepository.java`
+- Repository/DAO 数据访问入口: `dao/src/main/java/org/thingsboard/server/dao/sql/notification/NotificationRepository.java`
+- Repository/DAO 数据访问入口: 其余 15 处入口省略
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/aspect/SqlDaoCallsAspect.java`
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogLevelFilter.java`
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/audit/sink/DummyAuditLogSink.java`
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/audit/sink/ElasticsearchAuditLogSink.java`
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/cache/CacheExecutorService.java`
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/edge/DefaultEdgeSynchronizationManager.java`
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/nosql/CassandraBufferedRateReadExecutor.java`
+- Spring Component 组件入口: `dao/src/main/java/org/thingsboard/server/dao/nosql/CassandraBufferedRateWriteExecutor.java`
+- Spring Component 组件入口: 其余 89 处入口省略
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmTypesCaffeineCache.java`
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmTypesRedisCache.java`
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/alarm/BaseAlarmCommentService.java`
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/alarm/BaseAlarmService.java`
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/asset/AssetCaffeineCache.java`
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileCaffeineCache.java`
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileRedisCache.java`
+- Spring Service 业务服务入口: `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileServiceImpl.java`
+- Spring Service 业务服务入口: 其余 83 处入口省略
+- 定时任务入口: `dao/src/main/java/org/thingsboard/server/dao/aspect/SqlDaoCallsAspect.java`
+- 定时任务入口: `dao/src/main/java/org/thingsboard/server/dao/nosql/CassandraBufferedRateReadExecutor.java`
+- 定时任务入口: `dao/src/main/java/org/thingsboard/server/dao/nosql/CassandraBufferedRateWriteExecutor.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/eventsourcing/DeleteEntityEventTest.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/nosql/CassandraPartitionsCacheTest.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/service/AdminSettingsServiceTest.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/service/AlarmCommentServiceTest.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/service/AlarmServiceTest.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/service/ApiUsageStateServiceTest.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/service/AssetProfileServiceTest.java`
+- 测试框架入口: `dao/src/test/java/org/thingsboard/server/dao/service/AssetServiceTest.java`
+- 测试框架入口: 其余 81 处入口省略
+
+
+## 静态关键词统计（不等同于实际发送/写入）
+
+- database: 16947 处静态触点；直接操作证据：发现 Repository/JPA/Cassandra/JDBC/SSTable 或 DAO 模块操作模式。关键词触点 16947 处仅作为辅助线索。
+- actor: 0 处静态触点；未发现直接 Actor API 调用，但可能通过服务端消息模型间接进入 Actor。
+- mqtt: 338 处静态触点；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。
+- kafka: 0 处静态触点；未发现直接源码证据；若发生，通常在依赖的下游模块中完成。
+- rule_engine: 2427 处静态触点；未发现直接 Rule Engine 写入，但消息可能在下游规则链中继续处理。
+- cache: 1803 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 1803 处仅作为辅助线索。
+- queue: 1326 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 1326 处仅作为辅助线索。
+- rest: 2 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 2 处仅作为辅助线索。
+- websocket: 530 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 530 处仅作为辅助线索。
+- transport: 250 处静态触点；直接操作证据：发现静态关键词触点。关键词触点 250 处仅作为辅助线索。
+
+## 调用前后数据流
+
+1. 调用前：上游已完成权限校验、租户上下文确定、DTO 到实体的转换和事务边界选择
+2. 模块入口：`dao` 通过入口类、依赖 API、构建聚合或子模块暴露能力。
+3. 模块内转换：DTO/实体 ID/查询条件变成 SQL/Cassandra/Timeseries 查询，结果再变成 common data 模型
+4. 调用后：数据库结果被映射回实体/分页结果，缓存可能失效或更新，并返回给上游业务流程
+5. 数据库/Actor/MQTT/Kafka/Rule Engine 这些动作若没有直接触点，通常发生在依赖的 `application`、`dao`、`common/queue`、`common/transport` 或 `rule-engine` 模块中。
+
+## 子模块与依赖
+
+### 子模块
+
+- 无子模块。
+
+
+### 主要依赖
+
+- `org.thingsboard.common:data`
+- `org.thingsboard.common:cache`
+- `org.thingsboard.common:message`
+- `org.thingsboard.common:stats`
+- `org.thingsboard.common:dao-api`
+- `org.thingsboard.common:util`
+- `org.slf4j:slf4j-api`
+- `org.slf4j:log4j-over-slf4j`
+- `ch.qos.logback:logback-core`
+- `ch.qos.logback:logback-classic`
+- `org.postgresql:postgresql`
+- `org.bouncycastle:bcpkix-jdk15on`
+- `org.springframework.boot:spring-boot-starter-test`
+- `org.junit.vintage:junit-vintage-engine`
+- `org.awaitility:awaitility`
+- `org.dbunit:dbunit`
+- `com.github.springtestdbunit:spring-test-dbunit`
+- `org.apache.commons:commons-lang3`
+- `commons-collections:commons-collections`
+- `com.fasterxml.jackson.core:jackson-databind`
+- `org.hibernate.validator:hibernate-validator`
+- `org.glassfish:javax.el`
+- `org.springframework:spring-context`
+- `org.springframework:spring-tx`
+- `org.springframework:spring-web`
+- `org.springframework.security:spring-security-oauth2-client`
+- `com.datastax.oss:java-driver-core`
+- `com.datastax.oss:java-driver-query-builder`
+- `io.dropwizard.metrics:metrics-jmx`
+- `io.takari.junit:takari-cpsuite`
+- `com.google.guava:guava`
+- `com.google.protobuf:protobuf-java`
+- `org.apache.curator:curator-x-discovery`
+- `com.github.ben-manes.caffeine:caffeine`
+- `org.springframework.boot:spring-boot-autoconfigure`
+- `org.bouncycastle:bcprov-jdk15on`
+- `org.springframework.boot:spring-boot-starter-data-jpa`
+- `org.springframework:spring-test`
+- `org.testcontainers:cassandra`
+- `org.testcontainers:postgresql`
+
+
+## 关键类型样本
+
+- `Dao` (interface, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `DaoUtil` (class, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `ExportableEntityDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityRepository` (interface, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityRepository.java`)
+- `ImageContainerDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/ImageContainerDao.java`)
+- `JpaDaoConfig` (class, `dao/src/main/java/org/thingsboard/server/dao/JpaDaoConfig.java`)
+- `SqlTimeseriesDaoConfig` (class, `dao/src/main/java/org/thingsboard/server/dao/SqlTimeseriesDaoConfig.java`)
+- `SqlTsDaoConfig` (class, `dao/src/main/java/org/thingsboard/server/dao/SqlTsDaoConfig.java`)
+- `SqlTsLatestDaoConfig` (class, `dao/src/main/java/org/thingsboard/server/dao/SqlTsLatestDaoConfig.java`)
+- `TenantEntityDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityDao.java`)
+- `TenantEntityWithDataDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityWithDataDao.java`)
+- `ThingsboardPostgreSQLDialect` (class, `dao/src/main/java/org/thingsboard/server/dao/ThingsboardPostgreSQLDialect.java`)
+- `TimescaleDaoConfig` (class, `dao/src/main/java/org/thingsboard/server/dao/TimescaleDaoConfig.java`)
+- `TimescaleTsLatestDaoConfig` (class, `dao/src/main/java/org/thingsboard/server/dao/TimescaleTsLatestDaoConfig.java`)
+- `AlarmCommentDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmTypesCacheEvictEvent` (class, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmTypesCacheEvictEvent.java`)
+- `AlarmTypesCaffeineCache` (class, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmTypesCaffeineCache.java`)
+- `AlarmTypesRedisCache` (class, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmTypesRedisCache.java`)
+- `BaseAlarmCommentService` (class, `dao/src/main/java/org/thingsboard/server/dao/alarm/BaseAlarmCommentService.java`)
+- `BaseAlarmService` (class, `dao/src/main/java/org/thingsboard/server/dao/alarm/BaseAlarmService.java`)
+- `DbCallStats` (class, `dao/src/main/java/org/thingsboard/server/dao/aspect/DbCallStats.java`)
+- `DbCallStatsSnapshot` (class, `dao/src/main/java/org/thingsboard/server/dao/aspect/DbCallStatsSnapshot.java`)
+- `MethodCallStats` (class, `dao/src/main/java/org/thingsboard/server/dao/aspect/MethodCallStats.java`)
+- `MethodCallStatsSnapshot` (class, `dao/src/main/java/org/thingsboard/server/dao/aspect/MethodCallStatsSnapshot.java`)
+- `SqlDaoCallsAspect` (class, `dao/src/main/java/org/thingsboard/server/dao/aspect/SqlDaoCallsAspect.java`)
+- `AssetCacheEvictEvent` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetCacheEvictEvent.java`)
+- `AssetCacheKey` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetCacheKey.java`)
+- `AssetCaffeineCache` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetCaffeineCache.java`)
+- `AssetDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetDao.java`)
+- `AssetProfileCacheKey` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileCacheKey.java`)
+- `AssetProfileCaffeineCache` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileCaffeineCache.java`)
+- `AssetProfileDao` (interface, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileDao.java`)
+- `AssetProfileEvictEvent` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileEvictEvent.java`)
+- `AssetProfileRedisCache` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileRedisCache.java`)
+- `AssetProfileServiceImpl` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetProfileServiceImpl.java`)
+- `AssetRedisCache` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetRedisCache.java`)
+- `AssetTypeFilter` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/AssetTypeFilter.java`)
+- `BaseAssetService` (class, `dao/src/main/java/org/thingsboard/server/dao/asset/BaseAssetService.java`)
+- `AttributeCacheKey` (class, `dao/src/main/java/org/thingsboard/server/dao/attributes/AttributeCacheKey.java`)
+- 其余 20 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 阅读建议
+
+- 先看“完整流程图”确认模块在全链路中的位置。
+- 再看入口证据判断调用来源是 HTTP、MQTT/Transport、Actor、Kafka、Rule Engine、DAO、测试还是构建聚合。
+- 最后用触点统计区分直接行为和下游间接行为，避免把依赖模块的数据库写入误认为本模块直接写入。

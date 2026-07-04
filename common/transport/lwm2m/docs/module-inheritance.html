@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard LwM2M Transport Common 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard LwM2M Transport Common 模块继承体系分析
+
+&gt; 生成范围：`common/transport/lwm2m`  
+&gt; Maven artifact：`lwm2m`  
+&gt; Java 类型数量：170  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>Authorizer
+├── «implements» TbLwM2MAuthorizer
+BootstrapSecurityStore
+├── «implements» LwM2MBootstrapSecurityStore
+BootstrapTaskProvider
+├── LwM2MBootstrapTaskProvider
+├── ├── «implements» LwM2MBootstrapConfigStoreTaskProvider
+CaliforniumRegistrationStore
+├── «implements» TbLwM2mRedisRegistrationStore
+Cloneable
+├── «implements» ModelObject
+ConfigurationChecker
+├── LwM2MConfigurationChecker
+DefaultBootstrapSessionManager
+├── LwM2mDefaultBootstrapSessionManager
+Destroyable
+├── «implements» TbLwM2mRedisRegistrationStore
+Exception
+├── LwM2MClientStateException
+GenericFutureListener
+├── «implements» LwM2mSessionMsgListener
+HasContentFormat
+├── «implements» TbLwM2MObserveRequest
+├── «implements» TbLwM2MReadCompositeRequest
+├── «implements» TbLwM2MReadRequest
+InMemoryBootstrapConfigStore
+├── LwM2MInMemoryBootstrapConfigStore
+LwM2MAttributesService
+├── «implements» DefaultLwM2MAttributesService
+LwM2MModelConfigService
+├── «implements» LwM2MModelConfigServiceImpl
+LwM2MOtaUpdateService
+├── «implements» DefaultLwM2MOtaUpdateService
+LwM2MRpcRequestHandler
+├── «implements» DefaultLwM2MRpcRequestHandler
+LwM2MSecureServerConfig
+├── «implements» LwM2MTransportBootstrapConfig
+├── «implements» LwM2MTransportServerConfig
+LwM2MSessionManager
+├── «implements» DefaultLwM2MSessionManager
+LwM2MTelemetryLogService
+├── «implements» DefaultLwM2MTelemetryLogService
+LwM2MTransportAdaptor
+├── «implements» LwM2MJsonAdaptor
+LwM2mClientContext
+├── «implements» LwM2mClientContextImpl
+LwM2mCoapResource
+├── AbstractLwM2mTransportResource
+├── ├── LwM2mTransportCoapResource
+LwM2mDownlinkMsgHandler
+├── «implements» DefaultLwM2mDownlinkMsgHandler
+LwM2mModel
+├── «implements» DynamicModel
+LwM2mModelProvider
+├── «implements» LwM2mVersionedModelProvider
+LwM2mUplinkMsgHandler
+├── «implements» DefaultLwM2mUplinkMsgHandler
+LwM2mValueConverter
+├── «implements» LwM2mValueConverterImpl
+NewAdvancedCertificateVerifier
+├── «implements» TbLwM2MDtlsBootstrapCertificateVerifier
+├── «implements» TbLwM2MDtlsCertificateVerifier
+Object/外部框架
+├── AbstractTbLwM2MRequestCallback
+├── ├── TbLwM2MCancelAllObserveCallback
+├── ├── TbLwM2MCancelObserveCallback
+├── AbstractTbLwM2MTargetedDownlinkCompositeRequest
+├── ├── TbLwM2MReadCompositeRequest
+├── AbstractTbLwM2MTargetedDownlinkRequest
+├── ├── TbLwM2MCancelObserveRequest
+├── ├── TbLwM2MCreateRequest
+├── ├── TbLwM2MDeleteRequest
+├── ├── TbLwM2MDiscoverRequest
+├── ├── TbLwM2MExecuteRequest
+├── ├── TbLwM2MObserveRequest
+├── ├── TbLwM2MReadRequest
+├── ├── TbLwM2MWriteAttributesRequest
+├── ├── TbLwM2MWriteCompositeRequest
+├── ├── TbLwM2MWriteReplaceRequest
+├── ├── TbLwM2MWriteUpdateRequest
+├── Cleaner
+├── CoapResourceObserver
+├── DefaultLwM2MAttributesService
+├── DefaultLwM2MRpcRequestHandler
+├── DefaultLwM2MSessionManager
+├── DefaultLwM2MTelemetryLogService
+├── DefaultLwM2mTransportService
+├── DefaultLwM2mTransportServiceTest
+├── DynamicModel
+├── LwM2MBootstrapClientInstanceIds
+├── LwM2MBootstrapConfig
+├── LwM2MBootstrapConfigStoreTaskProvider
+├── LwM2MBootstrapSecurityStore
+├── LwM2MBootstrapServers
+├── LwM2MClientCredentials
+├── LwM2MClientOtaInfo
+├── ├── LwM2MClientFwOtaInfo
+├── ├── LwM2MClientSwOtaInfo
+├── LwM2MClientSerDes
+├── LwM2MClientSerDesTest
+├── LwM2MExecutorAwareService
+├── ├── DefaultLwM2MOtaUpdateService
+├── ├── DefaultLwM2mDownlinkMsgHandler
+├── ├── DefaultLwM2mUplinkMsgHandler
+├── LwM2MIdentitySerDes
+├── LwM2MIdentitySerDesTest
+├── LwM2MJsonAdaptor
+├── LwM2MModelConfig
+├── LwM2MModelConfigServiceImpl
+├── LwM2MModelConfigServiceImplTest
+├── LwM2MNetworkConfig
+├── LwM2MRpcRequestHeader
+├── ├── RpcCreateRequest
+├── ├── RpcWriteAttributesRequest
+├── ├── RpcWriteReplaceRequest
+├── ├── RpcWriteUpdateRequest
+├── LwM2MRpcResponseBody
+├── LwM2MServerBootstrap
+├── LwM2MTransportBootstrapConfig
+├── LwM2MTransportBootstrapService
+├── LwM2MTransportBootstrapServiceTest
+├── LwM2MTransportServerConfig
+├── LwM2MTransportServerConfigTest
+├── LwM2MTransportUtil
+├── LwM2mClient
+├── LwM2mClientContextImpl
+├── LwM2mClientTest
+├── LwM2mCredentialsSecurityInfoValidator
+├── LwM2mOtaConvert
+├── LwM2mRPkCredentials
+├── LwM2mServerListener
+├── LwM2mSessionMsgListener
+├── LwM2mTransportServerHelper
+├── LwM2mValueConverterImpl
+├── LwM2mVersionedModelProvider
+├── ModelObject
+├── ParametersAnalyzeResult
+├── ResourceValue
+├── ResultsAddKeyValueProto
+├── RpcCreateResponseCallback
+├── RpcDownlinkRequestCallbackProxy
+├── ├── RpcCancelAllObserveCallback
+├── ├── RpcCancelObserveCallback
+├── RpcEmptyResponseCallback
+├── RpcLinkSetCallback
+├── RpcLwM2MDownlinkCallback
+├── ├── RpcDiscoverCallback
+├── RpcReadCompositeRequest
+├── RpcReadResponseCallback
+├── RpcReadResponseCompositeCallback
+├── RpcWriteCompositeRequest
+├── TbDummyLwM2MClientOtaInfoStore
+├── TbDummyLwM2MClientStore
+├── TbDummyLwM2MModelConfigStore
+├── TbInMemorySecurityStore
+├── TbL2M2MDtlsSessionInMemoryStore
+├── TbLwM2MAuthorizer
+├── TbLwM2MCancelAllRequest
+├── TbLwM2MDiscoverAllRequest
+├── TbLwM2MDtlsBootstrapCertificateVerifier
+├── TbLwM2MDtlsCertificateVerifier
+├── TbLwM2MDtlsSessionRedisStore
+├── TbLwM2MLatchCallback
+├── TbLwM2MObserveAllRequest
+├── TbLwM2MSecurityInfo
+├── TbLwM2MTargetedCallback
+├── ├── TbLwM2MDeleteCallback
+├── ├── TbLwM2MDiscoverCallback
+├── ├── TbLwM2MExecuteCallback
+├── ├── TbLwM2MWriteAttributesCallback
+├── TbLwM2MUplinkTargetedCallback
+├── ├── TbLwM2MCreateResponseCallback
+├── ├── TbLwM2MObserveCallback
+├── ├── TbLwM2MReadCallback
+├── ├── TbLwM2MReadCompositeCallback
+├── ├── TbLwM2MWriteResponseCallback
+├── ├── TbLwM2MWriteResponseCompositeCallback
+├── TbLwM2mRedisClientOtaInfoStore
+├── TbLwM2mRedisRegistrationStore
+├── TbLwM2mRedisRegistrationStoreTest
+├── TbLwM2mRedisSecurityStore
+├── TbLwM2mSecurityStore
+├── TbLwM2mStoreFactory
+├── TbRedisLwM2MClientStore
+├── TbRedisLwM2MModelConfigStore
+├── TbX509DtlsSessionInfo
+ResourceObserver
+├── «implements» CoapResourceObserver
+Runnable
+├── «implements» Cleaner
+RuntimeException
+├── LwM2MAuthException
+SecurityStore
+├── TbSecurityStore
+├── ├── TbEditableSecurityStore
+├── ├── ├── «implements» TbInMemorySecurityStore
+├── ├── ├── «implements» TbLwM2mRedisSecurityStore
+├── ├── TbMainSecurityStore
+├── ├── ├── «implements» TbLwM2mSecurityStore
+Serializable
+├── «implements» LwM2MBootstrapConfig
+├── «implements» TbLwM2MSecurityInfo
+├── «implements» TbX509DtlsSessionInfo
+SessionMsgListener
+├── «implements» LwM2mSessionMsgListener
+Startable
+├── «implements» TbLwM2mRedisRegistrationStore
+Stoppable
+├── «implements» TbLwM2mRedisRegistrationStore
+TbLwM2MClientOtaInfoStore
+├── «implements» TbDummyLwM2MClientOtaInfoStore
+├── «implements» TbLwM2mRedisClientOtaInfoStore
+TbLwM2MClientStore
+├── «implements» TbDummyLwM2MClientStore
+├── «implements» TbRedisLwM2MClientStore
+TbLwM2MDownlinkRequest
+├── «implements» TbLwM2MCancelAllRequest
+├── «implements» TbLwM2MDiscoverAllRequest
+├── «implements» TbLwM2MObserveAllRequest
+TbLwM2MDtlsSessionStore
+├── «implements» TbL2M2MDtlsSessionInMemoryStore
+├── «implements» TbLwM2MDtlsSessionRedisStore
+TbLwM2MModelConfigStore
+├── «implements» TbDummyLwM2MModelConfigStore
+├── «implements» TbRedisLwM2MModelConfigStore
+TbTransportService
+├── LwM2MTransportService
+├── ├── «implements» DefaultLwM2mTransportService
+TransportContext
+├── LwM2mTransportContext</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MTransportBootstrapService_c0[&quot;LwM2MTransportBootstrapService&quot;]
+    Object______p1[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MBootstrapConfig_c1[&quot;LwM2MBootstrapConfig&quot;]
+    Serializable_p2[&quot;Serializable&quot;] --&gt;|implements| LwM2MBootstrapConfig_c2[&quot;LwM2MBootstrapConfig&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MBootstrapServers_c3[&quot;LwM2MBootstrapServers&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MServerBootstrap_c4[&quot;LwM2MServerBootstrap&quot;]
+    DefaultBootstrapSessionManager_p5[&quot;DefaultBootstrapSessionManager&quot;] --&gt;|extends| LwM2mDefaultBootstrapSessionManager_c5[&quot;LwM2mDefaultBootstrapSessionManager&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MDtlsBootstrapCertificateVerifier_c6[&quot;TbLwM2MDtlsBootstrapCertificateVerifier&quot;]
+    NewAdvancedCertificateVerifier_p7[&quot;NewAdvancedCertificateVerifier&quot;] --&gt;|implements| TbLwM2MDtlsBootstrapCertificateVerifier_c7[&quot;TbLwM2MDtlsBootstrapCertificateVerifier&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MBootstrapClientInstanceIds_c8[&quot;LwM2MBootstrapClientInstanceIds&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MBootstrapConfigStoreTaskProvider_c9[&quot;LwM2MBootstrapConfigStoreTaskProvider&quot;]
+    LwM2MBootstrapTaskProvider_p10[&quot;LwM2MBootstrapTaskProvider&quot;] --&gt;|implements| LwM2MBootstrapConfigStoreTaskProvider_c10[&quot;LwM2MBootstrapConfigStoreTaskProvider&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MBootstrapSecurityStore_c11[&quot;LwM2MBootstrapSecurityStore&quot;]
+    BootstrapSecurityStore_p12[&quot;BootstrapSecurityStore&quot;] --&gt;|implements| LwM2MBootstrapSecurityStore_c12[&quot;LwM2MBootstrapSecurityStore&quot;]
+    BootstrapTaskProvider_p13[&quot;BootstrapTaskProvider&quot;] --&gt;|extends| LwM2MBootstrapTaskProvider_c13[&quot;LwM2MBootstrapTaskProvider&quot;]
+    ConfigurationChecker_p14[&quot;ConfigurationChecker&quot;] --&gt;|extends| LwM2MConfigurationChecker_c14[&quot;LwM2MConfigurationChecker&quot;]
+    InMemoryBootstrapConfigStore_p15[&quot;InMemoryBootstrapConfigStore&quot;] --&gt;|extends| LwM2MInMemoryBootstrapConfigStore_c15[&quot;LwM2MInMemoryBootstrapConfigStore&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MTransportBootstrapConfig_c16[&quot;LwM2MTransportBootstrapConfig&quot;]
+    LwM2MSecureServerConfig_p17[&quot;LwM2MSecureServerConfig&quot;] --&gt;|implements| LwM2MTransportBootstrapConfig_c17[&quot;LwM2MTransportBootstrapConfig&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MTransportServerConfig_c18[&quot;LwM2MTransportServerConfig&quot;]
+    LwM2MSecureServerConfig_p19[&quot;LwM2MSecureServerConfig&quot;] --&gt;|implements| LwM2MTransportServerConfig_c19[&quot;LwM2MTransportServerConfig&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mCredentialsSecurityInfoValidator_c20[&quot;LwM2mCredentialsSecurityInfoValidator&quot;]
+    Object______p21[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mRPkCredentials_c21[&quot;LwM2mRPkCredentials&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MAuthorizer_c22[&quot;TbLwM2MAuthorizer&quot;]
+    Authorizer_p23[&quot;Authorizer&quot;] --&gt;|implements| TbLwM2MAuthorizer_c23[&quot;TbLwM2MAuthorizer&quot;]
+    Object______p24[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MDtlsCertificateVerifier_c24[&quot;TbLwM2MDtlsCertificateVerifier&quot;]
+    NewAdvancedCertificateVerifier_p25[&quot;NewAdvancedCertificateVerifier&quot;] --&gt;|implements| TbLwM2MDtlsCertificateVerifier_c25[&quot;TbLwM2MDtlsCertificateVerifier&quot;]
+    Object______p26[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MSecurityInfo_c26[&quot;TbLwM2MSecurityInfo&quot;]
+    Serializable_p27[&quot;Serializable&quot;] --&gt;|implements| TbLwM2MSecurityInfo_c27[&quot;TbLwM2MSecurityInfo&quot;]
+    Object______p28[&quot;Object/外部框架&quot;] --&gt;|extends| TbX509DtlsSessionInfo_c28[&quot;TbX509DtlsSessionInfo&quot;]
+    Serializable_p29[&quot;Serializable&quot;] --&gt;|implements| TbX509DtlsSessionInfo_c29[&quot;TbX509DtlsSessionInfo&quot;]
+    Object______p30[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MClientCredentials_c30[&quot;LwM2MClientCredentials&quot;]
+    LwM2mCoapResource_p31[&quot;LwM2mCoapResource&quot;] --&gt;|extends| AbstractLwM2mTransportResource_c31[&quot;AbstractLwM2mTransportResource&quot;]
+    Object______p32[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultLwM2mTransportService_c32[&quot;DefaultLwM2mTransportService&quot;]
+    LwM2MTransportService_p33[&quot;LwM2MTransportService&quot;] --&gt;|implements| DefaultLwM2mTransportService_c33[&quot;DefaultLwM2mTransportService&quot;]
+    Object______p34[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MNetworkConfig_c34[&quot;LwM2MNetworkConfig&quot;]
+    TbTransportService_p35[&quot;TbTransportService&quot;] --&gt;|extends| LwM2MTransportService_c35[&quot;LwM2MTransportService&quot;]
+    Object______p36[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mOtaConvert_c36[&quot;LwM2mOtaConvert&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mServerListener_c37[&quot;LwM2mServerListener&quot;]
+    Object______p38[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mSessionMsgListener_c38[&quot;LwM2mSessionMsgListener&quot;]
+    GenericFutureListener_p39[&quot;GenericFutureListener&quot;] --&gt;|implements| LwM2mSessionMsgListener_c39[&quot;LwM2mSessionMsgListener&quot;]
+    SessionMsgListener_p40[&quot;SessionMsgListener&quot;] --&gt;|implements| LwM2mSessionMsgListener_c40[&quot;LwM2mSessionMsgListener&quot;]
+    AbstractLwM2mTransportResource_p41[&quot;AbstractLwM2mTransportResource&quot;] --&gt;|extends| LwM2mTransportCoapResource_c41[&quot;LwM2mTransportCoapResource&quot;]
+    Object______p42[&quot;Object/外部框架&quot;] --&gt;|extends| CoapResourceObserver_c42[&quot;CoapResourceObserver&quot;]
+    ResourceObserver_p43[&quot;ResourceObserver&quot;] --&gt;|implements| CoapResourceObserver_c43[&quot;CoapResourceObserver&quot;]
+    TransportContext_p44[&quot;TransportContext&quot;] --&gt;|extends| LwM2mTransportContext_c44[&quot;LwM2mTransportContext&quot;]
+    Object______p45[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mTransportServerHelper_c45[&quot;LwM2mTransportServerHelper&quot;]
+    Object______p46[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mVersionedModelProvider_c46[&quot;LwM2mVersionedModelProvider&quot;]
+    LwM2mModelProvider_p47[&quot;LwM2mModelProvider&quot;] --&gt;|implements| LwM2mVersionedModelProvider_c47[&quot;LwM2mVersionedModelProvider&quot;]
+    Object______p48[&quot;Object/外部框架&quot;] --&gt;|extends| DynamicModel_c48[&quot;DynamicModel&quot;]
+    LwM2mModel_p49[&quot;LwM2mModel&quot;] --&gt;|implements| DynamicModel_c49[&quot;DynamicModel&quot;]
+    Object______p50[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MJsonAdaptor_c50[&quot;LwM2MJsonAdaptor&quot;]
+    LwM2MTransportAdaptor_p51[&quot;LwM2MTransportAdaptor&quot;] --&gt;|implements| LwM2MJsonAdaptor_c51[&quot;LwM2MJsonAdaptor&quot;]
+    Object______p52[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultLwM2MAttributesService_c52[&quot;DefaultLwM2MAttributesService&quot;]
+    LwM2MAttributesService_p53[&quot;LwM2MAttributesService&quot;] --&gt;|implements| DefaultLwM2MAttributesService_c53[&quot;DefaultLwM2MAttributesService&quot;]
+    RuntimeException_p54[&quot;RuntimeException&quot;] --&gt;|extends| LwM2MAuthException_c54[&quot;LwM2MAuthException&quot;]
+    Exception_p55[&quot;Exception&quot;] --&gt;|extends| LwM2MClientStateException_c55[&quot;LwM2MClientStateException&quot;]
+    Object______p56[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mClient_c56[&quot;LwM2mClient&quot;]
+    Object______p57[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mClientContextImpl_c57[&quot;LwM2mClientContextImpl&quot;]
+    LwM2mClientContext_p58[&quot;LwM2mClientContext&quot;] --&gt;|implements| LwM2mClientContextImpl_c58[&quot;LwM2mClientContextImpl&quot;]
+    Object______p59[&quot;Object/外部框架&quot;] --&gt;|extends| ModelObject_c59[&quot;ModelObject&quot;]
+    Cloneable_p60[&quot;Cloneable&quot;] --&gt;|implements| ModelObject_c60[&quot;ModelObject&quot;]
+    Object______p61[&quot;Object/外部框架&quot;] --&gt;|extends| ParametersAnalyzeResult_c61[&quot;ParametersAnalyzeResult&quot;]
+    Object______p62[&quot;Object/外部框架&quot;] --&gt;|extends| ResourceValue_c62[&quot;ResourceValue&quot;]
+    Object______p63[&quot;Object/外部框架&quot;] --&gt;|extends| ResultsAddKeyValueProto_c63[&quot;ResultsAddKeyValueProto&quot;]
+    Object______p64[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MExecutorAwareService_c64[&quot;LwM2MExecutorAwareService&quot;]
+    Object______p65[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractTbLwM2MRequestCallback_c65[&quot;AbstractTbLwM2MRequestCallback&quot;]
+    Object______p66[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractTbLwM2MTargetedDownlinkRequest_c66[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;]
+    LwM2MExecutorAwareService_p67[&quot;LwM2MExecutorAwareService&quot;] --&gt;|extends| DefaultLwM2mDownlinkMsgHandler_c67[&quot;DefaultLwM2mDownlinkMsgHandler&quot;]
+    LwM2mDownlinkMsgHandler_p68[&quot;LwM2mDownlinkMsgHandler&quot;] --&gt;|implements| DefaultLwM2mDownlinkMsgHandler_c68[&quot;DefaultLwM2mDownlinkMsgHandler&quot;]
+    AbstractTbLwM2MRequestCallback_p69[&quot;AbstractTbLwM2MRequestCallback&quot;] --&gt;|extends| TbLwM2MCancelAllObserveCallback_c69[&quot;TbLwM2MCancelAllObserveCallback&quot;]
+    Object______p70[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MCancelAllRequest_c70[&quot;TbLwM2MCancelAllRequest&quot;]
+    TbLwM2MDownlinkRequest_p71[&quot;TbLwM2MDownlinkRequest&quot;] --&gt;|implements| TbLwM2MCancelAllRequest_c71[&quot;TbLwM2MCancelAllRequest&quot;]
+    AbstractTbLwM2MRequestCallback_p72[&quot;AbstractTbLwM2MRequestCallback&quot;] --&gt;|extends| TbLwM2MCancelObserveCallback_c72[&quot;TbLwM2MCancelObserveCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p73[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MCancelObserveRequest_c73[&quot;TbLwM2MCancelObserveRequest&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p74[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MCreateRequest_c74[&quot;TbLwM2MCreateRequest&quot;]
+    TbLwM2MUplinkTargetedCallback_p75[&quot;TbLwM2MUplinkTargetedCallback&quot;] --&gt;|extends| TbLwM2MCreateResponseCallback_c75[&quot;TbLwM2MCreateResponseCallback&quot;]
+    TbLwM2MTargetedCallback_p76[&quot;TbLwM2MTargetedCallback&quot;] --&gt;|extends| TbLwM2MDeleteCallback_c76[&quot;TbLwM2MDeleteCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p77[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MDeleteRequest_c77[&quot;TbLwM2MDeleteRequest&quot;]
+    Object______p78[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MDiscoverAllRequest_c78[&quot;TbLwM2MDiscoverAllRequest&quot;]
+    TbLwM2MDownlinkRequest_p79[&quot;TbLwM2MDownlinkRequest&quot;] --&gt;|implements| TbLwM2MDiscoverAllRequest_c79[&quot;TbLwM2MDiscoverAllRequest&quot;]
+    TbLwM2MTargetedCallback_p80[&quot;TbLwM2MTargetedCallback&quot;] --&gt;|extends| TbLwM2MDiscoverCallback_c80[&quot;TbLwM2MDiscoverCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p81[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MDiscoverRequest_c81[&quot;TbLwM2MDiscoverRequest&quot;]
+    TbLwM2MTargetedCallback_p82[&quot;TbLwM2MTargetedCallback&quot;] --&gt;|extends| TbLwM2MExecuteCallback_c82[&quot;TbLwM2MExecuteCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p83[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MExecuteRequest_c83[&quot;TbLwM2MExecuteRequest&quot;]
+    Object______p84[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MLatchCallback_c84[&quot;TbLwM2MLatchCallback&quot;]
+    Object______p85[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MObserveAllRequest_c85[&quot;TbLwM2MObserveAllRequest&quot;]
+    TbLwM2MDownlinkRequest_p86[&quot;TbLwM2MDownlinkRequest&quot;] --&gt;|implements| TbLwM2MObserveAllRequest_c86[&quot;TbLwM2MObserveAllRequest&quot;]
+    TbLwM2MUplinkTargetedCallback_p87[&quot;TbLwM2MUplinkTargetedCallback&quot;] --&gt;|extends| TbLwM2MObserveCallback_c87[&quot;TbLwM2MObserveCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p88[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MObserveRequest_c88[&quot;TbLwM2MObserveRequest&quot;]
+    HasContentFormat_p89[&quot;HasContentFormat&quot;] --&gt;|implements| TbLwM2MObserveRequest_c89[&quot;TbLwM2MObserveRequest&quot;]
+    TbLwM2MUplinkTargetedCallback_p90[&quot;TbLwM2MUplinkTargetedCallback&quot;] --&gt;|extends| TbLwM2MReadCallback_c90[&quot;TbLwM2MReadCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p91[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MReadRequest_c91[&quot;TbLwM2MReadRequest&quot;]
+    HasContentFormat_p92[&quot;HasContentFormat&quot;] --&gt;|implements| TbLwM2MReadRequest_c92[&quot;TbLwM2MReadRequest&quot;]
+    Object______p93[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MTargetedCallback_c93[&quot;TbLwM2MTargetedCallback&quot;]
+    Object______p94[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MUplinkTargetedCallback_c94[&quot;TbLwM2MUplinkTargetedCallback&quot;]
+    TbLwM2MTargetedCallback_p95[&quot;TbLwM2MTargetedCallback&quot;] --&gt;|extends| TbLwM2MWriteAttributesCallback_c95[&quot;TbLwM2MWriteAttributesCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p96[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MWriteAttributesRequest_c96[&quot;TbLwM2MWriteAttributesRequest&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p97[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MWriteReplaceRequest_c97[&quot;TbLwM2MWriteReplaceRequest&quot;]
+    TbLwM2MUplinkTargetedCallback_p98[&quot;TbLwM2MUplinkTargetedCallback&quot;] --&gt;|extends| TbLwM2MWriteResponseCallback_c98[&quot;TbLwM2MWriteResponseCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p99[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MWriteUpdateRequest_c99[&quot;TbLwM2MWriteUpdateRequest&quot;]
+    Object______p100[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractTbLwM2MTargetedDownlinkCompositeRequest_c100[&quot;AbstractTbLwM2MTargetedDownlinkCompositeRequest&quot;]
+    TbLwM2MUplinkTargetedCallback_p101[&quot;TbLwM2MUplinkTargetedCallback&quot;] --&gt;|extends| TbLwM2MReadCompositeCallback_c101[&quot;TbLwM2MReadCompositeCallback&quot;]
+    AbstractTbLwM2MTargetedDownlinkCompositeRequest_p102[&quot;AbstractTbLwM2MTargetedDownlinkCompositeRequest&quot;] --&gt;|extends| TbLwM2MReadCompositeRequest_c102[&quot;TbLwM2MReadCompositeRequest&quot;]
+    HasContentFormat_p103[&quot;HasContentFormat&quot;] --&gt;|implements| TbLwM2MReadCompositeRequest_c103[&quot;TbLwM2MReadCompositeRequest&quot;]
+    AbstractTbLwM2MTargetedDownlinkRequest_p104[&quot;AbstractTbLwM2MTargetedDownlinkRequest&quot;] --&gt;|extends| TbLwM2MWriteCompositeRequest_c104[&quot;TbLwM2MWriteCompositeRequest&quot;]
+    TbLwM2MUplinkTargetedCallback_p105[&quot;TbLwM2MUplinkTargetedCallback&quot;] --&gt;|extends| TbLwM2MWriteResponseCompositeCallback_c105[&quot;TbLwM2MWriteResponseCompositeCallback&quot;]
+    Object______p106[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultLwM2MTelemetryLogService_c106[&quot;DefaultLwM2MTelemetryLogService&quot;]
+    LwM2MTelemetryLogService_p107[&quot;LwM2MTelemetryLogService&quot;] --&gt;|implements| DefaultLwM2MTelemetryLogService_c107[&quot;DefaultLwM2MTelemetryLogService&quot;]
+    Object______p108[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MModelConfig_c108[&quot;LwM2MModelConfig&quot;]
+    Object______p109[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MModelConfigServiceImpl_c109[&quot;LwM2MModelConfigServiceImpl&quot;]
+    LwM2MModelConfigService_p110[&quot;LwM2MModelConfigService&quot;] --&gt;|implements| LwM2MModelConfigServiceImpl_c110[&quot;LwM2MModelConfigServiceImpl&quot;]
+    LwM2MExecutorAwareService_p111[&quot;LwM2MExecutorAwareService&quot;] --&gt;|extends| DefaultLwM2MOtaUpdateService_c111[&quot;DefaultLwM2MOtaUpdateService&quot;]
+    LwM2MOtaUpdateService_p112[&quot;LwM2MOtaUpdateService&quot;] --&gt;|implements| DefaultLwM2MOtaUpdateService_c112[&quot;DefaultLwM2MOtaUpdateService&quot;]
+    Object______p113[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MClientOtaInfo_c113[&quot;LwM2MClientOtaInfo&quot;]
+    LwM2MClientOtaInfo_p114[&quot;LwM2MClientOtaInfo&quot;] --&gt;|extends| LwM2MClientFwOtaInfo_c114[&quot;LwM2MClientFwOtaInfo&quot;]
+    LwM2MClientOtaInfo_p115[&quot;LwM2MClientOtaInfo&quot;] --&gt;|extends| LwM2MClientSwOtaInfo_c115[&quot;LwM2MClientSwOtaInfo&quot;]
+    Object______p116[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultLwM2MRpcRequestHandler_c116[&quot;DefaultLwM2MRpcRequestHandler&quot;]
+    LwM2MRpcRequestHandler_p117[&quot;LwM2MRpcRequestHandler&quot;] --&gt;|implements| DefaultLwM2MRpcRequestHandler_c117[&quot;DefaultLwM2MRpcRequestHandler&quot;]
+    Object______p118[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MRpcRequestHeader_c118[&quot;LwM2MRpcRequestHeader&quot;]
+    Object______p119[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MRpcResponseBody_c119[&quot;LwM2MRpcResponseBody&quot;]
+    RpcDownlinkRequestCallbackProxy_p120[&quot;RpcDownlinkRequestCallbackProxy&quot;] --&gt;|extends| RpcCancelAllObserveCallback_c120[&quot;RpcCancelAllObserveCallback&quot;]
+    RpcDownlinkRequestCallbackProxy_p121[&quot;RpcDownlinkRequestCallbackProxy&quot;] --&gt;|extends| RpcCancelObserveCallback_c121[&quot;RpcCancelObserveCallback&quot;]
+    LwM2MRpcRequestHeader_p122[&quot;LwM2MRpcRequestHeader&quot;] --&gt;|extends| RpcCreateRequest_c122[&quot;RpcCreateRequest&quot;]
+    Object______p123[&quot;Object/外部框架&quot;] --&gt;|extends| RpcCreateResponseCallback_c123[&quot;RpcCreateResponseCallback&quot;]
+    RpcLwM2MDownlinkCallback_p124[&quot;RpcLwM2MDownlinkCallback&quot;] --&gt;|extends| RpcDiscoverCallback_c124[&quot;RpcDiscoverCallback&quot;]
+    Object______p125[&quot;Object/外部框架&quot;] --&gt;|extends| RpcDownlinkRequestCallbackProxy_c125[&quot;RpcDownlinkRequestCallbackProxy&quot;]
+    Object______p126[&quot;Object/外部框架&quot;] --&gt;|extends| RpcEmptyResponseCallback_c126[&quot;RpcEmptyResponseCallback&quot;]
+    Object______p127[&quot;Object/外部框架&quot;] --&gt;|extends| RpcLinkSetCallback_c127[&quot;RpcLinkSetCallback&quot;]
+    Object______p128[&quot;Object/外部框架&quot;] --&gt;|extends| RpcLwM2MDownlinkCallback_c128[&quot;RpcLwM2MDownlinkCallback&quot;]
+    Object______p129[&quot;Object/外部框架&quot;] --&gt;|extends| RpcReadResponseCallback_c129[&quot;RpcReadResponseCallback&quot;]
+    LwM2MRpcRequestHeader_p130[&quot;LwM2MRpcRequestHeader&quot;] --&gt;|extends| RpcWriteAttributesRequest_c130[&quot;RpcWriteAttributesRequest&quot;]
+    LwM2MRpcRequestHeader_p131[&quot;LwM2MRpcRequestHeader&quot;] --&gt;|extends| RpcWriteReplaceRequest_c131[&quot;RpcWriteReplaceRequest&quot;]
+    LwM2MRpcRequestHeader_p132[&quot;LwM2MRpcRequestHeader&quot;] --&gt;|extends| RpcWriteUpdateRequest_c132[&quot;RpcWriteUpdateRequest&quot;]
+    Object______p133[&quot;Object/外部框架&quot;] --&gt;|extends| RpcReadCompositeRequest_c133[&quot;RpcReadCompositeRequest&quot;]
+    Object______p134[&quot;Object/外部框架&quot;] --&gt;|extends| RpcReadResponseCompositeCallback_c134[&quot;RpcReadResponseCompositeCallback&quot;]
+    Object______p135[&quot;Object/外部框架&quot;] --&gt;|extends| RpcWriteCompositeRequest_c135[&quot;RpcWriteCompositeRequest&quot;]
+    Object______p136[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultLwM2MSessionManager_c136[&quot;DefaultLwM2MSessionManager&quot;]
+    LwM2MSessionManager_p137[&quot;LwM2MSessionManager&quot;] --&gt;|implements| DefaultLwM2MSessionManager_c137[&quot;DefaultLwM2MSessionManager&quot;]
+    Object______p138[&quot;Object/外部框架&quot;] --&gt;|extends| TbDummyLwM2MClientOtaInfoStore_c138[&quot;TbDummyLwM2MClientOtaInfoStore&quot;]
+    TbLwM2MClientOtaInfoStore_p139[&quot;TbLwM2MClientOtaInfoStore&quot;] --&gt;|implements| TbDummyLwM2MClientOtaInfoStore_c139[&quot;TbDummyLwM2MClientOtaInfoStore&quot;]
+    Object______p140[&quot;Object/外部框架&quot;] --&gt;|extends| TbDummyLwM2MClientStore_c140[&quot;TbDummyLwM2MClientStore&quot;]
+    TbLwM2MClientStore_p141[&quot;TbLwM2MClientStore&quot;] --&gt;|implements| TbDummyLwM2MClientStore_c141[&quot;TbDummyLwM2MClientStore&quot;]
+    Object______p142[&quot;Object/外部框架&quot;] --&gt;|extends| TbDummyLwM2MModelConfigStore_c142[&quot;TbDummyLwM2MModelConfigStore&quot;]
+    TbLwM2MModelConfigStore_p143[&quot;TbLwM2MModelConfigStore&quot;] --&gt;|implements| TbDummyLwM2MModelConfigStore_c143[&quot;TbDummyLwM2MModelConfigStore&quot;]
+    TbSecurityStore_p144[&quot;TbSecurityStore&quot;] --&gt;|extends| TbEditableSecurityStore_c144[&quot;TbEditableSecurityStore&quot;]
+    Object______p145[&quot;Object/外部框架&quot;] --&gt;|extends| TbInMemorySecurityStore_c145[&quot;TbInMemorySecurityStore&quot;]
+    TbEditableSecurityStore_p146[&quot;TbEditableSecurityStore&quot;] --&gt;|implements| TbInMemorySecurityStore_c146[&quot;TbInMemorySecurityStore&quot;]
+    Object______p147[&quot;Object/外部框架&quot;] --&gt;|extends| TbL2M2MDtlsSessionInMemoryStore_c147[&quot;TbL2M2MDtlsSessionInMemoryStore&quot;]
+    TbLwM2MDtlsSessionStore_p148[&quot;TbLwM2MDtlsSessionStore&quot;] --&gt;|implements| TbL2M2MDtlsSessionInMemoryStore_c148[&quot;TbL2M2MDtlsSessionInMemoryStore&quot;]
+    Object______p149[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2MDtlsSessionRedisStore_c149[&quot;TbLwM2MDtlsSessionRedisStore&quot;]
+    TbLwM2MDtlsSessionStore_p150[&quot;TbLwM2MDtlsSessionStore&quot;] --&gt;|implements| TbLwM2MDtlsSessionRedisStore_c150[&quot;TbLwM2MDtlsSessionRedisStore&quot;]
+    Object______p151[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2mRedisClientOtaInfoStore_c151[&quot;TbLwM2mRedisClientOtaInfoStore&quot;]
+    TbLwM2MClientOtaInfoStore_p152[&quot;TbLwM2MClientOtaInfoStore&quot;] --&gt;|implements| TbLwM2mRedisClientOtaInfoStore_c152[&quot;TbLwM2mRedisClientOtaInfoStore&quot;]
+    Object______p153[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2mRedisRegistrationStore_c153[&quot;TbLwM2mRedisRegistrationStore&quot;]
+    CaliforniumRegistrationStore_p154[&quot;CaliforniumRegistrationStore&quot;] --&gt;|implements| TbLwM2mRedisRegistrationStore_c154[&quot;TbLwM2mRedisRegistrationStore&quot;]
+    Startable_p155[&quot;Startable&quot;] --&gt;|implements| TbLwM2mRedisRegistrationStore_c155[&quot;TbLwM2mRedisRegistrationStore&quot;]
+    Stoppable_p156[&quot;Stoppable&quot;] --&gt;|implements| TbLwM2mRedisRegistrationStore_c156[&quot;TbLwM2mRedisRegistrationStore&quot;]
+    Destroyable_p157[&quot;Destroyable&quot;] --&gt;|implements| TbLwM2mRedisRegistrationStore_c157[&quot;TbLwM2mRedisRegistrationStore&quot;]
+    Object______p158[&quot;Object/外部框架&quot;] --&gt;|extends| Cleaner_c158[&quot;Cleaner&quot;]
+    Runnable_p159[&quot;Runnable&quot;] --&gt;|implements| Cleaner_c159[&quot;Cleaner&quot;]
+    Object______p160[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2mRedisSecurityStore_c160[&quot;TbLwM2mRedisSecurityStore&quot;]
+    TbEditableSecurityStore_p161[&quot;TbEditableSecurityStore&quot;] --&gt;|implements| TbLwM2mRedisSecurityStore_c161[&quot;TbLwM2mRedisSecurityStore&quot;]
+    Object______p162[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2mSecurityStore_c162[&quot;TbLwM2mSecurityStore&quot;]
+    TbMainSecurityStore_p163[&quot;TbMainSecurityStore&quot;] --&gt;|implements| TbLwM2mSecurityStore_c163[&quot;TbLwM2mSecurityStore&quot;]
+    Object______p164[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2mStoreFactory_c164[&quot;TbLwM2mStoreFactory&quot;]
+    TbSecurityStore_p165[&quot;TbSecurityStore&quot;] --&gt;|extends| TbMainSecurityStore_c165[&quot;TbMainSecurityStore&quot;]
+    Object______p166[&quot;Object/外部框架&quot;] --&gt;|extends| TbRedisLwM2MClientStore_c166[&quot;TbRedisLwM2MClientStore&quot;]
+    TbLwM2MClientStore_p167[&quot;TbLwM2MClientStore&quot;] --&gt;|implements| TbRedisLwM2MClientStore_c167[&quot;TbRedisLwM2MClientStore&quot;]
+    Object______p168[&quot;Object/外部框架&quot;] --&gt;|extends| TbRedisLwM2MModelConfigStore_c168[&quot;TbRedisLwM2MModelConfigStore&quot;]
+    TbLwM2MModelConfigStore_p169[&quot;TbLwM2MModelConfigStore&quot;] --&gt;|implements| TbRedisLwM2MModelConfigStore_c169[&quot;TbRedisLwM2MModelConfigStore&quot;]
+    SecurityStore_p170[&quot;SecurityStore&quot;] --&gt;|extends| TbSecurityStore_c170[&quot;TbSecurityStore&quot;]
+    Object______p171[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MClientSerDes_c171[&quot;LwM2MClientSerDes&quot;]
+    Object______p172[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MIdentitySerDes_c172[&quot;LwM2MIdentitySerDes&quot;]
+    LwM2MExecutorAwareService_p173[&quot;LwM2MExecutorAwareService&quot;] --&gt;|extends| DefaultLwM2mUplinkMsgHandler_c173[&quot;DefaultLwM2mUplinkMsgHandler&quot;]
+    LwM2mUplinkMsgHandler_p174[&quot;LwM2mUplinkMsgHandler&quot;] --&gt;|implements| DefaultLwM2mUplinkMsgHandler_c174[&quot;DefaultLwM2mUplinkMsgHandler&quot;]
+    Object______p175[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MTransportUtil_c175[&quot;LwM2MTransportUtil&quot;]
+    Object______p176[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mValueConverterImpl_c176[&quot;LwM2mValueConverterImpl&quot;]
+    LwM2mValueConverter_p177[&quot;LwM2mValueConverter&quot;] --&gt;|implements| LwM2mValueConverterImpl_c177[&quot;LwM2mValueConverterImpl&quot;]
+    Object______p178[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MTransportBootstrapServiceTest_c178[&quot;LwM2MTransportBootstrapServiceTest&quot;]
+    Object______p179[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MTransportServerConfigTest_c179[&quot;LwM2MTransportServerConfigTest&quot;]
+    Object______p180[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultLwM2mTransportServiceTest_c180[&quot;DefaultLwM2mTransportServiceTest&quot;]
+    Object______p181[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2mClientTest_c181[&quot;LwM2mClientTest&quot;]
+    Object______p182[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MModelConfigServiceImplTest_c182[&quot;LwM2MModelConfigServiceImplTest&quot;]
+    Object______p183[&quot;Object/外部框架&quot;] --&gt;|extends| TbLwM2mRedisRegistrationStoreTest_c183[&quot;TbLwM2mRedisRegistrationStoreTest&quot;]
+    Object______p184[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MClientSerDesTest_c184[&quot;LwM2MClientSerDesTest&quot;]
+    Object______p185[&quot;Object/外部框架&quot;] --&gt;|extends| LwM2MIdentitySerDesTest_c185[&quot;LwM2MIdentitySerDesTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `LwM2MBootstrapTaskProvider.remove()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapTaskProvider.java`)
+- `LwM2MSecureServerConfig.getId()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `LwM2MSecureServerConfig.getHost()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `LwM2MSecureServerConfig.getPort()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `LwM2MSecureServerConfig.getSecureHost()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `LwM2MSecureServerConfig.getSecurePort()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `LwM2MSecureServerConfig.getSslCredentials()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `AbstractLwM2mTransportResource.handleGET()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/AbstractLwM2mTransportResource.java`)
+- `AbstractLwM2mTransportResource.handlePOST()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/AbstractLwM2mTransportResource.java`)
+- `AbstractLwM2mTransportResource.processHandleGet()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/AbstractLwM2mTransportResource.java`)
+- `AbstractLwM2mTransportResource.processHandlePost()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/AbstractLwM2mTransportResource.java`)
+- `LwM2mQueuedRequest.send()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mQueuedRequest.java`)
+- `LwM2MAttributesService.getSharedAttributes()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/attributes/LwM2MAttributesService.java`)
+- `LwM2MAttributesService.onGetAttributesResponse()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/attributes/LwM2MAttributesService.java`)
+- `LwM2MAttributesService.onAttributesUpdate()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/attributes/LwM2MAttributesService.java`)
+- `LwM2MAttributesService.onAttributesUpdate()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/attributes/LwM2MAttributesService.java`)
+- `LwM2mClientContext.getClientByEndpoint()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getClientBySessionInfo()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getLwM2mClients()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getProfile()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getProfile()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.profileUpdate()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getSupportedIdVerInClient()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getClientByDeviceId()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getObjectIdByKeyNameFromProfile()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.registerClient()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.update()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.sendMsgsAfterSleeping()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.onUplink()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.getRequestTimeout()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.asleep()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.awake()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2mClientContext.isDownlinkAllowed()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContext.java`)
+- `LwM2MExecutorAwareService.getExecutorSize()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/common/LwM2MExecutorAwareService.java`)
+- `LwM2MExecutorAwareService.getExecutorName()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/common/LwM2MExecutorAwareService.java`)
+- `LwM2MExecutorAwareService.init()` (protected, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/common/LwM2MExecutorAwareService.java`)
+- `LwM2MExecutorAwareService.destroy()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/common/LwM2MExecutorAwareService.java`)
+- `AbstractTbLwM2MRequestCallback.onValidationError()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/AbstractTbLwM2MRequestCallback.java`)
+- `AbstractTbLwM2MRequestCallback.onError()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/AbstractTbLwM2MRequestCallback.java`)
+- `DownlinkRequestCallback.onSent()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DownlinkRequestCallback.java`)
+
+
+## 哪些方法可以重写
+
+- `LwM2MTransportBootstrapService.init()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java`)
+- `LwM2MTransportBootstrapService.shutdown()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java`)
+- `LwM2MTransportBootstrapService.getLhBootstrapServer()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java`)
+- `LwM2MTransportBootstrapService.LeshanBootstrapServerBuilder()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java`)
+- `LwM2MTransportBootstrapService.LwM2mDefaultBootstrapSessionManager()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java`)
+- `LwM2MBootstrapConfig.getLwM2MBootstrapConfig()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2MBootstrapConfig.java`)
+- `LwM2MBootstrapConfig.BootstrapConfig()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2MBootstrapConfig.java`)
+- `LwM2mDefaultBootstrapSessionManager.SecurityChecker()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.begin()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.DefaultBootstrapSession()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.hasConfigFor()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.initTasks()` (protected, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.getFirstRequest()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.nextRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.nextRequest()` (protected, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.BootstrapFinishRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.nextRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.BootstrapFinishRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.onResponseSuccess()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.onResponseError()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.onRequestFailure()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.end()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.failed()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.getSupportedCertificateTypes()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.init()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.StaticNewAdvancedCertificateVerifier()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.verifyCertificate()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.CertificateVerificationResult()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.AlertMessage()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.HandshakeException()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.CertificateVerificationResult()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.CertificateVerificationResult()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.getAcceptedIssuers()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.setResultHandler()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.ReentrantReadWriteLock()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.getTasks()` (public, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.Tasks()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BootstrapDiscoverRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.Tasks()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BootstrapReadRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+
+
+## 哪些方法必须重写
+
+- `LwM2MTransportBootstrapService.LeshanBootstrapServerBuilder()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java`)
+- `LwM2MTransportBootstrapService.LwM2mDefaultBootstrapSessionManager()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java`)
+- `LwM2MBootstrapConfig.BootstrapConfig()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2MBootstrapConfig.java`)
+- `LwM2mDefaultBootstrapSessionManager.SecurityChecker()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.DefaultBootstrapSession()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.nextRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.BootstrapFinishRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.nextRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `LwM2mDefaultBootstrapSessionManager.BootstrapFinishRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.StaticNewAdvancedCertificateVerifier()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.CertificateVerificationResult()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.AlertMessage()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.HandshakeException()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.CertificateVerificationResult()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `TbLwM2MDtlsBootstrapCertificateVerifier.CertificateVerificationResult()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/TbLwM2MDtlsBootstrapCertificateVerifier.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.ReentrantReadWriteLock()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.Tasks()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BootstrapDiscoverRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.Tasks()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BootstrapReadRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.LwM2mPath()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BigInteger()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.LwM2mPath()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BootstrapDeleteRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BootstrapDeleteRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.BootstrapDeleteRequest()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapConfigStoreTaskProvider.LwM2MBootstrapClientInstanceIds()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java`)
+- `LwM2MBootstrapSecurityStore.LwM2mSessionMsgListener()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapSecurityStore.java`)
+- `LwM2MBootstrapSecurityStore.AtomicBoolean()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapSecurityStore.java`)
+- `LwM2MBootstrapSecurityStore.AtomicBoolean()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapSecurityStore.java`)
+- `LwM2MBootstrapTaskProvider.remove()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapTaskProvider.java`)
+- `LwM2MConfigurationChecker.InvalidConfigurationException()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MConfigurationChecker.java`)
+- `LwM2MConfigurationChecker.InvalidConfigurationException()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MConfigurationChecker.java`)
+- `LwM2MConfigurationChecker.InvalidConfigurationException()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MConfigurationChecker.java`)
+- `LwM2MInMemoryBootstrapConfigStore.ReentrantReadWriteLock()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MInMemoryBootstrapConfigStore.java`)
+- `LwM2MInMemoryBootstrapConfigStore.LwM2MConfigurationChecker()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MInMemoryBootstrapConfigStore.java`)
+- `LwM2MInMemoryBootstrapConfigStore.InvalidConfigurationException()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MInMemoryBootstrapConfigStore.java`)
+- `LwM2MSecureServerConfig.getId()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `LwM2MSecureServerConfig.getHost()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+- `LwM2MSecureServerConfig.getPort()` (package, `common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/config/LwM2MSecureServerConfig.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `LwM2MTransportBootstrapService` (extends)
+- `Object/外部框架` -&gt; `LwM2MBootstrapConfig` (extends)
+- `Serializable` -&gt; `LwM2MBootstrapConfig` (implements)
+- `Object/外部框架` -&gt; `LwM2MBootstrapServers` (extends)
+- `Object/外部框架` -&gt; `LwM2MServerBootstrap` (extends)
+- `DefaultBootstrapSessionManager` -&gt; `LwM2mDefaultBootstrapSessionManager` (extends)
+- `Object/外部框架` -&gt; `TbLwM2MDtlsBootstrapCertificateVerifier` (extends)
+- `NewAdvancedCertificateVerifier` -&gt; `TbLwM2MDtlsBootstrapCertificateVerifier` (implements)
+- `Object/外部框架` -&gt; `LwM2MBootstrapClientInstanceIds` (extends)
+- `Object/外部框架` -&gt; `LwM2MBootstrapConfigStoreTaskProvider` (extends)
+- `LwM2MBootstrapTaskProvider` -&gt; `LwM2MBootstrapConfigStoreTaskProvider` (implements)
+- `Object/外部框架` -&gt; `LwM2MBootstrapSecurityStore` (extends)
+- `BootstrapSecurityStore` -&gt; `LwM2MBootstrapSecurityStore` (implements)
+- `BootstrapTaskProvider` -&gt; `LwM2MBootstrapTaskProvider` (extends)
+- `ConfigurationChecker` -&gt; `LwM2MConfigurationChecker` (extends)
+- `InMemoryBootstrapConfigStore` -&gt; `LwM2MInMemoryBootstrapConfigStore` (extends)
+- `Object/外部框架` -&gt; `LwM2MTransportBootstrapConfig` (extends)
+- `LwM2MSecureServerConfig` -&gt; `LwM2MTransportBootstrapConfig` (implements)
+- `Object/外部框架` -&gt; `LwM2MTransportServerConfig` (extends)
+- `LwM2MSecureServerConfig` -&gt; `LwM2MTransportServerConfig` (implements)
+- `Object/外部框架` -&gt; `LwM2mCredentialsSecurityInfoValidator` (extends)
+- `Object/外部框架` -&gt; `LwM2mRPkCredentials` (extends)
+- `Object/外部框架` -&gt; `TbLwM2MAuthorizer` (extends)
+- `Authorizer` -&gt; `TbLwM2MAuthorizer` (implements)
+- `Object/外部框架` -&gt; `TbLwM2MDtlsCertificateVerifier` (extends)
+- `NewAdvancedCertificateVerifier` -&gt; `TbLwM2MDtlsCertificateVerifier` (implements)
+- `Object/外部框架` -&gt; `TbLwM2MSecurityInfo` (extends)
+- `Serializable` -&gt; `TbLwM2MSecurityInfo` (implements)
+- `Object/外部框架` -&gt; `TbX509DtlsSessionInfo` (extends)
+- `Serializable` -&gt; `TbX509DtlsSessionInfo` (implements)
+- `Object/外部框架` -&gt; `LwM2MClientCredentials` (extends)
+- `LwM2mCoapResource` -&gt; `AbstractLwM2mTransportResource` (extends)
+- `Object/外部框架` -&gt; `DefaultLwM2mTransportService` (extends)
+- `LwM2MTransportService` -&gt; `DefaultLwM2mTransportService` (implements)
+- `Object/外部框架` -&gt; `LwM2MNetworkConfig` (extends)
+- `TbTransportService` -&gt; `LwM2MTransportService` (extends)
+- `Object/外部框架` -&gt; `LwM2mOtaConvert` (extends)
+- `Object/外部框架` -&gt; `LwM2mServerListener` (extends)
+- `Object/外部框架` -&gt; `LwM2mSessionMsgListener` (extends)
+- `GenericFutureListener` -&gt; `LwM2mSessionMsgListener` (implements)
+- 其余 40 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `Authorizer`
+- `BootstrapSecurityStore`
+- `BootstrapTaskProvider`
+- `CaliforniumRegistrationStore`
+- `Cloneable`
+- `ConfigurationChecker`
+- `DefaultBootstrapSessionManager`
+- `Destroyable`
+- `Exception`
+- `GenericFutureListener`
+- `InMemoryBootstrapConfigStore`
+- `LwM2mCoapResource`
+- `LwM2mModel`
+- `LwM2mModelProvider`
+- `LwM2mValueConverter`
+- `NewAdvancedCertificateVerifier`
+- `Object/外部框架`
+- `ResourceObserver`
+- `Runnable`
+- `RuntimeException`
+- `SecurityStore`
+- `Serializable`
+- `SessionMsgListener`
+- `Startable`
+- `Stoppable`
+- `TbTransportService`
+- `TransportContext`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

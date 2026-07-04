@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Rule Engine Components 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Rule Engine Components 模块继承体系分析
+
+&gt; 生成范围：`rule-engine/rule-engine-components`  
+&gt; Maven artifact：`rule-engine-components`  
+&gt; Java 类型数量：293  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>AbstractListeningExecutor
+├── DBCallbackExecutor
+├── RuleDispatcherExecutor
+CacheLoader
+├── CustomerCacheLoader
+├── EntityCacheLoader
+ClientCredentials
+├── «implements» AnonymousCredentials
+├── «implements» BasicCredentials
+├── «implements» CertPemCredentials
+├── «implements» ├── AzureIotHubSasCredentials
+DynamicPredicateValueCtx
+├── «implements» DynamicPredicateValueCtxImpl
+FutureCallback
+├── «implements» TelemetryNodeCallback
+├── «implements» ├── AttributesDeleteNodeCallback
+├── «implements» ├── AttributesUpdateNodeCallback
+ListeningExecutor
+├── «implements» TestDbCallbackExecutor
+NodeConfiguration
+├── «implements» BaseTbMsgPushNodeConfiguration
+├── «implements» ├── TbMsgPushToCloudNodeConfiguration
+├── «implements» ├── TbMsgPushToEdgeNodeConfiguration
+├── «implements» CalculateDeltaNodeConfiguration
+├── «implements» TbAssignToCustomerNodeConfiguration
+├── «implements» TbChangeOriginatorNodeConfiguration
+├── «implements» TbCheckAlarmStatusNodeConfig
+├── «implements» TbCheckMessageNodeConfiguration
+├── «implements» TbCheckRelationNodeConfiguration
+├── «implements» TbClearAlarmNodeConfiguration
+├── «implements» TbCopyKeysNodeConfiguration
+├── «implements» TbCreateAlarmNodeConfiguration
+├── «implements» TbCreateRelationNodeConfiguration
+├── «implements» TbDeleteKeysNodeConfiguration
+├── «implements» TbDeleteRelationNodeConfiguration
+├── «implements» TbDeviceProfileNodeConfiguration
+├── «implements» TbDeviceStateNodeConfiguration
+├── «implements» TbFetchDeviceCredentialsNodeConfiguration
+├── «implements» TbGetAttributesNodeConfiguration
+├── «implements» ├── TbGetDeviceAttrNodeConfiguration
+├── «implements» TbGetCustomerDetailsNodeConfiguration
+├── «implements» TbGetEntityDataNodeConfiguration
+├── «implements» ├── TbGetRelatedDataNodeConfiguration
+├── «implements» TbGetOriginatorFieldsConfiguration
+├── «implements» TbGetTelemetryNodeConfiguration
+├── «implements» TbGetTenantDetailsNodeConfiguration
+├── «implements» TbGpsGeofencingFilterNodeConfiguration
+├── «implements» ├── TbGpsGeofencingActionNodeConfiguration
+├── «implements» TbJsFilterNodeConfiguration
+├── «implements» TbJsSwitchNodeConfiguration
+├── «implements» TbJsonPathNodeConfiguration
+├── «implements» TbKafkaNodeConfiguration
+├── «implements» TbLogNodeConfiguration
+├── «implements» TbMathNodeConfiguration
+├── «implements» TbMqttNodeConfiguration
+├── «implements» ├── TbAzureIotHubNodeConfiguration
+├── «implements» TbMsgAttributesNodeConfiguration
+├── «implements» TbMsgCountNodeConfiguration
+├── «implements» TbMsgDeduplicationNodeConfiguration
+├── «implements» TbMsgDelayNodeConfiguration
+├── «implements» TbMsgDeleteAttributesNodeConfiguration
+├── «implements» TbMsgGeneratorNodeConfiguration
+├── «implements» TbMsgTimeseriesNodeConfiguration
+├── «implements» TbMsgToEmailNodeConfiguration
+├── «implements» TbMsgTypeFilterNodeConfiguration
+├── «implements» TbNotificationNodeConfiguration
+├── «implements» TbOriginatorTypeFilterNodeConfiguration
+├── «implements» TbPubSubNodeConfiguration
+├── «implements» TbRabbitMqNodeConfiguration
+├── «implements» TbRenameKeysNodeConfiguration
+├── «implements» TbRestApiCallNodeConfiguration
+├── «implements» TbRuleChainInputNodeConfiguration
+├── «implements» TbSaveToCustomCassandraTableNodeConfiguration
+├── «implements» TbSendEmailNodeConfiguration
+├── «implements» TbSendRpcReplyNodeConfiguration
+├── «implements» TbSendRpcRequestNodeConfiguration
+├── «implements» TbSendSmsNodeConfiguration
+├── «implements» TbSlackNodeConfiguration
+├── «implements» TbSnsNodeConfiguration
+├── «implements» TbSqsNodeConfiguration
+├── «implements» TbTransformMsgNodeConfiguration
+├── «implements» TbUnassignFromCustomerNodeConfiguration
+Object/外部框架
+├── AbstractGeofencingNode
+├── ├── TbGpsGeofencingActionNode
+├── ├── TbGpsGeofencingFilterNode
+├── AbstractRuleNodeUpgradeTest
+├── ├── TbCheckpointNodeTest
+├── ├── TbGpsGeofencingActionNodeTest
+├── ├── TbMsgAttributesNodeTest
+├── ├── TbMsgDeduplicationNodeTest
+├── ├── TbMsgGeneratorNodeTest
+├── AbstractTbMsgPushNode
+├── ├── TbMsgPushToCloudNode
+├── ├── TbMsgPushToEdgeNode
+├── AlarmRuleState
+├── AlarmRuleStateTest
+├── AlarmState
+├── AlarmStateTest
+├── AnonymousCredentials
+├── BaseTbMsgPushNodeConfiguration
+├── ├── TbMsgPushToCloudNodeConfiguration
+├── ├── TbMsgPushToEdgeNodeConfiguration
+├── BasicCredentials
+├── CalculateDeltaNode
+├── CalculateDeltaNodeConfiguration
+├── CalculateDeltaNodeTest
+├── CertPemCredentials
+├── ├── AzureIotHubSasCredentials
+├── CertPemCredentialsTest
+├── Coordinates
+├── CustomerKey
+├── DataSnapshot
+├── DeduplicationData
+├── DeviceRelationsQuery
+├── DeviceState
+├── DeviceStateTest
+├── DynamicPredicateValueCtxImpl
+├── EntitiesAlarmOriginatorIdAsyncLoader
+├── EntitiesByNameAndTypeLoader
+├── EntitiesCustomerIdAsyncLoader
+├── EntitiesCustomerIdAsyncLoaderTest
+├── EntitiesFieldsAsyncLoader
+├── EntitiesFieldsAsyncLoaderTest
+├── EntitiesRelatedDeviceIdAsyncLoader
+├── EntitiesRelatedDeviceIdAsyncLoaderTest
+├── EntitiesRelatedEntityIdAsyncLoader
+├── EntitiesRelatedEntityIdAsyncLoaderTest
+├── EntityContainer
+├── EntityGeofencingState
+├── EntityKey
+├── EntityKeyValue
+├── GeoUtil
+├── GeoUtilTest
+├── GpsGeofencingActionTestCase
+├── GpsGeofencingEvents
+├── Interval
+├── ListMatcher
+├── MailBodyTypeTestConfig
+├── MultipleTbMsgsCallbackWrapper
+├── Perimeter
+├── PersistedAlarmRuleState
+├── PersistedAlarmState
+├── PersistedDeviceState
+├── ProfileState
+├── RelationContainer
+├── RelationsQuery
+├── SearchDirectionIds
+├── SemaphoreWithQueue
+├── SnapshotUpdate
+├── TbAbstractAlarmNode
+├── ├── TbClearAlarmNode
+├── ├── TbCreateAlarmNode
+├── TbAbstractAlarmNodeConfiguration
+├── ├── TbClearAlarmNodeConfiguration
+├── ├── TbCreateAlarmNodeConfiguration
+├── TbAbstractCustomerActionNode
+├── ├── TbAssignToCustomerNode
+├── ├── TbUnassignFromCustomerNode
+├── TbAbstractCustomerActionNodeConfiguration
+├── ├── TbAssignToCustomerNodeConfiguration
+├── ├── TbUnassignFromCustomerNodeConfiguration
+├── TbAbstractExternalNode
+├── ├── TbKafkaNode
+├── ├── TbMqttNode
+├── ├── ├── TbAzureIotHubNode
+├── ├── TbNotificationNode
+├── ├── TbPubSubNode
+├── ├── TbRabbitMqNode
+├── ├── TbRestApiCallNode
+├── ├── TbSendEmailNode
+├── ├── TbSendSmsNode
+├── ├── TbSlackNode
+├── ├── TbSnsNode
+├── ├── TbSqsNode
+├── TbAbstractFetchToNodeConfiguration
+├── ├── TbAbstractGetEntityDetailsNodeConfiguration
+├── ├── ├── TbGetCustomerDetailsNodeConfiguration
+├── ├── ├── TbGetTenantDetailsNodeConfiguration
+├── ├── TbFetchDeviceCredentialsNodeConfiguration
+├── ├── TbGetAttributesNodeConfiguration
+├── ├── ├── TbGetDeviceAttrNodeConfiguration
+├── ├── TbGetMappedDataNodeConfiguration
+├── ├── ├── TbGetEntityDataNodeConfiguration
+├── ├── ├── ├── TbGetRelatedDataNodeConfiguration
+├── ├── ├── TbGetOriginatorFieldsConfiguration
+├── TbAbstractGetAttributesNode
+├── ├── TbGetAttributesNode
+├── ├── TbGetDeviceAttrNode
+├── TbAbstractGetEntityDataNode
+├── ├── TbGetCustomerAttributeNode
+├── ├── TbGetRelatedAttributeNode
+├── ├── TbGetTenantAttributeNode
+├── TbAbstractGetEntityDetailsNode
+├── ├── TbGetCustomerDetailsNode
+├── ├── TbGetTenantDetailsNode
+├── TbAbstractGetMappedDataNode
+├── ├── TbGetOriginatorFieldsNode
+├── TbAbstractNodeWithFetchTo
+├── ├── TbFetchDeviceCredentialsNode
+├── TbAbstractRelationActionNode
+├── ├── TbCreateRelationNode
+├── ├── TbDeleteRelationNode
+├── TbAbstractRelationActionNodeConfiguration
+├── ├── TbCreateRelationNodeConfiguration
+├── ├── TbDeleteRelationNodeConfiguration
+├── TbAbstractTransformNode
+├── ├── TbChangeOriginatorNode
+├── ├── TbTransformMsgNode
+├── TbAbstractTransformNodeWithTbMsgSource
+├── ├── TbCopyKeysNode
+├── ├── TbDeleteKeysNode
+├── ├── TbRenameKeysNode
+├── TbAbstractTypeSwitchNode
+├── ├── TbAssetTypeSwitchNode
+├── ├── TbDeviceTypeSwitchNode
+├── ├── TbOriginatorTypeSwitchNode
+├── TbAckNode
+├── TbAlarmNodeTest
+├── TbAlarmResult
+├── TbAssetTypeSwitchNodeTest
+├── TbChangeOriginatorNodeConfiguration
+├── TbChangeOriginatorNodeTest
+├── TbCheckAlarmStatusNode
+├── TbCheckAlarmStatusNodeConfig
+├── TbCheckAlarmStatusNodeTest
+├── TbCheckMessageNode
+├── TbCheckMessageNodeConfiguration
+├── TbCheckMessageNodeTest
+├── TbCheckRelationNode
+├── TbCheckRelationNodeConfiguration
+├── TbCheckRelationNodeTest
+├── TbCheckpointNode
+├── TbCopyAttributesToEntityViewNode
+├── TbCopyKeysNodeConfiguration
+├── TbCopyKeysNodeTest
+├── TbCreateRelationNodeTest
+├── TbDeleteKeysNodeConfiguration
+├── TbDeleteKeysNodeTest
+├── TbDeviceProfileNode
+├── TbDeviceProfileNodeConfiguration
+├── TbDeviceProfileNodeTest
+├── TbDeviceStateNode
+├── TbDeviceStateNodeConfiguration
+├── TbDeviceStateNodeTest
+├── TbDeviceTypeSwitchNodeTest
+├── TbFetchDeviceCredentialsNodeTest
+├── TbGetAttributesNodeTest
+├── TbGetCustomerAttributeNodeTest
+├── TbGetCustomerDetailsNodeTest
+├── TbGetDeviceAttrNodeTest
+├── TbGetOriginatorFieldsNodeTest
+├── TbGetRelatedAttributeNodeTest
+├── TbGetTelemetryNode
+├── TbGetTelemetryNodeConfiguration
+├── TbGetTelemetryNodeTest
+├── TbGetTenantAttributeNodeTest
+├── TbGetTenantDetailsNodeTest
+├── TbGpsGeofencingFilterNodeConfiguration
+├── ├── TbGpsGeofencingActionNodeConfiguration
+├── TbGpsGeofencingFilterNodeTest
+├── TbHttpClient
+├── TbHttpClientTest
+├── TbJsFilterNode
+├── TbJsFilterNodeConfiguration
+├── TbJsFilterNodeTest
+├── TbJsSwitchNode
+├── TbJsSwitchNodeConfiguration
+├── TbJsSwitchNodeTest
+├── TbJsonPathNode
+├── TbJsonPathNodeConfiguration
+├── TbJsonPathNodeTest
+├── TbKafkaNodeConfiguration
+├── TbLogNode
+├── TbLogNodeConfiguration
+├── TbLogNodeTest
+├── TbMathArgument
+├── TbMathArgumentValue
+├── TbMathArgumentValueTest
+├── TbMathNode
+├── TbMathNodeConfiguration
+├── TbMathNodeTest
+├── TbMathResult
+├── TbMqttNodeConfiguration
+├── ├── TbAzureIotHubNodeConfiguration
+├── TbMsgAttributesNode
+├── TbMsgAttributesNodeConfiguration
+├── TbMsgAttributesNodeConfigurationTest
+├── TbMsgCountNode
+├── TbMsgCountNodeConfiguration
+├── TbMsgDeduplicationNode
+├── TbMsgDeduplicationNodeConfiguration
+├── TbMsgDelayNode
+├── TbMsgDelayNodeConfiguration
+├── TbMsgDeleteAttributesNode
+├── TbMsgDeleteAttributesNodeConfiguration
+├── TbMsgDeleteAttributesNodeTest
+├── TbMsgGeneratorNode
+├── TbMsgGeneratorNodeConfiguration
+├── TbMsgPushToEdgeNodeTest
+├── TbMsgTbContextBiFunction
+├── TbMsgTimeseriesNode
+├── TbMsgTimeseriesNodeConfiguration
+├── TbMsgToEmailNode
+├── TbMsgToEmailNodeConfiguration
+├── TbMsgToEmailNodeTest
+├── TbMsgTypeFilterNode
+├── TbMsgTypeFilterNodeConfiguration
+├── TbMsgTypeFilterNodeTest
+├── TbMsgTypeSwitchNode
+├── TbMsgTypeSwitchNodeTest
+├── TbNotificationNodeConfiguration
+├── TbOriginatorTypeFilterNode
+├── TbOriginatorTypeFilterNodeConfiguration
+├── TbOriginatorTypeFilterNodeTest
+├── TbOriginatorTypeSwitchNodeTest
+├── TbPubSubNodeConfiguration
+├── TbRabbitMqNodeConfiguration
+├── TbRenameKeysNodeConfiguration
+├── TbRenameKeysNodeTest
+├── TbRestApiCallNodeConfiguration
+├── TbRestApiCallNodeTest
+├── TbRuleChainInputNode
+├── TbRuleChainInputNodeConfiguration
+├── TbRuleChainOutputNode
+├── TbSaveToCustomCassandraTableNode
+├── TbSaveToCustomCassandraTableNodeConfiguration
+├── TbSendEmailNodeConfiguration
+├── TbSendRPCReplyNode
+├── TbSendRPCReplyNodeTest
+├── TbSendRPCRequestNode
+├── TbSendRpcReplyNodeConfiguration
+├── TbSendRpcRequestNodeConfiguration
+├── TbSendSmsNodeConfiguration
+├── TbSlackNodeConfiguration
+├── TbSnsNodeConfiguration
+├── TbSplitArrayMsgNode
+├── TbSplitArrayMsgNodeTest
+├── TbSqsNodeConfiguration
+├── TbSynchronizationBeginNode
+├── TbSynchronizationEndNode
+├── TbTransformMsgNodeConfiguration
+├── TbTransformMsgNodeTest
+├── TelemetryNodeCallback
+├── ├── AttributesDeleteNodeCallback
+├── ├── AttributesUpdateNodeCallback
+├── TenantIdLoader
+├── TenantIdLoaderTest
+├── TestDbCallbackExecutor
+├── ValueWithTs
+RuntimeException
+├── NumericParseException
+TbMsgCallbackWrapper
+├── «implements» MultipleTbMsgsCallbackWrapper
+TbNode
+├── «implements» AbstractGeofencingNode
+├── «implements» ├── TbGpsGeofencingActionNode
+├── «implements» ├── TbGpsGeofencingFilterNode
+├── «implements» AbstractTbMsgPushNode
+├── «implements» ├── TbMsgPushToCloudNode
+├── «implements» ├── TbMsgPushToEdgeNode
+├── «implements» CalculateDeltaNode
+├── «implements» TbAbstractAlarmNode
+├── «implements» ├── TbClearAlarmNode
+├── «implements» ├── TbCreateAlarmNode
+├── «implements» TbAbstractCustomerActionNode
+├── «implements» ├── TbAssignToCustomerNode
+├── «implements» ├── TbUnassignFromCustomerNode
+├── «implements» TbAbstractExternalNode
+├── «implements» ├── TbKafkaNode
+├── «implements» ├── TbMqttNode
+├── «implements» ├── ├── TbAzureIotHubNode
+├── «implements» ├── TbNotificationNode
+├── «implements» ├── TbPubSubNode
+├── «implements» ├── TbRabbitMqNode
+├── «implements» ├── TbRestApiCallNode
+├── «implements» ├── TbSendEmailNode
+├── «implements» ├── TbSendSmsNode
+├── «implements» ├── TbSlackNode
+├── «implements» ├── TbSnsNode
+├── «implements» ├── TbSqsNode
+├── «implements» TbAbstractNodeWithFetchTo
+├── «implements» ├── TbFetchDeviceCredentialsNode
+├── «implements» TbAbstractRelationActionNode
+├── «implements» ├── TbCreateRelationNode
+├── «implements» ├── TbDeleteRelationNode
+├── «implements» TbAbstractTransformNode
+├── «implements» ├── TbChangeOriginatorNode
+├── «implements» ├── TbTransformMsgNode
+├── «implements» TbAbstractTransformNodeWithTbMsgSource
+├── «implements» ├── TbCopyKeysNode
+├── «implements» ├── TbDeleteKeysNode
+├── «implements» ├── TbRenameKeysNode
+├── «implements» TbAbstractTypeSwitchNode
+├── «implements» ├── TbAssetTypeSwitchNode
+├── «implements» ├── TbDeviceTypeSwitchNode
+├── «implements» ├── TbOriginatorTypeSwitchNode
+├── «implements» TbAckNode
+├── «implements» TbCheckAlarmStatusNode
+├── «implements» TbCheckMessageNode
+├── «implements» TbCheckRelationNode
+├── «implements» TbCheckpointNode
+├── «implements» TbCopyAttributesToEntityViewNode
+├── «implements» TbDeviceProfileNode
+├── «implements» TbDeviceStateNode
+├── «implements» TbGetTelemetryNode
+├── «implements» TbJsFilterNode
+├── «implements» TbJsSwitchNode
+├── «implements» TbJsonPathNode
+├── «implements» TbLogNode
+├── «implements» TbMathNode
+├── «implements» TbMsgAttributesNode
+├── «implements» TbMsgCountNode
+├── «implements» TbMsgDeduplicationNode
+├── «implements» TbMsgDelayNode
+├── «implements» TbMsgDeleteAttributesNode
+├── «implements» TbMsgGeneratorNode
+├── «implements» TbMsgTimeseriesNode
+├── «implements» TbMsgToEmailNode
+├── «implements» TbMsgTypeFilterNode
+├── «implements» TbMsgTypeSwitchNode
+├── «implements» TbOriginatorTypeFilterNode
+├── «implements» TbRuleChainInputNode
+├── «implements» TbRuleChainOutputNode
+├── «implements» TbSaveToCustomCassandraTableNode
+├── «implements» TbSendRPCReplyNode
+├── «implements» TbSendRPCRequestNode
+├── «implements» TbSplitArrayMsgNode
+├── «implements» TbSynchronizationBeginNode
+├── «implements» TbSynchronizationEndNode</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractAlarmNode_c0[&quot;TbAbstractAlarmNode&quot;]
+    TbNode_p1[&quot;TbNode&quot;] --&gt;|implements| TbAbstractAlarmNode_c1[&quot;TbAbstractAlarmNode&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractAlarmNodeConfiguration_c2[&quot;TbAbstractAlarmNodeConfiguration&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractCustomerActionNode_c3[&quot;TbAbstractCustomerActionNode&quot;]
+    TbNode_p4[&quot;TbNode&quot;] --&gt;|implements| TbAbstractCustomerActionNode_c4[&quot;TbAbstractCustomerActionNode&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| CustomerKey_c5[&quot;CustomerKey&quot;]
+    CacheLoader_p6[&quot;CacheLoader&quot;] --&gt;|extends| CustomerCacheLoader_c6[&quot;CustomerCacheLoader&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractCustomerActionNodeConfiguration_c7[&quot;TbAbstractCustomerActionNodeConfiguration&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractRelationActionNode_c8[&quot;TbAbstractRelationActionNode&quot;]
+    TbNode_p9[&quot;TbNode&quot;] --&gt;|implements| TbAbstractRelationActionNode_c9[&quot;TbAbstractRelationActionNode&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| EntityKey_c10[&quot;EntityKey&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| SearchDirectionIds_c11[&quot;SearchDirectionIds&quot;]
+    CacheLoader_p12[&quot;CacheLoader&quot;] --&gt;|extends| EntityCacheLoader_c12[&quot;EntityCacheLoader&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| RelationContainer_c13[&quot;RelationContainer&quot;]
+    Object______p14[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractRelationActionNodeConfiguration_c14[&quot;TbAbstractRelationActionNodeConfiguration&quot;]
+    Object______p15[&quot;Object/外部框架&quot;] --&gt;|extends| TbAlarmResult_c15[&quot;TbAlarmResult&quot;]
+    TbAbstractCustomerActionNode_p16[&quot;TbAbstractCustomerActionNode&quot;] --&gt;|extends| TbAssignToCustomerNode_c16[&quot;TbAssignToCustomerNode&quot;]
+    TbAbstractCustomerActionNodeConfiguration_p17[&quot;TbAbstractCustomerActionNodeConfiguration&quot;] --&gt;|extends| TbAssignToCustomerNodeConfiguration_c17[&quot;TbAssignToCustomerNodeConfiguration&quot;]
+    NodeConfiguration_p18[&quot;NodeConfiguration&quot;] --&gt;|implements| TbAssignToCustomerNodeConfiguration_c18[&quot;TbAssignToCustomerNodeConfiguration&quot;]
+    TbAbstractAlarmNode_p19[&quot;TbAbstractAlarmNode&quot;] --&gt;|extends| TbClearAlarmNode_c19[&quot;TbClearAlarmNode&quot;]
+    TbAbstractAlarmNodeConfiguration_p20[&quot;TbAbstractAlarmNodeConfiguration&quot;] --&gt;|extends| TbClearAlarmNodeConfiguration_c20[&quot;TbClearAlarmNodeConfiguration&quot;]
+    NodeConfiguration_p21[&quot;NodeConfiguration&quot;] --&gt;|implements| TbClearAlarmNodeConfiguration_c21[&quot;TbClearAlarmNodeConfiguration&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| TbCopyAttributesToEntityViewNode_c22[&quot;TbCopyAttributesToEntityViewNode&quot;]
+    TbNode_p23[&quot;TbNode&quot;] --&gt;|implements| TbCopyAttributesToEntityViewNode_c23[&quot;TbCopyAttributesToEntityViewNode&quot;]
+    TbAbstractAlarmNode_p24[&quot;TbAbstractAlarmNode&quot;] --&gt;|extends| TbCreateAlarmNode_c24[&quot;TbCreateAlarmNode&quot;]
+    TbAbstractAlarmNodeConfiguration_p25[&quot;TbAbstractAlarmNodeConfiguration&quot;] --&gt;|extends| TbCreateAlarmNodeConfiguration_c25[&quot;TbCreateAlarmNodeConfiguration&quot;]
+    NodeConfiguration_p26[&quot;NodeConfiguration&quot;] --&gt;|implements| TbCreateAlarmNodeConfiguration_c26[&quot;TbCreateAlarmNodeConfiguration&quot;]
+    TbAbstractRelationActionNode_p27[&quot;TbAbstractRelationActionNode&quot;] --&gt;|extends| TbCreateRelationNode_c27[&quot;TbCreateRelationNode&quot;]
+    TbAbstractRelationActionNodeConfiguration_p28[&quot;TbAbstractRelationActionNodeConfiguration&quot;] --&gt;|extends| TbCreateRelationNodeConfiguration_c28[&quot;TbCreateRelationNodeConfiguration&quot;]
+    NodeConfiguration_p29[&quot;NodeConfiguration&quot;] --&gt;|implements| TbCreateRelationNodeConfiguration_c29[&quot;TbCreateRelationNodeConfiguration&quot;]
+    TbAbstractRelationActionNode_p30[&quot;TbAbstractRelationActionNode&quot;] --&gt;|extends| TbDeleteRelationNode_c30[&quot;TbDeleteRelationNode&quot;]
+    TbAbstractRelationActionNodeConfiguration_p31[&quot;TbAbstractRelationActionNodeConfiguration&quot;] --&gt;|extends| TbDeleteRelationNodeConfiguration_c31[&quot;TbDeleteRelationNodeConfiguration&quot;]
+    NodeConfiguration_p32[&quot;NodeConfiguration&quot;] --&gt;|implements| TbDeleteRelationNodeConfiguration_c32[&quot;TbDeleteRelationNodeConfiguration&quot;]
+    Object______p33[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeviceStateNode_c33[&quot;TbDeviceStateNode&quot;]
+    TbNode_p34[&quot;TbNode&quot;] --&gt;|implements| TbDeviceStateNode_c34[&quot;TbDeviceStateNode&quot;]
+    Object______p35[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeviceStateNodeConfiguration_c35[&quot;TbDeviceStateNodeConfiguration&quot;]
+    NodeConfiguration_p36[&quot;NodeConfiguration&quot;] --&gt;|implements| TbDeviceStateNodeConfiguration_c36[&quot;TbDeviceStateNodeConfiguration&quot;]
+    Object______p37[&quot;Object/外部框架&quot;] --&gt;|extends| TbLogNode_c37[&quot;TbLogNode&quot;]
+    TbNode_p38[&quot;TbNode&quot;] --&gt;|implements| TbLogNode_c38[&quot;TbLogNode&quot;]
+    Object______p39[&quot;Object/外部框架&quot;] --&gt;|extends| TbLogNodeConfiguration_c39[&quot;TbLogNodeConfiguration&quot;]
+    NodeConfiguration_p40[&quot;NodeConfiguration&quot;] --&gt;|implements| TbLogNodeConfiguration_c40[&quot;TbLogNodeConfiguration&quot;]
+    Object______p41[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgCountNode_c41[&quot;TbMsgCountNode&quot;]
+    TbNode_p42[&quot;TbNode&quot;] --&gt;|implements| TbMsgCountNode_c42[&quot;TbMsgCountNode&quot;]
+    Object______p43[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgCountNodeConfiguration_c43[&quot;TbMsgCountNodeConfiguration&quot;]
+    NodeConfiguration_p44[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgCountNodeConfiguration_c44[&quot;TbMsgCountNodeConfiguration&quot;]
+    Object______p45[&quot;Object/外部框架&quot;] --&gt;|extends| TbSaveToCustomCassandraTableNode_c45[&quot;TbSaveToCustomCassandraTableNode&quot;]
+    TbNode_p46[&quot;TbNode&quot;] --&gt;|implements| TbSaveToCustomCassandraTableNode_c46[&quot;TbSaveToCustomCassandraTableNode&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| TbSaveToCustomCassandraTableNodeConfiguration_c47[&quot;TbSaveToCustomCassandraTableNodeConfiguration&quot;]
+    NodeConfiguration_p48[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSaveToCustomCassandraTableNodeConfiguration_c48[&quot;TbSaveToCustomCassandraTableNodeConfiguration&quot;]
+    TbAbstractCustomerActionNode_p49[&quot;TbAbstractCustomerActionNode&quot;] --&gt;|extends| TbUnassignFromCustomerNode_c49[&quot;TbUnassignFromCustomerNode&quot;]
+    TbAbstractCustomerActionNodeConfiguration_p50[&quot;TbAbstractCustomerActionNodeConfiguration&quot;] --&gt;|extends| TbUnassignFromCustomerNodeConfiguration_c50[&quot;TbUnassignFromCustomerNodeConfiguration&quot;]
+    NodeConfiguration_p51[&quot;NodeConfiguration&quot;] --&gt;|implements| TbUnassignFromCustomerNodeConfiguration_c51[&quot;TbUnassignFromCustomerNodeConfiguration&quot;]
+    TbAbstractExternalNode_p52[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbSnsNode_c52[&quot;TbSnsNode&quot;]
+    Object______p53[&quot;Object/外部框架&quot;] --&gt;|extends| TbSnsNodeConfiguration_c53[&quot;TbSnsNodeConfiguration&quot;]
+    NodeConfiguration_p54[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSnsNodeConfiguration_c54[&quot;TbSnsNodeConfiguration&quot;]
+    TbAbstractExternalNode_p55[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbSqsNode_c55[&quot;TbSqsNode&quot;]
+    Object______p56[&quot;Object/外部框架&quot;] --&gt;|extends| TbSqsNodeConfiguration_c56[&quot;TbSqsNodeConfiguration&quot;]
+    NodeConfiguration_p57[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSqsNodeConfiguration_c57[&quot;TbSqsNodeConfiguration&quot;]
+    Object______p58[&quot;Object/外部框架&quot;] --&gt;|extends| AnonymousCredentials_c58[&quot;AnonymousCredentials&quot;]
+    ClientCredentials_p59[&quot;ClientCredentials&quot;] --&gt;|implements| AnonymousCredentials_c59[&quot;AnonymousCredentials&quot;]
+    Object______p60[&quot;Object/外部框架&quot;] --&gt;|extends| BasicCredentials_c60[&quot;BasicCredentials&quot;]
+    ClientCredentials_p61[&quot;ClientCredentials&quot;] --&gt;|implements| BasicCredentials_c61[&quot;BasicCredentials&quot;]
+    Object______p62[&quot;Object/外部框架&quot;] --&gt;|extends| CertPemCredentials_c62[&quot;CertPemCredentials&quot;]
+    ClientCredentials_p63[&quot;ClientCredentials&quot;] --&gt;|implements| CertPemCredentials_c63[&quot;CertPemCredentials&quot;]
+    Object______p64[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceRelationsQuery_c64[&quot;DeviceRelationsQuery&quot;]
+    Object______p65[&quot;Object/外部框架&quot;] --&gt;|extends| RelationsQuery_c65[&quot;RelationsQuery&quot;]
+    Object______p66[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgGeneratorNode_c66[&quot;TbMsgGeneratorNode&quot;]
+    TbNode_p67[&quot;TbNode&quot;] --&gt;|implements| TbMsgGeneratorNode_c67[&quot;TbMsgGeneratorNode&quot;]
+    Object______p68[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgGeneratorNodeConfiguration_c68[&quot;TbMsgGeneratorNodeConfiguration&quot;]
+    NodeConfiguration_p69[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgGeneratorNodeConfiguration_c69[&quot;TbMsgGeneratorNodeConfiguration&quot;]
+    Object______p70[&quot;Object/外部框架&quot;] --&gt;|extends| DeduplicationData_c70[&quot;DeduplicationData&quot;]
+    Object______p71[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgDeduplicationNode_c71[&quot;TbMsgDeduplicationNode&quot;]
+    TbNode_p72[&quot;TbNode&quot;] --&gt;|implements| TbMsgDeduplicationNode_c72[&quot;TbMsgDeduplicationNode&quot;]
+    Object______p73[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgDeduplicationNodeConfiguration_c73[&quot;TbMsgDeduplicationNodeConfiguration&quot;]
+    NodeConfiguration_p74[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgDeduplicationNodeConfiguration_c74[&quot;TbMsgDeduplicationNodeConfiguration&quot;]
+    Object______p75[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgDelayNode_c75[&quot;TbMsgDelayNode&quot;]
+    TbNode_p76[&quot;TbNode&quot;] --&gt;|implements| TbMsgDelayNode_c76[&quot;TbMsgDelayNode&quot;]
+    Object______p77[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgDelayNodeConfiguration_c77[&quot;TbMsgDelayNodeConfiguration&quot;]
+    NodeConfiguration_p78[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgDelayNodeConfiguration_c78[&quot;TbMsgDelayNodeConfiguration&quot;]
+    Object______p79[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractTbMsgPushNode_c79[&quot;AbstractTbMsgPushNode&quot;]
+    TbNode_p80[&quot;TbNode&quot;] --&gt;|implements| AbstractTbMsgPushNode_c80[&quot;AbstractTbMsgPushNode&quot;]
+    Object______p81[&quot;Object/外部框架&quot;] --&gt;|extends| BaseTbMsgPushNodeConfiguration_c81[&quot;BaseTbMsgPushNodeConfiguration&quot;]
+    NodeConfiguration_p82[&quot;NodeConfiguration&quot;] --&gt;|implements| BaseTbMsgPushNodeConfiguration_c82[&quot;BaseTbMsgPushNodeConfiguration&quot;]
+    AbstractTbMsgPushNode_p83[&quot;AbstractTbMsgPushNode&quot;] --&gt;|extends| TbMsgPushToCloudNode_c83[&quot;TbMsgPushToCloudNode&quot;]
+    BaseTbMsgPushNodeConfiguration_p84[&quot;BaseTbMsgPushNodeConfiguration&quot;] --&gt;|extends| TbMsgPushToCloudNodeConfiguration_c84[&quot;TbMsgPushToCloudNodeConfiguration&quot;]
+    AbstractTbMsgPushNode_p85[&quot;AbstractTbMsgPushNode&quot;] --&gt;|extends| TbMsgPushToEdgeNode_c85[&quot;TbMsgPushToEdgeNode&quot;]
+    BaseTbMsgPushNodeConfiguration_p86[&quot;BaseTbMsgPushNodeConfiguration&quot;] --&gt;|extends| TbMsgPushToEdgeNodeConfiguration_c86[&quot;TbMsgPushToEdgeNodeConfiguration&quot;]
+    Object______p87[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractExternalNode_c87[&quot;TbAbstractExternalNode&quot;]
+    TbNode_p88[&quot;TbNode&quot;] --&gt;|implements| TbAbstractExternalNode_c88[&quot;TbAbstractExternalNode&quot;]
+    Object______p89[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractTypeSwitchNode_c89[&quot;TbAbstractTypeSwitchNode&quot;]
+    TbNode_p90[&quot;TbNode&quot;] --&gt;|implements| TbAbstractTypeSwitchNode_c90[&quot;TbAbstractTypeSwitchNode&quot;]
+    TbAbstractTypeSwitchNode_p91[&quot;TbAbstractTypeSwitchNode&quot;] --&gt;|extends| TbAssetTypeSwitchNode_c91[&quot;TbAssetTypeSwitchNode&quot;]
+    Object______p92[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckAlarmStatusNode_c92[&quot;TbCheckAlarmStatusNode&quot;]
+    TbNode_p93[&quot;TbNode&quot;] --&gt;|implements| TbCheckAlarmStatusNode_c93[&quot;TbCheckAlarmStatusNode&quot;]
+    Object______p94[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckAlarmStatusNodeConfig_c94[&quot;TbCheckAlarmStatusNodeConfig&quot;]
+    NodeConfiguration_p95[&quot;NodeConfiguration&quot;] --&gt;|implements| TbCheckAlarmStatusNodeConfig_c95[&quot;TbCheckAlarmStatusNodeConfig&quot;]
+    Object______p96[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckMessageNode_c96[&quot;TbCheckMessageNode&quot;]
+    TbNode_p97[&quot;TbNode&quot;] --&gt;|implements| TbCheckMessageNode_c97[&quot;TbCheckMessageNode&quot;]
+    Object______p98[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckMessageNodeConfiguration_c98[&quot;TbCheckMessageNodeConfiguration&quot;]
+    NodeConfiguration_p99[&quot;NodeConfiguration&quot;] --&gt;|implements| TbCheckMessageNodeConfiguration_c99[&quot;TbCheckMessageNodeConfiguration&quot;]
+    Object______p100[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckRelationNode_c100[&quot;TbCheckRelationNode&quot;]
+    TbNode_p101[&quot;TbNode&quot;] --&gt;|implements| TbCheckRelationNode_c101[&quot;TbCheckRelationNode&quot;]
+    Object______p102[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckRelationNodeConfiguration_c102[&quot;TbCheckRelationNodeConfiguration&quot;]
+    NodeConfiguration_p103[&quot;NodeConfiguration&quot;] --&gt;|implements| TbCheckRelationNodeConfiguration_c103[&quot;TbCheckRelationNodeConfiguration&quot;]
+    TbAbstractTypeSwitchNode_p104[&quot;TbAbstractTypeSwitchNode&quot;] --&gt;|extends| TbDeviceTypeSwitchNode_c104[&quot;TbDeviceTypeSwitchNode&quot;]
+    Object______p105[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsFilterNode_c105[&quot;TbJsFilterNode&quot;]
+    TbNode_p106[&quot;TbNode&quot;] --&gt;|implements| TbJsFilterNode_c106[&quot;TbJsFilterNode&quot;]
+    Object______p107[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsFilterNodeConfiguration_c107[&quot;TbJsFilterNodeConfiguration&quot;]
+    NodeConfiguration_p108[&quot;NodeConfiguration&quot;] --&gt;|implements| TbJsFilterNodeConfiguration_c108[&quot;TbJsFilterNodeConfiguration&quot;]
+    Object______p109[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsSwitchNode_c109[&quot;TbJsSwitchNode&quot;]
+    TbNode_p110[&quot;TbNode&quot;] --&gt;|implements| TbJsSwitchNode_c110[&quot;TbJsSwitchNode&quot;]
+    Object______p111[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsSwitchNodeConfiguration_c111[&quot;TbJsSwitchNodeConfiguration&quot;]
+    NodeConfiguration_p112[&quot;NodeConfiguration&quot;] --&gt;|implements| TbJsSwitchNodeConfiguration_c112[&quot;TbJsSwitchNodeConfiguration&quot;]
+    Object______p113[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTypeFilterNode_c113[&quot;TbMsgTypeFilterNode&quot;]
+    TbNode_p114[&quot;TbNode&quot;] --&gt;|implements| TbMsgTypeFilterNode_c114[&quot;TbMsgTypeFilterNode&quot;]
+    Object______p115[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTypeFilterNodeConfiguration_c115[&quot;TbMsgTypeFilterNodeConfiguration&quot;]
+    NodeConfiguration_p116[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgTypeFilterNodeConfiguration_c116[&quot;TbMsgTypeFilterNodeConfiguration&quot;]
+    Object______p117[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTypeSwitchNode_c117[&quot;TbMsgTypeSwitchNode&quot;]
+    TbNode_p118[&quot;TbNode&quot;] --&gt;|implements| TbMsgTypeSwitchNode_c118[&quot;TbMsgTypeSwitchNode&quot;]
+    Object______p119[&quot;Object/外部框架&quot;] --&gt;|extends| TbOriginatorTypeFilterNode_c119[&quot;TbOriginatorTypeFilterNode&quot;]
+    TbNode_p120[&quot;TbNode&quot;] --&gt;|implements| TbOriginatorTypeFilterNode_c120[&quot;TbOriginatorTypeFilterNode&quot;]
+    Object______p121[&quot;Object/外部框架&quot;] --&gt;|extends| TbOriginatorTypeFilterNodeConfiguration_c121[&quot;TbOriginatorTypeFilterNodeConfiguration&quot;]
+    NodeConfiguration_p122[&quot;NodeConfiguration&quot;] --&gt;|implements| TbOriginatorTypeFilterNodeConfiguration_c122[&quot;TbOriginatorTypeFilterNodeConfiguration&quot;]
+    TbAbstractTypeSwitchNode_p123[&quot;TbAbstractTypeSwitchNode&quot;] --&gt;|extends| TbOriginatorTypeSwitchNode_c123[&quot;TbOriginatorTypeSwitchNode&quot;]
+    Object______p124[&quot;Object/外部框架&quot;] --&gt;|extends| TbAckNode_c124[&quot;TbAckNode&quot;]
+    TbNode_p125[&quot;TbNode&quot;] --&gt;|implements| TbAckNode_c125[&quot;TbAckNode&quot;]
+    Object______p126[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckpointNode_c126[&quot;TbCheckpointNode&quot;]
+    TbNode_p127[&quot;TbNode&quot;] --&gt;|implements| TbCheckpointNode_c127[&quot;TbCheckpointNode&quot;]
+    Object______p128[&quot;Object/外部框架&quot;] --&gt;|extends| TbRuleChainInputNode_c128[&quot;TbRuleChainInputNode&quot;]
+    TbNode_p129[&quot;TbNode&quot;] --&gt;|implements| TbRuleChainInputNode_c129[&quot;TbRuleChainInputNode&quot;]
+    Object______p130[&quot;Object/外部框架&quot;] --&gt;|extends| TbRuleChainInputNodeConfiguration_c130[&quot;TbRuleChainInputNodeConfiguration&quot;]
+    NodeConfiguration_p131[&quot;NodeConfiguration&quot;] --&gt;|implements| TbRuleChainInputNodeConfiguration_c131[&quot;TbRuleChainInputNodeConfiguration&quot;]
+    Object______p132[&quot;Object/外部框架&quot;] --&gt;|extends| TbRuleChainOutputNode_c132[&quot;TbRuleChainOutputNode&quot;]
+    TbNode_p133[&quot;TbNode&quot;] --&gt;|implements| TbRuleChainOutputNode_c133[&quot;TbRuleChainOutputNode&quot;]
+    TbAbstractExternalNode_p134[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbPubSubNode_c134[&quot;TbPubSubNode&quot;]
+    Object______p135[&quot;Object/外部框架&quot;] --&gt;|extends| TbPubSubNodeConfiguration_c135[&quot;TbPubSubNodeConfiguration&quot;]
+    NodeConfiguration_p136[&quot;NodeConfiguration&quot;] --&gt;|implements| TbPubSubNodeConfiguration_c136[&quot;TbPubSubNodeConfiguration&quot;]
+    Object______p137[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractGeofencingNode_c137[&quot;AbstractGeofencingNode&quot;]
+    TbNode_p138[&quot;TbNode&quot;] --&gt;|implements| AbstractGeofencingNode_c138[&quot;AbstractGeofencingNode&quot;]
+    Object______p139[&quot;Object/外部框架&quot;] --&gt;|extends| Coordinates_c139[&quot;Coordinates&quot;]
+    Object______p140[&quot;Object/外部框架&quot;] --&gt;|extends| EntityGeofencingState_c140[&quot;EntityGeofencingState&quot;]
+    Object______p141[&quot;Object/外部框架&quot;] --&gt;|extends| GeoUtil_c141[&quot;GeoUtil&quot;]
+    Object______p142[&quot;Object/外部框架&quot;] --&gt;|extends| Perimeter_c142[&quot;Perimeter&quot;]
+    AbstractGeofencingNode_p143[&quot;AbstractGeofencingNode&quot;] --&gt;|extends| TbGpsGeofencingActionNode_c143[&quot;TbGpsGeofencingActionNode&quot;]
+    TbGpsGeofencingFilterNodeConfiguration_p144[&quot;TbGpsGeofencingFilterNodeConfiguration&quot;] --&gt;|extends| TbGpsGeofencingActionNodeConfiguration_c144[&quot;TbGpsGeofencingActionNodeConfiguration&quot;]
+    AbstractGeofencingNode_p145[&quot;AbstractGeofencingNode&quot;] --&gt;|extends| TbGpsGeofencingFilterNode_c145[&quot;TbGpsGeofencingFilterNode&quot;]
+    Object______p146[&quot;Object/外部框架&quot;] --&gt;|extends| TbGpsGeofencingFilterNodeConfiguration_c146[&quot;TbGpsGeofencingFilterNodeConfiguration&quot;]
+    NodeConfiguration_p147[&quot;NodeConfiguration&quot;] --&gt;|implements| TbGpsGeofencingFilterNodeConfiguration_c147[&quot;TbGpsGeofencingFilterNodeConfiguration&quot;]
+    TbAbstractExternalNode_p148[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbKafkaNode_c148[&quot;TbKafkaNode&quot;]
+    Object______p149[&quot;Object/外部框架&quot;] --&gt;|extends| TbKafkaNodeConfiguration_c149[&quot;TbKafkaNodeConfiguration&quot;]
+    NodeConfiguration_p150[&quot;NodeConfiguration&quot;] --&gt;|implements| TbKafkaNodeConfiguration_c150[&quot;TbKafkaNodeConfiguration&quot;]
+    Object______p151[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgToEmailNode_c151[&quot;TbMsgToEmailNode&quot;]
+    TbNode_p152[&quot;TbNode&quot;] --&gt;|implements| TbMsgToEmailNode_c152[&quot;TbMsgToEmailNode&quot;]
+    Object______p153[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgToEmailNodeConfiguration_c153[&quot;TbMsgToEmailNodeConfiguration&quot;]
+    NodeConfiguration_p154[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgToEmailNodeConfiguration_c154[&quot;TbMsgToEmailNodeConfiguration&quot;]
+    TbAbstractExternalNode_p155[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbSendEmailNode_c155[&quot;TbSendEmailNode&quot;]
+    Object______p156[&quot;Object/外部框架&quot;] --&gt;|extends| TbSendEmailNodeConfiguration_c156[&quot;TbSendEmailNodeConfiguration&quot;]
+    NodeConfiguration_p157[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSendEmailNodeConfiguration_c157[&quot;TbSendEmailNodeConfiguration&quot;]
+    Object______p158[&quot;Object/外部框架&quot;] --&gt;|extends| TbMathArgument_c158[&quot;TbMathArgument&quot;]
+    Object______p159[&quot;Object/外部框架&quot;] --&gt;|extends| TbMathArgumentValue_c159[&quot;TbMathArgumentValue&quot;]
+    Object______p160[&quot;Object/外部框架&quot;] --&gt;|extends| TbMathNode_c160[&quot;TbMathNode&quot;]
+    TbNode_p161[&quot;TbNode&quot;] --&gt;|implements| TbMathNode_c161[&quot;TbMathNode&quot;]
+    Object______p162[&quot;Object/外部框架&quot;] --&gt;|extends| SemaphoreWithQueue_c162[&quot;SemaphoreWithQueue&quot;]
+    Object______p163[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTbContextBiFunction_c163[&quot;TbMsgTbContextBiFunction&quot;]
+    Object______p164[&quot;Object/外部框架&quot;] --&gt;|extends| TbMathNodeConfiguration_c164[&quot;TbMathNodeConfiguration&quot;]
+    NodeConfiguration_p165[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMathNodeConfiguration_c165[&quot;TbMathNodeConfiguration&quot;]
+    Object______p166[&quot;Object/外部框架&quot;] --&gt;|extends| TbMathResult_c166[&quot;TbMathResult&quot;]
+    Object______p167[&quot;Object/外部框架&quot;] --&gt;|extends| CalculateDeltaNode_c167[&quot;CalculateDeltaNode&quot;]
+    TbNode_p168[&quot;TbNode&quot;] --&gt;|implements| CalculateDeltaNode_c168[&quot;CalculateDeltaNode&quot;]
+    Object______p169[&quot;Object/外部框架&quot;] --&gt;|extends| ValueWithTs_c169[&quot;ValueWithTs&quot;]
+    Object______p170[&quot;Object/外部框架&quot;] --&gt;|extends| CalculateDeltaNodeConfiguration_c170[&quot;CalculateDeltaNodeConfiguration&quot;]
+    NodeConfiguration_p171[&quot;NodeConfiguration&quot;] --&gt;|implements| CalculateDeltaNodeConfiguration_c171[&quot;CalculateDeltaNodeConfiguration&quot;]
+    Object______p172[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractFetchToNodeConfiguration_c172[&quot;TbAbstractFetchToNodeConfiguration&quot;]
+    Object______p173[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractGetAttributesNode_c173[&quot;TbAbstractGetAttributesNode&quot;]
+    Object______p174[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractGetEntityDataNode_c174[&quot;TbAbstractGetEntityDataNode&quot;]
+    Object______p175[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractGetEntityDetailsNode_c175[&quot;TbAbstractGetEntityDetailsNode&quot;]
+    TbAbstractFetchToNodeConfiguration_p176[&quot;TbAbstractFetchToNodeConfiguration&quot;] --&gt;|extends| TbAbstractGetEntityDetailsNodeConfiguration_c176[&quot;TbAbstractGetEntityDetailsNodeConfiguration&quot;]
+    Object______p177[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractGetMappedDataNode_c177[&quot;TbAbstractGetMappedDataNode&quot;]
+    Object______p178[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractNodeWithFetchTo_c178[&quot;TbAbstractNodeWithFetchTo&quot;]
+    TbNode_p179[&quot;TbNode&quot;] --&gt;|implements| TbAbstractNodeWithFetchTo_c179[&quot;TbAbstractNodeWithFetchTo&quot;]
+    TbAbstractNodeWithFetchTo_p180[&quot;TbAbstractNodeWithFetchTo&quot;] --&gt;|extends| TbFetchDeviceCredentialsNode_c180[&quot;TbFetchDeviceCredentialsNode&quot;]
+    TbAbstractFetchToNodeConfiguration_p181[&quot;TbAbstractFetchToNodeConfiguration&quot;] --&gt;|extends| TbFetchDeviceCredentialsNodeConfiguration_c181[&quot;TbFetchDeviceCredentialsNodeConfiguration&quot;]
+    NodeConfiguration_p182[&quot;NodeConfiguration&quot;] --&gt;|implements| TbFetchDeviceCredentialsNodeConfiguration_c182[&quot;TbFetchDeviceCredentialsNodeConfiguration&quot;]
+    TbAbstractGetAttributesNode_p183[&quot;TbAbstractGetAttributesNode&quot;] --&gt;|extends| TbGetAttributesNode_c183[&quot;TbGetAttributesNode&quot;]
+    TbAbstractFetchToNodeConfiguration_p184[&quot;TbAbstractFetchToNodeConfiguration&quot;] --&gt;|extends| TbGetAttributesNodeConfiguration_c184[&quot;TbGetAttributesNodeConfiguration&quot;]
+    NodeConfiguration_p185[&quot;NodeConfiguration&quot;] --&gt;|implements| TbGetAttributesNodeConfiguration_c185[&quot;TbGetAttributesNodeConfiguration&quot;]
+    TbAbstractGetEntityDataNode_p186[&quot;TbAbstractGetEntityDataNode&quot;] --&gt;|extends| TbGetCustomerAttributeNode_c186[&quot;TbGetCustomerAttributeNode&quot;]
+    TbAbstractGetEntityDetailsNode_p187[&quot;TbAbstractGetEntityDetailsNode&quot;] --&gt;|extends| TbGetCustomerDetailsNode_c187[&quot;TbGetCustomerDetailsNode&quot;]
+    TbAbstractGetEntityDetailsNodeConfiguration_p188[&quot;TbAbstractGetEntityDetailsNodeConfiguration&quot;] --&gt;|extends| TbGetCustomerDetailsNodeConfiguration_c188[&quot;TbGetCustomerDetailsNodeConfiguration&quot;]
+    NodeConfiguration_p189[&quot;NodeConfiguration&quot;] --&gt;|implements| TbGetCustomerDetailsNodeConfiguration_c189[&quot;TbGetCustomerDetailsNodeConfiguration&quot;]
+    TbAbstractGetAttributesNode_p190[&quot;TbAbstractGetAttributesNode&quot;] --&gt;|extends| TbGetDeviceAttrNode_c190[&quot;TbGetDeviceAttrNode&quot;]
+    TbGetAttributesNodeConfiguration_p191[&quot;TbGetAttributesNodeConfiguration&quot;] --&gt;|extends| TbGetDeviceAttrNodeConfiguration_c191[&quot;TbGetDeviceAttrNodeConfiguration&quot;]
+    TbGetMappedDataNodeConfiguration_p192[&quot;TbGetMappedDataNodeConfiguration&quot;] --&gt;|extends| TbGetEntityDataNodeConfiguration_c192[&quot;TbGetEntityDataNodeConfiguration&quot;]
+    NodeConfiguration_p193[&quot;NodeConfiguration&quot;] --&gt;|implements| TbGetEntityDataNodeConfiguration_c193[&quot;TbGetEntityDataNodeConfiguration&quot;]
+    TbAbstractFetchToNodeConfiguration_p194[&quot;TbAbstractFetchToNodeConfiguration&quot;] --&gt;|extends| TbGetMappedDataNodeConfiguration_c194[&quot;TbGetMappedDataNodeConfiguration&quot;]
+    TbGetMappedDataNodeConfiguration_p195[&quot;TbGetMappedDataNodeConfiguration&quot;] --&gt;|extends| TbGetOriginatorFieldsConfiguration_c195[&quot;TbGetOriginatorFieldsConfiguration&quot;]
+    NodeConfiguration_p196[&quot;NodeConfiguration&quot;] --&gt;|implements| TbGetOriginatorFieldsConfiguration_c196[&quot;TbGetOriginatorFieldsConfiguration&quot;]
+    TbAbstractGetMappedDataNode_p197[&quot;TbAbstractGetMappedDataNode&quot;] --&gt;|extends| TbGetOriginatorFieldsNode_c197[&quot;TbGetOriginatorFieldsNode&quot;]
+    TbAbstractGetEntityDataNode_p198[&quot;TbAbstractGetEntityDataNode&quot;] --&gt;|extends| TbGetRelatedAttributeNode_c198[&quot;TbGetRelatedAttributeNode&quot;]
+    TbGetEntityDataNodeConfiguration_p199[&quot;TbGetEntityDataNodeConfiguration&quot;] --&gt;|extends| TbGetRelatedDataNodeConfiguration_c199[&quot;TbGetRelatedDataNodeConfiguration&quot;]
+    Object______p200[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetTelemetryNode_c200[&quot;TbGetTelemetryNode&quot;]
+    TbNode_p201[&quot;TbNode&quot;] --&gt;|implements| TbGetTelemetryNode_c201[&quot;TbGetTelemetryNode&quot;]
+    Object______p202[&quot;Object/外部框架&quot;] --&gt;|extends| Interval_c202[&quot;Interval&quot;]
+    Object______p203[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetTelemetryNodeConfiguration_c203[&quot;TbGetTelemetryNodeConfiguration&quot;]
+    NodeConfiguration_p204[&quot;NodeConfiguration&quot;] --&gt;|implements| TbGetTelemetryNodeConfiguration_c204[&quot;TbGetTelemetryNodeConfiguration&quot;]
+    TbAbstractGetEntityDataNode_p205[&quot;TbAbstractGetEntityDataNode&quot;] --&gt;|extends| TbGetTenantAttributeNode_c205[&quot;TbGetTenantAttributeNode&quot;]
+    TbAbstractGetEntityDetailsNode_p206[&quot;TbAbstractGetEntityDetailsNode&quot;] --&gt;|extends| TbGetTenantDetailsNode_c206[&quot;TbGetTenantDetailsNode&quot;]
+    TbAbstractGetEntityDetailsNodeConfiguration_p207[&quot;TbAbstractGetEntityDetailsNodeConfiguration&quot;] --&gt;|extends| TbGetTenantDetailsNodeConfiguration_c207[&quot;TbGetTenantDetailsNodeConfiguration&quot;]
+    NodeConfiguration_p208[&quot;NodeConfiguration&quot;] --&gt;|implements| TbGetTenantDetailsNodeConfiguration_c208[&quot;TbGetTenantDetailsNodeConfiguration&quot;]
+    TbAbstractExternalNode_p209[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbMqttNode_c209[&quot;TbMqttNode&quot;]
+    Object______p210[&quot;Object/外部框架&quot;] --&gt;|extends| TbMqttNodeConfiguration_c210[&quot;TbMqttNodeConfiguration&quot;]
+    NodeConfiguration_p211[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMqttNodeConfiguration_c211[&quot;TbMqttNodeConfiguration&quot;]
+    CertPemCredentials_p212[&quot;CertPemCredentials&quot;] --&gt;|extends| AzureIotHubSasCredentials_c212[&quot;AzureIotHubSasCredentials&quot;]
+    TbMqttNode_p213[&quot;TbMqttNode&quot;] --&gt;|extends| TbAzureIotHubNode_c213[&quot;TbAzureIotHubNode&quot;]
+    TbMqttNodeConfiguration_p214[&quot;TbMqttNodeConfiguration&quot;] --&gt;|extends| TbAzureIotHubNodeConfiguration_c214[&quot;TbAzureIotHubNodeConfiguration&quot;]
+    TbAbstractExternalNode_p215[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbNotificationNode_c215[&quot;TbNotificationNode&quot;]
+    Object______p216[&quot;Object/外部框架&quot;] --&gt;|extends| TbNotificationNodeConfiguration_c216[&quot;TbNotificationNodeConfiguration&quot;]
+    NodeConfiguration_p217[&quot;NodeConfiguration&quot;] --&gt;|implements| TbNotificationNodeConfiguration_c217[&quot;TbNotificationNodeConfiguration&quot;]
+    TbAbstractExternalNode_p218[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbSlackNode_c218[&quot;TbSlackNode&quot;]
+    Object______p219[&quot;Object/外部框架&quot;] --&gt;|extends| TbSlackNodeConfiguration_c219[&quot;TbSlackNodeConfiguration&quot;]
+    NodeConfiguration_p220[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSlackNodeConfiguration_c220[&quot;TbSlackNodeConfiguration&quot;]
+    Object______p221[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmRuleState_c221[&quot;AlarmRuleState&quot;]
+    Object______p222[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmState_c222[&quot;AlarmState&quot;]
+    Object______p223[&quot;Object/外部框架&quot;] --&gt;|extends| DataSnapshot_c223[&quot;DataSnapshot&quot;]
+    Object______p224[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceState_c224[&quot;DeviceState&quot;]
+    Object______p225[&quot;Object/外部框架&quot;] --&gt;|extends| DynamicPredicateValueCtxImpl_c225[&quot;DynamicPredicateValueCtxImpl&quot;]
+    DynamicPredicateValueCtx_p226[&quot;DynamicPredicateValueCtx&quot;] --&gt;|implements| DynamicPredicateValueCtxImpl_c226[&quot;DynamicPredicateValueCtxImpl&quot;]
+    Object______p227[&quot;Object/外部框架&quot;] --&gt;|extends| EntityKeyValue_c227[&quot;EntityKeyValue&quot;]
+    RuntimeException_p228[&quot;RuntimeException&quot;] --&gt;|extends| NumericParseException_c228[&quot;NumericParseException&quot;]
+    Object______p229[&quot;Object/外部框架&quot;] --&gt;|extends| ProfileState_c229[&quot;ProfileState&quot;]
+    Object______p230[&quot;Object/外部框架&quot;] --&gt;|extends| SnapshotUpdate_c230[&quot;SnapshotUpdate&quot;]
+    Object______p231[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeviceProfileNode_c231[&quot;TbDeviceProfileNode&quot;]
+    TbNode_p232[&quot;TbNode&quot;] --&gt;|implements| TbDeviceProfileNode_c232[&quot;TbDeviceProfileNode&quot;]
+    Object______p233[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeviceProfileNodeConfiguration_c233[&quot;TbDeviceProfileNodeConfiguration&quot;]
+    NodeConfiguration_p234[&quot;NodeConfiguration&quot;] --&gt;|implements| TbDeviceProfileNodeConfiguration_c234[&quot;TbDeviceProfileNodeConfiguration&quot;]
+    Object______p235[&quot;Object/外部框架&quot;] --&gt;|extends| PersistedAlarmRuleState_c235[&quot;PersistedAlarmRuleState&quot;]
+    Object______p236[&quot;Object/外部框架&quot;] --&gt;|extends| PersistedAlarmState_c236[&quot;PersistedAlarmState&quot;]
+    Object______p237[&quot;Object/外部框架&quot;] --&gt;|extends| PersistedDeviceState_c237[&quot;PersistedDeviceState&quot;]
+    TbAbstractExternalNode_p238[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbRabbitMqNode_c238[&quot;TbRabbitMqNode&quot;]
+    Object______p239[&quot;Object/外部框架&quot;] --&gt;|extends| TbRabbitMqNodeConfiguration_c239[&quot;TbRabbitMqNodeConfiguration&quot;]
+    NodeConfiguration_p240[&quot;NodeConfiguration&quot;] --&gt;|implements| TbRabbitMqNodeConfiguration_c240[&quot;TbRabbitMqNodeConfiguration&quot;]
+    Object______p241[&quot;Object/外部框架&quot;] --&gt;|extends| TbHttpClient_c241[&quot;TbHttpClient&quot;]
+    TbAbstractExternalNode_p242[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbRestApiCallNode_c242[&quot;TbRestApiCallNode&quot;]
+    Object______p243[&quot;Object/外部框架&quot;] --&gt;|extends| TbRestApiCallNodeConfiguration_c243[&quot;TbRestApiCallNodeConfiguration&quot;]
+    NodeConfiguration_p244[&quot;NodeConfiguration&quot;] --&gt;|implements| TbRestApiCallNodeConfiguration_c244[&quot;TbRestApiCallNodeConfiguration&quot;]
+    Object______p245[&quot;Object/外部框架&quot;] --&gt;|extends| TbSendRPCReplyNode_c245[&quot;TbSendRPCReplyNode&quot;]
+    TbNode_p246[&quot;TbNode&quot;] --&gt;|implements| TbSendRPCReplyNode_c246[&quot;TbSendRPCReplyNode&quot;]
+    Object______p247[&quot;Object/外部框架&quot;] --&gt;|extends| TbSendRPCRequestNode_c247[&quot;TbSendRPCRequestNode&quot;]
+    TbNode_p248[&quot;TbNode&quot;] --&gt;|implements| TbSendRPCRequestNode_c248[&quot;TbSendRPCRequestNode&quot;]
+    Object______p249[&quot;Object/外部框架&quot;] --&gt;|extends| TbSendRpcReplyNodeConfiguration_c249[&quot;TbSendRpcReplyNodeConfiguration&quot;]
+    NodeConfiguration_p250[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSendRpcReplyNodeConfiguration_c250[&quot;TbSendRpcReplyNodeConfiguration&quot;]
+    Object______p251[&quot;Object/外部框架&quot;] --&gt;|extends| TbSendRpcRequestNodeConfiguration_c251[&quot;TbSendRpcRequestNodeConfiguration&quot;]
+    NodeConfiguration_p252[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSendRpcRequestNodeConfiguration_c252[&quot;TbSendRpcRequestNodeConfiguration&quot;]
+    TbAbstractExternalNode_p253[&quot;TbAbstractExternalNode&quot;] --&gt;|extends| TbSendSmsNode_c253[&quot;TbSendSmsNode&quot;]
+    Object______p254[&quot;Object/外部框架&quot;] --&gt;|extends| TbSendSmsNodeConfiguration_c254[&quot;TbSendSmsNodeConfiguration&quot;]
+    NodeConfiguration_p255[&quot;NodeConfiguration&quot;] --&gt;|implements| TbSendSmsNodeConfiguration_c255[&quot;TbSendSmsNodeConfiguration&quot;]
+    TelemetryNodeCallback_p256[&quot;TelemetryNodeCallback&quot;] --&gt;|extends| AttributesDeleteNodeCallback_c256[&quot;AttributesDeleteNodeCallback&quot;]
+    TelemetryNodeCallback_p257[&quot;TelemetryNodeCallback&quot;] --&gt;|extends| AttributesUpdateNodeCallback_c257[&quot;AttributesUpdateNodeCallback&quot;]
+    Object______p258[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgAttributesNode_c258[&quot;TbMsgAttributesNode&quot;]
+    TbNode_p259[&quot;TbNode&quot;] --&gt;|implements| TbMsgAttributesNode_c259[&quot;TbMsgAttributesNode&quot;]
+    Object______p260[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgAttributesNodeConfiguration_c260[&quot;TbMsgAttributesNodeConfiguration&quot;]
+    NodeConfiguration_p261[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgAttributesNodeConfiguration_c261[&quot;TbMsgAttributesNodeConfiguration&quot;]
+    Object______p262[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgDeleteAttributesNode_c262[&quot;TbMsgDeleteAttributesNode&quot;]
+    TbNode_p263[&quot;TbNode&quot;] --&gt;|implements| TbMsgDeleteAttributesNode_c263[&quot;TbMsgDeleteAttributesNode&quot;]
+    Object______p264[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgDeleteAttributesNodeConfiguration_c264[&quot;TbMsgDeleteAttributesNodeConfiguration&quot;]
+    NodeConfiguration_p265[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgDeleteAttributesNodeConfiguration_c265[&quot;TbMsgDeleteAttributesNodeConfiguration&quot;]
+    Object______p266[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTimeseriesNode_c266[&quot;TbMsgTimeseriesNode&quot;]
+    TbNode_p267[&quot;TbNode&quot;] --&gt;|implements| TbMsgTimeseriesNode_c267[&quot;TbMsgTimeseriesNode&quot;]
+    Object______p268[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTimeseriesNodeConfiguration_c268[&quot;TbMsgTimeseriesNodeConfiguration&quot;]
+    NodeConfiguration_p269[&quot;NodeConfiguration&quot;] --&gt;|implements| TbMsgTimeseriesNodeConfiguration_c269[&quot;TbMsgTimeseriesNodeConfiguration&quot;]
+    Object______p270[&quot;Object/外部框架&quot;] --&gt;|extends| TelemetryNodeCallback_c270[&quot;TelemetryNodeCallback&quot;]
+    FutureCallback_p271[&quot;FutureCallback&quot;] --&gt;|implements| TelemetryNodeCallback_c271[&quot;TelemetryNodeCallback&quot;]
+    Object______p272[&quot;Object/外部框架&quot;] --&gt;|extends| TbSynchronizationBeginNode_c272[&quot;TbSynchronizationBeginNode&quot;]
+    TbNode_p273[&quot;TbNode&quot;] --&gt;|implements| TbSynchronizationBeginNode_c273[&quot;TbSynchronizationBeginNode&quot;]
+    Object______p274[&quot;Object/外部框架&quot;] --&gt;|extends| TbSynchronizationEndNode_c274[&quot;TbSynchronizationEndNode&quot;]
+    TbNode_p275[&quot;TbNode&quot;] --&gt;|implements| TbSynchronizationEndNode_c275[&quot;TbSynchronizationEndNode&quot;]
+    Object______p276[&quot;Object/外部框架&quot;] --&gt;|extends| MultipleTbMsgsCallbackWrapper_c276[&quot;MultipleTbMsgsCallbackWrapper&quot;]
+    TbMsgCallbackWrapper_p277[&quot;TbMsgCallbackWrapper&quot;] --&gt;|implements| MultipleTbMsgsCallbackWrapper_c277[&quot;MultipleTbMsgsCallbackWrapper&quot;]
+    Object______p278[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractTransformNode_c278[&quot;TbAbstractTransformNode&quot;]
+    TbNode_p279[&quot;TbNode&quot;] --&gt;|implements| TbAbstractTransformNode_c279[&quot;TbAbstractTransformNode&quot;]
+    Object______p280[&quot;Object/外部框架&quot;] --&gt;|extends| TbAbstractTransformNodeWithTbMsgSource_c280[&quot;TbAbstractTransformNodeWithTbMsgSource&quot;]
+    TbNode_p281[&quot;TbNode&quot;] --&gt;|implements| TbAbstractTransformNodeWithTbMsgSource_c281[&quot;TbAbstractTransformNodeWithTbMsgSource&quot;]
+    TbAbstractTransformNode_p282[&quot;TbAbstractTransformNode&quot;] --&gt;|extends| TbChangeOriginatorNode_c282[&quot;TbChangeOriginatorNode&quot;]
+    Object______p283[&quot;Object/外部框架&quot;] --&gt;|extends| TbChangeOriginatorNodeConfiguration_c283[&quot;TbChangeOriginatorNodeConfiguration&quot;]
+    NodeConfiguration_p284[&quot;NodeConfiguration&quot;] --&gt;|implements| TbChangeOriginatorNodeConfiguration_c284[&quot;TbChangeOriginatorNodeConfiguration&quot;]
+    TbAbstractTransformNodeWithTbMsgSource_p285[&quot;TbAbstractTransformNodeWithTbMsgSource&quot;] --&gt;|extends| TbCopyKeysNode_c285[&quot;TbCopyKeysNode&quot;]
+    Object______p286[&quot;Object/外部框架&quot;] --&gt;|extends| TbCopyKeysNodeConfiguration_c286[&quot;TbCopyKeysNodeConfiguration&quot;]
+    NodeConfiguration_p287[&quot;NodeConfiguration&quot;] --&gt;|implements| TbCopyKeysNodeConfiguration_c287[&quot;TbCopyKeysNodeConfiguration&quot;]
+    TbAbstractTransformNodeWithTbMsgSource_p288[&quot;TbAbstractTransformNodeWithTbMsgSource&quot;] --&gt;|extends| TbDeleteKeysNode_c288[&quot;TbDeleteKeysNode&quot;]
+    Object______p289[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeleteKeysNodeConfiguration_c289[&quot;TbDeleteKeysNodeConfiguration&quot;]
+    NodeConfiguration_p290[&quot;NodeConfiguration&quot;] --&gt;|implements| TbDeleteKeysNodeConfiguration_c290[&quot;TbDeleteKeysNodeConfiguration&quot;]
+    Object______p291[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsonPathNode_c291[&quot;TbJsonPathNode&quot;]
+    TbNode_p292[&quot;TbNode&quot;] --&gt;|implements| TbJsonPathNode_c292[&quot;TbJsonPathNode&quot;]
+    Object______p293[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsonPathNodeConfiguration_c293[&quot;TbJsonPathNodeConfiguration&quot;]
+    NodeConfiguration_p294[&quot;NodeConfiguration&quot;] --&gt;|implements| TbJsonPathNodeConfiguration_c294[&quot;TbJsonPathNodeConfiguration&quot;]
+    TbAbstractTransformNodeWithTbMsgSource_p295[&quot;TbAbstractTransformNodeWithTbMsgSource&quot;] --&gt;|extends| TbRenameKeysNode_c295[&quot;TbRenameKeysNode&quot;]
+    Object______p296[&quot;Object/外部框架&quot;] --&gt;|extends| TbRenameKeysNodeConfiguration_c296[&quot;TbRenameKeysNodeConfiguration&quot;]
+    NodeConfiguration_p297[&quot;NodeConfiguration&quot;] --&gt;|implements| TbRenameKeysNodeConfiguration_c297[&quot;TbRenameKeysNodeConfiguration&quot;]
+    Object______p298[&quot;Object/外部框架&quot;] --&gt;|extends| TbSplitArrayMsgNode_c298[&quot;TbSplitArrayMsgNode&quot;]
+    TbNode_p299[&quot;TbNode&quot;] --&gt;|implements| TbSplitArrayMsgNode_c299[&quot;TbSplitArrayMsgNode&quot;]
+    TbAbstractTransformNode_p300[&quot;TbAbstractTransformNode&quot;] --&gt;|extends| TbTransformMsgNode_c300[&quot;TbTransformMsgNode&quot;]
+    Object______p301[&quot;Object/外部框架&quot;] --&gt;|extends| TbTransformMsgNodeConfiguration_c301[&quot;TbTransformMsgNodeConfiguration&quot;]
+    NodeConfiguration_p302[&quot;NodeConfiguration&quot;] --&gt;|implements| TbTransformMsgNodeConfiguration_c302[&quot;TbTransformMsgNodeConfiguration&quot;]
+    Object______p303[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesAlarmOriginatorIdAsyncLoader_c303[&quot;EntitiesAlarmOriginatorIdAsyncLoader&quot;]
+    Object______p304[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesByNameAndTypeLoader_c304[&quot;EntitiesByNameAndTypeLoader&quot;]
+    Object______p305[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesCustomerIdAsyncLoader_c305[&quot;EntitiesCustomerIdAsyncLoader&quot;]
+    Object______p306[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesFieldsAsyncLoader_c306[&quot;EntitiesFieldsAsyncLoader&quot;]
+    Object______p307[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesRelatedDeviceIdAsyncLoader_c307[&quot;EntitiesRelatedDeviceIdAsyncLoader&quot;]
+    Object______p308[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesRelatedEntityIdAsyncLoader_c308[&quot;EntitiesRelatedEntityIdAsyncLoader&quot;]
+    Object______p309[&quot;Object/外部框架&quot;] --&gt;|extends| EntityContainer_c309[&quot;EntityContainer&quot;]
+    Object______p310[&quot;Object/外部框架&quot;] --&gt;|extends| GpsGeofencingEvents_c310[&quot;GpsGeofencingEvents&quot;]
+    Object______p311[&quot;Object/外部框架&quot;] --&gt;|extends| TenantIdLoader_c311[&quot;TenantIdLoader&quot;]
+    Object______p312[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractRuleNodeUpgradeTest_c312[&quot;AbstractRuleNodeUpgradeTest&quot;]
+    Object______p313[&quot;Object/外部框架&quot;] --&gt;|extends| TestDbCallbackExecutor_c313[&quot;TestDbCallbackExecutor&quot;]
+    ListeningExecutor_p314[&quot;ListeningExecutor&quot;] --&gt;|implements| TestDbCallbackExecutor_c314[&quot;TestDbCallbackExecutor&quot;]
+    Object______p315[&quot;Object/外部框架&quot;] --&gt;|extends| TbAlarmNodeTest_c315[&quot;TbAlarmNodeTest&quot;]
+    Object______p316[&quot;Object/外部框架&quot;] --&gt;|extends| TbCreateRelationNodeTest_c316[&quot;TbCreateRelationNodeTest&quot;]
+    Object______p317[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeviceStateNodeTest_c317[&quot;TbDeviceStateNodeTest&quot;]
+    Object______p318[&quot;Object/外部框架&quot;] --&gt;|extends| TbLogNodeTest_c318[&quot;TbLogNodeTest&quot;]
+    Object______p319[&quot;Object/外部框架&quot;] --&gt;|extends| CertPemCredentialsTest_c319[&quot;CertPemCredentialsTest&quot;]
+    AbstractRuleNodeUpgradeTest_p320[&quot;AbstractRuleNodeUpgradeTest&quot;] --&gt;|extends| TbMsgGeneratorNodeTest_c320[&quot;TbMsgGeneratorNodeTest&quot;]
+    Object______p321[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgPushToEdgeNodeTest_c321[&quot;TbMsgPushToEdgeNodeTest&quot;]
+    Object______p322[&quot;Object/外部框架&quot;] --&gt;|extends| TbAssetTypeSwitchNodeTest_c322[&quot;TbAssetTypeSwitchNodeTest&quot;]
+    Object______p323[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckAlarmStatusNodeTest_c323[&quot;TbCheckAlarmStatusNodeTest&quot;]
+    Object______p324[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckMessageNodeTest_c324[&quot;TbCheckMessageNodeTest&quot;]
+    Object______p325[&quot;Object/外部框架&quot;] --&gt;|extends| TbCheckRelationNodeTest_c325[&quot;TbCheckRelationNodeTest&quot;]
+    Object______p326[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeviceTypeSwitchNodeTest_c326[&quot;TbDeviceTypeSwitchNodeTest&quot;]
+    Object______p327[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsFilterNodeTest_c327[&quot;TbJsFilterNodeTest&quot;]
+    Object______p328[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsSwitchNodeTest_c328[&quot;TbJsSwitchNodeTest&quot;]
+    Object______p329[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTypeFilterNodeTest_c329[&quot;TbMsgTypeFilterNodeTest&quot;]
+    Object______p330[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgTypeSwitchNodeTest_c330[&quot;TbMsgTypeSwitchNodeTest&quot;]
+    Object______p331[&quot;Object/外部框架&quot;] --&gt;|extends| TbOriginatorTypeFilterNodeTest_c331[&quot;TbOriginatorTypeFilterNodeTest&quot;]
+    Object______p332[&quot;Object/外部框架&quot;] --&gt;|extends| TbOriginatorTypeSwitchNodeTest_c332[&quot;TbOriginatorTypeSwitchNodeTest&quot;]
+    AbstractRuleNodeUpgradeTest_p333[&quot;AbstractRuleNodeUpgradeTest&quot;] --&gt;|extends| TbCheckpointNodeTest_c333[&quot;TbCheckpointNodeTest&quot;]
+    Object______p334[&quot;Object/外部框架&quot;] --&gt;|extends| GeoUtilTest_c334[&quot;GeoUtilTest&quot;]
+    Object______p335[&quot;Object/外部框架&quot;] --&gt;|extends| GpsGeofencingActionTestCase_c335[&quot;GpsGeofencingActionTestCase&quot;]
+    AbstractRuleNodeUpgradeTest_p336[&quot;AbstractRuleNodeUpgradeTest&quot;] --&gt;|extends| TbGpsGeofencingActionNodeTest_c336[&quot;TbGpsGeofencingActionNodeTest&quot;]
+    Object______p337[&quot;Object/外部框架&quot;] --&gt;|extends| TbGpsGeofencingFilterNodeTest_c337[&quot;TbGpsGeofencingFilterNodeTest&quot;]
+    Object______p338[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgToEmailNodeTest_c338[&quot;TbMsgToEmailNodeTest&quot;]
+    Object______p339[&quot;Object/外部框架&quot;] --&gt;|extends| MailBodyTypeTestConfig_c339[&quot;MailBodyTypeTestConfig&quot;]
+    Object______p340[&quot;Object/外部框架&quot;] --&gt;|extends| TbMathArgumentValueTest_c340[&quot;TbMathArgumentValueTest&quot;]
+    Object______p341[&quot;Object/外部框架&quot;] --&gt;|extends| TbMathNodeTest_c341[&quot;TbMathNodeTest&quot;]
+    AbstractListeningExecutor_p342[&quot;AbstractListeningExecutor&quot;] --&gt;|extends| RuleDispatcherExecutor_c342[&quot;RuleDispatcherExecutor&quot;]
+    AbstractListeningExecutor_p343[&quot;AbstractListeningExecutor&quot;] --&gt;|extends| DBCallbackExecutor_c343[&quot;DBCallbackExecutor&quot;]
+    Object______p344[&quot;Object/外部框架&quot;] --&gt;|extends| CalculateDeltaNodeTest_c344[&quot;CalculateDeltaNodeTest&quot;]
+    Object______p345[&quot;Object/外部框架&quot;] --&gt;|extends| ListMatcher_c345[&quot;ListMatcher&quot;]
+    Object______p346[&quot;Object/外部框架&quot;] --&gt;|extends| TbFetchDeviceCredentialsNodeTest_c346[&quot;TbFetchDeviceCredentialsNodeTest&quot;]
+    Object______p347[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetAttributesNodeTest_c347[&quot;TbGetAttributesNodeTest&quot;]
+    Object______p348[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetCustomerAttributeNodeTest_c348[&quot;TbGetCustomerAttributeNodeTest&quot;]
+    Object______p349[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetCustomerDetailsNodeTest_c349[&quot;TbGetCustomerDetailsNodeTest&quot;]
+    Object______p350[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetDeviceAttrNodeTest_c350[&quot;TbGetDeviceAttrNodeTest&quot;]
+    Object______p351[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetOriginatorFieldsNodeTest_c351[&quot;TbGetOriginatorFieldsNodeTest&quot;]
+    Object______p352[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetRelatedAttributeNodeTest_c352[&quot;TbGetRelatedAttributeNodeTest&quot;]
+    Object______p353[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetTelemetryNodeTest_c353[&quot;TbGetTelemetryNodeTest&quot;]
+    Object______p354[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetTenantAttributeNodeTest_c354[&quot;TbGetTenantAttributeNodeTest&quot;]
+    Object______p355[&quot;Object/外部框架&quot;] --&gt;|extends| TbGetTenantDetailsNodeTest_c355[&quot;TbGetTenantDetailsNodeTest&quot;]
+    Object______p356[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmRuleStateTest_c356[&quot;AlarmRuleStateTest&quot;]
+    Object______p357[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmStateTest_c357[&quot;AlarmStateTest&quot;]
+    Object______p358[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceStateTest_c358[&quot;DeviceStateTest&quot;]
+    Object______p359[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeviceProfileNodeTest_c359[&quot;TbDeviceProfileNodeTest&quot;]
+    Object______p360[&quot;Object/外部框架&quot;] --&gt;|extends| TbHttpClientTest_c360[&quot;TbHttpClientTest&quot;]
+    Object______p361[&quot;Object/外部框架&quot;] --&gt;|extends| TbRestApiCallNodeTest_c361[&quot;TbRestApiCallNodeTest&quot;]
+    Object______p362[&quot;Object/外部框架&quot;] --&gt;|extends| TbSendRPCReplyNodeTest_c362[&quot;TbSendRPCReplyNodeTest&quot;]
+    Object______p363[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgAttributesNodeConfigurationTest_c363[&quot;TbMsgAttributesNodeConfigurationTest&quot;]
+    AbstractRuleNodeUpgradeTest_p364[&quot;AbstractRuleNodeUpgradeTest&quot;] --&gt;|extends| TbMsgAttributesNodeTest_c364[&quot;TbMsgAttributesNodeTest&quot;]
+    Object______p365[&quot;Object/外部框架&quot;] --&gt;|extends| TbMsgDeleteAttributesNodeTest_c365[&quot;TbMsgDeleteAttributesNodeTest&quot;]
+    Object______p366[&quot;Object/外部框架&quot;] --&gt;|extends| TbChangeOriginatorNodeTest_c366[&quot;TbChangeOriginatorNodeTest&quot;]
+    Object______p367[&quot;Object/外部框架&quot;] --&gt;|extends| TbCopyKeysNodeTest_c367[&quot;TbCopyKeysNodeTest&quot;]
+    Object______p368[&quot;Object/外部框架&quot;] --&gt;|extends| TbDeleteKeysNodeTest_c368[&quot;TbDeleteKeysNodeTest&quot;]
+    Object______p369[&quot;Object/外部框架&quot;] --&gt;|extends| TbJsonPathNodeTest_c369[&quot;TbJsonPathNodeTest&quot;]
+    AbstractRuleNodeUpgradeTest_p370[&quot;AbstractRuleNodeUpgradeTest&quot;] --&gt;|extends| TbMsgDeduplicationNodeTest_c370[&quot;TbMsgDeduplicationNodeTest&quot;]
+    Object______p371[&quot;Object/外部框架&quot;] --&gt;|extends| TbRenameKeysNodeTest_c371[&quot;TbRenameKeysNodeTest&quot;]
+    Object______p372[&quot;Object/外部框架&quot;] --&gt;|extends| TbSplitArrayMsgNodeTest_c372[&quot;TbSplitArrayMsgNodeTest&quot;]
+    Object______p373[&quot;Object/外部框架&quot;] --&gt;|extends| TbTransformMsgNodeTest_c373[&quot;TbTransformMsgNodeTest&quot;]
+    Object______p374[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesCustomerIdAsyncLoaderTest_c374[&quot;EntitiesCustomerIdAsyncLoaderTest&quot;]
+    Object______p375[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesFieldsAsyncLoaderTest_c375[&quot;EntitiesFieldsAsyncLoaderTest&quot;]
+    Object______p376[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesRelatedDeviceIdAsyncLoaderTest_c376[&quot;EntitiesRelatedDeviceIdAsyncLoaderTest&quot;]
+    Object______p377[&quot;Object/外部框架&quot;] --&gt;|extends| EntitiesRelatedEntityIdAsyncLoaderTest_c377[&quot;EntitiesRelatedEntityIdAsyncLoaderTest&quot;]
+    Object______p378[&quot;Object/外部框架&quot;] --&gt;|extends| TenantIdLoaderTest_c378[&quot;TenantIdLoaderTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `TbAbstractAlarmNode.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractAlarmNode.processAlarm()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractAlarmNode.buildAlarmDetails()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractAlarmNode.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractCustomerActionNode.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.createCustomerIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.doProcessCustomerAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.getCustomer()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.CustomerKey()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.load()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractRelationActionNode.EntityCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.processEntityRelationAction()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.createEntityIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.doProcessEntityRelationAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.getEntity()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.EntityKey()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.processSingleSearchDirection()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.SearchDirectionIds()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.processListSearchDirection()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.processPattern()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.EntityCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.load()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.loadEntity()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.EntityContainer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.Device()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.Asset()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `ClientCredentials.getType()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/credentials/ClientCredentials.java`)
+- `AbstractTbMsgPushNode.getConfigClazz()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/edge/AbstractTbMsgPushNode.java`)
+- `AbstractTbMsgPushNode.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/edge/AbstractTbMsgPushNode.java`)
+- `AbstractTbMsgPushNode.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/edge/AbstractTbMsgPushNode.java`)
+- `AbstractTbMsgPushNode.buildEvent()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/edge/AbstractTbMsgPushNode.java`)
+
+
+## 哪些方法可以重写
+
+- `TbAbstractAlarmNode.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractAlarmNode.processAlarm()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractAlarmNode.buildAlarmDetails()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractAlarmNode.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractCustomerActionNode.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.createCustomerIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.doProcessCustomerAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.getCustomer()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.CustomerKey()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.load()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.createCustomerIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.doProcessCustomerAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.getCustomer()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.load()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.createCustomerIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.doProcessCustomerAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.getCustomer()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.CustomerKey()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.load()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractRelationActionNode.EntityCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.onMsg()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.destroy()` (public, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.processEntityRelationAction()` (protected, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.createEntityIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.doProcessEntityRelationAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+
+
+## 哪些方法必须重写
+
+- `TbAbstractAlarmNode.processAlarm()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractAlarmNode.java`)
+- `TbAbstractCustomerActionNode.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.createCustomerIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.doProcessCustomerAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.CustomerKey()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractCustomerActionNode.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.CustomerCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.createCustomerIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.doProcessCustomerAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerKey.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.createCustomerIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.doProcessCustomerAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.CustomerKey()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `CustomerCacheLoader.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractCustomerActionNode.java`)
+- `TbAbstractRelationActionNode.EntityCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.createEntityIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.doProcessEntityRelationAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.EntityKey()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.SearchDirectionIds()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.loadEntity()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.EntityContainer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.Device()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.Asset()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `TbAbstractRelationActionNode.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.EntityCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.createEntityIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.doProcessEntityRelationAction()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.RuntimeException()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.SearchDirectionIds()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.loadEntity()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.EntityContainer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.Device()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.Asset()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `EntityKey.Customer()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `SearchDirectionIds.EntityCacheLoader()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+- `SearchDirectionIds.createEntityIfNotExists()` (package, `rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/action/TbAbstractRelationActionNode.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `TbAbstractAlarmNode` (extends)
+- `TbNode` -&gt; `TbAbstractAlarmNode` (implements)
+- `Object/外部框架` -&gt; `TbAbstractAlarmNodeConfiguration` (extends)
+- `Object/外部框架` -&gt; `TbAbstractCustomerActionNode` (extends)
+- `TbNode` -&gt; `TbAbstractCustomerActionNode` (implements)
+- `Object/外部框架` -&gt; `CustomerKey` (extends)
+- `CacheLoader` -&gt; `CustomerCacheLoader` (extends)
+- `Object/外部框架` -&gt; `TbAbstractCustomerActionNodeConfiguration` (extends)
+- `Object/外部框架` -&gt; `TbAbstractRelationActionNode` (extends)
+- `TbNode` -&gt; `TbAbstractRelationActionNode` (implements)
+- `Object/外部框架` -&gt; `EntityKey` (extends)
+- `Object/外部框架` -&gt; `SearchDirectionIds` (extends)
+- `CacheLoader` -&gt; `EntityCacheLoader` (extends)
+- `Object/外部框架` -&gt; `RelationContainer` (extends)
+- `Object/外部框架` -&gt; `TbAbstractRelationActionNodeConfiguration` (extends)
+- `Object/外部框架` -&gt; `TbAlarmResult` (extends)
+- `TbAbstractCustomerActionNode` -&gt; `TbAssignToCustomerNode` (extends)
+- `TbAbstractCustomerActionNodeConfiguration` -&gt; `TbAssignToCustomerNodeConfiguration` (extends)
+- `NodeConfiguration` -&gt; `TbAssignToCustomerNodeConfiguration` (implements)
+- `TbAbstractAlarmNode` -&gt; `TbClearAlarmNode` (extends)
+- `TbAbstractAlarmNodeConfiguration` -&gt; `TbClearAlarmNodeConfiguration` (extends)
+- `NodeConfiguration` -&gt; `TbClearAlarmNodeConfiguration` (implements)
+- `Object/外部框架` -&gt; `TbCopyAttributesToEntityViewNode` (extends)
+- `TbNode` -&gt; `TbCopyAttributesToEntityViewNode` (implements)
+- `TbAbstractAlarmNode` -&gt; `TbCreateAlarmNode` (extends)
+- `TbAbstractAlarmNodeConfiguration` -&gt; `TbCreateAlarmNodeConfiguration` (extends)
+- `NodeConfiguration` -&gt; `TbCreateAlarmNodeConfiguration` (implements)
+- `TbAbstractRelationActionNode` -&gt; `TbCreateRelationNode` (extends)
+- `TbAbstractRelationActionNodeConfiguration` -&gt; `TbCreateRelationNodeConfiguration` (extends)
+- `NodeConfiguration` -&gt; `TbCreateRelationNodeConfiguration` (implements)
+- `TbAbstractRelationActionNode` -&gt; `TbDeleteRelationNode` (extends)
+- `TbAbstractRelationActionNodeConfiguration` -&gt; `TbDeleteRelationNodeConfiguration` (extends)
+- `NodeConfiguration` -&gt; `TbDeleteRelationNodeConfiguration` (implements)
+- `Object/外部框架` -&gt; `TbDeviceStateNode` (extends)
+- `TbNode` -&gt; `TbDeviceStateNode` (implements)
+- `Object/外部框架` -&gt; `TbDeviceStateNodeConfiguration` (extends)
+- `NodeConfiguration` -&gt; `TbDeviceStateNodeConfiguration` (implements)
+- `Object/外部框架` -&gt; `TbLogNode` (extends)
+- `TbNode` -&gt; `TbLogNode` (implements)
+- `Object/外部框架` -&gt; `TbLogNodeConfiguration` (extends)
+- 其余 40 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `AbstractListeningExecutor`
+- `CacheLoader`
+- `FutureCallback`
+- `ListeningExecutor`
+- `NodeConfiguration`
+- `Object/外部框架`
+- `RuntimeException`
+- `TbNode`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

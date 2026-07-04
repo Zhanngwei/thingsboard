@@ -1,0 +1,2114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server DAO Layer 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server DAO Layer 模块继承体系分析
+
+&gt; 生成范围：`dao`  
+&gt; Maven artifact：`dao`  
+&gt; Java 类型数量：652  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>AbstractAlarmCommentEntity
+├── AlarmCommentEntity
+├── AlarmCommentInfoEntity
+AbstractAlarmEntity
+├── AlarmEntity
+├── AlarmInfoEntity
+AbstractAssetEntity
+├── AssetEntity
+├── AssetInfoEntity
+AbstractDeviceEntity
+├── DeviceEntity
+├── DeviceInfoEntity
+AbstractEdgeEntity
+├── EdgeEntity
+├── EdgeInfoEntity
+AbstractListeningExecutor
+├── CacheExecutorService
+├── JpaExecutorService
+├── JpaRelationQueryExecutorService
+AbstractSingleColumnStandardBasicType
+├── JsonBinaryType
+├── JsonStringType
+AbstractTenantEntity
+├── TenantEntity
+├── TenantInfoEntity
+AbstractTsKvEntity
+├── TimescaleTsKvEntity
+├── TsKvEntity
+├── TsKvLatestEntity
+AbstractTypeDescriptor
+├── JsonTypeDescriptor
+AbstractWidgetTypeEntity
+├── WidgetTypeDetailsEntity
+├── WidgetTypeEntity
+├── WidgetTypeInfoEntity
+AdminSettingsService
+├── «implements» AdminSettingsServiceImpl
+AggregationTimeseriesDao
+├── «implements» AbstractSqlTimeseriesDao
+├── «implements» ├── AbstractChunkedAggregationTimeseriesDao
+├── «implements» ├── ├── JpaSqlTimeseriesDao
+├── «implements» ├── TimescaleTimeseriesDao
+├── «implements» CassandraBaseTimeseriesDao
+Alarm&gt; extends BaseSqlEntity
+├── public
+AlarmComment&gt; extends BaseSqlEntity
+├── public
+AlarmCommentService
+├── «implements» BaseAlarmCommentService
+AlarmQueryRepository
+├── «implements» DefaultAlarmQueryRepository
+AlarmService
+├── «implements» BaseAlarmService
+ApiLimitService
+├── «implements» DefaultApiLimitService
+ApiUsageStateService
+├── «implements» ApiUsageStateServiceImpl
+Asset&gt; extends BaseSqlEntity
+├── public
+AssetProfileService
+├── «implements» AssetProfileServiceImpl
+AssetService
+├── «implements» BaseAssetService
+AsyncFunction
+├── «implements» AggregatePartitionsFunction
+AttributesDao
+├── «implements» JpaAttributeDao
+AttributesService
+├── «implements» BaseAttributesService
+├── «implements» CachedAttributesService
+AuditLogService
+├── «implements» AuditLogServiceImpl
+├── «implements» DummyAuditLogServiceImpl
+AuditLogSink
+├── «implements» DummyAuditLogSink
+├── «implements» ElasticsearchAuditLogSink
+BaseEntity
+├── «implements» AdminSettingsEntity
+├── «implements» ApiUsageStateEntity
+├── «implements» AuditLogEntity
+├── «implements» DeviceCredentialsEntity
+├── «implements» EdgeEventEntity
+├── «implements» ErrorEventEntity
+├── «implements» LifecycleEventEntity
+├── «implements» RpcEntity
+├── «implements» RuleChainDebugEventEntity
+├── «implements» RuleNodeDebugEventEntity
+├── «implements» StatisticsEventEntity
+├── «implements» TbResourceInfoEntity
+├── «implements» UserAuthSettingsEntity
+├── «implements» UserCredentialsEntity
+├── «implements» public
+BaseSqlEntity
+├── AdminSettingsEntity
+├── ApiUsageStateEntity
+├── AssetProfileEntity
+├── AuditLogEntity
+├── ComponentDescriptorEntity
+├── CustomerEntity
+├── DashboardEntity
+├── DashboardInfoEntity
+├── DeviceCredentialsEntity
+├── DeviceProfileEntity
+├── EdgeEventEntity
+├── NotificationEntity
+├── NotificationRequestEntity
+├── ├── NotificationRequestInfoEntity
+├── NotificationRuleEntity
+├── ├── NotificationRuleInfoEntity
+├── NotificationTargetEntity
+├── NotificationTemplateEntity
+├── OAuth2ClientRegistrationTemplateEntity
+├── OAuth2DomainEntity
+├── OAuth2MobileEntity
+├── OAuth2ParamsEntity
+├── OAuth2RegistrationEntity
+├── OtaPackageEntity
+├── OtaPackageInfoEntity
+├── QueueEntity
+├── RpcEntity
+├── RuleChainEntity
+├── RuleNodeEntity
+├── RuleNodeStateEntity
+├── TbResourceEntity
+├── TbResourceInfoEntity
+├── TenantProfileEntity
+├── UserAuthSettingsEntity
+├── UserCredentialsEntity
+├── UserEntity
+├── WidgetsBundleEntity
+BaseWidgetType&gt; extends BaseSqlEntity
+├── public
+CaffeineTbTransactionalCache
+├── AlarmTypesCaffeineCache
+├── AssetCaffeineCache
+├── AssetProfileCaffeineCache
+├── AttributeCaffeineCache
+├── DashboardTitlesCaffeineCache
+├── DeviceCredentialsCaffeineCache
+├── DeviceProfileCaffeineCache
+├── EdgeCaffeineCache
+├── EntityCountCaffeineCache
+├── EntityViewCaffeineCache
+├── OtaPackageCaffeineCache
+├── RelationCaffeineCache
+├── TenantCaffeineCache
+├── TenantExistsCaffeineCache
+├── TenantProfileCaffeineCache
+├── UserSettingsCaffeineCache
+ClientRegistrationRepository
+├── «implements» HybridClientRegistrationRepository
+ComponentDescriptorInsertRepository
+├── «implements» AbstractComponentDescriptorInsertRepository
+├── «implements» ├── SqlComponentDescriptorInsertRepository
+ComponentDescriptorService
+├── «implements» BaseComponentDescriptorService
+CustomerService
+├── «implements» CustomerServiceImpl
+Dao
+├── AdminSettingsDao
+├── ├── «implements» JpaAdminSettingsDao
+├── AlarmCommentDao
+├── ├── «implements» JpaAlarmCommentDao
+├── AlarmDao
+├── ├── «implements» JpaAlarmDao
+├── ApiUsageStateDao
+├── ├── «implements» JpaApiUsageStateDao
+├── AssetDao
+├── ├── «implements» JpaAssetDao
+├── AssetProfileDao
+├── ├── «implements» JpaAssetProfileDao
+├── AuditLogDao
+├── ├── «implements» JpaAuditLogDao
+├── ComponentDescriptorDao
+├── ├── «implements» JpaBaseComponentDescriptorDao
+├── CustomerDao
+├── ├── «implements» JpaCustomerDao
+├── DashboardDao
+├── ├── «implements» JpaDashboardDao
+├── DashboardInfoDao
+├── ├── «implements» JpaDashboardInfoDao
+├── DeviceCredentialsDao
+├── ├── «implements» JpaDeviceCredentialsDao
+├── DeviceDao
+├── ├── «implements» JpaDeviceDao
+├── DeviceProfileDao
+├── ├── «implements» JpaDeviceProfileDao
+├── EdgeDao
+├── ├── «implements» JpaEdgeDao
+├── EdgeEventDao
+├── ├── «implements» JpaBaseEdgeEventDao
+├── EntityViewDao
+├── ├── «implements» JpaEntityViewDao
+├── NotificationDao
+├── ├── «implements» JpaNotificationDao
+├── NotificationRequestDao
+├── ├── «implements» JpaNotificationRequestDao
+├── NotificationRuleDao
+├── ├── «implements» JpaNotificationRuleDao
+├── NotificationTargetDao
+├── ├── «implements» JpaNotificationTargetDao
+├── NotificationTemplateDao
+├── ├── «implements» JpaNotificationTemplateDao
+├── OAuth2ClientRegistrationTemplateDao
+├── ├── «implements» JpaOAuth2ClientRegistrationTemplateDao
+├── OAuth2DomainDao
+├── ├── «implements» JpaOAuth2DomainDao
+├── OAuth2MobileDao
+├── ├── «implements» JpaOAuth2MobileDao
+├── OAuth2ParamsDao
+├── ├── «implements» JpaOAuth2ParamsDao
+├── OAuth2RegistrationDao
+├── ├── «implements» JpaOAuth2RegistrationDao
+├── OtaPackageDao
+├── ├── «implements» JpaOtaPackageDao
+├── OtaPackageInfoDao
+├── ├── «implements» JpaOtaPackageInfoDao
+├── QueueDao
+├── ├── «implements» JpaQueueDao
+├── RpcDao
+├── ├── «implements» JpaRpcDao
+├── RuleChainDao
+├── ├── «implements» JpaRuleChainDao
+├── RuleNodeDao
+├── ├── «implements» JpaRuleNodeDao
+├── RuleNodeStateDao
+├── ├── «implements» JpaRuleNodeStateDao
+├── TbResourceDao
+├── ├── «implements» JpaTbResourceDao
+├── TbResourceInfoDao
+├── ├── «implements» JpaTbResourceInfoDao
+├── TenantDao
+├── ├── «implements» JpaTenantDao
+├── TenantProfileDao
+├── ├── «implements» JpaTenantProfileDao
+├── UserAuthSettingsDao
+├── ├── «implements» JpaUserAuthSettingsDao
+├── UserCredentialsDao
+├── ├── «implements» JpaUserCredentialsDao
+├── UserDao
+├── ├── «implements» JpaUserDao
+├── WidgetTypeDao
+├── ├── «implements» JpaWidgetTypeDao
+├── WidgetsBundleDao
+├── ├── «implements» JpaWidgetsBundleDao
+DashboardService
+├── «implements» DashboardServiceImpl
+Device&gt; extends BaseSqlEntity
+├── public
+DeviceConnectivityService
+├── «implements» DeviceConnectivityServiceImpl
+DeviceCredentialsService
+├── «implements» DeviceCredentialsServiceImpl
+DeviceProfileService
+├── «implements» DeviceProfileServiceImpl
+DeviceService
+├── «implements» DeviceServiceImpl
+DynamicParameterizedType
+├── «implements» JsonBinaryType
+├── «implements» JsonStringType
+├── «implements» JsonTypeDescriptor
+Edge&gt; extends BaseSqlEntity
+├── public
+EdgeEventService
+├── «implements» BaseEdgeEventService
+EdgeService
+├── «implements» EdgeServiceImpl
+EdgeSynchronizationManager
+├── «implements» DefaultEdgeSynchronizationManager
+EntityCountService
+├── «implements» BaseEntityCountService
+EntityDaoService
+├── «implements» DefaultNotificationRequestService
+├── «implements» DefaultNotificationRuleService
+├── «implements» DefaultNotificationService
+├── «implements» DefaultNotificationTargetService
+├── «implements» DefaultNotificationTemplateService
+EntityQueryDao
+├── «implements» JpaEntityQueryDao
+EntityQueryRepository
+├── «implements» DefaultEntityQueryRepository
+EntityService
+├── «implements» BaseEntityService
+EntityServiceRegistry
+├── «implements» DefaultEntityServiceRegistry
+EntityViewService
+├── «implements» EntityViewServiceImpl
+Event&gt;
+├── public
+EventCleanupRepository
+├── «implements» SqlEventCleanupRepository
+EventDao
+├── «implements» JpaBaseEventDao
+EventEntity
+├── ErrorEventEntity
+├── LifecycleEventEntity
+├── RuleChainDebugEventEntity
+├── RuleNodeDebugEventEntity
+├── StatisticsEventEntity
+EventRepository
+├── ErrorEventRepository
+├── LifecycleEventRepository
+├── RuleChainDebugEventRepository
+├── RuleNodeDebugEventRepository
+├── StatisticsEventRepository
+EventService
+├── «implements» BaseEventService
+Exception
+├── TenantRateLimitException
+ExportableEntityDao
+├── AssetDao
+├── ├── «implements» JpaAssetDao
+├── AssetProfileDao
+├── ├── «implements» JpaAssetProfileDao
+├── CustomerDao
+├── ├── «implements» JpaCustomerDao
+├── DashboardDao
+├── ├── «implements» JpaDashboardDao
+├── DeviceDao
+├── ├── «implements» JpaDeviceDao
+├── DeviceProfileDao
+├── ├── «implements» JpaDeviceProfileDao
+├── EntityViewDao
+├── ├── «implements» JpaEntityViewDao
+├── NotificationRuleDao
+├── ├── «implements» JpaNotificationRuleDao
+├── NotificationTargetDao
+├── ├── «implements» JpaNotificationTargetDao
+├── NotificationTemplateDao
+├── ├── «implements» JpaNotificationTemplateDao
+├── RuleChainDao
+├── ├── «implements» JpaRuleChainDao
+├── TbResourceDao
+├── ├── «implements» JpaTbResourceDao
+├── WidgetTypeDao
+├── ├── «implements» JpaWidgetTypeDao
+├── WidgetsBundleDao
+├── ├── «implements» JpaWidgetsBundleDao
+ExportableEntityRepository
+├── AssetProfileRepository
+├── AssetRepository
+├── CustomerRepository
+├── DashboardRepository
+├── DeviceProfileRepository
+├── DeviceRepository
+├── EntityViewRepository
+├── NotificationRuleRepository
+├── NotificationTargetRepository
+├── NotificationTemplateRepository
+├── RuleChainRepository
+├── TbResourceRepository
+├── WidgetTypeRepository
+├── WidgetsBundleRepository
+ImageContainerDao
+├── AssetProfileDao
+├── ├── «implements» JpaAssetProfileDao
+├── DashboardInfoDao
+├── ├── «implements» JpaDashboardInfoDao
+├── DeviceProfileDao
+├── ├── «implements» JpaDeviceProfileDao
+├── WidgetTypeDao
+├── ├── «implements» JpaWidgetTypeDao
+├── WidgetsBundleDao
+├── ├── «implements» JpaWidgetsBundleDao
+ImageService
+├── «implements» BaseImageService
+InsertLatestTsRepository
+├── «implements» SqlLatestInsertTsRepository
+InsertTsRepository
+├── «implements» SqlInsertTsRepository
+├── «implements» TimescaleInsertTsRepository
+JpaRepository
+├── AdminSettingsRepository
+├── AlarmCommentRepository
+├── AlarmRepository
+├── ApiUsageStateRepository
+├── AssetProfileRepository
+├── AssetRepository
+├── AttributeKvRepository
+├── AuditLogRepository
+├── ComponentDescriptorRepository
+├── CustomerRepository
+├── DashboardInfoRepository
+├── DashboardRepository
+├── DeviceCredentialsRepository
+├── DeviceProfileRepository
+├── DeviceRepository
+├── EdgeEventRepository
+├── EdgeRepository
+├── EntityAlarmRepository
+├── EntityViewRepository
+├── ErrorEventRepository
+├── LifecycleEventRepository
+├── NotificationRepository
+├── NotificationRequestRepository
+├── NotificationRuleRepository
+├── NotificationTargetRepository
+├── NotificationTemplateRepository
+├── OAuth2ClientRegistrationTemplateRepository
+├── OAuth2DomainRepository
+├── OAuth2MobileRepository
+├── OAuth2ParamsRepository
+├── OAuth2RegistrationRepository
+├── OtaPackageInfoRepository
+├── OtaPackageRepository
+├── QueueRepository
+├── RelationRepository
+├── RpcRepository
+├── RuleChainDebugEventRepository
+├── RuleChainRepository
+├── RuleNodeDebugEventRepository
+├── RuleNodeRepository
+├── RuleNodeStateRepository
+├── StatisticsEventRepository
+├── TbResourceInfoRepository
+├── TbResourceRepository
+├── TenantProfileRepository
+├── TenantRepository
+├── TsKvDictionaryRepository
+├── TsKvLatestRepository
+├── TsKvRepository
+├── TsKvTimescaleRepository
+├── UserAuthSettingsRepository
+├── UserCredentialsRepository
+├── UserRepository
+├── UserSettingsRepository
+├── WidgetTypeInfoRepository
+├── WidgetTypeRepository
+├── WidgetsBundleRepository
+├── WidgetsBundleWidgetRepository
+JpaSpecificationExecutor
+├── EdgeEventRepository
+├── RelationRepository
+NativeDeviceRepository
+├── «implements» DefaultNativeDeviceRepository
+NotificationRequestService
+├── «implements» DefaultNotificationRequestService
+NotificationRuleService
+├── «implements» DefaultNotificationRuleService
+NotificationService
+├── «implements» DefaultNotificationService
+NotificationSettingsService
+├── «implements» DefaultNotificationSettingsService
+NotificationTargetService
+├── «implements» DefaultNotificationTargetService
+NotificationTemplateService
+├── «implements» DefaultNotificationTemplateService
+OAuth2ConfigTemplateService
+├── «implements» OAuth2ConfigTemplateServiceImpl
+OAuth2Service
+├── «implements» OAuth2ServiceImpl
+Object/外部框架
+├── AbstractBufferedRateExecutor
+├── ├── CassandraBufferedRateReadExecutor
+├── ├── CassandraBufferedRateWriteExecutor
+├── AbstractCachedService
+├── ├── UserSettingsServiceImpl
+├── AbstractChunkedAggregationTimeseriesDaoTest
+├── AbstractComponentDescriptorInsertRepository
+├── ├── SqlComponentDescriptorInsertRepository
+├── AbstractDaoServiceTest
+├── AbstractEntityService
+├── ├── AbstractCachedEntityService
+├── ├── ├── AssetProfileServiceImpl
+├── ├── ├── BaseAlarmService
+├── ├── ├── BaseAssetService
+├── ├── ├── BaseEntityCountService
+├── ├── ├── BaseOtaPackageService
+├── ├── ├── BaseResourceService
+├── ├── ├── ├── BaseImageService
+├── ├── ├── DeviceCredentialsServiceImpl
+├── ├── ├── DeviceProfileServiceImpl
+├── ├── ├── DeviceServiceImpl
+├── ├── ├── EdgeServiceImpl
+├── ├── ├── EntityViewServiceImpl
+├── ├── ├── TenantProfileServiceImpl
+├── ├── ├── TenantServiceImpl
+├── ├── ApiUsageStateServiceImpl
+├── ├── BaseAlarmCommentService
+├── ├── BaseEntityService
+├── ├── BaseQueueService
+├── ├── BaseRuleChainService
+├── ├── BaseRuleNodeStateService
+├── ├── CustomerServiceImpl
+├── ├── DashboardServiceImpl
+├── ├── DefaultNotificationRuleService
+├── ├── DefaultNotificationTargetService
+├── ├── DefaultNotificationTemplateService
+├── ├── OAuth2ConfigTemplateServiceImpl
+├── ├── OAuth2ServiceImpl
+├── ├── UserServiceImpl
+├── AbstractEntityViewEntity
+├── ├── EntityViewEntity
+├── ├── EntityViewInfoEntity
+├── AbstractHasOtaPackageValidator
+├── ├── DeviceDataValidator
+├── ├── DeviceProfileDataValidator
+├── AbstractInsertRepository
+├── ├── SqlInsertTsRepository
+├── ├── SqlLatestInsertTsRepository
+├── ├── TimescaleInsertTsRepository
+├── AbstractJpaDaoTest
+├── ├── JpaAlarmCommentDaoTest
+├── ├── JpaAlarmDaoTest
+├── ├── JpaAssetDaoTest
+├── ├── JpaAuditLogDaoTest
+├── ├── JpaBaseComponentDescriptorDaoTest
+├── ├── JpaBaseEventDaoTest
+├── ├── JpaCustomerDaoTest
+├── ├── JpaDashboardInfoDaoTest
+├── ├── JpaDeviceCredentialsDaoTest
+├── ├── JpaDeviceDaoTest
+├── ├── JpaRpcDaoTest
+├── ├── JpaRuleNodeDaoTest
+├── ├── JpaTenantDaoTest
+├── ├── JpaUserCredentialsDaoTest
+├── ├── JpaUserDaoTest
+├── ├── JpaUserSettingsDaoTest
+├── ├── JpaWidgetTypeDaoTest
+├── ├── JpaWidgetsBundleDaoTest
+├── AbstractJsonSqlTypeDescriptor
+├── ├── JsonBinarySqlTypeDescriptor
+├── ├── JsonStringSqlTypeDescriptor
+├── AbstractNoSqlContainer
+├── ├── NoSqlDaoServiceTestSuite
+├── AbstractRedisContainer
+├── ├── RedisSqlTestSuite
+├── AbstractServiceTest
+├── ├── AdminSettingsServiceTest
+├── ├── AlarmCommentServiceTest
+├── ├── AlarmServiceTest
+├── ├── ApiUsageStateServiceTest
+├── ├── AssetProfileServiceTest
+├── ├── AssetServiceTest
+├── ├── BaseAttributesServiceTest
+├── ├── ├── AttributesServiceSqlTest
+├── ├── BaseEventServiceTest
+├── ├── ├── EventServiceSqlTest
+├── ├── BaseTimeseriesServiceTest
+├── ├── ├── TimeseriesServiceNoSqlTest
+├── ├── ├── ├── TimeseriesServiceNoSqlSetNullEnabledTest
+├── ├── ├── TimeseriesServiceSqlTest
+├── ├── ├── TimeseriesServiceTimescaleTest
+├── ├── CustomerServiceTest
+├── ├── DashboardServiceTest
+├── ├── DeviceCredentialsCacheTest
+├── ├── DeviceCredentialsServiceTest
+├── ├── DeviceProfileServiceTest
+├── ├── DeviceServiceTest
+├── ├── EdgeEventServiceTest
+├── ├── EdgeServiceTest
+├── ├── EntitiesSchemaSqlTest
+├── ├── EntityServiceRegistryTest
+├── ├── EntityServiceTest
+├── ├── OAuth2ConfigTemplateServiceTest
+├── ├── OAuth2ServiceTest
+├── ├── OtaPackageServiceTest
+├── ├── QueueServiceTest
+├── ├── RelationCacheTest
+├── ├── RelationServiceTest
+├── ├── RuleChainServiceTest
+├── ├── TbCacheSerializationTest
+├── ├── TenantProfileServiceTest
+├── ├── TenantServiceTest
+├── ├── UserServiceTest
+├── ├── WidgetTypeServiceTest
+├── ├── WidgetsBundleServiceTest
+├── ActionEntityEvent
+├── AdminSettingsDataValidatorTest
+├── AdminSettingsServiceImpl
+├── AggregatePartitionsFunction
+├── AggregationRepository
+├── AggregationResult
+├── AlarmDataAdapter
+├── AlarmDataValidatorTest
+├── AlarmTypesCacheEvictEvent
+├── AssetCacheEvictEvent
+├── AssetCacheKey
+├── AssetDataValidatorTest
+├── AssetProfileCacheKey
+├── AssetProfileDataValidatorTest
+├── AssetProfileEvictEvent
+├── AssetTypeFilter
+├── AsyncTaskContext
+├── AttributeCacheKey
+├── AttributeKvCompositeKey
+├── AttributeKvEntity
+├── AttributeKvInsertRepository
+├── ├── SqlAttributesInsertRepository
+├── AttributeUtils
+├── AuditLogLevelFilter
+├── AuditLogLevelProperties
+├── AuditLogServiceImpl
+├── BaseAttributesService
+├── BaseComponentDescriptorService
+├── BaseEdgeEventService
+├── BaseEventService
+├── BaseOtaPackageDataValidator
+├── ├── OtaPackageDataValidator
+├── ├── OtaPackageInfoDataValidator
+├── BaseOtaPackageDataValidatorTest
+├── BaseRelationService
+├── BaseRpcService
+├── BaseTimeseriesService
+├── BasicUsageInfoService
+├── BufferedRateExecutorStats
+├── CacheCallback
+├── CachedAttributesService
+├── CassandraAbstractDao
+├── ├── CassandraAbstractAsyncDao
+├── ├── ├── AbstractCassandraBaseTimeseriesDao
+├── ├── ├── ├── CassandraBaseTimeseriesDao
+├── ├── ├── ├── CassandraBaseTimeseriesLatestDao
+├── CassandraBaseTimeseriesDaoPartitioningDaysAlwaysExistsTest
+├── CassandraBaseTimeseriesDaoPartitioningHoursAlwaysExistsTest
+├── CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExistsTest
+├── CassandraBaseTimeseriesDaoPartitioningMinutesAlwaysExistsTest
+├── CassandraBaseTimeseriesDaoPartitioningMonthsAlwaysExistsTest
+├── CassandraBaseTimeseriesDaoPartitioningYearsAlwaysExistsTest
+├── CassandraPartitionCacheKey
+├── CassandraPartitionsCacheTest
+├── CassandraTsPartitionsCache
+├── ClaimDataInfo
+├── ComponentDescriptorDataValidatorTest
+├── ConstraintValidator
+├── ├── «implements» NoXssValidator
+├── ├── «implements» StringLengthValidator
+├── ConstraintValidatorTest
+├── CustomerDataValidatorTest
+├── DaoUtil
+├── DashboardDataValidatorTest
+├── DashboardTitleEvictEvent
+├── DataValidator
+├── ├── AdminSettingsDataValidator
+├── ├── AlarmCommentDataValidator
+├── ├── AlarmDataValidator
+├── ├── ApiUsageDataValidator
+├── ├── AssetDataValidator
+├── ├── AssetProfileDataValidator
+├── ├── AuditLogDataValidator
+├── ├── ClientRegistrationTemplateDataValidator
+├── ├── ComponentDescriptorDataValidator
+├── ├── CustomerDataValidator
+├── ├── DashboardDataValidator
+├── ├── DeviceCredentialsDataValidator
+├── ├── EdgeDataValidator
+├── ├── EdgeEventDataValidator
+├── ├── EntityViewDataValidator
+├── ├── EventDataValidator
+├── ├── NotificationRequestValidator
+├── ├── QueueValidator
+├── ├── ResourceDataValidator
+├── ├── RuleChainDataValidator
+├── ├── TenantDataValidator
+├── ├── TenantProfileDataValidator
+├── ├── UserCredentialsDataValidator
+├── ├── UserDataValidator
+├── ├── WidgetTypeDataValidator
+├── ├── WidgetsBundleDataValidator
+├── DataValidatorTest
+├── DbCallStats
+├── DbCallStatsSnapshot
+├── DefaultAlarmQueryRepository
+├── DefaultApiLimitService
+├── DefaultEdgeSynchronizationManager
+├── DefaultEntityQueryRepository
+├── DefaultEntityQueryRepositoryTest
+├── DefaultEntityServiceRegistry
+├── DefaultNativeDeviceRepository
+├── DefaultNotification
+├── DefaultNotificationRequestService
+├── DefaultNotificationService
+├── DefaultNotificationSettingsService
+├── DefaultNotifications
+├── DefaultQueryLogComponent
+├── DefaultQueryLogComponentTest
+├── DefaultRule
+├── DefaultTbTenantProfileCache
+├── DeleteEntityEvent
+├── DeleteEntityEventTest
+├── DeviceConnectivityConfiguration
+├── DeviceConnectivityInfo
+├── DeviceConnectivityServiceImpl
+├── DeviceConnectivityUtil
+├── DeviceConnectivityUtilTest
+├── DeviceCredentialsEvictEvent
+├── DeviceDataValidatorTest
+├── DeviceProfileCacheKey
+├── DeviceProfileDataValidatorTest
+├── DeviceProfileEvictEvent
+├── DummyAuditLogServiceImpl
+├── DummyAuditLogSink
+├── EdgeCacheEvictEvent
+├── EdgeCacheKey
+├── EdgeDataValidatorTest
+├── EdgeEventInsertRepository
+├── ElasticsearchAuditLogSink
+├── EntityAlarmCompositeKey
+├── EntityAlarmEntity
+├── EntityContainer
+├── EntityCountCacheEvictEvent
+├── EntityCountCacheKey
+├── EntityDataAdapter
+├── EntityDataAdapterTest
+├── EntityKeyMapping
+├── EntityKeyMappingTest
+├── EntityRelationEvent
+├── EntityViewCacheKey
+├── EntityViewCacheValue
+├── EntityViewDataValidatorTest
+├── EntityViewEvictEvent
+├── EventInsertRepository
+├── EventPartitionConfiguration
+├── HybridClientRegistrationRepository
+├── IdComparator
+├── ImageCacheKey
+├── ImageUtils
+├── JpaAbstractDao
+├── ├── JpaAdminSettingsDao
+├── ├── JpaAlarmDao
+├── ├── JpaApiUsageStateDao
+├── ├── JpaAssetDao
+├── ├── JpaAssetProfileDao
+├── ├── JpaBaseComponentDescriptorDao
+├── ├── JpaCustomerDao
+├── ├── JpaDashboardDao
+├── ├── JpaDashboardInfoDao
+├── ├── JpaDeviceCredentialsDao
+├── ├── JpaDeviceDao
+├── ├── JpaDeviceProfileDao
+├── ├── JpaEdgeDao
+├── ├── JpaEntityViewDao
+├── ├── JpaNotificationRequestDao
+├── ├── JpaNotificationRuleDao
+├── ├── JpaNotificationTargetDao
+├── ├── JpaNotificationTemplateDao
+├── ├── JpaOAuth2ClientRegistrationTemplateDao
+├── ├── JpaOAuth2DomainDao
+├── ├── JpaOAuth2MobileDao
+├── ├── JpaOAuth2ParamsDao
+├── ├── JpaOAuth2RegistrationDao
+├── ├── JpaOtaPackageDao
+├── ├── JpaOtaPackageInfoDao
+├── ├── JpaQueueDao
+├── ├── JpaRpcDao
+├── ├── JpaRuleChainDao
+├── ├── JpaRuleNodeDao
+├── ├── JpaRuleNodeStateDao
+├── ├── JpaTbResourceDao
+├── ├── JpaTbResourceInfoDao
+├── ├── JpaTenantDao
+├── ├── JpaTenantProfileDao
+├── ├── JpaUserAuthSettingsDao
+├── ├── JpaUserCredentialsDao
+├── ├── JpaUserDao
+├── ├── JpaWidgetTypeDao
+├── ├── JpaWidgetsBundleDao
+├── JpaAbstractDaoListeningExecutorService
+├── ├── BaseAbstractSqlTimeseriesDao
+├── ├── ├── AbstractSqlTimeseriesDao
+├── ├── ├── ├── AbstractChunkedAggregationTimeseriesDao
+├── ├── ├── ├── ├── JpaSqlTimeseriesDao
+├── ├── ├── ├── TimescaleTimeseriesDao
+├── ├── ├── SqlTimeseriesLatestDao
+├── ├── JpaAttributeDao
+├── ├── JpaRelationDao
+├── ├── JpaUserSettingsDao
+├── ├── SqlEventCleanupRepository
+├── JpaBaseEventDao
+├── JpaDaoConfig
+├── JpaEntityQueryDao
+├── JpaPartitionedAbstractDao
+├── ├── JpaAlarmCommentDao
+├── ├── JpaAuditLogDao
+├── ├── JpaBaseEdgeEventDao
+├── ├── JpaNotificationDao
+├── JsonNodeProcessingTask
+├── JsonPathProcessingTask
+├── KvUtils
+├── MethodCallStats
+├── MethodCallStatsSnapshot
+├── ModelConstants
+├── NoXssValidator
+├── NoXssValidatorTest
+├── OAuth2Configuration
+├── OAuth2Utils
+├── OtaPackageCacheEvictEvent
+├── OtaPackageCacheKey
+├── PaginatedRemover
+├── ├── CustomerDashboardsUnassigner
+├── ├── CustomerDashboardsUpdater
+├── Parameter
+├── PostgreSqlInitializer
+├── ProcessedImage
+├── QueryContext
+├── QueryCursor
+├── ├── TsKvQueryCursor
+├── QuerySecurityContext
+├── RelationActionEvent
+├── RelationCacheKey
+├── RelationCacheValue
+├── RelationCompositeKey
+├── RelationEntity
+├── RelationQueueCtx
+├── RelationTask
+├── ResourceDataValidatorTest
+├── RuleChainDataValidatorTest
+├── SaveEntityEvent
+├── ScheduledLogExecutorComponent
+├── SearchTsKvLatestRepository
+├── SimpleListenableFuture
+├── SqlDaoCallsAspect
+├── SqlPartition
+├── SqlPartitioningRepository
+├── SqlRelationInsertRepository
+├── SqlTimeseriesDaoConfig
+├── SqlTsDaoConfig
+├── SqlTsLatestDaoConfig
+├── StringLengthValidator
+├── TbSqlBlockingQueue
+├── TbSqlBlockingQueueParams
+├── TbSqlBlockingQueueWrapper
+├── TbSqlQueueElement
+├── TenantDataValidatorTest
+├── TenantEvictEvent
+├── TenantProfileCacheKey
+├── TenantProfileDataValidatorTest
+├── TenantProfileEvictEvent
+├── TimePaginatedRemover
+├── TimeUtils
+├── TimeUtilsTest
+├── TimescaleDaoConfig
+├── TimescaleDaoServiceTestSuite
+├── TimescaleSqlInitializer
+├── TimescaleTsKvCompositeKey
+├── TimescaleTsLatestDaoConfig
+├── TsKey
+├── TsKvCompositeKey
+├── TsKvDictionary
+├── TsKvDictionaryCompositeKey
+├── TsKvLatestCompositeKey
+├── UpdateResult
+├── UserSettingsEntity
+├── UserSettingsEvictEvent
+├── Validator
+├── WidgetTypeDataValidatorTest
+├── WidgetTypeIdFqnEntity
+├── WidgetTypeServiceImpl
+├── WidgetsBundleDataValidatorTest
+├── WidgetsBundleServiceImpl
+├── WidgetsBundleWidgetCompositeKey
+├── WidgetsBundleWidgetEntity
+├── public
+OtaPackageService
+├── «implements» BaseOtaPackageService
+PostgreSQL10Dialect
+├── ThingsboardPostgreSQLDialect
+QueryLogComponent
+├── «implements» DefaultQueryLogComponent
+QueueService
+├── «implements» BaseQueueService
+RedisTbTransactionalCache
+├── AlarmTypesRedisCache
+├── AssetProfileRedisCache
+├── AssetRedisCache
+├── AttributeRedisCache
+├── DashboardTitlesRedisCache
+├── DeviceCredentialsRedisCache
+├── DeviceProfileRedisCache
+├── EdgeRedisCache
+├── EntityCountRedisCache
+├── EntityViewRedisCache
+├── OtaPackageRedisCache
+├── RelationRedisCache
+├── TenantExistsRedisCache
+├── TenantProfileRedisCache
+├── TenantRedisCache
+├── UserSettingsRedisCache
+RelationDao
+├── «implements» JpaRelationDao
+RelationInsertRepository
+├── «implements» SqlRelationInsertRepository
+RelationService
+├── «implements» BaseRelationService
+ResourceService
+├── «implements» BaseResourceService
+├── «implements» ├── BaseImageService
+RpcService
+├── «implements» BaseRpcService
+RuleChainService
+├── «implements» BaseRuleChainService
+RuleNodeStateService
+├── «implements» BaseRuleNodeStateService
+RuntimeException
+├── BufferLimitException
+├── DataValidationException
+├── ├── DeviceCredentialsValidationException
+├── ├── EntitiesLimitException
+├── DatabaseException
+├── IncorrectParameterException
+Serializable
+├── «implements» AssetCacheKey
+├── «implements» AssetProfileCacheKey
+├── «implements» AttributeCacheKey
+├── «implements» AttributeKvCompositeKey
+├── «implements» AttributeKvEntity
+├── «implements» DeviceProfileCacheKey
+├── «implements» EdgeCacheKey
+├── «implements» EntityAlarmCompositeKey
+├── «implements» EntityCountCacheKey
+├── «implements» EntityViewCacheKey
+├── «implements» EntityViewCacheValue
+├── «implements» OtaPackageCacheKey
+├── «implements» RelationCacheKey
+├── «implements» RelationCacheValue
+├── «implements» RelationCompositeKey
+├── «implements» TenantProfileCacheKey
+├── «implements» TimescaleTsKvCompositeKey
+├── «implements» TsKvCompositeKey
+├── «implements» TsKvDictionaryCompositeKey
+├── «implements» TsKvLatestCompositeKey
+├── «implements» WidgetsBundleWidgetCompositeKey
+SqlParameterSource
+├── «implements» QueryContext
+SqlTypeDescriptor
+├── «implements» AbstractJsonSqlTypeDescriptor
+├── «implements» ├── JsonBinarySqlTypeDescriptor
+├── «implements» ├── JsonStringSqlTypeDescriptor
+TbTenantProfileCache
+├── «implements» DefaultTbTenantProfileCache
+Tenant&gt; extends BaseSqlEntity
+├── public
+TenantEntityDao
+├── AssetDao
+├── ├── «implements» JpaAssetDao
+├── CustomerDao
+├── ├── «implements» JpaCustomerDao
+├── DashboardDao
+├── ├── «implements» JpaDashboardDao
+├── DeviceDao
+├── ├── «implements» JpaDeviceDao
+├── NotificationTargetDao
+├── ├── «implements» JpaNotificationTargetDao
+├── RuleChainDao
+├── ├── «implements» JpaRuleChainDao
+├── UserDao
+├── ├── «implements» JpaUserDao
+TenantEntityWithDataDao
+├── OtaPackageDao
+├── ├── «implements» JpaOtaPackageDao
+├── TbResourceDao
+├── ├── «implements» JpaTbResourceDao
+TenantProfileProvider
+├── «implements» DefaultTbTenantProfileCache
+TenantProfileService
+├── «implements» TenantProfileServiceImpl
+TenantService
+├── «implements» TenantServiceImpl
+TimeseriesDao
+├── «implements» AbstractChunkedAggregationTimeseriesDao
+├── «implements» ├── JpaSqlTimeseriesDao
+├── «implements» CassandraBaseTimeseriesDao
+├── «implements» TimescaleTimeseriesDao
+TimeseriesLatestDao
+├── «implements» CassandraBaseTimeseriesLatestDao
+├── «implements» SqlTimeseriesLatestDao
+TimeseriesService
+├── «implements» BaseTimeseriesService
+ToData
+├── «implements» AttributeKvEntity
+├── «implements» EntityAlarmEntity
+├── «implements» RelationEntity
+├── «implements» UserSettingsEntity
+├── «implements» WidgetsBundleWidgetEntity
+├── «implements» public
+UsageInfoService
+├── «implements» BasicUsageInfoService
+UserService
+├── «implements» UserServiceImpl
+UserSettingsDao
+├── «implements» JpaUserSettingsDao
+UserSettingsService
+├── «implements» UserSettingsServiceImpl
+WidgetTypeService
+├── «implements» WidgetTypeServiceImpl
+WidgetsBundleService
+├── «implements» WidgetsBundleServiceImpl</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| DaoUtil_c0[&quot;DaoUtil&quot;]
+    Object______p1[&quot;Object/外部框架&quot;] --&gt;|extends| JpaDaoConfig_c1[&quot;JpaDaoConfig&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| SqlTimeseriesDaoConfig_c2[&quot;SqlTimeseriesDaoConfig&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| SqlTsDaoConfig_c3[&quot;SqlTsDaoConfig&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| SqlTsLatestDaoConfig_c4[&quot;SqlTsLatestDaoConfig&quot;]
+    PostgreSQL10Dialect_p5[&quot;PostgreSQL10Dialect&quot;] --&gt;|extends| ThingsboardPostgreSQLDialect_c5[&quot;ThingsboardPostgreSQLDialect&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| TimescaleDaoConfig_c6[&quot;TimescaleDaoConfig&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| TimescaleTsLatestDaoConfig_c7[&quot;TimescaleTsLatestDaoConfig&quot;]
+    Dao_p8[&quot;Dao&quot;] --&gt;|extends| AlarmCommentDao_c8[&quot;AlarmCommentDao&quot;]
+    Dao_p9[&quot;Dao&quot;] --&gt;|extends| AlarmDao_c9[&quot;AlarmDao&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmTypesCacheEvictEvent_c10[&quot;AlarmTypesCacheEvictEvent&quot;]
+    CaffeineTbTransactionalCache_p11[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| AlarmTypesCaffeineCache_c11[&quot;AlarmTypesCaffeineCache&quot;]
+    RedisTbTransactionalCache_p12[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| AlarmTypesRedisCache_c12[&quot;AlarmTypesRedisCache&quot;]
+    AbstractEntityService_p13[&quot;AbstractEntityService&quot;] --&gt;|extends| BaseAlarmCommentService_c13[&quot;BaseAlarmCommentService&quot;]
+    AlarmCommentService_p14[&quot;AlarmCommentService&quot;] --&gt;|implements| BaseAlarmCommentService_c14[&quot;BaseAlarmCommentService&quot;]
+    AbstractCachedEntityService_p15[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| BaseAlarmService_c15[&quot;BaseAlarmService&quot;]
+    AlarmService_p16[&quot;AlarmService&quot;] --&gt;|implements| BaseAlarmService_c16[&quot;BaseAlarmService&quot;]
+    Object______p17[&quot;Object/外部框架&quot;] --&gt;|extends| DbCallStats_c17[&quot;DbCallStats&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| DbCallStatsSnapshot_c18[&quot;DbCallStatsSnapshot&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| MethodCallStats_c19[&quot;MethodCallStats&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| MethodCallStatsSnapshot_c20[&quot;MethodCallStatsSnapshot&quot;]
+    Object______p21[&quot;Object/外部框架&quot;] --&gt;|extends| SqlDaoCallsAspect_c21[&quot;SqlDaoCallsAspect&quot;]
+    Object______p22[&quot;Object/外部框架&quot;] --&gt;|extends| AssetCacheEvictEvent_c22[&quot;AssetCacheEvictEvent&quot;]
+    Object______p23[&quot;Object/外部框架&quot;] --&gt;|extends| AssetCacheKey_c23[&quot;AssetCacheKey&quot;]
+    Serializable_p24[&quot;Serializable&quot;] --&gt;|implements| AssetCacheKey_c24[&quot;AssetCacheKey&quot;]
+    CaffeineTbTransactionalCache_p25[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| AssetCaffeineCache_c25[&quot;AssetCaffeineCache&quot;]
+    Dao_p26[&quot;Dao&quot;] --&gt;|extends| AssetDao_c26[&quot;AssetDao&quot;]
+    TenantEntityDao_p27[&quot;TenantEntityDao&quot;] --&gt;|extends| AssetDao_c27[&quot;AssetDao&quot;]
+    ExportableEntityDao_p28[&quot;ExportableEntityDao&quot;] --&gt;|extends| AssetDao_c28[&quot;AssetDao&quot;]
+    Object______p29[&quot;Object/外部框架&quot;] --&gt;|extends| AssetProfileCacheKey_c29[&quot;AssetProfileCacheKey&quot;]
+    Serializable_p30[&quot;Serializable&quot;] --&gt;|implements| AssetProfileCacheKey_c30[&quot;AssetProfileCacheKey&quot;]
+    CaffeineTbTransactionalCache_p31[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| AssetProfileCaffeineCache_c31[&quot;AssetProfileCaffeineCache&quot;]
+    Dao_p32[&quot;Dao&quot;] --&gt;|extends| AssetProfileDao_c32[&quot;AssetProfileDao&quot;]
+    ExportableEntityDao_p33[&quot;ExportableEntityDao&quot;] --&gt;|extends| AssetProfileDao_c33[&quot;AssetProfileDao&quot;]
+    ImageContainerDao_p34[&quot;ImageContainerDao&quot;] --&gt;|extends| AssetProfileDao_c34[&quot;AssetProfileDao&quot;]
+    Object______p35[&quot;Object/外部框架&quot;] --&gt;|extends| AssetProfileEvictEvent_c35[&quot;AssetProfileEvictEvent&quot;]
+    RedisTbTransactionalCache_p36[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| AssetProfileRedisCache_c36[&quot;AssetProfileRedisCache&quot;]
+    AbstractCachedEntityService_p37[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| AssetProfileServiceImpl_c37[&quot;AssetProfileServiceImpl&quot;]
+    AssetProfileService_p38[&quot;AssetProfileService&quot;] --&gt;|implements| AssetProfileServiceImpl_c38[&quot;AssetProfileServiceImpl&quot;]
+    RedisTbTransactionalCache_p39[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| AssetRedisCache_c39[&quot;AssetRedisCache&quot;]
+    Object______p40[&quot;Object/外部框架&quot;] --&gt;|extends| AssetTypeFilter_c40[&quot;AssetTypeFilter&quot;]
+    AbstractCachedEntityService_p41[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| BaseAssetService_c41[&quot;BaseAssetService&quot;]
+    AssetService_p42[&quot;AssetService&quot;] --&gt;|implements| BaseAssetService_c42[&quot;BaseAssetService&quot;]
+    Object______p43[&quot;Object/外部框架&quot;] --&gt;|extends| AttributeCacheKey_c43[&quot;AttributeCacheKey&quot;]
+    Serializable_p44[&quot;Serializable&quot;] --&gt;|implements| AttributeCacheKey_c44[&quot;AttributeCacheKey&quot;]
+    CaffeineTbTransactionalCache_p45[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| AttributeCaffeineCache_c45[&quot;AttributeCaffeineCache&quot;]
+    RedisTbTransactionalCache_p46[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| AttributeRedisCache_c46[&quot;AttributeRedisCache&quot;]
+    Object______p47[&quot;Object/外部框架&quot;] --&gt;|extends| AttributeUtils_c47[&quot;AttributeUtils&quot;]
+    Object______p48[&quot;Object/外部框架&quot;] --&gt;|extends| BaseAttributesService_c48[&quot;BaseAttributesService&quot;]
+    AttributesService_p49[&quot;AttributesService&quot;] --&gt;|implements| BaseAttributesService_c49[&quot;BaseAttributesService&quot;]
+    Object______p50[&quot;Object/外部框架&quot;] --&gt;|extends| CachedAttributesService_c50[&quot;CachedAttributesService&quot;]
+    AttributesService_p51[&quot;AttributesService&quot;] --&gt;|implements| CachedAttributesService_c51[&quot;CachedAttributesService&quot;]
+    Dao_p52[&quot;Dao&quot;] --&gt;|extends| AuditLogDao_c52[&quot;AuditLogDao&quot;]
+    Object______p53[&quot;Object/外部框架&quot;] --&gt;|extends| AuditLogLevelFilter_c53[&quot;AuditLogLevelFilter&quot;]
+    Object______p54[&quot;Object/外部框架&quot;] --&gt;|extends| AuditLogLevelProperties_c54[&quot;AuditLogLevelProperties&quot;]
+    Object______p55[&quot;Object/外部框架&quot;] --&gt;|extends| AuditLogServiceImpl_c55[&quot;AuditLogServiceImpl&quot;]
+    AuditLogService_p56[&quot;AuditLogService&quot;] --&gt;|implements| AuditLogServiceImpl_c56[&quot;AuditLogServiceImpl&quot;]
+    Object______p57[&quot;Object/外部框架&quot;] --&gt;|extends| DummyAuditLogServiceImpl_c57[&quot;DummyAuditLogServiceImpl&quot;]
+    AuditLogService_p58[&quot;AuditLogService&quot;] --&gt;|implements| DummyAuditLogServiceImpl_c58[&quot;DummyAuditLogServiceImpl&quot;]
+    Object______p59[&quot;Object/外部框架&quot;] --&gt;|extends| DummyAuditLogSink_c59[&quot;DummyAuditLogSink&quot;]
+    AuditLogSink_p60[&quot;AuditLogSink&quot;] --&gt;|implements| DummyAuditLogSink_c60[&quot;DummyAuditLogSink&quot;]
+    Object______p61[&quot;Object/外部框架&quot;] --&gt;|extends| ElasticsearchAuditLogSink_c61[&quot;ElasticsearchAuditLogSink&quot;]
+    AuditLogSink_p62[&quot;AuditLogSink&quot;] --&gt;|implements| ElasticsearchAuditLogSink_c62[&quot;ElasticsearchAuditLogSink&quot;]
+    AbstractListeningExecutor_p63[&quot;AbstractListeningExecutor&quot;] --&gt;|extends| CacheExecutorService_c63[&quot;CacheExecutorService&quot;]
+    Object______p64[&quot;Object/外部框架&quot;] --&gt;|extends| BaseComponentDescriptorService_c64[&quot;BaseComponentDescriptorService&quot;]
+    ComponentDescriptorService_p65[&quot;ComponentDescriptorService&quot;] --&gt;|implements| BaseComponentDescriptorService_c65[&quot;BaseComponentDescriptorService&quot;]
+    Dao_p66[&quot;Dao&quot;] --&gt;|extends| ComponentDescriptorDao_c66[&quot;ComponentDescriptorDao&quot;]
+    Dao_p67[&quot;Dao&quot;] --&gt;|extends| CustomerDao_c67[&quot;CustomerDao&quot;]
+    TenantEntityDao_p68[&quot;TenantEntityDao&quot;] --&gt;|extends| CustomerDao_c68[&quot;CustomerDao&quot;]
+    ExportableEntityDao_p69[&quot;ExportableEntityDao&quot;] --&gt;|extends| CustomerDao_c69[&quot;CustomerDao&quot;]
+    AbstractEntityService_p70[&quot;AbstractEntityService&quot;] --&gt;|extends| CustomerServiceImpl_c70[&quot;CustomerServiceImpl&quot;]
+    CustomerService_p71[&quot;CustomerService&quot;] --&gt;|implements| CustomerServiceImpl_c71[&quot;CustomerServiceImpl&quot;]
+    Dao_p72[&quot;Dao&quot;] --&gt;|extends| DashboardDao_c72[&quot;DashboardDao&quot;]
+    TenantEntityDao_p73[&quot;TenantEntityDao&quot;] --&gt;|extends| DashboardDao_c73[&quot;DashboardDao&quot;]
+    ExportableEntityDao_p74[&quot;ExportableEntityDao&quot;] --&gt;|extends| DashboardDao_c74[&quot;DashboardDao&quot;]
+    Dao_p75[&quot;Dao&quot;] --&gt;|extends| DashboardInfoDao_c75[&quot;DashboardInfoDao&quot;]
+    ImageContainerDao_p76[&quot;ImageContainerDao&quot;] --&gt;|extends| DashboardInfoDao_c76[&quot;DashboardInfoDao&quot;]
+    AbstractEntityService_p77[&quot;AbstractEntityService&quot;] --&gt;|extends| DashboardServiceImpl_c77[&quot;DashboardServiceImpl&quot;]
+    DashboardService_p78[&quot;DashboardService&quot;] --&gt;|implements| DashboardServiceImpl_c78[&quot;DashboardServiceImpl&quot;]
+    PaginatedRemover_p79[&quot;PaginatedRemover&quot;] --&gt;|extends| CustomerDashboardsUnassigner_c79[&quot;CustomerDashboardsUnassigner&quot;]
+    PaginatedRemover_p80[&quot;PaginatedRemover&quot;] --&gt;|extends| CustomerDashboardsUpdater_c80[&quot;CustomerDashboardsUpdater&quot;]
+    Object______p81[&quot;Object/外部框架&quot;] --&gt;|extends| DashboardTitleEvictEvent_c81[&quot;DashboardTitleEvictEvent&quot;]
+    CaffeineTbTransactionalCache_p82[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| DashboardTitlesCaffeineCache_c82[&quot;DashboardTitlesCaffeineCache&quot;]
+    RedisTbTransactionalCache_p83[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| DashboardTitlesRedisCache_c83[&quot;DashboardTitlesRedisCache&quot;]
+    Object______p84[&quot;Object/外部框架&quot;] --&gt;|extends| ClaimDataInfo_c84[&quot;ClaimDataInfo&quot;]
+    Object______p85[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceConnectivityConfiguration_c85[&quot;DeviceConnectivityConfiguration&quot;]
+    Object______p86[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceConnectivityInfo_c86[&quot;DeviceConnectivityInfo&quot;]
+    Object______p87[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceConnectivityServiceImpl_c87[&quot;DeviceConnectivityServiceImpl&quot;]
+    DeviceConnectivityService_p88[&quot;DeviceConnectivityService&quot;] --&gt;|implements| DeviceConnectivityServiceImpl_c88[&quot;DeviceConnectivityServiceImpl&quot;]
+    CaffeineTbTransactionalCache_p89[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| DeviceCredentialsCaffeineCache_c89[&quot;DeviceCredentialsCaffeineCache&quot;]
+    Dao_p90[&quot;Dao&quot;] --&gt;|extends| DeviceCredentialsDao_c90[&quot;DeviceCredentialsDao&quot;]
+    Object______p91[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceCredentialsEvictEvent_c91[&quot;DeviceCredentialsEvictEvent&quot;]
+    RedisTbTransactionalCache_p92[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| DeviceCredentialsRedisCache_c92[&quot;DeviceCredentialsRedisCache&quot;]
+    AbstractCachedEntityService_p93[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| DeviceCredentialsServiceImpl_c93[&quot;DeviceCredentialsServiceImpl&quot;]
+    DeviceCredentialsService_p94[&quot;DeviceCredentialsService&quot;] --&gt;|implements| DeviceCredentialsServiceImpl_c94[&quot;DeviceCredentialsServiceImpl&quot;]
+    Dao_p95[&quot;Dao&quot;] --&gt;|extends| DeviceDao_c95[&quot;DeviceDao&quot;]
+    TenantEntityDao_p96[&quot;TenantEntityDao&quot;] --&gt;|extends| DeviceDao_c96[&quot;DeviceDao&quot;]
+    ExportableEntityDao_p97[&quot;ExportableEntityDao&quot;] --&gt;|extends| DeviceDao_c97[&quot;DeviceDao&quot;]
+    Object______p98[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProfileCacheKey_c98[&quot;DeviceProfileCacheKey&quot;]
+    Serializable_p99[&quot;Serializable&quot;] --&gt;|implements| DeviceProfileCacheKey_c99[&quot;DeviceProfileCacheKey&quot;]
+    CaffeineTbTransactionalCache_p100[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| DeviceProfileCaffeineCache_c100[&quot;DeviceProfileCaffeineCache&quot;]
+    Dao_p101[&quot;Dao&quot;] --&gt;|extends| DeviceProfileDao_c101[&quot;DeviceProfileDao&quot;]
+    ExportableEntityDao_p102[&quot;ExportableEntityDao&quot;] --&gt;|extends| DeviceProfileDao_c102[&quot;DeviceProfileDao&quot;]
+    ImageContainerDao_p103[&quot;ImageContainerDao&quot;] --&gt;|extends| DeviceProfileDao_c103[&quot;DeviceProfileDao&quot;]
+    Object______p104[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProfileEvictEvent_c104[&quot;DeviceProfileEvictEvent&quot;]
+    RedisTbTransactionalCache_p105[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| DeviceProfileRedisCache_c105[&quot;DeviceProfileRedisCache&quot;]
+    AbstractCachedEntityService_p106[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| DeviceProfileServiceImpl_c106[&quot;DeviceProfileServiceImpl&quot;]
+    DeviceProfileService_p107[&quot;DeviceProfileService&quot;] --&gt;|implements| DeviceProfileServiceImpl_c107[&quot;DeviceProfileServiceImpl&quot;]
+    AbstractCachedEntityService_p108[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| DeviceServiceImpl_c108[&quot;DeviceServiceImpl&quot;]
+    DeviceService_p109[&quot;DeviceService&quot;] --&gt;|implements| DeviceServiceImpl_c109[&quot;DeviceServiceImpl&quot;]
+    Object______p110[&quot;Object/外部框架&quot;] --&gt;|extends| BaseEdgeEventService_c110[&quot;BaseEdgeEventService&quot;]
+    EdgeEventService_p111[&quot;EdgeEventService&quot;] --&gt;|implements| BaseEdgeEventService_c111[&quot;BaseEdgeEventService&quot;]
+    Object______p112[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultEdgeSynchronizationManager_c112[&quot;DefaultEdgeSynchronizationManager&quot;]
+    EdgeSynchronizationManager_p113[&quot;EdgeSynchronizationManager&quot;] --&gt;|implements| DefaultEdgeSynchronizationManager_c113[&quot;DefaultEdgeSynchronizationManager&quot;]
+    Object______p114[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeCacheEvictEvent_c114[&quot;EdgeCacheEvictEvent&quot;]
+    Object______p115[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeCacheKey_c115[&quot;EdgeCacheKey&quot;]
+    Serializable_p116[&quot;Serializable&quot;] --&gt;|implements| EdgeCacheKey_c116[&quot;EdgeCacheKey&quot;]
+    CaffeineTbTransactionalCache_p117[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| EdgeCaffeineCache_c117[&quot;EdgeCaffeineCache&quot;]
+    Dao_p118[&quot;Dao&quot;] --&gt;|extends| EdgeDao_c118[&quot;EdgeDao&quot;]
+    Dao_p119[&quot;Dao&quot;] --&gt;|extends| EdgeEventDao_c119[&quot;EdgeEventDao&quot;]
+    RedisTbTransactionalCache_p120[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| EdgeRedisCache_c120[&quot;EdgeRedisCache&quot;]
+    AbstractCachedEntityService_p121[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| EdgeServiceImpl_c121[&quot;EdgeServiceImpl&quot;]
+    EdgeService_p122[&quot;EdgeService&quot;] --&gt;|implements| EdgeServiceImpl_c122[&quot;EdgeServiceImpl&quot;]
+    AbstractEntityService_p123[&quot;AbstractEntityService&quot;] --&gt;|extends| AbstractCachedEntityService_c123[&quot;AbstractCachedEntityService&quot;]
+    Object______p124[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractCachedService_c124[&quot;AbstractCachedService&quot;]
+    Object______p125[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractEntityService_c125[&quot;AbstractEntityService&quot;]
+    AbstractCachedEntityService_p126[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| BaseEntityCountService_c126[&quot;BaseEntityCountService&quot;]
+    EntityCountService_p127[&quot;EntityCountService&quot;] --&gt;|implements| BaseEntityCountService_c127[&quot;BaseEntityCountService&quot;]
+    AbstractEntityService_p128[&quot;AbstractEntityService&quot;] --&gt;|extends| BaseEntityService_c128[&quot;BaseEntityService&quot;]
+    EntityService_p129[&quot;EntityService&quot;] --&gt;|implements| BaseEntityService_c129[&quot;BaseEntityService&quot;]
+    Object______p130[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultEntityServiceRegistry_c130[&quot;DefaultEntityServiceRegistry&quot;]
+    EntityServiceRegistry_p131[&quot;EntityServiceRegistry&quot;] --&gt;|implements| DefaultEntityServiceRegistry_c131[&quot;DefaultEntityServiceRegistry&quot;]
+    Object______p132[&quot;Object/外部框架&quot;] --&gt;|extends| EntityCountCacheEvictEvent_c132[&quot;EntityCountCacheEvictEvent&quot;]
+    Object______p133[&quot;Object/外部框架&quot;] --&gt;|extends| EntityCountCacheKey_c133[&quot;EntityCountCacheKey&quot;]
+    Serializable_p134[&quot;Serializable&quot;] --&gt;|implements| EntityCountCacheKey_c134[&quot;EntityCountCacheKey&quot;]
+    CaffeineTbTransactionalCache_p135[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| EntityCountCaffeineCache_c135[&quot;EntityCountCaffeineCache&quot;]
+    RedisTbTransactionalCache_p136[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| EntityCountRedisCache_c136[&quot;EntityCountRedisCache&quot;]
+    Object______p137[&quot;Object/外部框架&quot;] --&gt;|extends| EntityViewCacheKey_c137[&quot;EntityViewCacheKey&quot;]
+    Serializable_p138[&quot;Serializable&quot;] --&gt;|implements| EntityViewCacheKey_c138[&quot;EntityViewCacheKey&quot;]
+    Object______p139[&quot;Object/外部框架&quot;] --&gt;|extends| EntityViewCacheValue_c139[&quot;EntityViewCacheValue&quot;]
+    Serializable_p140[&quot;Serializable&quot;] --&gt;|implements| EntityViewCacheValue_c140[&quot;EntityViewCacheValue&quot;]
+    CaffeineTbTransactionalCache_p141[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| EntityViewCaffeineCache_c141[&quot;EntityViewCaffeineCache&quot;]
+    Dao_p142[&quot;Dao&quot;] --&gt;|extends| EntityViewDao_c142[&quot;EntityViewDao&quot;]
+    ExportableEntityDao_p143[&quot;ExportableEntityDao&quot;] --&gt;|extends| EntityViewDao_c143[&quot;EntityViewDao&quot;]
+    Object______p144[&quot;Object/外部框架&quot;] --&gt;|extends| EntityViewEvictEvent_c144[&quot;EntityViewEvictEvent&quot;]
+    RedisTbTransactionalCache_p145[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| EntityViewRedisCache_c145[&quot;EntityViewRedisCache&quot;]
+    AbstractCachedEntityService_p146[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| EntityViewServiceImpl_c146[&quot;EntityViewServiceImpl&quot;]
+    EntityViewService_p147[&quot;EntityViewService&quot;] --&gt;|implements| EntityViewServiceImpl_c147[&quot;EntityViewServiceImpl&quot;]
+    Object______p148[&quot;Object/外部框架&quot;] --&gt;|extends| BaseEventService_c148[&quot;BaseEventService&quot;]
+    EventService_p149[&quot;EventService&quot;] --&gt;|implements| BaseEventService_c149[&quot;BaseEventService&quot;]
+    Object______p150[&quot;Object/外部框架&quot;] --&gt;|extends| ActionEntityEvent_c150[&quot;ActionEntityEvent&quot;]
+    Object______p151[&quot;Object/外部框架&quot;] --&gt;|extends| DeleteEntityEvent_c151[&quot;DeleteEntityEvent&quot;]
+    Object______p152[&quot;Object/外部框架&quot;] --&gt;|extends| RelationActionEvent_c152[&quot;RelationActionEvent&quot;]
+    Object______p153[&quot;Object/外部框架&quot;] --&gt;|extends| SaveEntityEvent_c153[&quot;SaveEntityEvent&quot;]
+    RuntimeException_p154[&quot;RuntimeException&quot;] --&gt;|extends| BufferLimitException_c154[&quot;BufferLimitException&quot;]
+    RuntimeException_p155[&quot;RuntimeException&quot;] --&gt;|extends| DataValidationException_c155[&quot;DataValidationException&quot;]
+    RuntimeException_p156[&quot;RuntimeException&quot;] --&gt;|extends| DatabaseException_c156[&quot;DatabaseException&quot;]
+    DataValidationException_p157[&quot;DataValidationException&quot;] --&gt;|extends| DeviceCredentialsValidationException_c157[&quot;DeviceCredentialsValidationException&quot;]
+    DataValidationException_p158[&quot;DataValidationException&quot;] --&gt;|extends| EntitiesLimitException_c158[&quot;EntitiesLimitException&quot;]
+    RuntimeException_p159[&quot;RuntimeException&quot;] --&gt;|extends| IncorrectParameterException_c159[&quot;IncorrectParameterException&quot;]
+    Object______p160[&quot;Object/外部框架&quot;] --&gt;|extends| public_c160[&quot;public&quot;]
+    BaseEntity_p161[&quot;BaseEntity&quot;] --&gt;|implements| public_c161[&quot;public&quot;]
+    Object______p162[&quot;Object/外部框架&quot;] --&gt;|extends| ModelConstants_c162[&quot;ModelConstants&quot;]
+    AlarmComment__extends_BaseSqlEntity_p163[&quot;AlarmComment&gt; extends BaseSqlEntity&quot;] --&gt;|extends| public_c163[&quot;public&quot;]
+    Alarm__extends_BaseSqlEntity_p164[&quot;Alarm&gt; extends BaseSqlEntity&quot;] --&gt;|extends| public_c164[&quot;public&quot;]
+    Asset__extends_BaseSqlEntity_p165[&quot;Asset&gt; extends BaseSqlEntity&quot;] --&gt;|extends| public_c165[&quot;public&quot;]
+    Device__extends_BaseSqlEntity_p166[&quot;Device&gt; extends BaseSqlEntity&quot;] --&gt;|extends| public_c166[&quot;public&quot;]
+    Edge__extends_BaseSqlEntity_p167[&quot;Edge&gt; extends BaseSqlEntity&quot;] --&gt;|extends| public_c167[&quot;public&quot;]
+    Object______p168[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractEntityViewEntity_c168[&quot;AbstractEntityViewEntity&quot;]
+    Tenant__extends_BaseSqlEntity_p169[&quot;Tenant&gt; extends BaseSqlEntity&quot;] --&gt;|extends| public_c169[&quot;public&quot;]
+    ToData_p170[&quot;ToData&quot;] --&gt;|implements| public_c170[&quot;public&quot;]
+    BaseWidgetType__extends_BaseSqlEntity_p171[&quot;BaseWidgetType&gt; extends BaseSqlEntity&quot;] --&gt;|extends| public_c171[&quot;public&quot;]
+    BaseSqlEntity_p172[&quot;BaseSqlEntity&quot;] --&gt;|extends| AdminSettingsEntity_c172[&quot;AdminSettingsEntity&quot;]
+    BaseEntity_p173[&quot;BaseEntity&quot;] --&gt;|implements| AdminSettingsEntity_c173[&quot;AdminSettingsEntity&quot;]
+    AbstractAlarmCommentEntity_p174[&quot;AbstractAlarmCommentEntity&quot;] --&gt;|extends| AlarmCommentEntity_c174[&quot;AlarmCommentEntity&quot;]
+    AbstractAlarmCommentEntity_p175[&quot;AbstractAlarmCommentEntity&quot;] --&gt;|extends| AlarmCommentInfoEntity_c175[&quot;AlarmCommentInfoEntity&quot;]
+    AbstractAlarmEntity_p176[&quot;AbstractAlarmEntity&quot;] --&gt;|extends| AlarmEntity_c176[&quot;AlarmEntity&quot;]
+    AbstractAlarmEntity_p177[&quot;AbstractAlarmEntity&quot;] --&gt;|extends| AlarmInfoEntity_c177[&quot;AlarmInfoEntity&quot;]
+    BaseSqlEntity_p178[&quot;BaseSqlEntity&quot;] --&gt;|extends| ApiUsageStateEntity_c178[&quot;ApiUsageStateEntity&quot;]
+    BaseEntity_p179[&quot;BaseEntity&quot;] --&gt;|implements| ApiUsageStateEntity_c179[&quot;ApiUsageStateEntity&quot;]
+    AbstractAssetEntity_p180[&quot;AbstractAssetEntity&quot;] --&gt;|extends| AssetEntity_c180[&quot;AssetEntity&quot;]
+    AbstractAssetEntity_p181[&quot;AbstractAssetEntity&quot;] --&gt;|extends| AssetInfoEntity_c181[&quot;AssetInfoEntity&quot;]
+    BaseSqlEntity_p182[&quot;BaseSqlEntity&quot;] --&gt;|extends| AssetProfileEntity_c182[&quot;AssetProfileEntity&quot;]
+    Object______p183[&quot;Object/外部框架&quot;] --&gt;|extends| AttributeKvCompositeKey_c183[&quot;AttributeKvCompositeKey&quot;]
+    Serializable_p184[&quot;Serializable&quot;] --&gt;|implements| AttributeKvCompositeKey_c184[&quot;AttributeKvCompositeKey&quot;]
+    Object______p185[&quot;Object/外部框架&quot;] --&gt;|extends| AttributeKvEntity_c185[&quot;AttributeKvEntity&quot;]
+    ToData_p186[&quot;ToData&quot;] --&gt;|implements| AttributeKvEntity_c186[&quot;AttributeKvEntity&quot;]
+    Serializable_p187[&quot;Serializable&quot;] --&gt;|implements| AttributeKvEntity_c187[&quot;AttributeKvEntity&quot;]
+    BaseSqlEntity_p188[&quot;BaseSqlEntity&quot;] --&gt;|extends| AuditLogEntity_c188[&quot;AuditLogEntity&quot;]
+    BaseEntity_p189[&quot;BaseEntity&quot;] --&gt;|implements| AuditLogEntity_c189[&quot;AuditLogEntity&quot;]
+    BaseSqlEntity_p190[&quot;BaseSqlEntity&quot;] --&gt;|extends| ComponentDescriptorEntity_c190[&quot;ComponentDescriptorEntity&quot;]
+    BaseSqlEntity_p191[&quot;BaseSqlEntity&quot;] --&gt;|extends| CustomerEntity_c191[&quot;CustomerEntity&quot;]
+    BaseSqlEntity_p192[&quot;BaseSqlEntity&quot;] --&gt;|extends| DashboardEntity_c192[&quot;DashboardEntity&quot;]
+    BaseSqlEntity_p193[&quot;BaseSqlEntity&quot;] --&gt;|extends| DashboardInfoEntity_c193[&quot;DashboardInfoEntity&quot;]
+    BaseSqlEntity_p194[&quot;BaseSqlEntity&quot;] --&gt;|extends| DeviceCredentialsEntity_c194[&quot;DeviceCredentialsEntity&quot;]
+    BaseEntity_p195[&quot;BaseEntity&quot;] --&gt;|implements| DeviceCredentialsEntity_c195[&quot;DeviceCredentialsEntity&quot;]
+    AbstractDeviceEntity_p196[&quot;AbstractDeviceEntity&quot;] --&gt;|extends| DeviceEntity_c196[&quot;DeviceEntity&quot;]
+    AbstractDeviceEntity_p197[&quot;AbstractDeviceEntity&quot;] --&gt;|extends| DeviceInfoEntity_c197[&quot;DeviceInfoEntity&quot;]
+    BaseSqlEntity_p198[&quot;BaseSqlEntity&quot;] --&gt;|extends| DeviceProfileEntity_c198[&quot;DeviceProfileEntity&quot;]
+    AbstractEdgeEntity_p199[&quot;AbstractEdgeEntity&quot;] --&gt;|extends| EdgeEntity_c199[&quot;EdgeEntity&quot;]
+    BaseSqlEntity_p200[&quot;BaseSqlEntity&quot;] --&gt;|extends| EdgeEventEntity_c200[&quot;EdgeEventEntity&quot;]
+    BaseEntity_p201[&quot;BaseEntity&quot;] --&gt;|implements| EdgeEventEntity_c201[&quot;EdgeEventEntity&quot;]
+    AbstractEdgeEntity_p202[&quot;AbstractEdgeEntity&quot;] --&gt;|extends| EdgeInfoEntity_c202[&quot;EdgeInfoEntity&quot;]
+    Object______p203[&quot;Object/外部框架&quot;] --&gt;|extends| EntityAlarmCompositeKey_c203[&quot;EntityAlarmCompositeKey&quot;]
+    Serializable_p204[&quot;Serializable&quot;] --&gt;|implements| EntityAlarmCompositeKey_c204[&quot;EntityAlarmCompositeKey&quot;]
+    Object______p205[&quot;Object/外部框架&quot;] --&gt;|extends| EntityAlarmEntity_c205[&quot;EntityAlarmEntity&quot;]
+    ToData_p206[&quot;ToData&quot;] --&gt;|implements| EntityAlarmEntity_c206[&quot;EntityAlarmEntity&quot;]
+    AbstractEntityViewEntity_p207[&quot;AbstractEntityViewEntity&quot;] --&gt;|extends| EntityViewEntity_c207[&quot;EntityViewEntity&quot;]
+    AbstractEntityViewEntity_p208[&quot;AbstractEntityViewEntity&quot;] --&gt;|extends| EntityViewInfoEntity_c208[&quot;EntityViewInfoEntity&quot;]
+    EventEntity_p209[&quot;EventEntity&quot;] --&gt;|extends| ErrorEventEntity_c209[&quot;ErrorEventEntity&quot;]
+    BaseEntity_p210[&quot;BaseEntity&quot;] --&gt;|implements| ErrorEventEntity_c210[&quot;ErrorEventEntity&quot;]
+    Event__p211[&quot;Event&gt;&quot;] --&gt;|extends| public_c211[&quot;public&quot;]
+    EventEntity_p212[&quot;EventEntity&quot;] --&gt;|extends| LifecycleEventEntity_c212[&quot;LifecycleEventEntity&quot;]
+    BaseEntity_p213[&quot;BaseEntity&quot;] --&gt;|implements| LifecycleEventEntity_c213[&quot;LifecycleEventEntity&quot;]
+    BaseSqlEntity_p214[&quot;BaseSqlEntity&quot;] --&gt;|extends| NotificationEntity_c214[&quot;NotificationEntity&quot;]
+    BaseSqlEntity_p215[&quot;BaseSqlEntity&quot;] --&gt;|extends| NotificationRequestEntity_c215[&quot;NotificationRequestEntity&quot;]
+    NotificationRequestEntity_p216[&quot;NotificationRequestEntity&quot;] --&gt;|extends| NotificationRequestInfoEntity_c216[&quot;NotificationRequestInfoEntity&quot;]
+    BaseSqlEntity_p217[&quot;BaseSqlEntity&quot;] --&gt;|extends| NotificationRuleEntity_c217[&quot;NotificationRuleEntity&quot;]
+    NotificationRuleEntity_p218[&quot;NotificationRuleEntity&quot;] --&gt;|extends| NotificationRuleInfoEntity_c218[&quot;NotificationRuleInfoEntity&quot;]
+    BaseSqlEntity_p219[&quot;BaseSqlEntity&quot;] --&gt;|extends| NotificationTargetEntity_c219[&quot;NotificationTargetEntity&quot;]
+    BaseSqlEntity_p220[&quot;BaseSqlEntity&quot;] --&gt;|extends| NotificationTemplateEntity_c220[&quot;NotificationTemplateEntity&quot;]
+    BaseSqlEntity_p221[&quot;BaseSqlEntity&quot;] --&gt;|extends| OAuth2ClientRegistrationTemplateEntity_c221[&quot;OAuth2ClientRegistrationTemplateEntity&quot;]
+    BaseSqlEntity_p222[&quot;BaseSqlEntity&quot;] --&gt;|extends| OAuth2DomainEntity_c222[&quot;OAuth2DomainEntity&quot;]
+    BaseSqlEntity_p223[&quot;BaseSqlEntity&quot;] --&gt;|extends| OAuth2MobileEntity_c223[&quot;OAuth2MobileEntity&quot;]
+    BaseSqlEntity_p224[&quot;BaseSqlEntity&quot;] --&gt;|extends| OAuth2ParamsEntity_c224[&quot;OAuth2ParamsEntity&quot;]
+    BaseSqlEntity_p225[&quot;BaseSqlEntity&quot;] --&gt;|extends| OAuth2RegistrationEntity_c225[&quot;OAuth2RegistrationEntity&quot;]
+    BaseSqlEntity_p226[&quot;BaseSqlEntity&quot;] --&gt;|extends| OtaPackageEntity_c226[&quot;OtaPackageEntity&quot;]
+    BaseSqlEntity_p227[&quot;BaseSqlEntity&quot;] --&gt;|extends| OtaPackageInfoEntity_c227[&quot;OtaPackageInfoEntity&quot;]
+    BaseSqlEntity_p228[&quot;BaseSqlEntity&quot;] --&gt;|extends| QueueEntity_c228[&quot;QueueEntity&quot;]
+    Object______p229[&quot;Object/外部框架&quot;] --&gt;|extends| RelationCompositeKey_c229[&quot;RelationCompositeKey&quot;]
+    Serializable_p230[&quot;Serializable&quot;] --&gt;|implements| RelationCompositeKey_c230[&quot;RelationCompositeKey&quot;]
+    Object______p231[&quot;Object/外部框架&quot;] --&gt;|extends| RelationEntity_c231[&quot;RelationEntity&quot;]
+    ToData_p232[&quot;ToData&quot;] --&gt;|implements| RelationEntity_c232[&quot;RelationEntity&quot;]
+    BaseSqlEntity_p233[&quot;BaseSqlEntity&quot;] --&gt;|extends| RpcEntity_c233[&quot;RpcEntity&quot;]
+    BaseEntity_p234[&quot;BaseEntity&quot;] --&gt;|implements| RpcEntity_c234[&quot;RpcEntity&quot;]
+    EventEntity_p235[&quot;EventEntity&quot;] --&gt;|extends| RuleChainDebugEventEntity_c235[&quot;RuleChainDebugEventEntity&quot;]
+    BaseEntity_p236[&quot;BaseEntity&quot;] --&gt;|implements| RuleChainDebugEventEntity_c236[&quot;RuleChainDebugEventEntity&quot;]
+    BaseSqlEntity_p237[&quot;BaseSqlEntity&quot;] --&gt;|extends| RuleChainEntity_c237[&quot;RuleChainEntity&quot;]
+    EventEntity_p238[&quot;EventEntity&quot;] --&gt;|extends| RuleNodeDebugEventEntity_c238[&quot;RuleNodeDebugEventEntity&quot;]
+    BaseEntity_p239[&quot;BaseEntity&quot;] --&gt;|implements| RuleNodeDebugEventEntity_c239[&quot;RuleNodeDebugEventEntity&quot;]
+    BaseSqlEntity_p240[&quot;BaseSqlEntity&quot;] --&gt;|extends| RuleNodeEntity_c240[&quot;RuleNodeEntity&quot;]
+    BaseSqlEntity_p241[&quot;BaseSqlEntity&quot;] --&gt;|extends| RuleNodeStateEntity_c241[&quot;RuleNodeStateEntity&quot;]
+    EventEntity_p242[&quot;EventEntity&quot;] --&gt;|extends| StatisticsEventEntity_c242[&quot;StatisticsEventEntity&quot;]
+    BaseEntity_p243[&quot;BaseEntity&quot;] --&gt;|implements| StatisticsEventEntity_c243[&quot;StatisticsEventEntity&quot;]
+    BaseSqlEntity_p244[&quot;BaseSqlEntity&quot;] --&gt;|extends| TbResourceEntity_c244[&quot;TbResourceEntity&quot;]
+    BaseSqlEntity_p245[&quot;BaseSqlEntity&quot;] --&gt;|extends| TbResourceInfoEntity_c245[&quot;TbResourceInfoEntity&quot;]
+    BaseEntity_p246[&quot;BaseEntity&quot;] --&gt;|implements| TbResourceInfoEntity_c246[&quot;TbResourceInfoEntity&quot;]
+    AbstractTenantEntity_p247[&quot;AbstractTenantEntity&quot;] --&gt;|extends| TenantEntity_c247[&quot;TenantEntity&quot;]
+    AbstractTenantEntity_p248[&quot;AbstractTenantEntity&quot;] --&gt;|extends| TenantInfoEntity_c248[&quot;TenantInfoEntity&quot;]
+    BaseSqlEntity_p249[&quot;BaseSqlEntity&quot;] --&gt;|extends| TenantProfileEntity_c249[&quot;TenantProfileEntity&quot;]
+    BaseSqlEntity_p250[&quot;BaseSqlEntity&quot;] --&gt;|extends| UserAuthSettingsEntity_c250[&quot;UserAuthSettingsEntity&quot;]
+    BaseEntity_p251[&quot;BaseEntity&quot;] --&gt;|implements| UserAuthSettingsEntity_c251[&quot;UserAuthSettingsEntity&quot;]
+    BaseSqlEntity_p252[&quot;BaseSqlEntity&quot;] --&gt;|extends| UserCredentialsEntity_c252[&quot;UserCredentialsEntity&quot;]
+    BaseEntity_p253[&quot;BaseEntity&quot;] --&gt;|implements| UserCredentialsEntity_c253[&quot;UserCredentialsEntity&quot;]
+    BaseSqlEntity_p254[&quot;BaseSqlEntity&quot;] --&gt;|extends| UserEntity_c254[&quot;UserEntity&quot;]
+    Object______p255[&quot;Object/外部框架&quot;] --&gt;|extends| UserSettingsEntity_c255[&quot;UserSettingsEntity&quot;]
+    ToData_p256[&quot;ToData&quot;] --&gt;|implements| UserSettingsEntity_c256[&quot;UserSettingsEntity&quot;]
+    AbstractWidgetTypeEntity_p257[&quot;AbstractWidgetTypeEntity&quot;] --&gt;|extends| WidgetTypeDetailsEntity_c257[&quot;WidgetTypeDetailsEntity&quot;]
+    AbstractWidgetTypeEntity_p258[&quot;AbstractWidgetTypeEntity&quot;] --&gt;|extends| WidgetTypeEntity_c258[&quot;WidgetTypeEntity&quot;]
+    Object______p259[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetTypeIdFqnEntity_c259[&quot;WidgetTypeIdFqnEntity&quot;]
+    AbstractWidgetTypeEntity_p260[&quot;AbstractWidgetTypeEntity&quot;] --&gt;|extends| WidgetTypeInfoEntity_c260[&quot;WidgetTypeInfoEntity&quot;]
+    BaseSqlEntity_p261[&quot;BaseSqlEntity&quot;] --&gt;|extends| WidgetsBundleEntity_c261[&quot;WidgetsBundleEntity&quot;]
+    Object______p262[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetsBundleWidgetCompositeKey_c262[&quot;WidgetsBundleWidgetCompositeKey&quot;]
+    Serializable_p263[&quot;Serializable&quot;] --&gt;|implements| WidgetsBundleWidgetCompositeKey_c263[&quot;WidgetsBundleWidgetCompositeKey&quot;]
+    Object______p264[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetsBundleWidgetEntity_c264[&quot;WidgetsBundleWidgetEntity&quot;]
+    ToData_p265[&quot;ToData&quot;] --&gt;|implements| WidgetsBundleWidgetEntity_c265[&quot;WidgetsBundleWidgetEntity&quot;]
+    Object______p266[&quot;Object/外部框架&quot;] --&gt;|extends| TsKvDictionary_c266[&quot;TsKvDictionary&quot;]
+    Object______p267[&quot;Object/外部框架&quot;] --&gt;|extends| TsKvDictionaryCompositeKey_c267[&quot;TsKvDictionaryCompositeKey&quot;]
+    Serializable_p268[&quot;Serializable&quot;] --&gt;|implements| TsKvDictionaryCompositeKey_c268[&quot;TsKvDictionaryCompositeKey&quot;]
+    Object______p269[&quot;Object/外部框架&quot;] --&gt;|extends| TsKvLatestCompositeKey_c269[&quot;TsKvLatestCompositeKey&quot;]
+    Serializable_p270[&quot;Serializable&quot;] --&gt;|implements| TsKvLatestCompositeKey_c270[&quot;TsKvLatestCompositeKey&quot;]
+    AbstractTsKvEntity_p271[&quot;AbstractTsKvEntity&quot;] --&gt;|extends| TsKvLatestEntity_c271[&quot;TsKvLatestEntity&quot;]
+    Object______p272[&quot;Object/外部框架&quot;] --&gt;|extends| TimescaleTsKvCompositeKey_c272[&quot;TimescaleTsKvCompositeKey&quot;]
+    Serializable_p273[&quot;Serializable&quot;] --&gt;|implements| TimescaleTsKvCompositeKey_c273[&quot;TimescaleTsKvCompositeKey&quot;]
+    AbstractTsKvEntity_p274[&quot;AbstractTsKvEntity&quot;] --&gt;|extends| TimescaleTsKvEntity_c274[&quot;TimescaleTsKvEntity&quot;]
+    Object______p275[&quot;Object/外部框架&quot;] --&gt;|extends| TsKvCompositeKey_c275[&quot;TsKvCompositeKey&quot;]
+    Serializable_p276[&quot;Serializable&quot;] --&gt;|implements| TsKvCompositeKey_c276[&quot;TsKvCompositeKey&quot;]
+    AbstractTsKvEntity_p277[&quot;AbstractTsKvEntity&quot;] --&gt;|extends| TsKvEntity_c277[&quot;TsKvEntity&quot;]
+    CassandraAbstractDao_p278[&quot;CassandraAbstractDao&quot;] --&gt;|extends| CassandraAbstractAsyncDao_c278[&quot;CassandraAbstractAsyncDao&quot;]
+    Object______p279[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraAbstractDao_c279[&quot;CassandraAbstractDao&quot;]
+    AbstractBufferedRateExecutor_p280[&quot;AbstractBufferedRateExecutor&quot;] --&gt;|extends| CassandraBufferedRateReadExecutor_c280[&quot;CassandraBufferedRateReadExecutor&quot;]
+    AbstractBufferedRateExecutor_p281[&quot;AbstractBufferedRateExecutor&quot;] --&gt;|extends| CassandraBufferedRateWriteExecutor_c281[&quot;CassandraBufferedRateWriteExecutor&quot;]
+    Object______p282[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultNotificationRequestService_c282[&quot;DefaultNotificationRequestService&quot;]
+    NotificationRequestService_p283[&quot;NotificationRequestService&quot;] --&gt;|implements| DefaultNotificationRequestService_c283[&quot;DefaultNotificationRequestService&quot;]
+    EntityDaoService_p284[&quot;EntityDaoService&quot;] --&gt;|implements| DefaultNotificationRequestService_c284[&quot;DefaultNotificationRequestService&quot;]
+    DataValidator_p285[&quot;DataValidator&quot;] --&gt;|extends| NotificationRequestValidator_c285[&quot;NotificationRequestValidator&quot;]
+    AbstractEntityService_p286[&quot;AbstractEntityService&quot;] --&gt;|extends| DefaultNotificationRuleService_c286[&quot;DefaultNotificationRuleService&quot;]
+    NotificationRuleService_p287[&quot;NotificationRuleService&quot;] --&gt;|implements| DefaultNotificationRuleService_c287[&quot;DefaultNotificationRuleService&quot;]
+    EntityDaoService_p288[&quot;EntityDaoService&quot;] --&gt;|implements| DefaultNotificationRuleService_c288[&quot;DefaultNotificationRuleService&quot;]
+    Object______p289[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultNotificationService_c289[&quot;DefaultNotificationService&quot;]
+    NotificationService_p290[&quot;NotificationService&quot;] --&gt;|implements| DefaultNotificationService_c290[&quot;DefaultNotificationService&quot;]
+    EntityDaoService_p291[&quot;EntityDaoService&quot;] --&gt;|implements| DefaultNotificationService_c291[&quot;DefaultNotificationService&quot;]
+    Object______p292[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultNotificationSettingsService_c292[&quot;DefaultNotificationSettingsService&quot;]
+    NotificationSettingsService_p293[&quot;NotificationSettingsService&quot;] --&gt;|implements| DefaultNotificationSettingsService_c293[&quot;DefaultNotificationSettingsService&quot;]
+    AbstractEntityService_p294[&quot;AbstractEntityService&quot;] --&gt;|extends| DefaultNotificationTargetService_c294[&quot;DefaultNotificationTargetService&quot;]
+    NotificationTargetService_p295[&quot;NotificationTargetService&quot;] --&gt;|implements| DefaultNotificationTargetService_c295[&quot;DefaultNotificationTargetService&quot;]
+    EntityDaoService_p296[&quot;EntityDaoService&quot;] --&gt;|implements| DefaultNotificationTargetService_c296[&quot;DefaultNotificationTargetService&quot;]
+    AbstractEntityService_p297[&quot;AbstractEntityService&quot;] --&gt;|extends| DefaultNotificationTemplateService_c297[&quot;DefaultNotificationTemplateService&quot;]
+    NotificationTemplateService_p298[&quot;NotificationTemplateService&quot;] --&gt;|implements| DefaultNotificationTemplateService_c298[&quot;DefaultNotificationTemplateService&quot;]
+    EntityDaoService_p299[&quot;EntityDaoService&quot;] --&gt;|implements| DefaultNotificationTemplateService_c299[&quot;DefaultNotificationTemplateService&quot;]
+    Object______p300[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultNotifications_c300[&quot;DefaultNotifications&quot;]
+    Object______p301[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultNotification_c301[&quot;DefaultNotification&quot;]
+    Object______p302[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultRule_c302[&quot;DefaultRule&quot;]
+    Dao_p303[&quot;Dao&quot;] --&gt;|extends| NotificationDao_c303[&quot;NotificationDao&quot;]
+    Dao_p304[&quot;Dao&quot;] --&gt;|extends| NotificationRequestDao_c304[&quot;NotificationRequestDao&quot;]
+    Dao_p305[&quot;Dao&quot;] --&gt;|extends| NotificationRuleDao_c305[&quot;NotificationRuleDao&quot;]
+    ExportableEntityDao_p306[&quot;ExportableEntityDao&quot;] --&gt;|extends| NotificationRuleDao_c306[&quot;NotificationRuleDao&quot;]
+    Dao_p307[&quot;Dao&quot;] --&gt;|extends| NotificationTargetDao_c307[&quot;NotificationTargetDao&quot;]
+    TenantEntityDao_p308[&quot;TenantEntityDao&quot;] --&gt;|extends| NotificationTargetDao_c308[&quot;NotificationTargetDao&quot;]
+    ExportableEntityDao_p309[&quot;ExportableEntityDao&quot;] --&gt;|extends| NotificationTargetDao_c309[&quot;NotificationTargetDao&quot;]
+    Dao_p310[&quot;Dao&quot;] --&gt;|extends| NotificationTemplateDao_c310[&quot;NotificationTemplateDao&quot;]
+    ExportableEntityDao_p311[&quot;ExportableEntityDao&quot;] --&gt;|extends| NotificationTemplateDao_c311[&quot;NotificationTemplateDao&quot;]
+    Object______p312[&quot;Object/外部框架&quot;] --&gt;|extends| HybridClientRegistrationRepository_c312[&quot;HybridClientRegistrationRepository&quot;]
+    ClientRegistrationRepository_p313[&quot;ClientRegistrationRepository&quot;] --&gt;|implements| HybridClientRegistrationRepository_c313[&quot;HybridClientRegistrationRepository&quot;]
+    Dao_p314[&quot;Dao&quot;] --&gt;|extends| OAuth2ClientRegistrationTemplateDao_c314[&quot;OAuth2ClientRegistrationTemplateDao&quot;]
+    AbstractEntityService_p315[&quot;AbstractEntityService&quot;] --&gt;|extends| OAuth2ConfigTemplateServiceImpl_c315[&quot;OAuth2ConfigTemplateServiceImpl&quot;]
+    OAuth2ConfigTemplateService_p316[&quot;OAuth2ConfigTemplateService&quot;] --&gt;|implements| OAuth2ConfigTemplateServiceImpl_c316[&quot;OAuth2ConfigTemplateServiceImpl&quot;]
+    Object______p317[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2Configuration_c317[&quot;OAuth2Configuration&quot;]
+    Dao_p318[&quot;Dao&quot;] --&gt;|extends| OAuth2DomainDao_c318[&quot;OAuth2DomainDao&quot;]
+    Dao_p319[&quot;Dao&quot;] --&gt;|extends| OAuth2MobileDao_c319[&quot;OAuth2MobileDao&quot;]
+    Dao_p320[&quot;Dao&quot;] --&gt;|extends| OAuth2ParamsDao_c320[&quot;OAuth2ParamsDao&quot;]
+    Dao_p321[&quot;Dao&quot;] --&gt;|extends| OAuth2RegistrationDao_c321[&quot;OAuth2RegistrationDao&quot;]
+    AbstractEntityService_p322[&quot;AbstractEntityService&quot;] --&gt;|extends| OAuth2ServiceImpl_c322[&quot;OAuth2ServiceImpl&quot;]
+    OAuth2Service_p323[&quot;OAuth2Service&quot;] --&gt;|implements| OAuth2ServiceImpl_c323[&quot;OAuth2ServiceImpl&quot;]
+    Object______p324[&quot;Object/外部框架&quot;] --&gt;|extends| OAuth2Utils_c324[&quot;OAuth2Utils&quot;]
+    AbstractCachedEntityService_p325[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| BaseOtaPackageService_c325[&quot;BaseOtaPackageService&quot;]
+    OtaPackageService_p326[&quot;OtaPackageService&quot;] --&gt;|implements| BaseOtaPackageService_c326[&quot;BaseOtaPackageService&quot;]
+    Object______p327[&quot;Object/外部框架&quot;] --&gt;|extends| OtaPackageCacheEvictEvent_c327[&quot;OtaPackageCacheEvictEvent&quot;]
+    Object______p328[&quot;Object/外部框架&quot;] --&gt;|extends| OtaPackageCacheKey_c328[&quot;OtaPackageCacheKey&quot;]
+    Serializable_p329[&quot;Serializable&quot;] --&gt;|implements| OtaPackageCacheKey_c329[&quot;OtaPackageCacheKey&quot;]
+    CaffeineTbTransactionalCache_p330[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| OtaPackageCaffeineCache_c330[&quot;OtaPackageCaffeineCache&quot;]
+    Dao_p331[&quot;Dao&quot;] --&gt;|extends| OtaPackageDao_c331[&quot;OtaPackageDao&quot;]
+    TenantEntityWithDataDao_p332[&quot;TenantEntityWithDataDao&quot;] --&gt;|extends| OtaPackageDao_c332[&quot;OtaPackageDao&quot;]
+    Dao_p333[&quot;Dao&quot;] --&gt;|extends| OtaPackageInfoDao_c333[&quot;OtaPackageInfoDao&quot;]
+    RedisTbTransactionalCache_p334[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| OtaPackageRedisCache_c334[&quot;OtaPackageRedisCache&quot;]
+    AbstractEntityService_p335[&quot;AbstractEntityService&quot;] --&gt;|extends| BaseQueueService_c335[&quot;BaseQueueService&quot;]
+    QueueService_p336[&quot;QueueService&quot;] --&gt;|implements| BaseQueueService_c336[&quot;BaseQueueService&quot;]
+    Dao_p337[&quot;Dao&quot;] --&gt;|extends| QueueDao_c337[&quot;QueueDao&quot;]
+    Object______p338[&quot;Object/外部框架&quot;] --&gt;|extends| BaseRelationService_c338[&quot;BaseRelationService&quot;]
+    RelationService_p339[&quot;RelationService&quot;] --&gt;|implements| BaseRelationService_c339[&quot;BaseRelationService&quot;]
+    Object______p340[&quot;Object/外部框架&quot;] --&gt;|extends| RelationQueueCtx_c340[&quot;RelationQueueCtx&quot;]
+    Object______p341[&quot;Object/外部框架&quot;] --&gt;|extends| RelationTask_c341[&quot;RelationTask&quot;]
+    Object______p342[&quot;Object/外部框架&quot;] --&gt;|extends| EntityRelationEvent_c342[&quot;EntityRelationEvent&quot;]
+    Object______p343[&quot;Object/外部框架&quot;] --&gt;|extends| RelationCacheKey_c343[&quot;RelationCacheKey&quot;]
+    Serializable_p344[&quot;Serializable&quot;] --&gt;|implements| RelationCacheKey_c344[&quot;RelationCacheKey&quot;]
+    Object______p345[&quot;Object/外部框架&quot;] --&gt;|extends| RelationCacheValue_c345[&quot;RelationCacheValue&quot;]
+    Serializable_p346[&quot;Serializable&quot;] --&gt;|implements| RelationCacheValue_c346[&quot;RelationCacheValue&quot;]
+    CaffeineTbTransactionalCache_p347[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| RelationCaffeineCache_c347[&quot;RelationCaffeineCache&quot;]
+    RedisTbTransactionalCache_p348[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| RelationRedisCache_c348[&quot;RelationRedisCache&quot;]
+    BaseResourceService_p349[&quot;BaseResourceService&quot;] --&gt;|extends| BaseImageService_c349[&quot;BaseImageService&quot;]
+    ImageService_p350[&quot;ImageService&quot;] --&gt;|implements| BaseImageService_c350[&quot;BaseImageService&quot;]
+    Object______p351[&quot;Object/外部框架&quot;] --&gt;|extends| UpdateResult_c351[&quot;UpdateResult&quot;]
+    AbstractCachedEntityService_p352[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| BaseResourceService_c352[&quot;BaseResourceService&quot;]
+    ResourceService_p353[&quot;ResourceService&quot;] --&gt;|implements| BaseResourceService_c353[&quot;BaseResourceService&quot;]
+    Object______p354[&quot;Object/外部框架&quot;] --&gt;|extends| ImageCacheKey_c354[&quot;ImageCacheKey&quot;]
+    Dao_p355[&quot;Dao&quot;] --&gt;|extends| TbResourceDao_c355[&quot;TbResourceDao&quot;]
+    TenantEntityWithDataDao_p356[&quot;TenantEntityWithDataDao&quot;] --&gt;|extends| TbResourceDao_c356[&quot;TbResourceDao&quot;]
+    ExportableEntityDao_p357[&quot;ExportableEntityDao&quot;] --&gt;|extends| TbResourceDao_c357[&quot;TbResourceDao&quot;]
+    Dao_p358[&quot;Dao&quot;] --&gt;|extends| TbResourceInfoDao_c358[&quot;TbResourceInfoDao&quot;]
+    Object______p359[&quot;Object/外部框架&quot;] --&gt;|extends| BaseRpcService_c359[&quot;BaseRpcService&quot;]
+    RpcService_p360[&quot;RpcService&quot;] --&gt;|implements| BaseRpcService_c360[&quot;BaseRpcService&quot;]
+    Dao_p361[&quot;Dao&quot;] --&gt;|extends| RpcDao_c361[&quot;RpcDao&quot;]
+    AbstractEntityService_p362[&quot;AbstractEntityService&quot;] --&gt;|extends| BaseRuleChainService_c362[&quot;BaseRuleChainService&quot;]
+    RuleChainService_p363[&quot;RuleChainService&quot;] --&gt;|implements| BaseRuleChainService_c363[&quot;BaseRuleChainService&quot;]
+    AbstractEntityService_p364[&quot;AbstractEntityService&quot;] --&gt;|extends| BaseRuleNodeStateService_c364[&quot;BaseRuleNodeStateService&quot;]
+    RuleNodeStateService_p365[&quot;RuleNodeStateService&quot;] --&gt;|implements| BaseRuleNodeStateService_c365[&quot;BaseRuleNodeStateService&quot;]
+    Dao_p366[&quot;Dao&quot;] --&gt;|extends| RuleChainDao_c366[&quot;RuleChainDao&quot;]
+    TenantEntityDao_p367[&quot;TenantEntityDao&quot;] --&gt;|extends| RuleChainDao_c367[&quot;RuleChainDao&quot;]
+    ExportableEntityDao_p368[&quot;ExportableEntityDao&quot;] --&gt;|extends| RuleChainDao_c368[&quot;RuleChainDao&quot;]
+    Dao_p369[&quot;Dao&quot;] --&gt;|extends| RuleNodeDao_c369[&quot;RuleNodeDao&quot;]
+    Dao_p370[&quot;Dao&quot;] --&gt;|extends| RuleNodeStateDao_c370[&quot;RuleNodeStateDao&quot;]
+    Object______p371[&quot;Object/外部框架&quot;] --&gt;|extends| ConstraintValidator_c371[&quot;ConstraintValidator&quot;]
+    Object______p372[&quot;Object/外部框架&quot;] --&gt;|extends| DataValidator_c372[&quot;DataValidator&quot;]
+    Object______p373[&quot;Object/外部框架&quot;] --&gt;|extends| NoXssValidator_c373[&quot;NoXssValidator&quot;]
+    ConstraintValidator_p374[&quot;ConstraintValidator&quot;] --&gt;|implements| NoXssValidator_c374[&quot;NoXssValidator&quot;]
+    Object______p375[&quot;Object/外部框架&quot;] --&gt;|extends| PaginatedRemover_c375[&quot;PaginatedRemover&quot;]
+    Object______p376[&quot;Object/外部框架&quot;] --&gt;|extends| StringLengthValidator_c376[&quot;StringLengthValidator&quot;]
+    ConstraintValidator_p377[&quot;ConstraintValidator&quot;] --&gt;|implements| StringLengthValidator_c377[&quot;StringLengthValidator&quot;]
+    Object______p378[&quot;Object/外部框架&quot;] --&gt;|extends| TimePaginatedRemover_c378[&quot;TimePaginatedRemover&quot;]
+    Object______p379[&quot;Object/外部框架&quot;] --&gt;|extends| Validator_c379[&quot;Validator&quot;]
+    Object______p380[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractHasOtaPackageValidator_c380[&quot;AbstractHasOtaPackageValidator&quot;]
+    DataValidator_p381[&quot;DataValidator&quot;] --&gt;|extends| AdminSettingsDataValidator_c381[&quot;AdminSettingsDataValidator&quot;]
+    DataValidator_p382[&quot;DataValidator&quot;] --&gt;|extends| AlarmCommentDataValidator_c382[&quot;AlarmCommentDataValidator&quot;]
+    DataValidator_p383[&quot;DataValidator&quot;] --&gt;|extends| AlarmDataValidator_c383[&quot;AlarmDataValidator&quot;]
+    DataValidator_p384[&quot;DataValidator&quot;] --&gt;|extends| ApiUsageDataValidator_c384[&quot;ApiUsageDataValidator&quot;]
+    DataValidator_p385[&quot;DataValidator&quot;] --&gt;|extends| AssetDataValidator_c385[&quot;AssetDataValidator&quot;]
+    DataValidator_p386[&quot;DataValidator&quot;] --&gt;|extends| AssetProfileDataValidator_c386[&quot;AssetProfileDataValidator&quot;]
+    DataValidator_p387[&quot;DataValidator&quot;] --&gt;|extends| AuditLogDataValidator_c387[&quot;AuditLogDataValidator&quot;]
+    Object______p388[&quot;Object/外部框架&quot;] --&gt;|extends| BaseOtaPackageDataValidator_c388[&quot;BaseOtaPackageDataValidator&quot;]
+    DataValidator_p389[&quot;DataValidator&quot;] --&gt;|extends| ClientRegistrationTemplateDataValidator_c389[&quot;ClientRegistrationTemplateDataValidator&quot;]
+    DataValidator_p390[&quot;DataValidator&quot;] --&gt;|extends| ComponentDescriptorDataValidator_c390[&quot;ComponentDescriptorDataValidator&quot;]
+    DataValidator_p391[&quot;DataValidator&quot;] --&gt;|extends| CustomerDataValidator_c391[&quot;CustomerDataValidator&quot;]
+    DataValidator_p392[&quot;DataValidator&quot;] --&gt;|extends| DashboardDataValidator_c392[&quot;DashboardDataValidator&quot;]
+    DataValidator_p393[&quot;DataValidator&quot;] --&gt;|extends| DeviceCredentialsDataValidator_c393[&quot;DeviceCredentialsDataValidator&quot;]
+    AbstractHasOtaPackageValidator_p394[&quot;AbstractHasOtaPackageValidator&quot;] --&gt;|extends| DeviceDataValidator_c394[&quot;DeviceDataValidator&quot;]
+    AbstractHasOtaPackageValidator_p395[&quot;AbstractHasOtaPackageValidator&quot;] --&gt;|extends| DeviceProfileDataValidator_c395[&quot;DeviceProfileDataValidator&quot;]
+    DataValidator_p396[&quot;DataValidator&quot;] --&gt;|extends| EdgeDataValidator_c396[&quot;EdgeDataValidator&quot;]
+    DataValidator_p397[&quot;DataValidator&quot;] --&gt;|extends| EdgeEventDataValidator_c397[&quot;EdgeEventDataValidator&quot;]
+    DataValidator_p398[&quot;DataValidator&quot;] --&gt;|extends| EntityViewDataValidator_c398[&quot;EntityViewDataValidator&quot;]
+    DataValidator_p399[&quot;DataValidator&quot;] --&gt;|extends| EventDataValidator_c399[&quot;EventDataValidator&quot;]
+    BaseOtaPackageDataValidator_p400[&quot;BaseOtaPackageDataValidator&quot;] --&gt;|extends| OtaPackageDataValidator_c400[&quot;OtaPackageDataValidator&quot;]
+    BaseOtaPackageDataValidator_p401[&quot;BaseOtaPackageDataValidator&quot;] --&gt;|extends| OtaPackageInfoDataValidator_c401[&quot;OtaPackageInfoDataValidator&quot;]
+    DataValidator_p402[&quot;DataValidator&quot;] --&gt;|extends| QueueValidator_c402[&quot;QueueValidator&quot;]
+    DataValidator_p403[&quot;DataValidator&quot;] --&gt;|extends| ResourceDataValidator_c403[&quot;ResourceDataValidator&quot;]
+    DataValidator_p404[&quot;DataValidator&quot;] --&gt;|extends| RuleChainDataValidator_c404[&quot;RuleChainDataValidator&quot;]
+    DataValidator_p405[&quot;DataValidator&quot;] --&gt;|extends| TenantDataValidator_c405[&quot;TenantDataValidator&quot;]
+    DataValidator_p406[&quot;DataValidator&quot;] --&gt;|extends| TenantProfileDataValidator_c406[&quot;TenantProfileDataValidator&quot;]
+    DataValidator_p407[&quot;DataValidator&quot;] --&gt;|extends| UserCredentialsDataValidator_c407[&quot;UserCredentialsDataValidator&quot;]
+    DataValidator_p408[&quot;DataValidator&quot;] --&gt;|extends| UserDataValidator_c408[&quot;UserDataValidator&quot;]
+    DataValidator_p409[&quot;DataValidator&quot;] --&gt;|extends| WidgetTypeDataValidator_c409[&quot;WidgetTypeDataValidator&quot;]
+    DataValidator_p410[&quot;DataValidator&quot;] --&gt;|extends| WidgetsBundleDataValidator_c410[&quot;WidgetsBundleDataValidator&quot;]
+    Dao_p411[&quot;Dao&quot;] --&gt;|extends| AdminSettingsDao_c411[&quot;AdminSettingsDao&quot;]
+    Object______p412[&quot;Object/外部框架&quot;] --&gt;|extends| AdminSettingsServiceImpl_c412[&quot;AdminSettingsServiceImpl&quot;]
+    AdminSettingsService_p413[&quot;AdminSettingsService&quot;] --&gt;|implements| AdminSettingsServiceImpl_c413[&quot;AdminSettingsServiceImpl&quot;]
+    Object______p414[&quot;Object/外部框架&quot;] --&gt;|extends| JpaAbstractDao_c414[&quot;JpaAbstractDao&quot;]
+    Object______p415[&quot;Object/外部框架&quot;] --&gt;|extends| JpaAbstractDaoListeningExecutorService_c415[&quot;JpaAbstractDaoListeningExecutorService&quot;]
+    AbstractListeningExecutor_p416[&quot;AbstractListeningExecutor&quot;] --&gt;|extends| JpaExecutorService_c416[&quot;JpaExecutorService&quot;]
+    Object______p417[&quot;Object/外部框架&quot;] --&gt;|extends| JpaPartitionedAbstractDao_c417[&quot;JpaPartitionedAbstractDao&quot;]
+    Object______p418[&quot;Object/外部框架&quot;] --&gt;|extends| ScheduledLogExecutorComponent_c418[&quot;ScheduledLogExecutorComponent&quot;]
+    Object______p419[&quot;Object/外部框架&quot;] --&gt;|extends| TbSqlBlockingQueue_c419[&quot;TbSqlBlockingQueue&quot;]
+    Object______p420[&quot;Object/外部框架&quot;] --&gt;|extends| TbSqlBlockingQueueParams_c420[&quot;TbSqlBlockingQueueParams&quot;]
+    Object______p421[&quot;Object/外部框架&quot;] --&gt;|extends| TbSqlBlockingQueueWrapper_c421[&quot;TbSqlBlockingQueueWrapper&quot;]
+    Object______p422[&quot;Object/外部框架&quot;] --&gt;|extends| TbSqlQueueElement_c422[&quot;TbSqlQueueElement&quot;]
+    JpaRepository_p423[&quot;JpaRepository&quot;] --&gt;|extends| AlarmCommentRepository_c423[&quot;AlarmCommentRepository&quot;]
+    JpaRepository_p424[&quot;JpaRepository&quot;] --&gt;|extends| AlarmRepository_c424[&quot;AlarmRepository&quot;]
+    JpaRepository_p425[&quot;JpaRepository&quot;] --&gt;|extends| EntityAlarmRepository_c425[&quot;EntityAlarmRepository&quot;]
+    JpaPartitionedAbstractDao_p426[&quot;JpaPartitionedAbstractDao&quot;] --&gt;|extends| JpaAlarmCommentDao_c426[&quot;JpaAlarmCommentDao&quot;]
+    AlarmCommentDao_p427[&quot;AlarmCommentDao&quot;] --&gt;|implements| JpaAlarmCommentDao_c427[&quot;JpaAlarmCommentDao&quot;]
+    JpaAbstractDao_p428[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaAlarmDao_c428[&quot;JpaAlarmDao&quot;]
+    AlarmDao_p429[&quot;AlarmDao&quot;] --&gt;|implements| JpaAlarmDao_c429[&quot;JpaAlarmDao&quot;]
+    JpaRepository_p430[&quot;JpaRepository&quot;] --&gt;|extends| AssetProfileRepository_c430[&quot;AssetProfileRepository&quot;]
+    ExportableEntityRepository_p431[&quot;ExportableEntityRepository&quot;] --&gt;|extends| AssetProfileRepository_c431[&quot;AssetProfileRepository&quot;]
+    JpaRepository_p432[&quot;JpaRepository&quot;] --&gt;|extends| AssetRepository_c432[&quot;AssetRepository&quot;]
+    ExportableEntityRepository_p433[&quot;ExportableEntityRepository&quot;] --&gt;|extends| AssetRepository_c433[&quot;AssetRepository&quot;]
+    JpaAbstractDao_p434[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaAssetDao_c434[&quot;JpaAssetDao&quot;]
+    AssetDao_p435[&quot;AssetDao&quot;] --&gt;|implements| JpaAssetDao_c435[&quot;JpaAssetDao&quot;]
+    JpaAbstractDao_p436[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaAssetProfileDao_c436[&quot;JpaAssetProfileDao&quot;]
+    AssetProfileDao_p437[&quot;AssetProfileDao&quot;] --&gt;|implements| JpaAssetProfileDao_c437[&quot;JpaAssetProfileDao&quot;]
+    Object______p438[&quot;Object/外部框架&quot;] --&gt;|extends| AttributeKvInsertRepository_c438[&quot;AttributeKvInsertRepository&quot;]
+    JpaRepository_p439[&quot;JpaRepository&quot;] --&gt;|extends| AttributeKvRepository_c439[&quot;AttributeKvRepository&quot;]
+    JpaAbstractDaoListeningExecutorService_p440[&quot;JpaAbstractDaoListeningExecutorService&quot;] --&gt;|extends| JpaAttributeDao_c440[&quot;JpaAttributeDao&quot;]
+    AttributesDao_p441[&quot;AttributesDao&quot;] --&gt;|implements| JpaAttributeDao_c441[&quot;JpaAttributeDao&quot;]
+    AttributeKvInsertRepository_p442[&quot;AttributeKvInsertRepository&quot;] --&gt;|extends| SqlAttributesInsertRepository_c442[&quot;SqlAttributesInsertRepository&quot;]
+    JpaRepository_p443[&quot;JpaRepository&quot;] --&gt;|extends| AuditLogRepository_c443[&quot;AuditLogRepository&quot;]
+    JpaPartitionedAbstractDao_p444[&quot;JpaPartitionedAbstractDao&quot;] --&gt;|extends| JpaAuditLogDao_c444[&quot;JpaAuditLogDao&quot;]
+    AuditLogDao_p445[&quot;AuditLogDao&quot;] --&gt;|implements| JpaAuditLogDao_c445[&quot;JpaAuditLogDao&quot;]
+    Object______p446[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractComponentDescriptorInsertRepository_c446[&quot;AbstractComponentDescriptorInsertRepository&quot;]
+    ComponentDescriptorInsertRepository_p447[&quot;ComponentDescriptorInsertRepository&quot;] --&gt;|implements| AbstractComponentDescriptorInsertRepository_c447[&quot;AbstractComponentDescriptorInsertRepository&quot;]
+    JpaRepository_p448[&quot;JpaRepository&quot;] --&gt;|extends| ComponentDescriptorRepository_c448[&quot;ComponentDescriptorRepository&quot;]
+    JpaAbstractDao_p449[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaBaseComponentDescriptorDao_c449[&quot;JpaBaseComponentDescriptorDao&quot;]
+    ComponentDescriptorDao_p450[&quot;ComponentDescriptorDao&quot;] --&gt;|implements| JpaBaseComponentDescriptorDao_c450[&quot;JpaBaseComponentDescriptorDao&quot;]
+    AbstractComponentDescriptorInsertRepository_p451[&quot;AbstractComponentDescriptorInsertRepository&quot;] --&gt;|extends| SqlComponentDescriptorInsertRepository_c451[&quot;SqlComponentDescriptorInsertRepository&quot;]
+    JpaRepository_p452[&quot;JpaRepository&quot;] --&gt;|extends| CustomerRepository_c452[&quot;CustomerRepository&quot;]
+    ExportableEntityRepository_p453[&quot;ExportableEntityRepository&quot;] --&gt;|extends| CustomerRepository_c453[&quot;CustomerRepository&quot;]
+    JpaAbstractDao_p454[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaCustomerDao_c454[&quot;JpaCustomerDao&quot;]
+    CustomerDao_p455[&quot;CustomerDao&quot;] --&gt;|implements| JpaCustomerDao_c455[&quot;JpaCustomerDao&quot;]
+    JpaRepository_p456[&quot;JpaRepository&quot;] --&gt;|extends| DashboardInfoRepository_c456[&quot;DashboardInfoRepository&quot;]
+    JpaRepository_p457[&quot;JpaRepository&quot;] --&gt;|extends| DashboardRepository_c457[&quot;DashboardRepository&quot;]
+    ExportableEntityRepository_p458[&quot;ExportableEntityRepository&quot;] --&gt;|extends| DashboardRepository_c458[&quot;DashboardRepository&quot;]
+    JpaAbstractDao_p459[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaDashboardDao_c459[&quot;JpaDashboardDao&quot;]
+    DashboardDao_p460[&quot;DashboardDao&quot;] --&gt;|implements| JpaDashboardDao_c460[&quot;JpaDashboardDao&quot;]
+    JpaAbstractDao_p461[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaDashboardInfoDao_c461[&quot;JpaDashboardInfoDao&quot;]
+    DashboardInfoDao_p462[&quot;DashboardInfoDao&quot;] --&gt;|implements| JpaDashboardInfoDao_c462[&quot;JpaDashboardInfoDao&quot;]
+    Object______p463[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultNativeDeviceRepository_c463[&quot;DefaultNativeDeviceRepository&quot;]
+    NativeDeviceRepository_p464[&quot;NativeDeviceRepository&quot;] --&gt;|implements| DefaultNativeDeviceRepository_c464[&quot;DefaultNativeDeviceRepository&quot;]
+    JpaRepository_p465[&quot;JpaRepository&quot;] --&gt;|extends| DeviceCredentialsRepository_c465[&quot;DeviceCredentialsRepository&quot;]
+    JpaRepository_p466[&quot;JpaRepository&quot;] --&gt;|extends| DeviceProfileRepository_c466[&quot;DeviceProfileRepository&quot;]
+    ExportableEntityRepository_p467[&quot;ExportableEntityRepository&quot;] --&gt;|extends| DeviceProfileRepository_c467[&quot;DeviceProfileRepository&quot;]
+    JpaRepository_p468[&quot;JpaRepository&quot;] --&gt;|extends| DeviceRepository_c468[&quot;DeviceRepository&quot;]
+    ExportableEntityRepository_p469[&quot;ExportableEntityRepository&quot;] --&gt;|extends| DeviceRepository_c469[&quot;DeviceRepository&quot;]
+    JpaAbstractDao_p470[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaDeviceCredentialsDao_c470[&quot;JpaDeviceCredentialsDao&quot;]
+    DeviceCredentialsDao_p471[&quot;DeviceCredentialsDao&quot;] --&gt;|implements| JpaDeviceCredentialsDao_c471[&quot;JpaDeviceCredentialsDao&quot;]
+    JpaAbstractDao_p472[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaDeviceDao_c472[&quot;JpaDeviceDao&quot;]
+    DeviceDao_p473[&quot;DeviceDao&quot;] --&gt;|implements| JpaDeviceDao_c473[&quot;JpaDeviceDao&quot;]
+    JpaAbstractDao_p474[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaDeviceProfileDao_c474[&quot;JpaDeviceProfileDao&quot;]
+    DeviceProfileDao_p475[&quot;DeviceProfileDao&quot;] --&gt;|implements| JpaDeviceProfileDao_c475[&quot;JpaDeviceProfileDao&quot;]
+    Object______p476[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeEventInsertRepository_c476[&quot;EdgeEventInsertRepository&quot;]
+    JpaRepository_p477[&quot;JpaRepository&quot;] --&gt;|extends| EdgeEventRepository_c477[&quot;EdgeEventRepository&quot;]
+    JpaSpecificationExecutor_p478[&quot;JpaSpecificationExecutor&quot;] --&gt;|extends| EdgeEventRepository_c478[&quot;EdgeEventRepository&quot;]
+    JpaRepository_p479[&quot;JpaRepository&quot;] --&gt;|extends| EdgeRepository_c479[&quot;EdgeRepository&quot;]
+    JpaPartitionedAbstractDao_p480[&quot;JpaPartitionedAbstractDao&quot;] --&gt;|extends| JpaBaseEdgeEventDao_c480[&quot;JpaBaseEdgeEventDao&quot;]
+    EdgeEventDao_p481[&quot;EdgeEventDao&quot;] --&gt;|implements| JpaBaseEdgeEventDao_c481[&quot;JpaBaseEdgeEventDao&quot;]
+    JpaAbstractDao_p482[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaEdgeDao_c482[&quot;JpaEdgeDao&quot;]
+    EdgeDao_p483[&quot;EdgeDao&quot;] --&gt;|implements| JpaEdgeDao_c483[&quot;JpaEdgeDao&quot;]
+    JpaRepository_p484[&quot;JpaRepository&quot;] --&gt;|extends| EntityViewRepository_c484[&quot;EntityViewRepository&quot;]
+    ExportableEntityRepository_p485[&quot;ExportableEntityRepository&quot;] --&gt;|extends| EntityViewRepository_c485[&quot;EntityViewRepository&quot;]
+    JpaAbstractDao_p486[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaEntityViewDao_c486[&quot;JpaEntityViewDao&quot;]
+    EntityViewDao_p487[&quot;EntityViewDao&quot;] --&gt;|implements| JpaEntityViewDao_c487[&quot;JpaEntityViewDao&quot;]
+    EventRepository_p488[&quot;EventRepository&quot;] --&gt;|extends| ErrorEventRepository_c488[&quot;ErrorEventRepository&quot;]
+    JpaRepository_p489[&quot;JpaRepository&quot;] --&gt;|extends| ErrorEventRepository_c489[&quot;ErrorEventRepository&quot;]
+    Object______p490[&quot;Object/外部框架&quot;] --&gt;|extends| EventInsertRepository_c490[&quot;EventInsertRepository&quot;]
+    Object______p491[&quot;Object/外部框架&quot;] --&gt;|extends| EventPartitionConfiguration_c491[&quot;EventPartitionConfiguration&quot;]
+    Object______p492[&quot;Object/外部框架&quot;] --&gt;|extends| JpaBaseEventDao_c492[&quot;JpaBaseEventDao&quot;]
+    EventDao_p493[&quot;EventDao&quot;] --&gt;|implements| JpaBaseEventDao_c493[&quot;JpaBaseEventDao&quot;]
+    EventRepository_p494[&quot;EventRepository&quot;] --&gt;|extends| LifecycleEventRepository_c494[&quot;LifecycleEventRepository&quot;]
+    JpaRepository_p495[&quot;JpaRepository&quot;] --&gt;|extends| LifecycleEventRepository_c495[&quot;LifecycleEventRepository&quot;]
+    EventRepository_p496[&quot;EventRepository&quot;] --&gt;|extends| RuleChainDebugEventRepository_c496[&quot;RuleChainDebugEventRepository&quot;]
+    JpaRepository_p497[&quot;JpaRepository&quot;] --&gt;|extends| RuleChainDebugEventRepository_c497[&quot;RuleChainDebugEventRepository&quot;]
+    EventRepository_p498[&quot;EventRepository&quot;] --&gt;|extends| RuleNodeDebugEventRepository_c498[&quot;RuleNodeDebugEventRepository&quot;]
+    JpaRepository_p499[&quot;JpaRepository&quot;] --&gt;|extends| RuleNodeDebugEventRepository_c499[&quot;RuleNodeDebugEventRepository&quot;]
+    JpaAbstractDaoListeningExecutorService_p500[&quot;JpaAbstractDaoListeningExecutorService&quot;] --&gt;|extends| SqlEventCleanupRepository_c500[&quot;SqlEventCleanupRepository&quot;]
+    EventCleanupRepository_p501[&quot;EventCleanupRepository&quot;] --&gt;|implements| SqlEventCleanupRepository_c501[&quot;SqlEventCleanupRepository&quot;]
+    EventRepository_p502[&quot;EventRepository&quot;] --&gt;|extends| StatisticsEventRepository_c502[&quot;StatisticsEventRepository&quot;]
+    JpaRepository_p503[&quot;JpaRepository&quot;] --&gt;|extends| StatisticsEventRepository_c503[&quot;StatisticsEventRepository&quot;]
+    JpaPartitionedAbstractDao_p504[&quot;JpaPartitionedAbstractDao&quot;] --&gt;|extends| JpaNotificationDao_c504[&quot;JpaNotificationDao&quot;]
+    NotificationDao_p505[&quot;NotificationDao&quot;] --&gt;|implements| JpaNotificationDao_c505[&quot;JpaNotificationDao&quot;]
+    JpaAbstractDao_p506[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaNotificationRequestDao_c506[&quot;JpaNotificationRequestDao&quot;]
+    NotificationRequestDao_p507[&quot;NotificationRequestDao&quot;] --&gt;|implements| JpaNotificationRequestDao_c507[&quot;JpaNotificationRequestDao&quot;]
+    JpaAbstractDao_p508[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaNotificationRuleDao_c508[&quot;JpaNotificationRuleDao&quot;]
+    NotificationRuleDao_p509[&quot;NotificationRuleDao&quot;] --&gt;|implements| JpaNotificationRuleDao_c509[&quot;JpaNotificationRuleDao&quot;]
+    JpaAbstractDao_p510[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaNotificationTargetDao_c510[&quot;JpaNotificationTargetDao&quot;]
+    NotificationTargetDao_p511[&quot;NotificationTargetDao&quot;] --&gt;|implements| JpaNotificationTargetDao_c511[&quot;JpaNotificationTargetDao&quot;]
+    JpaAbstractDao_p512[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaNotificationTemplateDao_c512[&quot;JpaNotificationTemplateDao&quot;]
+    NotificationTemplateDao_p513[&quot;NotificationTemplateDao&quot;] --&gt;|implements| JpaNotificationTemplateDao_c513[&quot;JpaNotificationTemplateDao&quot;]
+    JpaRepository_p514[&quot;JpaRepository&quot;] --&gt;|extends| NotificationRepository_c514[&quot;NotificationRepository&quot;]
+    JpaRepository_p515[&quot;JpaRepository&quot;] --&gt;|extends| NotificationRequestRepository_c515[&quot;NotificationRequestRepository&quot;]
+    JpaRepository_p516[&quot;JpaRepository&quot;] --&gt;|extends| NotificationRuleRepository_c516[&quot;NotificationRuleRepository&quot;]
+    ExportableEntityRepository_p517[&quot;ExportableEntityRepository&quot;] --&gt;|extends| NotificationRuleRepository_c517[&quot;NotificationRuleRepository&quot;]
+    JpaRepository_p518[&quot;JpaRepository&quot;] --&gt;|extends| NotificationTargetRepository_c518[&quot;NotificationTargetRepository&quot;]
+    ExportableEntityRepository_p519[&quot;ExportableEntityRepository&quot;] --&gt;|extends| NotificationTargetRepository_c519[&quot;NotificationTargetRepository&quot;]
+    JpaRepository_p520[&quot;JpaRepository&quot;] --&gt;|extends| NotificationTemplateRepository_c520[&quot;NotificationTemplateRepository&quot;]
+    ExportableEntityRepository_p521[&quot;ExportableEntityRepository&quot;] --&gt;|extends| NotificationTemplateRepository_c521[&quot;NotificationTemplateRepository&quot;]
+    JpaAbstractDao_p522[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaOAuth2ClientRegistrationTemplateDao_c522[&quot;JpaOAuth2ClientRegistrationTemplateDao&quot;]
+    OAuth2ClientRegistrationTemplateDao_p523[&quot;OAuth2ClientRegistrationTemplateDao&quot;] --&gt;|implements| JpaOAuth2ClientRegistrationTemplateDao_c523[&quot;JpaOAuth2ClientRegistrationTemplateDao&quot;]
+    JpaAbstractDao_p524[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaOAuth2DomainDao_c524[&quot;JpaOAuth2DomainDao&quot;]
+    OAuth2DomainDao_p525[&quot;OAuth2DomainDao&quot;] --&gt;|implements| JpaOAuth2DomainDao_c525[&quot;JpaOAuth2DomainDao&quot;]
+    JpaAbstractDao_p526[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaOAuth2MobileDao_c526[&quot;JpaOAuth2MobileDao&quot;]
+    OAuth2MobileDao_p527[&quot;OAuth2MobileDao&quot;] --&gt;|implements| JpaOAuth2MobileDao_c527[&quot;JpaOAuth2MobileDao&quot;]
+    JpaAbstractDao_p528[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaOAuth2ParamsDao_c528[&quot;JpaOAuth2ParamsDao&quot;]
+    OAuth2ParamsDao_p529[&quot;OAuth2ParamsDao&quot;] --&gt;|implements| JpaOAuth2ParamsDao_c529[&quot;JpaOAuth2ParamsDao&quot;]
+    JpaAbstractDao_p530[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaOAuth2RegistrationDao_c530[&quot;JpaOAuth2RegistrationDao&quot;]
+    OAuth2RegistrationDao_p531[&quot;OAuth2RegistrationDao&quot;] --&gt;|implements| JpaOAuth2RegistrationDao_c531[&quot;JpaOAuth2RegistrationDao&quot;]
+    JpaRepository_p532[&quot;JpaRepository&quot;] --&gt;|extends| OAuth2ClientRegistrationTemplateRepository_c532[&quot;OAuth2ClientRegistrationTemplateRepository&quot;]
+    JpaRepository_p533[&quot;JpaRepository&quot;] --&gt;|extends| OAuth2DomainRepository_c533[&quot;OAuth2DomainRepository&quot;]
+    JpaRepository_p534[&quot;JpaRepository&quot;] --&gt;|extends| OAuth2MobileRepository_c534[&quot;OAuth2MobileRepository&quot;]
+    JpaRepository_p535[&quot;JpaRepository&quot;] --&gt;|extends| OAuth2ParamsRepository_c535[&quot;OAuth2ParamsRepository&quot;]
+    JpaRepository_p536[&quot;JpaRepository&quot;] --&gt;|extends| OAuth2RegistrationRepository_c536[&quot;OAuth2RegistrationRepository&quot;]
+    JpaAbstractDao_p537[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaOtaPackageDao_c537[&quot;JpaOtaPackageDao&quot;]
+    OtaPackageDao_p538[&quot;OtaPackageDao&quot;] --&gt;|implements| JpaOtaPackageDao_c538[&quot;JpaOtaPackageDao&quot;]
+    JpaAbstractDao_p539[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaOtaPackageInfoDao_c539[&quot;JpaOtaPackageInfoDao&quot;]
+    OtaPackageInfoDao_p540[&quot;OtaPackageInfoDao&quot;] --&gt;|implements| JpaOtaPackageInfoDao_c540[&quot;JpaOtaPackageInfoDao&quot;]
+    JpaRepository_p541[&quot;JpaRepository&quot;] --&gt;|extends| OtaPackageInfoRepository_c541[&quot;OtaPackageInfoRepository&quot;]
+    JpaRepository_p542[&quot;JpaRepository&quot;] --&gt;|extends| OtaPackageRepository_c542[&quot;OtaPackageRepository&quot;]
+    Object______p543[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmDataAdapter_c543[&quot;AlarmDataAdapter&quot;]
+    Object______p544[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultAlarmQueryRepository_c544[&quot;DefaultAlarmQueryRepository&quot;]
+    AlarmQueryRepository_p545[&quot;AlarmQueryRepository&quot;] --&gt;|implements| DefaultAlarmQueryRepository_c545[&quot;DefaultAlarmQueryRepository&quot;]
+    Object______p546[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultEntityQueryRepository_c546[&quot;DefaultEntityQueryRepository&quot;]
+    EntityQueryRepository_p547[&quot;EntityQueryRepository&quot;] --&gt;|implements| DefaultEntityQueryRepository_c547[&quot;DefaultEntityQueryRepository&quot;]
+    Object______p548[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultQueryLogComponent_c548[&quot;DefaultQueryLogComponent&quot;]
+    QueryLogComponent_p549[&quot;QueryLogComponent&quot;] --&gt;|implements| DefaultQueryLogComponent_c549[&quot;DefaultQueryLogComponent&quot;]
+    Object______p550[&quot;Object/外部框架&quot;] --&gt;|extends| EntityDataAdapter_c550[&quot;EntityDataAdapter&quot;]
+    Object______p551[&quot;Object/外部框架&quot;] --&gt;|extends| EntityKeyMapping_c551[&quot;EntityKeyMapping&quot;]
+    Object______p552[&quot;Object/外部框架&quot;] --&gt;|extends| JpaEntityQueryDao_c552[&quot;JpaEntityQueryDao&quot;]
+    EntityQueryDao_p553[&quot;EntityQueryDao&quot;] --&gt;|implements| JpaEntityQueryDao_c553[&quot;JpaEntityQueryDao&quot;]
+    Object______p554[&quot;Object/外部框架&quot;] --&gt;|extends| QueryContext_c554[&quot;QueryContext&quot;]
+    SqlParameterSource_p555[&quot;SqlParameterSource&quot;] --&gt;|implements| QueryContext_c555[&quot;QueryContext&quot;]
+    Object______p556[&quot;Object/外部框架&quot;] --&gt;|extends| Parameter_c556[&quot;Parameter&quot;]
+    Object______p557[&quot;Object/外部框架&quot;] --&gt;|extends| QuerySecurityContext_c557[&quot;QuerySecurityContext&quot;]
+    JpaAbstractDao_p558[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaQueueDao_c558[&quot;JpaQueueDao&quot;]
+    QueueDao_p559[&quot;QueueDao&quot;] --&gt;|implements| JpaQueueDao_c559[&quot;JpaQueueDao&quot;]
+    JpaRepository_p560[&quot;JpaRepository&quot;] --&gt;|extends| QueueRepository_c560[&quot;QueueRepository&quot;]
+    JpaAbstractDaoListeningExecutorService_p561[&quot;JpaAbstractDaoListeningExecutorService&quot;] --&gt;|extends| JpaRelationDao_c561[&quot;JpaRelationDao&quot;]
+    RelationDao_p562[&quot;RelationDao&quot;] --&gt;|implements| JpaRelationDao_c562[&quot;JpaRelationDao&quot;]
+    AbstractListeningExecutor_p563[&quot;AbstractListeningExecutor&quot;] --&gt;|extends| JpaRelationQueryExecutorService_c563[&quot;JpaRelationQueryExecutorService&quot;]
+    JpaRepository_p564[&quot;JpaRepository&quot;] --&gt;|extends| RelationRepository_c564[&quot;RelationRepository&quot;]
+    JpaSpecificationExecutor_p565[&quot;JpaSpecificationExecutor&quot;] --&gt;|extends| RelationRepository_c565[&quot;RelationRepository&quot;]
+    Object______p566[&quot;Object/外部框架&quot;] --&gt;|extends| SqlRelationInsertRepository_c566[&quot;SqlRelationInsertRepository&quot;]
+    RelationInsertRepository_p567[&quot;RelationInsertRepository&quot;] --&gt;|implements| SqlRelationInsertRepository_c567[&quot;SqlRelationInsertRepository&quot;]
+    JpaAbstractDao_p568[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaTbResourceDao_c568[&quot;JpaTbResourceDao&quot;]
+    TbResourceDao_p569[&quot;TbResourceDao&quot;] --&gt;|implements| JpaTbResourceDao_c569[&quot;JpaTbResourceDao&quot;]
+    JpaAbstractDao_p570[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaTbResourceInfoDao_c570[&quot;JpaTbResourceInfoDao&quot;]
+    TbResourceInfoDao_p571[&quot;TbResourceInfoDao&quot;] --&gt;|implements| JpaTbResourceInfoDao_c571[&quot;JpaTbResourceInfoDao&quot;]
+    JpaRepository_p572[&quot;JpaRepository&quot;] --&gt;|extends| TbResourceInfoRepository_c572[&quot;TbResourceInfoRepository&quot;]
+    JpaRepository_p573[&quot;JpaRepository&quot;] --&gt;|extends| TbResourceRepository_c573[&quot;TbResourceRepository&quot;]
+    ExportableEntityRepository_p574[&quot;ExportableEntityRepository&quot;] --&gt;|extends| TbResourceRepository_c574[&quot;TbResourceRepository&quot;]
+    JpaAbstractDao_p575[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaRpcDao_c575[&quot;JpaRpcDao&quot;]
+    RpcDao_p576[&quot;RpcDao&quot;] --&gt;|implements| JpaRpcDao_c576[&quot;JpaRpcDao&quot;]
+    JpaRepository_p577[&quot;JpaRepository&quot;] --&gt;|extends| RpcRepository_c577[&quot;RpcRepository&quot;]
+    JpaAbstractDao_p578[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaRuleChainDao_c578[&quot;JpaRuleChainDao&quot;]
+    RuleChainDao_p579[&quot;RuleChainDao&quot;] --&gt;|implements| JpaRuleChainDao_c579[&quot;JpaRuleChainDao&quot;]
+    JpaAbstractDao_p580[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaRuleNodeDao_c580[&quot;JpaRuleNodeDao&quot;]
+    RuleNodeDao_p581[&quot;RuleNodeDao&quot;] --&gt;|implements| JpaRuleNodeDao_c581[&quot;JpaRuleNodeDao&quot;]
+    JpaAbstractDao_p582[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaRuleNodeStateDao_c582[&quot;JpaRuleNodeStateDao&quot;]
+    RuleNodeStateDao_p583[&quot;RuleNodeStateDao&quot;] --&gt;|implements| JpaRuleNodeStateDao_c583[&quot;JpaRuleNodeStateDao&quot;]
+    JpaRepository_p584[&quot;JpaRepository&quot;] --&gt;|extends| RuleChainRepository_c584[&quot;RuleChainRepository&quot;]
+    ExportableEntityRepository_p585[&quot;ExportableEntityRepository&quot;] --&gt;|extends| RuleChainRepository_c585[&quot;RuleChainRepository&quot;]
+    JpaRepository_p586[&quot;JpaRepository&quot;] --&gt;|extends| RuleNodeRepository_c586[&quot;RuleNodeRepository&quot;]
+    JpaRepository_p587[&quot;JpaRepository&quot;] --&gt;|extends| RuleNodeStateRepository_c587[&quot;RuleNodeStateRepository&quot;]
+    JpaRepository_p588[&quot;JpaRepository&quot;] --&gt;|extends| AdminSettingsRepository_c588[&quot;AdminSettingsRepository&quot;]
+    JpaAbstractDao_p589[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaAdminSettingsDao_c589[&quot;JpaAdminSettingsDao&quot;]
+    AdminSettingsDao_p590[&quot;AdminSettingsDao&quot;] --&gt;|implements| JpaAdminSettingsDao_c590[&quot;JpaAdminSettingsDao&quot;]
+    JpaAbstractDao_p591[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaTenantDao_c591[&quot;JpaTenantDao&quot;]
+    TenantDao_p592[&quot;TenantDao&quot;] --&gt;|implements| JpaTenantDao_c592[&quot;JpaTenantDao&quot;]
+    JpaAbstractDao_p593[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaTenantProfileDao_c593[&quot;JpaTenantProfileDao&quot;]
+    TenantProfileDao_p594[&quot;TenantProfileDao&quot;] --&gt;|implements| JpaTenantProfileDao_c594[&quot;JpaTenantProfileDao&quot;]
+    JpaRepository_p595[&quot;JpaRepository&quot;] --&gt;|extends| TenantProfileRepository_c595[&quot;TenantProfileRepository&quot;]
+    JpaRepository_p596[&quot;JpaRepository&quot;] --&gt;|extends| TenantRepository_c596[&quot;TenantRepository&quot;]
+    JpaRepository_p597[&quot;JpaRepository&quot;] --&gt;|extends| ApiUsageStateRepository_c597[&quot;ApiUsageStateRepository&quot;]
+    JpaAbstractDao_p598[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaApiUsageStateDao_c598[&quot;JpaApiUsageStateDao&quot;]
+    ApiUsageStateDao_p599[&quot;ApiUsageStateDao&quot;] --&gt;|implements| JpaApiUsageStateDao_c599[&quot;JpaApiUsageStateDao&quot;]
+    JpaAbstractDao_p600[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaUserAuthSettingsDao_c600[&quot;JpaUserAuthSettingsDao&quot;]
+    UserAuthSettingsDao_p601[&quot;UserAuthSettingsDao&quot;] --&gt;|implements| JpaUserAuthSettingsDao_c601[&quot;JpaUserAuthSettingsDao&quot;]
+    JpaAbstractDao_p602[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaUserCredentialsDao_c602[&quot;JpaUserCredentialsDao&quot;]
+    UserCredentialsDao_p603[&quot;UserCredentialsDao&quot;] --&gt;|implements| JpaUserCredentialsDao_c603[&quot;JpaUserCredentialsDao&quot;]
+    JpaAbstractDao_p604[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaUserDao_c604[&quot;JpaUserDao&quot;]
+    UserDao_p605[&quot;UserDao&quot;] --&gt;|implements| JpaUserDao_c605[&quot;JpaUserDao&quot;]
+    JpaAbstractDaoListeningExecutorService_p606[&quot;JpaAbstractDaoListeningExecutorService&quot;] --&gt;|extends| JpaUserSettingsDao_c606[&quot;JpaUserSettingsDao&quot;]
+    UserSettingsDao_p607[&quot;UserSettingsDao&quot;] --&gt;|implements| JpaUserSettingsDao_c607[&quot;JpaUserSettingsDao&quot;]
+    JpaRepository_p608[&quot;JpaRepository&quot;] --&gt;|extends| UserAuthSettingsRepository_c608[&quot;UserAuthSettingsRepository&quot;]
+    JpaRepository_p609[&quot;JpaRepository&quot;] --&gt;|extends| UserCredentialsRepository_c609[&quot;UserCredentialsRepository&quot;]
+    JpaRepository_p610[&quot;JpaRepository&quot;] --&gt;|extends| UserRepository_c610[&quot;UserRepository&quot;]
+    JpaRepository_p611[&quot;JpaRepository&quot;] --&gt;|extends| UserSettingsRepository_c611[&quot;UserSettingsRepository&quot;]
+    JpaAbstractDao_p612[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaWidgetTypeDao_c612[&quot;JpaWidgetTypeDao&quot;]
+    WidgetTypeDao_p613[&quot;WidgetTypeDao&quot;] --&gt;|implements| JpaWidgetTypeDao_c613[&quot;JpaWidgetTypeDao&quot;]
+    JpaAbstractDao_p614[&quot;JpaAbstractDao&quot;] --&gt;|extends| JpaWidgetsBundleDao_c614[&quot;JpaWidgetsBundleDao&quot;]
+    WidgetsBundleDao_p615[&quot;WidgetsBundleDao&quot;] --&gt;|implements| JpaWidgetsBundleDao_c615[&quot;JpaWidgetsBundleDao&quot;]
+    JpaRepository_p616[&quot;JpaRepository&quot;] --&gt;|extends| WidgetTypeInfoRepository_c616[&quot;WidgetTypeInfoRepository&quot;]
+    JpaRepository_p617[&quot;JpaRepository&quot;] --&gt;|extends| WidgetTypeRepository_c617[&quot;WidgetTypeRepository&quot;]
+    ExportableEntityRepository_p618[&quot;ExportableEntityRepository&quot;] --&gt;|extends| WidgetTypeRepository_c618[&quot;WidgetTypeRepository&quot;]
+    JpaRepository_p619[&quot;JpaRepository&quot;] --&gt;|extends| WidgetsBundleRepository_c619[&quot;WidgetsBundleRepository&quot;]
+    ExportableEntityRepository_p620[&quot;ExportableEntityRepository&quot;] --&gt;|extends| WidgetsBundleRepository_c620[&quot;WidgetsBundleRepository&quot;]
+    JpaRepository_p621[&quot;JpaRepository&quot;] --&gt;|extends| WidgetsBundleWidgetRepository_c621[&quot;WidgetsBundleWidgetRepository&quot;]
+    AbstractSqlTimeseriesDao_p622[&quot;AbstractSqlTimeseriesDao&quot;] --&gt;|extends| AbstractChunkedAggregationTimeseriesDao_c622[&quot;AbstractChunkedAggregationTimeseriesDao&quot;]
+    TimeseriesDao_p623[&quot;TimeseriesDao&quot;] --&gt;|implements| AbstractChunkedAggregationTimeseriesDao_c623[&quot;AbstractChunkedAggregationTimeseriesDao&quot;]
+    BaseAbstractSqlTimeseriesDao_p624[&quot;BaseAbstractSqlTimeseriesDao&quot;] --&gt;|extends| AbstractSqlTimeseriesDao_c624[&quot;AbstractSqlTimeseriesDao&quot;]
+    AggregationTimeseriesDao_p625[&quot;AggregationTimeseriesDao&quot;] --&gt;|implements| AbstractSqlTimeseriesDao_c625[&quot;AbstractSqlTimeseriesDao&quot;]
+    JpaAbstractDaoListeningExecutorService_p626[&quot;JpaAbstractDaoListeningExecutorService&quot;] --&gt;|extends| BaseAbstractSqlTimeseriesDao_c626[&quot;BaseAbstractSqlTimeseriesDao&quot;]
+    Object______p627[&quot;Object/外部框架&quot;] --&gt;|extends| EntityContainer_c627[&quot;EntityContainer&quot;]
+    BaseAbstractSqlTimeseriesDao_p628[&quot;BaseAbstractSqlTimeseriesDao&quot;] --&gt;|extends| SqlTimeseriesLatestDao_c628[&quot;SqlTimeseriesLatestDao&quot;]
+    TimeseriesLatestDao_p629[&quot;TimeseriesLatestDao&quot;] --&gt;|implements| SqlTimeseriesLatestDao_c629[&quot;SqlTimeseriesLatestDao&quot;]
+    Object______p630[&quot;Object/外部框架&quot;] --&gt;|extends| TsKey_c630[&quot;TsKey&quot;]
+    JpaRepository_p631[&quot;JpaRepository&quot;] --&gt;|extends| TsKvDictionaryRepository_c631[&quot;TsKvDictionaryRepository&quot;]
+    Object______p632[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractInsertRepository_c632[&quot;AbstractInsertRepository&quot;]
+    AbstractInsertRepository_p633[&quot;AbstractInsertRepository&quot;] --&gt;|extends| SqlLatestInsertTsRepository_c633[&quot;SqlLatestInsertTsRepository&quot;]
+    InsertLatestTsRepository_p634[&quot;InsertLatestTsRepository&quot;] --&gt;|implements| SqlLatestInsertTsRepository_c634[&quot;SqlLatestInsertTsRepository&quot;]
+    AbstractInsertRepository_p635[&quot;AbstractInsertRepository&quot;] --&gt;|extends| SqlInsertTsRepository_c635[&quot;SqlInsertTsRepository&quot;]
+    InsertTsRepository_p636[&quot;InsertTsRepository&quot;] --&gt;|implements| SqlInsertTsRepository_c636[&quot;SqlInsertTsRepository&quot;]
+    Object______p637[&quot;Object/外部框架&quot;] --&gt;|extends| SqlPartitioningRepository_c637[&quot;SqlPartitioningRepository&quot;]
+    AbstractInsertRepository_p638[&quot;AbstractInsertRepository&quot;] --&gt;|extends| TimescaleInsertTsRepository_c638[&quot;TimescaleInsertTsRepository&quot;]
+    InsertTsRepository_p639[&quot;InsertTsRepository&quot;] --&gt;|implements| TimescaleInsertTsRepository_c639[&quot;TimescaleInsertTsRepository&quot;]
+    Object______p640[&quot;Object/外部框架&quot;] --&gt;|extends| SearchTsKvLatestRepository_c640[&quot;SearchTsKvLatestRepository&quot;]
+    JpaRepository_p641[&quot;JpaRepository&quot;] --&gt;|extends| TsKvLatestRepository_c641[&quot;TsKvLatestRepository&quot;]
+    AbstractChunkedAggregationTimeseriesDao_p642[&quot;AbstractChunkedAggregationTimeseriesDao&quot;] --&gt;|extends| JpaSqlTimeseriesDao_c642[&quot;JpaSqlTimeseriesDao&quot;]
+    Object______p643[&quot;Object/外部框架&quot;] --&gt;|extends| AggregationRepository_c643[&quot;AggregationRepository&quot;]
+    AbstractSqlTimeseriesDao_p644[&quot;AbstractSqlTimeseriesDao&quot;] --&gt;|extends| TimescaleTimeseriesDao_c644[&quot;TimescaleTimeseriesDao&quot;]
+    TimeseriesDao_p645[&quot;TimeseriesDao&quot;] --&gt;|implements| TimescaleTimeseriesDao_c645[&quot;TimescaleTimeseriesDao&quot;]
+    JpaRepository_p646[&quot;JpaRepository&quot;] --&gt;|extends| TsKvTimescaleRepository_c646[&quot;TsKvTimescaleRepository&quot;]
+    JpaRepository_p647[&quot;JpaRepository&quot;] --&gt;|extends| TsKvRepository_c647[&quot;TsKvRepository&quot;]
+    Object______p648[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultTbTenantProfileCache_c648[&quot;DefaultTbTenantProfileCache&quot;]
+    TbTenantProfileCache_p649[&quot;TbTenantProfileCache&quot;] --&gt;|implements| DefaultTbTenantProfileCache_c649[&quot;DefaultTbTenantProfileCache&quot;]
+    TenantProfileProvider_p650[&quot;TenantProfileProvider&quot;] --&gt;|implements| DefaultTbTenantProfileCache_c650[&quot;DefaultTbTenantProfileCache&quot;]
+    CaffeineTbTransactionalCache_p651[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| TenantCaffeineCache_c651[&quot;TenantCaffeineCache&quot;]
+    Dao_p652[&quot;Dao&quot;] --&gt;|extends| TenantDao_c652[&quot;TenantDao&quot;]
+    Object______p653[&quot;Object/外部框架&quot;] --&gt;|extends| TenantEvictEvent_c653[&quot;TenantEvictEvent&quot;]
+    CaffeineTbTransactionalCache_p654[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| TenantExistsCaffeineCache_c654[&quot;TenantExistsCaffeineCache&quot;]
+    RedisTbTransactionalCache_p655[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| TenantExistsRedisCache_c655[&quot;TenantExistsRedisCache&quot;]
+    Object______p656[&quot;Object/外部框架&quot;] --&gt;|extends| TenantProfileCacheKey_c656[&quot;TenantProfileCacheKey&quot;]
+    Serializable_p657[&quot;Serializable&quot;] --&gt;|implements| TenantProfileCacheKey_c657[&quot;TenantProfileCacheKey&quot;]
+    CaffeineTbTransactionalCache_p658[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| TenantProfileCaffeineCache_c658[&quot;TenantProfileCaffeineCache&quot;]
+    Dao_p659[&quot;Dao&quot;] --&gt;|extends| TenantProfileDao_c659[&quot;TenantProfileDao&quot;]
+    Object______p660[&quot;Object/外部框架&quot;] --&gt;|extends| TenantProfileEvictEvent_c660[&quot;TenantProfileEvictEvent&quot;]
+    RedisTbTransactionalCache_p661[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| TenantProfileRedisCache_c661[&quot;TenantProfileRedisCache&quot;]
+    AbstractCachedEntityService_p662[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| TenantProfileServiceImpl_c662[&quot;TenantProfileServiceImpl&quot;]
+    TenantProfileService_p663[&quot;TenantProfileService&quot;] --&gt;|implements| TenantProfileServiceImpl_c663[&quot;TenantProfileServiceImpl&quot;]
+    RedisTbTransactionalCache_p664[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| TenantRedisCache_c664[&quot;TenantRedisCache&quot;]
+    AbstractCachedEntityService_p665[&quot;AbstractCachedEntityService&quot;] --&gt;|extends| TenantServiceImpl_c665[&quot;TenantServiceImpl&quot;]
+    TenantService_p666[&quot;TenantService&quot;] --&gt;|implements| TenantServiceImpl_c666[&quot;TenantServiceImpl&quot;]
+    CassandraAbstractAsyncDao_p667[&quot;CassandraAbstractAsyncDao&quot;] --&gt;|extends| AbstractCassandraBaseTimeseriesDao_c667[&quot;AbstractCassandraBaseTimeseriesDao&quot;]
+    Object______p668[&quot;Object/外部框架&quot;] --&gt;|extends| AggregatePartitionsFunction_c668[&quot;AggregatePartitionsFunction&quot;]
+    AsyncFunction_p669[&quot;AsyncFunction&quot;] --&gt;|implements| AggregatePartitionsFunction_c669[&quot;AggregatePartitionsFunction&quot;]
+    Object______p670[&quot;Object/外部框架&quot;] --&gt;|extends| AggregationResult_c670[&quot;AggregationResult&quot;]
+    Object______p671[&quot;Object/外部框架&quot;] --&gt;|extends| BaseTimeseriesService_c671[&quot;BaseTimeseriesService&quot;]
+    TimeseriesService_p672[&quot;TimeseriesService&quot;] --&gt;|implements| BaseTimeseriesService_c672[&quot;BaseTimeseriesService&quot;]
+    AbstractCassandraBaseTimeseriesDao_p673[&quot;AbstractCassandraBaseTimeseriesDao&quot;] --&gt;|extends| CassandraBaseTimeseriesDao_c673[&quot;CassandraBaseTimeseriesDao&quot;]
+    TimeseriesDao_p674[&quot;TimeseriesDao&quot;] --&gt;|implements| CassandraBaseTimeseriesDao_c674[&quot;CassandraBaseTimeseriesDao&quot;]
+    AggregationTimeseriesDao_p675[&quot;AggregationTimeseriesDao&quot;] --&gt;|implements| CassandraBaseTimeseriesDao_c675[&quot;CassandraBaseTimeseriesDao&quot;]
+    Object______p676[&quot;Object/外部框架&quot;] --&gt;|extends| CacheCallback_c676[&quot;CacheCallback&quot;]
+    AbstractCassandraBaseTimeseriesDao_p677[&quot;AbstractCassandraBaseTimeseriesDao&quot;] --&gt;|extends| CassandraBaseTimeseriesLatestDao_c677[&quot;CassandraBaseTimeseriesLatestDao&quot;]
+    TimeseriesLatestDao_p678[&quot;TimeseriesLatestDao&quot;] --&gt;|implements| CassandraBaseTimeseriesLatestDao_c678[&quot;CassandraBaseTimeseriesLatestDao&quot;]
+    Object______p679[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraPartitionCacheKey_c679[&quot;CassandraPartitionCacheKey&quot;]
+    Object______p680[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraTsPartitionsCache_c680[&quot;CassandraTsPartitionsCache&quot;]
+    Object______p681[&quot;Object/外部框架&quot;] --&gt;|extends| QueryCursor_c681[&quot;QueryCursor&quot;]
+    Object______p682[&quot;Object/外部框架&quot;] --&gt;|extends| SimpleListenableFuture_c682[&quot;SimpleListenableFuture&quot;]
+    Object______p683[&quot;Object/外部框架&quot;] --&gt;|extends| SqlPartition_c683[&quot;SqlPartition&quot;]
+    QueryCursor_p684[&quot;QueryCursor&quot;] --&gt;|extends| TsKvQueryCursor_c684[&quot;TsKvQueryCursor&quot;]
+    Object______p685[&quot;Object/外部框架&quot;] --&gt;|extends| BasicUsageInfoService_c685[&quot;BasicUsageInfoService&quot;]
+    UsageInfoService_p686[&quot;UsageInfoService&quot;] --&gt;|implements| BasicUsageInfoService_c686[&quot;BasicUsageInfoService&quot;]
+    Dao_p687[&quot;Dao&quot;] --&gt;|extends| ApiUsageStateDao_c687[&quot;ApiUsageStateDao&quot;]
+    AbstractEntityService_p688[&quot;AbstractEntityService&quot;] --&gt;|extends| ApiUsageStateServiceImpl_c688[&quot;ApiUsageStateServiceImpl&quot;]
+    ApiUsageStateService_p689[&quot;ApiUsageStateService&quot;] --&gt;|implements| ApiUsageStateServiceImpl_c689[&quot;ApiUsageStateServiceImpl&quot;]
+    Object______p690[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultApiLimitService_c690[&quot;DefaultApiLimitService&quot;]
+    ApiLimitService_p691[&quot;ApiLimitService&quot;] --&gt;|implements| DefaultApiLimitService_c691[&quot;DefaultApiLimitService&quot;]
+    Dao_p692[&quot;Dao&quot;] --&gt;|extends| UserAuthSettingsDao_c692[&quot;UserAuthSettingsDao&quot;]
+    Dao_p693[&quot;Dao&quot;] --&gt;|extends| UserCredentialsDao_c693[&quot;UserCredentialsDao&quot;]
+    Dao_p694[&quot;Dao&quot;] --&gt;|extends| UserDao_c694[&quot;UserDao&quot;]
+    TenantEntityDao_p695[&quot;TenantEntityDao&quot;] --&gt;|extends| UserDao_c695[&quot;UserDao&quot;]
+    AbstractEntityService_p696[&quot;AbstractEntityService&quot;] --&gt;|extends| UserServiceImpl_c696[&quot;UserServiceImpl&quot;]
+    UserService_p697[&quot;UserService&quot;] --&gt;|implements| UserServiceImpl_c697[&quot;UserServiceImpl&quot;]
+    CaffeineTbTransactionalCache_p698[&quot;CaffeineTbTransactionalCache&quot;] --&gt;|extends| UserSettingsCaffeineCache_c698[&quot;UserSettingsCaffeineCache&quot;]
+    Object______p699[&quot;Object/外部框架&quot;] --&gt;|extends| UserSettingsEvictEvent_c699[&quot;UserSettingsEvictEvent&quot;]
+    RedisTbTransactionalCache_p700[&quot;RedisTbTransactionalCache&quot;] --&gt;|extends| UserSettingsRedisCache_c700[&quot;UserSettingsRedisCache&quot;]
+    AbstractCachedService_p701[&quot;AbstractCachedService&quot;] --&gt;|extends| UserSettingsServiceImpl_c701[&quot;UserSettingsServiceImpl&quot;]
+    UserSettingsService_p702[&quot;UserSettingsService&quot;] --&gt;|implements| UserSettingsServiceImpl_c702[&quot;UserSettingsServiceImpl&quot;]
+    Object______p703[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractBufferedRateExecutor_c703[&quot;AbstractBufferedRateExecutor&quot;]
+    Object______p704[&quot;Object/外部框架&quot;] --&gt;|extends| AsyncTaskContext_c704[&quot;AsyncTaskContext&quot;]
+    Object______p705[&quot;Object/外部框架&quot;] --&gt;|extends| BufferedRateExecutorStats_c705[&quot;BufferedRateExecutorStats&quot;]
+    Object______p706[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceConnectivityUtil_c706[&quot;DeviceConnectivityUtil&quot;]
+    Object______p707[&quot;Object/外部框架&quot;] --&gt;|extends| ImageUtils_c707[&quot;ImageUtils&quot;]
+    Object______p708[&quot;Object/外部框架&quot;] --&gt;|extends| ProcessedImage_c708[&quot;ProcessedImage&quot;]
+    Object______p709[&quot;Object/外部框架&quot;] --&gt;|extends| JsonNodeProcessingTask_c709[&quot;JsonNodeProcessingTask&quot;]
+    Object______p710[&quot;Object/外部框架&quot;] --&gt;|extends| JsonPathProcessingTask_c710[&quot;JsonPathProcessingTask&quot;]
+    Object______p711[&quot;Object/外部框架&quot;] --&gt;|extends| KvUtils_c711[&quot;KvUtils&quot;]
+    Exception_p712[&quot;Exception&quot;] --&gt;|extends| TenantRateLimitException_c712[&quot;TenantRateLimitException&quot;]
+    Object______p713[&quot;Object/外部框架&quot;] --&gt;|extends| TimeUtils_c713[&quot;TimeUtils&quot;]
+    Object______p714[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractJsonSqlTypeDescriptor_c714[&quot;AbstractJsonSqlTypeDescriptor&quot;]
+    SqlTypeDescriptor_p715[&quot;SqlTypeDescriptor&quot;] --&gt;|implements| AbstractJsonSqlTypeDescriptor_c715[&quot;AbstractJsonSqlTypeDescriptor&quot;]
+    AbstractJsonSqlTypeDescriptor_p716[&quot;AbstractJsonSqlTypeDescriptor&quot;] --&gt;|extends| JsonBinarySqlTypeDescriptor_c716[&quot;JsonBinarySqlTypeDescriptor&quot;]
+    AbstractSingleColumnStandardBasicType_p717[&quot;AbstractSingleColumnStandardBasicType&quot;] --&gt;|extends| JsonBinaryType_c717[&quot;JsonBinaryType&quot;]
+    DynamicParameterizedType_p718[&quot;DynamicParameterizedType&quot;] --&gt;|implements| JsonBinaryType_c718[&quot;JsonBinaryType&quot;]
+    AbstractJsonSqlTypeDescriptor_p719[&quot;AbstractJsonSqlTypeDescriptor&quot;] --&gt;|extends| JsonStringSqlTypeDescriptor_c719[&quot;JsonStringSqlTypeDescriptor&quot;]
+    AbstractSingleColumnStandardBasicType_p720[&quot;AbstractSingleColumnStandardBasicType&quot;] --&gt;|extends| JsonStringType_c720[&quot;JsonStringType&quot;]
+    DynamicParameterizedType_p721[&quot;DynamicParameterizedType&quot;] --&gt;|implements| JsonStringType_c721[&quot;JsonStringType&quot;]
+    AbstractTypeDescriptor_p722[&quot;AbstractTypeDescriptor&quot;] --&gt;|extends| JsonTypeDescriptor_c722[&quot;JsonTypeDescriptor&quot;]
+    DynamicParameterizedType_p723[&quot;DynamicParameterizedType&quot;] --&gt;|implements| JsonTypeDescriptor_c723[&quot;JsonTypeDescriptor&quot;]
+    Dao_p724[&quot;Dao&quot;] --&gt;|extends| WidgetTypeDao_c724[&quot;WidgetTypeDao&quot;]
+    ExportableEntityDao_p725[&quot;ExportableEntityDao&quot;] --&gt;|extends| WidgetTypeDao_c725[&quot;WidgetTypeDao&quot;]
+    ImageContainerDao_p726[&quot;ImageContainerDao&quot;] --&gt;|extends| WidgetTypeDao_c726[&quot;WidgetTypeDao&quot;]
+    Object______p727[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetTypeServiceImpl_c727[&quot;WidgetTypeServiceImpl&quot;]
+    WidgetTypeService_p728[&quot;WidgetTypeService&quot;] --&gt;|implements| WidgetTypeServiceImpl_c728[&quot;WidgetTypeServiceImpl&quot;]
+    Dao_p729[&quot;Dao&quot;] --&gt;|extends| WidgetsBundleDao_c729[&quot;WidgetsBundleDao&quot;]
+    ExportableEntityDao_p730[&quot;ExportableEntityDao&quot;] --&gt;|extends| WidgetsBundleDao_c730[&quot;WidgetsBundleDao&quot;]
+    ImageContainerDao_p731[&quot;ImageContainerDao&quot;] --&gt;|extends| WidgetsBundleDao_c731[&quot;WidgetsBundleDao&quot;]
+    Object______p732[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetsBundleServiceImpl_c732[&quot;WidgetsBundleServiceImpl&quot;]
+    WidgetsBundleService_p733[&quot;WidgetsBundleService&quot;] --&gt;|implements| WidgetsBundleServiceImpl_c733[&quot;WidgetsBundleServiceImpl&quot;]
+    Object______p734[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractDaoServiceTest_c734[&quot;AbstractDaoServiceTest&quot;]
+    Object______p735[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractJpaDaoTest_c735[&quot;AbstractJpaDaoTest&quot;]
+    Object______p736[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractNoSqlContainer_c736[&quot;AbstractNoSqlContainer&quot;]
+    Object______p737[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractRedisContainer_c737[&quot;AbstractRedisContainer&quot;]
+    AbstractNoSqlContainer_p738[&quot;AbstractNoSqlContainer&quot;] --&gt;|extends| NoSqlDaoServiceTestSuite_c738[&quot;NoSqlDaoServiceTestSuite&quot;]
+    Object______p739[&quot;Object/外部框架&quot;] --&gt;|extends| PostgreSqlInitializer_c739[&quot;PostgreSqlInitializer&quot;]
+    AbstractRedisContainer_p740[&quot;AbstractRedisContainer&quot;] --&gt;|extends| RedisSqlTestSuite_c740[&quot;RedisSqlTestSuite&quot;]
+    Object______p741[&quot;Object/外部框架&quot;] --&gt;|extends| TimescaleDaoServiceTestSuite_c741[&quot;TimescaleDaoServiceTestSuite&quot;]
+    Object______p742[&quot;Object/外部框架&quot;] --&gt;|extends| TimescaleSqlInitializer_c742[&quot;TimescaleSqlInitializer&quot;]
+    Object______p743[&quot;Object/外部框架&quot;] --&gt;|extends| DeleteEntityEventTest_c743[&quot;DeleteEntityEventTest&quot;]
+    Object______p744[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraPartitionsCacheTest_c744[&quot;CassandraPartitionsCacheTest&quot;]
+    Object______p745[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractServiceTest_c745[&quot;AbstractServiceTest&quot;]
+    Object______p746[&quot;Object/外部框架&quot;] --&gt;|extends| IdComparator_c746[&quot;IdComparator&quot;]
+    AbstractServiceTest_p747[&quot;AbstractServiceTest&quot;] --&gt;|extends| AdminSettingsServiceTest_c747[&quot;AdminSettingsServiceTest&quot;]
+    AbstractServiceTest_p748[&quot;AbstractServiceTest&quot;] --&gt;|extends| AlarmCommentServiceTest_c748[&quot;AlarmCommentServiceTest&quot;]
+    AbstractServiceTest_p749[&quot;AbstractServiceTest&quot;] --&gt;|extends| AlarmServiceTest_c749[&quot;AlarmServiceTest&quot;]
+    AbstractServiceTest_p750[&quot;AbstractServiceTest&quot;] --&gt;|extends| ApiUsageStateServiceTest_c750[&quot;ApiUsageStateServiceTest&quot;]
+    AbstractServiceTest_p751[&quot;AbstractServiceTest&quot;] --&gt;|extends| AssetProfileServiceTest_c751[&quot;AssetProfileServiceTest&quot;]
+    AbstractServiceTest_p752[&quot;AbstractServiceTest&quot;] --&gt;|extends| AssetServiceTest_c752[&quot;AssetServiceTest&quot;]
+    Object______p753[&quot;Object/外部框架&quot;] --&gt;|extends| ConstraintValidatorTest_c753[&quot;ConstraintValidatorTest&quot;]
+    AbstractServiceTest_p754[&quot;AbstractServiceTest&quot;] --&gt;|extends| CustomerServiceTest_c754[&quot;CustomerServiceTest&quot;]
+    AbstractServiceTest_p755[&quot;AbstractServiceTest&quot;] --&gt;|extends| DashboardServiceTest_c755[&quot;DashboardServiceTest&quot;]
+    Object______p756[&quot;Object/外部框架&quot;] --&gt;|extends| DataValidatorTest_c756[&quot;DataValidatorTest&quot;]
+    AbstractServiceTest_p757[&quot;AbstractServiceTest&quot;] --&gt;|extends| DeviceCredentialsCacheTest_c757[&quot;DeviceCredentialsCacheTest&quot;]
+    AbstractServiceTest_p758[&quot;AbstractServiceTest&quot;] --&gt;|extends| DeviceCredentialsServiceTest_c758[&quot;DeviceCredentialsServiceTest&quot;]
+    AbstractServiceTest_p759[&quot;AbstractServiceTest&quot;] --&gt;|extends| DeviceProfileServiceTest_c759[&quot;DeviceProfileServiceTest&quot;]
+    AbstractServiceTest_p760[&quot;AbstractServiceTest&quot;] --&gt;|extends| DeviceServiceTest_c760[&quot;DeviceServiceTest&quot;]
+    AbstractServiceTest_p761[&quot;AbstractServiceTest&quot;] --&gt;|extends| EdgeEventServiceTest_c761[&quot;EdgeEventServiceTest&quot;]
+    AbstractServiceTest_p762[&quot;AbstractServiceTest&quot;] --&gt;|extends| EdgeServiceTest_c762[&quot;EdgeServiceTest&quot;]
+    AbstractServiceTest_p763[&quot;AbstractServiceTest&quot;] --&gt;|extends| EntityServiceRegistryTest_c763[&quot;EntityServiceRegistryTest&quot;]
+    AbstractServiceTest_p764[&quot;AbstractServiceTest&quot;] --&gt;|extends| EntityServiceTest_c764[&quot;EntityServiceTest&quot;]
+    Object______p765[&quot;Object/外部框架&quot;] --&gt;|extends| NoXssValidatorTest_c765[&quot;NoXssValidatorTest&quot;]
+    AbstractServiceTest_p766[&quot;AbstractServiceTest&quot;] --&gt;|extends| OAuth2ConfigTemplateServiceTest_c766[&quot;OAuth2ConfigTemplateServiceTest&quot;]
+    AbstractServiceTest_p767[&quot;AbstractServiceTest&quot;] --&gt;|extends| OAuth2ServiceTest_c767[&quot;OAuth2ServiceTest&quot;]
+    AbstractServiceTest_p768[&quot;AbstractServiceTest&quot;] --&gt;|extends| OtaPackageServiceTest_c768[&quot;OtaPackageServiceTest&quot;]
+    AbstractServiceTest_p769[&quot;AbstractServiceTest&quot;] --&gt;|extends| QueueServiceTest_c769[&quot;QueueServiceTest&quot;]
+    AbstractServiceTest_p770[&quot;AbstractServiceTest&quot;] --&gt;|extends| RelationCacheTest_c770[&quot;RelationCacheTest&quot;]
+    AbstractServiceTest_p771[&quot;AbstractServiceTest&quot;] --&gt;|extends| RelationServiceTest_c771[&quot;RelationServiceTest&quot;]
+    AbstractServiceTest_p772[&quot;AbstractServiceTest&quot;] --&gt;|extends| RuleChainServiceTest_c772[&quot;RuleChainServiceTest&quot;]
+    AbstractServiceTest_p773[&quot;AbstractServiceTest&quot;] --&gt;|extends| TbCacheSerializationTest_c773[&quot;TbCacheSerializationTest&quot;]
+    AbstractServiceTest_p774[&quot;AbstractServiceTest&quot;] --&gt;|extends| TenantProfileServiceTest_c774[&quot;TenantProfileServiceTest&quot;]
+    AbstractServiceTest_p775[&quot;AbstractServiceTest&quot;] --&gt;|extends| TenantServiceTest_c775[&quot;TenantServiceTest&quot;]
+    AbstractServiceTest_p776[&quot;AbstractServiceTest&quot;] --&gt;|extends| UserServiceTest_c776[&quot;UserServiceTest&quot;]
+    AbstractServiceTest_p777[&quot;AbstractServiceTest&quot;] --&gt;|extends| WidgetTypeServiceTest_c777[&quot;WidgetTypeServiceTest&quot;]
+    AbstractServiceTest_p778[&quot;AbstractServiceTest&quot;] --&gt;|extends| WidgetsBundleServiceTest_c778[&quot;WidgetsBundleServiceTest&quot;]
+    AbstractServiceTest_p779[&quot;AbstractServiceTest&quot;] --&gt;|extends| BaseAttributesServiceTest_c779[&quot;BaseAttributesServiceTest&quot;]
+    BaseAttributesServiceTest_p780[&quot;BaseAttributesServiceTest&quot;] --&gt;|extends| AttributesServiceSqlTest_c780[&quot;AttributesServiceSqlTest&quot;]
+    AbstractServiceTest_p781[&quot;AbstractServiceTest&quot;] --&gt;|extends| BaseEventServiceTest_c781[&quot;BaseEventServiceTest&quot;]
+    BaseEventServiceTest_p782[&quot;BaseEventServiceTest&quot;] --&gt;|extends| EventServiceSqlTest_c782[&quot;EventServiceSqlTest&quot;]
+    AbstractServiceTest_p783[&quot;AbstractServiceTest&quot;] --&gt;|extends| EntitiesSchemaSqlTest_c783[&quot;EntitiesSchemaSqlTest&quot;]
+    AbstractServiceTest_p784[&quot;AbstractServiceTest&quot;] --&gt;|extends| BaseTimeseriesServiceTest_c784[&quot;BaseTimeseriesServiceTest&quot;]
+    TimeseriesServiceNoSqlTest_p785[&quot;TimeseriesServiceNoSqlTest&quot;] --&gt;|extends| TimeseriesServiceNoSqlSetNullEnabledTest_c785[&quot;TimeseriesServiceNoSqlSetNullEnabledTest&quot;]
+    BaseTimeseriesServiceTest_p786[&quot;BaseTimeseriesServiceTest&quot;] --&gt;|extends| TimeseriesServiceNoSqlTest_c786[&quot;TimeseriesServiceNoSqlTest&quot;]
+    BaseTimeseriesServiceTest_p787[&quot;BaseTimeseriesServiceTest&quot;] --&gt;|extends| TimeseriesServiceTimescaleTest_c787[&quot;TimeseriesServiceTimescaleTest&quot;]
+    BaseTimeseriesServiceTest_p788[&quot;BaseTimeseriesServiceTest&quot;] --&gt;|extends| TimeseriesServiceSqlTest_c788[&quot;TimeseriesServiceSqlTest&quot;]
+    Object______p789[&quot;Object/外部框架&quot;] --&gt;|extends| AdminSettingsDataValidatorTest_c789[&quot;AdminSettingsDataValidatorTest&quot;]
+    Object______p790[&quot;Object/外部框架&quot;] --&gt;|extends| AlarmDataValidatorTest_c790[&quot;AlarmDataValidatorTest&quot;]
+    Object______p791[&quot;Object/外部框架&quot;] --&gt;|extends| AssetDataValidatorTest_c791[&quot;AssetDataValidatorTest&quot;]
+    Object______p792[&quot;Object/外部框架&quot;] --&gt;|extends| AssetProfileDataValidatorTest_c792[&quot;AssetProfileDataValidatorTest&quot;]
+    Object______p793[&quot;Object/外部框架&quot;] --&gt;|extends| BaseOtaPackageDataValidatorTest_c793[&quot;BaseOtaPackageDataValidatorTest&quot;]
+    Object______p794[&quot;Object/外部框架&quot;] --&gt;|extends| ComponentDescriptorDataValidatorTest_c794[&quot;ComponentDescriptorDataValidatorTest&quot;]
+    Object______p795[&quot;Object/外部框架&quot;] --&gt;|extends| CustomerDataValidatorTest_c795[&quot;CustomerDataValidatorTest&quot;]
+    Object______p796[&quot;Object/外部框架&quot;] --&gt;|extends| DashboardDataValidatorTest_c796[&quot;DashboardDataValidatorTest&quot;]
+    Object______p797[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceDataValidatorTest_c797[&quot;DeviceDataValidatorTest&quot;]
+    Object______p798[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProfileDataValidatorTest_c798[&quot;DeviceProfileDataValidatorTest&quot;]
+    Object______p799[&quot;Object/外部框架&quot;] --&gt;|extends| EdgeDataValidatorTest_c799[&quot;EdgeDataValidatorTest&quot;]
+    Object______p800[&quot;Object/外部框架&quot;] --&gt;|extends| EntityViewDataValidatorTest_c800[&quot;EntityViewDataValidatorTest&quot;]
+    Object______p801[&quot;Object/外部框架&quot;] --&gt;|extends| ResourceDataValidatorTest_c801[&quot;ResourceDataValidatorTest&quot;]
+    Object______p802[&quot;Object/外部框架&quot;] --&gt;|extends| RuleChainDataValidatorTest_c802[&quot;RuleChainDataValidatorTest&quot;]
+    Object______p803[&quot;Object/外部框架&quot;] --&gt;|extends| TenantDataValidatorTest_c803[&quot;TenantDataValidatorTest&quot;]
+    Object______p804[&quot;Object/外部框架&quot;] --&gt;|extends| TenantProfileDataValidatorTest_c804[&quot;TenantProfileDataValidatorTest&quot;]
+    Object______p805[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetTypeDataValidatorTest_c805[&quot;WidgetTypeDataValidatorTest&quot;]
+    Object______p806[&quot;Object/外部框架&quot;] --&gt;|extends| WidgetsBundleDataValidatorTest_c806[&quot;WidgetsBundleDataValidatorTest&quot;]
+    AbstractJpaDaoTest_p807[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaAlarmCommentDaoTest_c807[&quot;JpaAlarmCommentDaoTest&quot;]
+    AbstractJpaDaoTest_p808[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaAlarmDaoTest_c808[&quot;JpaAlarmDaoTest&quot;]
+    AbstractJpaDaoTest_p809[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaAssetDaoTest_c809[&quot;JpaAssetDaoTest&quot;]
+    AbstractJpaDaoTest_p810[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaAuditLogDaoTest_c810[&quot;JpaAuditLogDaoTest&quot;]
+    AbstractJpaDaoTest_p811[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaBaseComponentDescriptorDaoTest_c811[&quot;JpaBaseComponentDescriptorDaoTest&quot;]
+    AbstractJpaDaoTest_p812[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaCustomerDaoTest_c812[&quot;JpaCustomerDaoTest&quot;]
+    AbstractJpaDaoTest_p813[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaDashboardInfoDaoTest_c813[&quot;JpaDashboardInfoDaoTest&quot;]
+    AbstractJpaDaoTest_p814[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaDeviceCredentialsDaoTest_c814[&quot;JpaDeviceCredentialsDaoTest&quot;]
+    AbstractJpaDaoTest_p815[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaDeviceDaoTest_c815[&quot;JpaDeviceDaoTest&quot;]
+    AbstractJpaDaoTest_p816[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaBaseEventDaoTest_c816[&quot;JpaBaseEventDaoTest&quot;]
+    Object______p817[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultEntityQueryRepositoryTest_c817[&quot;DefaultEntityQueryRepositoryTest&quot;]
+    Object______p818[&quot;Object/外部框架&quot;] --&gt;|extends| DefaultQueryLogComponentTest_c818[&quot;DefaultQueryLogComponentTest&quot;]
+    Object______p819[&quot;Object/外部框架&quot;] --&gt;|extends| EntityDataAdapterTest_c819[&quot;EntityDataAdapterTest&quot;]
+    Object______p820[&quot;Object/外部框架&quot;] --&gt;|extends| EntityKeyMappingTest_c820[&quot;EntityKeyMappingTest&quot;]
+    AbstractJpaDaoTest_p821[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaRpcDaoTest_c821[&quot;JpaRpcDaoTest&quot;]
+    AbstractJpaDaoTest_p822[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaRuleNodeDaoTest_c822[&quot;JpaRuleNodeDaoTest&quot;]
+    AbstractJpaDaoTest_p823[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaTenantDaoTest_c823[&quot;JpaTenantDaoTest&quot;]
+    AbstractJpaDaoTest_p824[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaUserCredentialsDaoTest_c824[&quot;JpaUserCredentialsDaoTest&quot;]
+    AbstractJpaDaoTest_p825[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaUserDaoTest_c825[&quot;JpaUserDaoTest&quot;]
+    AbstractJpaDaoTest_p826[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaUserSettingsDaoTest_c826[&quot;JpaUserSettingsDaoTest&quot;]
+    AbstractJpaDaoTest_p827[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaWidgetTypeDaoTest_c827[&quot;JpaWidgetTypeDaoTest&quot;]
+    AbstractJpaDaoTest_p828[&quot;AbstractJpaDaoTest&quot;] --&gt;|extends| JpaWidgetsBundleDaoTest_c828[&quot;JpaWidgetsBundleDaoTest&quot;]
+    Object______p829[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractChunkedAggregationTimeseriesDaoTest_c829[&quot;AbstractChunkedAggregationTimeseriesDaoTest&quot;]
+    Object______p830[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraBaseTimeseriesDaoPartitioningDaysAlwaysExistsTest_c830[&quot;CassandraBaseTimeseriesDaoPartitioningDaysAlwaysExistsTest&quot;]
+    Object______p831[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraBaseTimeseriesDaoPartitioningHoursAlwaysExistsTest_c831[&quot;CassandraBaseTimeseriesDaoPartitioningHoursAlwaysExistsTest&quot;]
+    Object______p832[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExists_c832[&quot;CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExistsTest&quot;]
+    Object______p833[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraBaseTimeseriesDaoPartitioningMinutesAlwaysExistsTes_c833[&quot;CassandraBaseTimeseriesDaoPartitioningMinutesAlwaysExistsTest&quot;]
+    Object______p834[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraBaseTimeseriesDaoPartitioningMonthsAlwaysExistsTest_c834[&quot;CassandraBaseTimeseriesDaoPartitioningMonthsAlwaysExistsTest&quot;]
+    Object______p835[&quot;Object/外部框架&quot;] --&gt;|extends| CassandraBaseTimeseriesDaoPartitioningYearsAlwaysExistsTest_c835[&quot;CassandraBaseTimeseriesDaoPartitioningYearsAlwaysExistsTest&quot;]
+    Object______p836[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceConnectivityUtilTest_c836[&quot;DeviceConnectivityUtilTest&quot;]
+    Object______p837[&quot;Object/外部框架&quot;] --&gt;|extends| TimeUtilsTest_c837[&quot;TimeUtilsTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `Dao.find()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.findById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.findByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.existsById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.existsByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.save()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.saveAndFlush()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.removeById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.removeAllByIds()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.getEntityType()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `DaoUtil.toPageable()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.toPageable()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.PageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.EntitySubtype()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.EntitySubtype()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `ExportableEntityDao.findByTenantIdAndExternalId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantIdAndName()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.UnsupportedOperationException()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findIdsByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.getExternalIdByInternal()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityRepository.findByTenantIdAndExternalId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityRepository.java`)
+- `ImageContainerDao.findByTenantAndImageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/ImageContainerDao.java`)
+- `ImageContainerDao.findByImageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/ImageContainerDao.java`)
+- `TenantEntityDao.countByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityDao.java`)
+- `TenantEntityWithDataDao.sumDataSizeByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityWithDataDao.java`)
+- `AlarmCommentDao.findAlarmCommentById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmCommentDao.findAlarmComments()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmCommentDao.findAlarmCommentByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmDao.findLatestByOriginatorAndType()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findLatestActiveByOriginatorAndType()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findLatestByOriginatorAndTypeAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmInfoById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.save()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarms()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findCustomerAlarms()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmsV2()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+
+
+## 哪些方法可以重写
+
+- `Dao.find()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.findById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.findByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.existsById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.existsByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.save()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.saveAndFlush()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.removeById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.removeAllByIds()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.getEntityType()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `DaoUtil.toPageable()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.toPageable()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.PageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.EntitySubtype()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.EntitySubtype()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `ExportableEntityDao.findByTenantIdAndExternalId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantIdAndName()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.UnsupportedOperationException()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findIdsByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.getExternalIdByInternal()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityRepository.findByTenantIdAndExternalId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityRepository.java`)
+- `ImageContainerDao.findByTenantAndImageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/ImageContainerDao.java`)
+- `ImageContainerDao.findByImageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/ImageContainerDao.java`)
+- `TenantEntityDao.countByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityDao.java`)
+- `TenantEntityWithDataDao.sumDataSizeByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityWithDataDao.java`)
+- `ThingsboardPostgreSQLDialect.SQLFunctionTemplate()` (package, `dao/src/main/java/org/thingsboard/server/dao/ThingsboardPostgreSQLDialect.java`)
+- `AlarmCommentDao.findAlarmCommentById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmCommentDao.findAlarmComments()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmCommentDao.findAlarmCommentByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmDao.findLatestByOriginatorAndType()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findLatestActiveByOriginatorAndType()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findLatestByOriginatorAndTypeAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmInfoById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.save()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarms()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findCustomerAlarms()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+
+
+## 哪些方法必须重写
+
+- `Dao.find()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.findById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.findByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.existsById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.existsByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.save()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.saveAndFlush()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.removeById()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.removeAllByIds()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `Dao.getEntityType()` (package, `dao/src/main/java/org/thingsboard/server/dao/Dao.java`)
+- `DaoUtil.toPageable()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.toPageable()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.PageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.EntitySubtype()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `DaoUtil.EntitySubtype()` (package, `dao/src/main/java/org/thingsboard/server/dao/DaoUtil.java`)
+- `ExportableEntityDao.findByTenantIdAndExternalId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantIdAndName()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.UnsupportedOperationException()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findIdsByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.findByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityDao.getExternalIdByInternal()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityDao.java`)
+- `ExportableEntityRepository.findByTenantIdAndExternalId()` (package, `dao/src/main/java/org/thingsboard/server/dao/ExportableEntityRepository.java`)
+- `ImageContainerDao.findByTenantAndImageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/ImageContainerDao.java`)
+- `ImageContainerDao.findByImageLink()` (package, `dao/src/main/java/org/thingsboard/server/dao/ImageContainerDao.java`)
+- `TenantEntityDao.countByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityDao.java`)
+- `TenantEntityWithDataDao.sumDataSizeByTenantId()` (package, `dao/src/main/java/org/thingsboard/server/dao/TenantEntityWithDataDao.java`)
+- `ThingsboardPostgreSQLDialect.SQLFunctionTemplate()` (package, `dao/src/main/java/org/thingsboard/server/dao/ThingsboardPostgreSQLDialect.java`)
+- `AlarmCommentDao.findAlarmCommentById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmCommentDao.findAlarmComments()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmCommentDao.findAlarmCommentByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmCommentDao.java`)
+- `AlarmDao.findLatestByOriginatorAndType()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findLatestActiveByOriginatorAndType()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findLatestByOriginatorAndTypeAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmByIdAsync()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarmInfoById()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.save()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findAlarms()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+- `AlarmDao.findCustomerAlarms()` (package, `dao/src/main/java/org/thingsboard/server/dao/alarm/AlarmDao.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `DaoUtil` (extends)
+- `Object/外部框架` -&gt; `JpaDaoConfig` (extends)
+- `Object/外部框架` -&gt; `SqlTimeseriesDaoConfig` (extends)
+- `Object/外部框架` -&gt; `SqlTsDaoConfig` (extends)
+- `Object/外部框架` -&gt; `SqlTsLatestDaoConfig` (extends)
+- `PostgreSQL10Dialect` -&gt; `ThingsboardPostgreSQLDialect` (extends)
+- `Object/外部框架` -&gt; `TimescaleDaoConfig` (extends)
+- `Object/外部框架` -&gt; `TimescaleTsLatestDaoConfig` (extends)
+- `Dao` -&gt; `AlarmCommentDao` (extends)
+- `Dao` -&gt; `AlarmDao` (extends)
+- `Object/外部框架` -&gt; `AlarmTypesCacheEvictEvent` (extends)
+- `CaffeineTbTransactionalCache` -&gt; `AlarmTypesCaffeineCache` (extends)
+- `RedisTbTransactionalCache` -&gt; `AlarmTypesRedisCache` (extends)
+- `AbstractEntityService` -&gt; `BaseAlarmCommentService` (extends)
+- `AlarmCommentService` -&gt; `BaseAlarmCommentService` (implements)
+- `AbstractCachedEntityService` -&gt; `BaseAlarmService` (extends)
+- `AlarmService` -&gt; `BaseAlarmService` (implements)
+- `Object/外部框架` -&gt; `DbCallStats` (extends)
+- `Object/外部框架` -&gt; `DbCallStatsSnapshot` (extends)
+- `Object/外部框架` -&gt; `MethodCallStats` (extends)
+- `Object/外部框架` -&gt; `MethodCallStatsSnapshot` (extends)
+- `Object/外部框架` -&gt; `SqlDaoCallsAspect` (extends)
+- `Object/外部框架` -&gt; `AssetCacheEvictEvent` (extends)
+- `Object/外部框架` -&gt; `AssetCacheKey` (extends)
+- `Serializable` -&gt; `AssetCacheKey` (implements)
+- `CaffeineTbTransactionalCache` -&gt; `AssetCaffeineCache` (extends)
+- `Dao` -&gt; `AssetDao` (extends)
+- `TenantEntityDao` -&gt; `AssetDao` (extends)
+- `ExportableEntityDao` -&gt; `AssetDao` (extends)
+- `Object/外部框架` -&gt; `AssetProfileCacheKey` (extends)
+- `Serializable` -&gt; `AssetProfileCacheKey` (implements)
+- `CaffeineTbTransactionalCache` -&gt; `AssetProfileCaffeineCache` (extends)
+- `Dao` -&gt; `AssetProfileDao` (extends)
+- `ExportableEntityDao` -&gt; `AssetProfileDao` (extends)
+- `ImageContainerDao` -&gt; `AssetProfileDao` (extends)
+- `Object/外部框架` -&gt; `AssetProfileEvictEvent` (extends)
+- `RedisTbTransactionalCache` -&gt; `AssetProfileRedisCache` (extends)
+- `AbstractCachedEntityService` -&gt; `AssetProfileServiceImpl` (extends)
+- `AssetProfileService` -&gt; `AssetProfileServiceImpl` (implements)
+- `RedisTbTransactionalCache` -&gt; `AssetRedisCache` (extends)
+- 其余 40 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 外部父类/接口
+
+- `AbstractAlarmCommentEntity`
+- `AbstractAlarmEntity`
+- `AbstractAssetEntity`
+- `AbstractDeviceEntity`
+- `AbstractEdgeEntity`
+- `AbstractListeningExecutor`
+- `AbstractSingleColumnStandardBasicType`
+- `AbstractTenantEntity`
+- `AbstractTsKvEntity`
+- `AbstractTypeDescriptor`
+- `AbstractWidgetTypeEntity`
+- `AdminSettingsService`
+- `Alarm&gt; extends BaseSqlEntity`
+- `AlarmComment&gt; extends BaseSqlEntity`
+- `AlarmCommentService`
+- `AlarmService`
+- `ApiLimitService`
+- `ApiUsageStateService`
+- `Asset&gt; extends BaseSqlEntity`
+- `AssetProfileService`
+- `AssetService`
+- `AsyncFunction`
+- `AttributesService`
+- `AuditLogService`
+- `BaseSqlEntity`
+- `BaseWidgetType&gt; extends BaseSqlEntity`
+- `CaffeineTbTransactionalCache`
+- `ClientRegistrationRepository`
+- `ComponentDescriptorService`
+- `CustomerService`
+- `DashboardService`
+- `Device&gt; extends BaseSqlEntity`
+- `DeviceConnectivityService`
+- `DeviceCredentialsService`
+- `DeviceProfileService`
+- `DeviceService`
+- `DynamicParameterizedType`
+- `Edge&gt; extends BaseSqlEntity`
+- `EdgeEventService`
+- `EdgeService`
+- 其余 46 项已省略；完整源码证据可通过本模块 Java 文件继续追踪。
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

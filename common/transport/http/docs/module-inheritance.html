@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard HTTP Transport Common 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard HTTP Transport Common 模块继承体系分析
+
+&gt; 生成范围：`common/transport/http`  
+&gt; Maven artifact：`http`  
+&gt; Java 类型数量：8  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>Object/外部框架
+├── DeviceApiController
+├── DeviceAuthCallback
+├── DeviceProvisionCallback
+├── GetOtaPackageCallback
+├── HttpOkCallback
+├── HttpSessionListener
+├── SessionCloseOnErrorCallback
+SessionMsgListener
+├── «implements» HttpSessionListener
+TbTransportService
+├── «implements» DeviceApiController
+TransportContext
+├── HttpTransportContext
+TransportServiceCallback
+├── «implements» DeviceAuthCallback
+├── «implements» DeviceProvisionCallback
+├── «implements» GetOtaPackageCallback
+├── «implements» HttpOkCallback
+├── «implements» SessionCloseOnErrorCallback</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceApiController_c0[&quot;DeviceApiController&quot;]
+    TbTransportService_p1[&quot;TbTransportService&quot;] --&gt;|implements| DeviceApiController_c1[&quot;DeviceApiController&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceAuthCallback_c2[&quot;DeviceAuthCallback&quot;]
+    TransportServiceCallback_p3[&quot;TransportServiceCallback&quot;] --&gt;|implements| DeviceAuthCallback_c3[&quot;DeviceAuthCallback&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| DeviceProvisionCallback_c4[&quot;DeviceProvisionCallback&quot;]
+    TransportServiceCallback_p5[&quot;TransportServiceCallback&quot;] --&gt;|implements| DeviceProvisionCallback_c5[&quot;DeviceProvisionCallback&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| GetOtaPackageCallback_c6[&quot;GetOtaPackageCallback&quot;]
+    TransportServiceCallback_p7[&quot;TransportServiceCallback&quot;] --&gt;|implements| GetOtaPackageCallback_c7[&quot;GetOtaPackageCallback&quot;]
+    Object______p8[&quot;Object/外部框架&quot;] --&gt;|extends| SessionCloseOnErrorCallback_c8[&quot;SessionCloseOnErrorCallback&quot;]
+    TransportServiceCallback_p9[&quot;TransportServiceCallback&quot;] --&gt;|implements| SessionCloseOnErrorCallback_c9[&quot;SessionCloseOnErrorCallback&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| HttpOkCallback_c10[&quot;HttpOkCallback&quot;]
+    TransportServiceCallback_p11[&quot;TransportServiceCallback&quot;] --&gt;|implements| HttpOkCallback_c11[&quot;HttpOkCallback&quot;]
+    Object______p12[&quot;Object/外部框架&quot;] --&gt;|extends| HttpSessionListener_c12[&quot;HttpSessionListener&quot;]
+    SessionMsgListener_p13[&quot;SessionMsgListener&quot;] --&gt;|implements| HttpSessionListener_c13[&quot;HttpSessionListener&quot;]
+    TransportContext_p14[&quot;TransportContext&quot;] --&gt;|extends| HttpTransportContext_c14[&quot;HttpTransportContext&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- 未发现明显抽象类模板方法；本模块可能主要使用具体类、接口或外部框架回调。
+
+
+## 哪些方法可以重写
+
+- `DeviceApiController.getDeviceAttributes()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.postDeviceAttributes()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.postTelemetry()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.claimDevice()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.DeviceId()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpOkCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.subscribeToCommands()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpOkCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.postRpcRequest()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.subscribeToAttributes()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.getFirmware()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.getOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.getSoftware()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.getOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.provisionDevice()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.DeviceProvisionCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.GetOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onSuccess()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onError()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onSuccess()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onError()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onSuccess()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.UUID()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.ByteArrayResource()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onError()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onSuccess()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onError()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpOkCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.onSuccess()` (public, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+
+
+## 哪些方法必须重写
+
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.DeviceId()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpOkCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpOkCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.getOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.getOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.DeviceProvisionCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.GetOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.UUID()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.ByteArrayResource()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceApiController.UUID()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.DeviceId()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.HttpOkCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.HttpOkCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.JsonParser()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.HttpSessionListener()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.SessionCloseOnErrorCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.getOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.getOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.DeviceProvisionCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.GetOtaPackageCallback()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+- `DeviceAuthCallback.UUID()` (package, `common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `DeviceApiController` (extends)
+- `TbTransportService` -&gt; `DeviceApiController` (implements)
+- `Object/外部框架` -&gt; `DeviceAuthCallback` (extends)
+- `TransportServiceCallback` -&gt; `DeviceAuthCallback` (implements)
+- `Object/外部框架` -&gt; `DeviceProvisionCallback` (extends)
+- `TransportServiceCallback` -&gt; `DeviceProvisionCallback` (implements)
+- `Object/外部框架` -&gt; `GetOtaPackageCallback` (extends)
+- `TransportServiceCallback` -&gt; `GetOtaPackageCallback` (implements)
+- `Object/外部框架` -&gt; `SessionCloseOnErrorCallback` (extends)
+- `TransportServiceCallback` -&gt; `SessionCloseOnErrorCallback` (implements)
+- `Object/外部框架` -&gt; `HttpOkCallback` (extends)
+- `TransportServiceCallback` -&gt; `HttpOkCallback` (implements)
+- `Object/外部框架` -&gt; `HttpSessionListener` (extends)
+- `SessionMsgListener` -&gt; `HttpSessionListener` (implements)
+- `TransportContext` -&gt; `HttpTransportContext` (extends)
+
+
+## 外部父类/接口
+
+- `Object/外部框架`
+- `SessionMsgListener`
+- `TbTransportService`
+- `TransportContext`
+- `TransportServiceCallback`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Thingsboard Server Common Utils 继承体系分析</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 32px; color: #1f2937; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; border: 1px solid #d0d7de; border-radius: 6px; white-space: pre; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #d0d7de; padding: 8px; vertical-align: top; }
+    code { background: #f6f8fa; padding: 0 4px; border-radius: 4px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+</head>
+<body>
+<pre class="markdown-source"># Thingsboard Server Common Utils 模块继承体系分析
+
+&gt; 生成范围：`common/util`  
+&gt; Maven artifact：`util`  
+&gt; Java 类型数量：19  
+&gt; 分析方式：静态扫描 `class/interface/enum/record` 的 `extends`、`implements`、方法签名和源码触点。
+
+## 完整继承树</pre>
+<pre>Executor
+├── ListeningExecutor
+├── ├── «implements» AbstractListeningExecutor
+ForkJoinWorkerThreadFactory
+├── «implements» ThingsBoardForkJoinWorkerThreadFactory
+Object/外部框架
+├── AbstractListeningExecutor
+├── AzureIotHubUtil
+├── DonAsynchron
+├── ExceptionUtil
+├── ExceptionUtilTest
+├── JacksonUtil
+├── JacksonUtilTest
+├── KvUtil
+├── LinkedHashMapRemoveEldest
+├── LinkedHashMapRemoveEldestTest
+├── RegexUtils
+├── SslUtil
+├── SystemUtil
+├── ThingsBoardExecutors
+├── ThingsBoardForkJoinWorkerThreadFactory
+├── ThingsBoardThreadFactory
+StopWatch
+├── TbStopWatch
+ThreadFactory
+├── «implements» ThingsBoardThreadFactory</pre>
+<pre class="markdown-source">## 继承图</pre>
+<pre class="mermaid">flowchart TD
+    Object______p0[&quot;Object/外部框架&quot;] --&gt;|extends| AbstractListeningExecutor_c0[&quot;AbstractListeningExecutor&quot;]
+    ListeningExecutor_p1[&quot;ListeningExecutor&quot;] --&gt;|implements| AbstractListeningExecutor_c1[&quot;AbstractListeningExecutor&quot;]
+    Object______p2[&quot;Object/外部框架&quot;] --&gt;|extends| AzureIotHubUtil_c2[&quot;AzureIotHubUtil&quot;]
+    Object______p3[&quot;Object/外部框架&quot;] --&gt;|extends| DonAsynchron_c3[&quot;DonAsynchron&quot;]
+    Object______p4[&quot;Object/外部框架&quot;] --&gt;|extends| ExceptionUtil_c4[&quot;ExceptionUtil&quot;]
+    Object______p5[&quot;Object/外部框架&quot;] --&gt;|extends| JacksonUtil_c5[&quot;JacksonUtil&quot;]
+    Object______p6[&quot;Object/外部框架&quot;] --&gt;|extends| KvUtil_c6[&quot;KvUtil&quot;]
+    Object______p7[&quot;Object/外部框架&quot;] --&gt;|extends| LinkedHashMapRemoveEldest_c7[&quot;LinkedHashMapRemoveEldest&quot;]
+    Executor_p8[&quot;Executor&quot;] --&gt;|extends| ListeningExecutor_c8[&quot;ListeningExecutor&quot;]
+    Object______p9[&quot;Object/外部框架&quot;] --&gt;|extends| RegexUtils_c9[&quot;RegexUtils&quot;]
+    Object______p10[&quot;Object/外部框架&quot;] --&gt;|extends| SslUtil_c10[&quot;SslUtil&quot;]
+    Object______p11[&quot;Object/外部框架&quot;] --&gt;|extends| SystemUtil_c11[&quot;SystemUtil&quot;]
+    StopWatch_p12[&quot;StopWatch&quot;] --&gt;|extends| TbStopWatch_c12[&quot;TbStopWatch&quot;]
+    Object______p13[&quot;Object/外部框架&quot;] --&gt;|extends| ThingsBoardExecutors_c13[&quot;ThingsBoardExecutors&quot;]
+    Object______p14[&quot;Object/外部框架&quot;] --&gt;|extends| ThingsBoardForkJoinWorkerThreadFactory_c14[&quot;ThingsBoardForkJoinWorkerThreadFactory&quot;]
+    ForkJoinWorkerThreadFactory_p15[&quot;ForkJoinWorkerThreadFactory&quot;] --&gt;|implements| ThingsBoardForkJoinWorkerThreadFactory_c15[&quot;ThingsBoardForkJoinWorkerThreadFactory&quot;]
+    Object______p16[&quot;Object/外部框架&quot;] --&gt;|extends| ThingsBoardThreadFactory_c16[&quot;ThingsBoardThreadFactory&quot;]
+    ThreadFactory_p17[&quot;ThreadFactory&quot;] --&gt;|implements| ThingsBoardThreadFactory_c17[&quot;ThingsBoardThreadFactory&quot;]
+    Object______p18[&quot;Object/外部框架&quot;] --&gt;|extends| ExceptionUtilTest_c18[&quot;ExceptionUtilTest&quot;]
+    Object______p19[&quot;Object/外部框架&quot;] --&gt;|extends| JacksonUtilTest_c19[&quot;JacksonUtilTest&quot;]
+    Object______p20[&quot;Object/外部框架&quot;] --&gt;|extends| LinkedHashMapRemoveEldestTest_c20[&quot;LinkedHashMapRemoveEldestTest&quot;]</pre>
+<pre class="markdown-source">## 每一层为什么存在
+
+- 外部/上层父类或接口层：提供框架生命周期、Java 标准契约、Spring/Netty/DAO/Rule Engine 等扩展点。
+- 接口层：定义跨模块契约，让调用方依赖稳定 API，而不是具体实现。
+- 抽象类层：沉淀公共状态、校验、模板流程和默认实现，把变化点留给子类。
+- 具体类层：完成协议、DAO、Controller、Rule Node、工具或测试场景中的最终业务动作。
+
+## 抽象了什么
+
+- 父类/接口抽象公共生命周期、输入输出契约、错误处理、协议适配、DAO 查询形态、消息处理模板或测试夹具。
+- 子类保留具体协议、实体类型、规则节点行为、数据库实现、页面/测试步骤或命令参数差异。
+- 对聚合或无 Java 模块，抽象体现在 Maven 子模块划分和构建生命周期，而不是 Java 继承。
+
+## 父类负责什么
+
+- 提供稳定方法签名、共享字段、默认流程、通用校验、资源释放和框架回调入口。
+- 在 Spring、Netty、DAO、Rule Engine、Transport 等框架中，父类还负责让运行时可以通过统一类型调度不同实现。
+
+## 子类负责什么
+
+- 实现具体业务差异，例如协议解析、实体 DAO、规则节点处理、Controller API、客户端命令或测试用例。
+- 覆盖父类预留的扩展点，把模块特有数据转换、数据库查询、消息发送或外部调用补进去。
+
+## 为什么不用组合
+
+- 继承用于框架生命周期和模板方法：运行时需要把子类当作父类处理，例如 Spring Bean、Netty Handler、DAO Repository、Rule Node 或测试基类。
+- 组合适合注入协作者，本模块中仍然通过字段依赖使用组合；但当需要统一回调签名、共享模板流程或多态派发时，单纯组合不能替代继承。
+
+## 为什么不用接口
+
+- 接口只能表达契约，不能集中保存公共状态、默认校验、资源关闭和模板流程。
+- 当模块只需要契约时会使用接口；当多个实现还需要共享代码、默认行为或受保护扩展点时使用抽象类。
+
+## 模板方法
+
+- `AbstractListeningExecutor.init()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.destroy()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.executeAsync()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.executeAsync()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.execute()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.executor()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.getThreadPollSize()` (package, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `ExecutorProvider.getExecutor()` (package, `common/util/src/main/java/org/thingsboard/common/util/ExecutorProvider.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.submit()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.submit()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+
+
+## 哪些方法可以重写
+
+- `AbstractListeningExecutor.init()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.destroy()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.executeAsync()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.executeAsync()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.execute()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.executor()` (public, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AbstractListeningExecutor.getThreadPollSize()` (package, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AzureIotHubUtil.SecretKeySpec()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.String()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `DonAsynchron.onSuccess()` (public, `common/util/src/main/java/org/thingsboard/common/util/DonAsynchron.java`)
+- `DonAsynchron.onFailure()` (public, `common/util/src/main/java/org/thingsboard/common/util/DonAsynchron.java`)
+- `DonAsynchron.submit()` (package, `common/util/src/main/java/org/thingsboard/common/util/DonAsynchron.java`)
+- `ExceptionUtil.StringWriter()` (package, `common/util/src/main/java/org/thingsboard/common/util/ExceptionUtil.java`)
+- `ExceptionUtil.PrintWriter()` (package, `common/util/src/main/java/org/thingsboard/common/util/ExceptionUtil.java`)
+- `ExecutorProvider.getExecutor()` (package, `common/util/src/main/java/org/thingsboard/common/util/ExecutorProvider.java`)
+- `JacksonUtil.ObjectMapper()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.ObjectMapper()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.toJsonNode()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.newObjectNode()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.newArrayNode()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.fromString()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+
+
+## 哪些方法必须重写
+
+- `AbstractListeningExecutor.getThreadPollSize()` (package, `common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java`)
+- `AzureIotHubUtil.SecretKeySpec()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `AzureIotHubUtil.String()` (package, `common/util/src/main/java/org/thingsboard/common/util/AzureIotHubUtil.java`)
+- `DonAsynchron.submit()` (package, `common/util/src/main/java/org/thingsboard/common/util/DonAsynchron.java`)
+- `ExceptionUtil.StringWriter()` (package, `common/util/src/main/java/org/thingsboard/common/util/ExceptionUtil.java`)
+- `ExceptionUtil.PrintWriter()` (package, `common/util/src/main/java/org/thingsboard/common/util/ExceptionUtil.java`)
+- `ExecutorProvider.getExecutor()` (package, `common/util/src/main/java/org/thingsboard/common/util/ExecutorProvider.java`)
+- `JacksonUtil.ObjectMapper()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.ObjectMapper()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.RuntimeException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.toJsonNode()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.newObjectNode()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.newArrayNode()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.fromString()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.IllegalArgumentException()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `JacksonUtil.toJsonNode()` (package, `common/util/src/main/java/org/thingsboard/common/util/JacksonUtil.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.submit()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.submit()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+- `ListeningExecutor.executeAsync()` (package, `common/util/src/main/java/org/thingsboard/common/util/ListeningExecutor.java`)
+
+
+## 哪些地方使用了多态
+
+- `Object/外部框架` -&gt; `AbstractListeningExecutor` (extends)
+- `ListeningExecutor` -&gt; `AbstractListeningExecutor` (implements)
+- `Object/外部框架` -&gt; `AzureIotHubUtil` (extends)
+- `Object/外部框架` -&gt; `DonAsynchron` (extends)
+- `Object/外部框架` -&gt; `ExceptionUtil` (extends)
+- `Object/外部框架` -&gt; `JacksonUtil` (extends)
+- `Object/外部框架` -&gt; `KvUtil` (extends)
+- `Object/外部框架` -&gt; `LinkedHashMapRemoveEldest` (extends)
+- `Executor` -&gt; `ListeningExecutor` (extends)
+- `Object/外部框架` -&gt; `RegexUtils` (extends)
+- `Object/外部框架` -&gt; `SslUtil` (extends)
+- `Object/外部框架` -&gt; `SystemUtil` (extends)
+- `StopWatch` -&gt; `TbStopWatch` (extends)
+- `Object/外部框架` -&gt; `ThingsBoardExecutors` (extends)
+- `Object/外部框架` -&gt; `ThingsBoardForkJoinWorkerThreadFactory` (extends)
+- `ForkJoinWorkerThreadFactory` -&gt; `ThingsBoardForkJoinWorkerThreadFactory` (implements)
+- `Object/外部框架` -&gt; `ThingsBoardThreadFactory` (extends)
+- `ThreadFactory` -&gt; `ThingsBoardThreadFactory` (implements)
+- `Object/外部框架` -&gt; `ExceptionUtilTest` (extends)
+- `Object/外部框架` -&gt; `JacksonUtilTest` (extends)
+- `Object/外部框架` -&gt; `LinkedHashMapRemoveEldestTest` (extends)
+
+
+## 外部父类/接口
+
+- `Executor`
+- `ForkJoinWorkerThreadFactory`
+- `Object/外部框架`
+- `StopWatch`
+- `ThreadFactory`
+
+
+## 整个继承体系解决了什么问题
+
+该继承体系把“稳定生命周期/契约”和“模块特定行为”分开：父类或接口负责统一入口、共享流程和多态调度，子类负责差异化协议、实体、规则、DAO、测试或工具行为。这样可以让上游模块通过父类型调用下游实现，同时保持每个实现只关注自己的变化点。</pre>
+</body>
+</html>
