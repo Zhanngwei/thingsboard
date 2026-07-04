@@ -86,51 +86,140 @@ import java.util.Map;
  *
  */
 @SuppressWarnings("deprecation")
+/**
+ * 中文说明：
+ * 1. 类目的：`SnmpDeviceSimulatorV3` 是ThingsBoard Common 测试模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
+ * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
+ * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
+ * 4. 生命周期：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ */
 public class SnmpDeviceSimulatorV3 extends BaseAgent {
+    /**
+     * 字段说明：
+     * 1. 保存 `address` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected String address;
     private Snmp4jHeartbeatMib heartbeatMIB;
+    /**
+     * 字段说明：
+     * 1. 保存 `agentppSimulationMIB` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private AgentppSimulationMib agentppSimulationMIB;
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `SnmpDeviceSimulatorV3` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public SnmpDeviceSimulatorV3(CommandProcessor processor) throws IOException {
         super(new File("SNMP4JTestAgentBC.cfg"), new File("SNMP4JTestAgentConfig.cfg"),
                 processor);
         agent.setWorkerPool(ThreadPool.create("RequestPool", 4));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `setUpMappings` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void setUpMappings(Map<String, String> oidToResponseMappings) {
         unregisterManagedObject(getSnmpv2MIB());
         oidToResponseMappings.forEach((oid, response) -> {
             registerManagedObject(new MOScalar<>(new OID(oid), MOAccessImpl.ACCESS_READ_WRITE, new OctetString(response)));
         });
     }
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `registerManagedObject` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void registerManagedObject(ManagedObject mo) {
         try {
             server.register(mo, null);
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (DuplicateRegistrationException ex) {
             throw new RuntimeException(ex);
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `unregisterManagedObject` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void unregisterManagedObject(MOGroup moGroup) {
         moGroup.unregisterMOs(server, getContext(moGroup));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `registerManagedObjects` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void registerManagedObjects() {
         try {
             server.register(createStaticIfTable(), null);
             server.register(createStaticIfXTable(), null);
             agentppSimulationMIB.registerMOs(server, null);
             heartbeatMIB.registerMOs(server, null);
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (DuplicateRegistrationException ex) {
             ex.printStackTrace();
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `addNotificationTargets` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void addNotificationTargets(SnmpTargetMIB targetMIB,
                                           SnmpNotificationMIB notificationMIB) {
         targetMIB.addDefaultTDomains();
 
         targetMIB.addTargetAddress(new OctetString("notificationV2c"),
+                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 TransportDomains.transportDomainUdpIpv4,
                 new OctetString(new UdpAddress("127.0.0.1/162").getValue()),
                 200, 1,
@@ -138,6 +227,7 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
                 new OctetString("v2c"),
                 StorageType.permanent);
         targetMIB.addTargetAddress(new OctetString("notificationV3"),
+                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 TransportDomains.transportDomainUdpIpv4,
                 new OctetString(new UdpAddress("127.0.0.1/1162").getValue()),
                 200, 1,
@@ -161,6 +251,16 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
                 SnmpNotificationMIB.SnmpNotifyTypeEnum.inform,
                 StorageType.permanent);
     }
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `addViews` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void addViews(VacmMIB vacm) {
         vacm.addGroup(SecurityModel.SECURITY_MODEL_SNMPv1,
                 new OctetString("cpublic"),
@@ -340,6 +440,16 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
 
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `addUsmUser` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void addUsmUser(USM usm) {
         UsmUser user = new UsmUser(new OctetString("SHADES"),
                 AuthSHA.ID,
@@ -459,6 +569,16 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createStaticIfXTable` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private static DefaultMOTable createStaticIfXTable() {
         MOTableSubIndex[] subIndexes =
                 new MOTableSubIndex[] { new MOTableSubIndex(SMIConstants.SYNTAX_INTEGER) };
@@ -575,6 +695,16 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createStaticIfTable` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private static DefaultMOTable createStaticIfTable() {
         MOTableSubIndex[] subIndexes =
                 new MOTableSubIndex[] { new MOTableSubIndex(SMIConstants.SYNTAX_INTEGER) };
@@ -635,15 +765,40 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
         return ifTable;
     }
     @SuppressWarnings({"unchecked", "rawtypes"})
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `initTransportMappings` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void initTransportMappings() throws IOException {
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportMappings = new TransportMapping[2];
         Address addr = GenericAddress.parse(address);
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportMapping tm =
+                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 TransportMappings.getInstance().createTransportMapping(addr);
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportMappings[0] = tm;
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportMappings[1] = new DefaultTcpTransportMapping(new TcpAddress(address));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `start` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void start(String ip, String port) throws IOException {
         address = ip + "/" + port;
         //BasicConfigurator.configure();
@@ -656,10 +811,30 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
         sendColdStartNotification();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `unregisterManagedObjects` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void unregisterManagedObjects() {
         // here we should unregister those objects previously registered...
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `addCommunities` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void addCommunities(SnmpCommunityMIB communityMIB) {
         Variable[] com2sec = new Variable[] {
                 new OctetString("public"),              // community name
@@ -677,6 +852,16 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
 //    snmpCommunityMIB.setSourceAddressFiltering(true);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `registerSnmpMIBs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void registerSnmpMIBs() {
         heartbeatMIB = new Snmp4jHeartbeatMib(super.getNotificationOriginator(),
                 new OctetString(),
@@ -685,6 +870,16 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
         super.registerSnmpMIBs();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `initMessageDispatcher` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void initMessageDispatcher() {
         this.dispatcher = new MessageDispatcherImpl();
         this.mpv3 = new MPv3(this.agent.getContextEngineID().getValue());
@@ -698,3 +893,11 @@ public class SnmpDeviceSimulatorV3 extends BaseAgent {
     }
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`SnmpDeviceSimulatorV3` 在 ThingsBoard Common 测试模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
+ * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+ * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

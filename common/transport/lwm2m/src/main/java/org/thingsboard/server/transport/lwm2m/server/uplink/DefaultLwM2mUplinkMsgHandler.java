@@ -142,47 +142,161 @@ import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.fr
 @Service("lwM2mUplinkMsgHandler")
 @TbLwM2mTransportComponent
 @RequiredArgsConstructor
+/**
+ * 中文说明：
+ * 1. 类目的：`DefaultLwM2mUplinkMsgHandler` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
+ * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
+ * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
+ * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ */
 public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService implements LwM2mUplinkMsgHandler {
 
     @Getter
     private final LwM2mValueConverter converter = LwM2mValueConverterImpl.getInstance();;
 
+    /**
+     * 字段说明：
+     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final TransportService transportService;
     private final LwM2mTransportContext context;
     @Lazy
+    /**
+     * 字段说明：
+     * 1. 保存 `attributesService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final LwM2MAttributesService attributesService;
     private final LwM2MSessionManager sessionManager;
     @Lazy
+    /**
+     * 字段说明：
+     * 1. 保存 `otaService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final LwM2MOtaUpdateService otaService;
     private final LwM2MTransportServerConfig config;
+    /**
+     * 字段说明：
+     * 1. 保存 `logService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final LwM2MTelemetryLogService logService;
     private final LwM2mTransportServerHelper helper;
+    /**
+     * 字段说明：
+     * 1. 保存 `sessionStore` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final TbLwM2MDtlsSessionStore sessionStore;
     private final LwM2mClientContext clientContext;
+    /**
+     * 字段说明：
+     * 1. 保存 `defaultLwM2MDownlinkMsgHandler;` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final LwM2mDownlinkMsgHandler defaultLwM2MDownlinkMsgHandler; //Do not use Lazy because we need live executor to handle msgs
     private final LwM2mVersionedModelProvider modelProvider;
+    /**
+     * 字段说明：
+     * 1. 保存 `registrationStore` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final RegistrationStore registrationStore;
     private final TbLwM2mSecurityStore securityStore;
+    /**
+     * 字段说明：
+     * 1. 保存 `modelConfigService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final LwM2MModelConfigService modelConfigService;
 
     @PostConstruct
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void init() {
         super.init();
         this.context.getScheduler().scheduleAtFixedRate(this::reportActivity, new Random().nextInt((int) config.getSessionReportTimeout()), config.getSessionReportTimeout(), TimeUnit.MILLISECONDS);
     }
 
     @PreDestroy
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `destroy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void destroy() {
         log.trace("Destroying {}", getClass().getSimpleName());
         super.destroy();
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getExecutorName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected String getExecutorName() {
         return "LwM2M uplink";
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getExecutorSize` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected int getExecutorSize() {
         return config.getUplinkPoolSize();
     }
@@ -201,12 +315,23 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param registration         - Registration LwM2M Client
      * @param previousObservations - may be null
      */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onRegistered` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onRegistered(Registration registration, Collection<Observation> previousObservations) {
         executor.submit(() -> {
             LwM2mClient lwM2MClient = this.clientContext.getClientByEndpoint(registration.getEndpoint());
             try {
                 log.debug("[{}] [{{}] Client: create after Registration", registration.getEndpoint(), registration.getId());
                 Optional<SessionInfoProto> oldSessionInfo = this.clientContext.register(lwM2MClient, registration);
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (oldSessionInfo.isPresent()) {
                     log.info("[{}] Closing old session: {}", registration.getEndpoint(), new UUID(oldSessionInfo.get().getSessionIdMSB(), oldSessionInfo.get().getSessionIdLSB()));
                     sessionManager.deregister(oldSessionInfo.get());
@@ -218,7 +343,9 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
                 this.initAttributes(lwM2MClient, true);
                 otaService.init(lwM2MClient);
                 lwM2MClient.getRetryAttempts().set(0);
+            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (LwM2MClientStateException stateException) {
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (LwM2MClientState.UNREGISTERED.equals(stateException.getState())) {
                     log.info("[{}] retry registration due to race condition: [{}].", registration.getEndpoint(), stateException.getState());
                     // Race condition detected and the client was in progress of unregistration while new registration arrived. Let's try again.
@@ -230,6 +357,7 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
                 } else {
                     logService.log(lwM2MClient, LOG_LWM2M_WARN + ": Client registration failed due to invalid state: " + stateException.getState());
                 }
+            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Throwable t) {
                 log.error("[{}] endpoint [{}] error Unable registration.", registration.getEndpoint(), t);
                 logService.log(lwM2MClient, LOG_LWM2M_WARN + ": Client registration failed due to: " + t.getMessage());
@@ -242,6 +370,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      *
      * @param registration - Registration LwM2M Client
      */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `updatedReg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void updatedReg(Registration registration) {
         executor.submit(() -> {
             LwM2mClient lwM2MClient = clientContext.getClientByEndpoint(registration.getEndpoint());
@@ -250,12 +388,15 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
                 logService.log(lwM2MClient, String.format("[%s][%s] Updated registration.", registration.getId(), registration.getSocketAddress()));
                 clientContext.updateRegistration(lwM2MClient, registration);
                 this.reportActivityAndRegister(lwM2MClient.getSession());
+            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (LwM2MClientStateException stateException) {
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (LwM2MClientState.REGISTERED.equals(stateException.getState())) {
                     log.info("[{}] update registration failed because client has different registration id: [{}] {}.", registration.getEndpoint(), stateException.getState(), stateException.getMessage());
                 } else {
                     onRegistered(registration, Collections.emptyList());
                 }
+            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Throwable t) {
                 log.error("[{}] endpoint [{}] error Unable update registration.", registration.getEndpoint(), t);
                 logService.log(lwM2MClient, LOG_LWM2M_ERROR + String.format(": Client update Registration, %s", t.getMessage()));
@@ -267,15 +408,36 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param registration - Registration LwM2M Client
      * @param observations - !!! Warn: if have not finishing unReg, then this operation will be finished on next Client`s connect
      */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `unReg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void unReg(Registration registration, Collection<Observation> observations) {
         executor.submit(() -> doUnReg(registration, clientContext.getClientByEndpoint(registration.getEndpoint())));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `doUnReg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void doUnReg(Registration registration, LwM2mClient client) {
         try {
             logService.log(client, LOG_LWM2M_INFO + ": Client unRegistration");
             clientContext.unregister(client, registration);
             SessionInfoProto sessionInfo = client.getSession();
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sessionInfo != null) {
                 sessionManager.deregister(sessionInfo);
                 sessionStore.remove(registration.getEndpoint());
@@ -283,8 +445,10 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
             } else {
                 log.error("Client close session: [{}] unReg [{}] name  [{}] sessionInfo ", registration.getId(), registration.getEndpoint(), null);
             }
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (LwM2MClientStateException stateException) {
             log.info("[{}] delete registration: [{}] {}.", registration.getEndpoint(), stateException.getState(), stateException.getMessage());
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Throwable t) {
             log.error("[{}] endpoint [{}] error Unable un registration.", registration.getEndpoint(), t);
             logService.log(client, LOG_LWM2M_ERROR + String.format(": Client Unable un Registration, %s", t.getMessage()));
@@ -292,6 +456,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onSleepingDev` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onSleepingDev(Registration registration) {
         log.debug("[{}] [{}] Received endpoint sleeping event", registration.getId(), registration.getEndpoint());
         clientContext.asleep(clientContext.getClientByEndpoint(registration.getEndpoint()));
@@ -305,11 +479,23 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param response     - observe
      */
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onUpdateValueAfterReadResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onUpdateValueAfterReadResponse(Registration registration, String path, ReadResponse response) {
         LwM2mNode content = response.getContent();
+        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (content != null) {
             LwM2mClient lwM2MClient = clientContext.getClientByEndpoint(registration.getEndpoint());
             ObjectModel objectModelVersion = lwM2MClient.getObjectModel(path, modelProvider);
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (objectModelVersion != null) {
                 int responseCode = response.getCode().getCode();
                 if (content instanceof LwM2mObject) {
@@ -327,6 +513,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onUpdateValueAfterReadCompositeResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onUpdateValueAfterReadCompositeResponse(Registration registration, ReadCompositeResponse response) {
         log.trace("ReadCompositeResponse: [{}]", response);
         if (response.getContent() != null) {
@@ -355,6 +551,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param sendRequest  - sendRequest
      */
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onUpdateValueWithSendRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onUpdateValueWithSendRequest(Registration registration, SendRequest sendRequest) {
         for(var entry : sendRequest.getNodes().entrySet()) {
             LwM2mPath path = entry.getKey();
@@ -383,6 +589,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param deviceProfile -
      */
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onDeviceProfileUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onDeviceProfileUpdate(SessionInfoProto sessionInfo, DeviceProfile deviceProfile) {
         try {
             List<LwM2mClient> clients = clientContext.getLwM2mClients()
@@ -402,6 +618,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onDeviceUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onDeviceUpdate(SessionInfoProto sessionInfo, Device device, Optional<DeviceProfile> newDeviceProfileOpt) {
         try {
             LwM2mClient client = clientContext.getClientByDeviceId(device.getUuidId());
@@ -417,11 +643,31 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onDeviceDelete` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onDeviceDelete(DeviceId deviceId) {
         clearAndUnregister(clientContext.getClientByDeviceId(deviceId.getId()));
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onResourceUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onResourceUpdate(TransportProtos.ResourceUpdateMsg resourceUpdateMsgOpt) {
         String idVer = resourceUpdateMsgOpt.getResourceKey();
         TenantId tenantId = TenantId.fromUUID(new UUID(resourceUpdateMsgOpt.getTenantIdMSB(), resourceUpdateMsgOpt.getTenantIdLSB()));
@@ -430,6 +676,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onResourceDelete` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onResourceDelete(TransportProtos.ResourceDeleteMsg resourceDeleteMsgOpt) {
         String pathIdVer = resourceDeleteMsgOpt.getResourceKey();
         TenantId tenantId = TenantId.fromUUID(new UUID(resourceDeleteMsgOpt.getTenantIdMSB(), resourceDeleteMsgOpt.getTenantIdLSB()));
@@ -444,6 +700,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param registration -
      */
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onAwakeDev` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onAwakeDev(Registration registration) {
         log.debug("[{}] [{}] Received endpoint awake event", registration.getId(), registration.getEndpoint());
         clientContext.awake(clientContext.getClientByEndpoint(registration.getEndpoint()));
@@ -458,6 +724,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      *
      * @param lwM2MClient - object with All parameters off client
      */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `initClientTelemetry` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void initClientTelemetry(LwM2mClient lwM2MClient) {
         Lwm2mDeviceProfileTransportConfiguration profile = clientContext.getProfile(lwM2MClient.getProfileId());
         Set<String> supportedObjects = clientContext.getSupportedIdVerInClient(lwM2MClient);
@@ -470,6 +746,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendReadRequests` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendReadRequests(LwM2mClient lwM2MClient, Lwm2mDeviceProfileTransportConfiguration profile, Set<String> supportedObjects) {
         try {
             Set<String> targetIds = new HashSet<>(profile.getObserveAttr().getAttribute());
@@ -489,6 +775,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendObserveRequests` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendObserveRequests(LwM2mClient lwM2MClient, Lwm2mDeviceProfileTransportConfiguration profile, Set<String> supportedObjects) {
         try {
             Set<String> targetIds = profile.getObserveAttr().getObserve();
@@ -507,6 +803,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendWriteAttributeRequests` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendWriteAttributeRequests(LwM2mClient lwM2MClient, Lwm2mDeviceProfileTransportConfiguration profile, Set<String> supportedObjects) {
         try {
             Map<String, ObjectAttributes> attributesMap = profile.getObserveAttr().getAttributeLwm2m();
@@ -518,34 +824,104 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendReadRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendReadRequest(LwM2mClient lwM2MClient, String versionedId) {
         sendReadRequest(lwM2MClient, versionedId, new TbLwM2MReadCallback(this, logService, lwM2MClient, versionedId));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendReadRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendReadRequest(LwM2mClient lwM2MClient, String versionedId, DownlinkRequestCallback<ReadRequest, ReadResponse> callback) {
         TbLwM2MReadRequest request = TbLwM2MReadRequest.builder().versionedId(versionedId).timeout(clientContext.getRequestTimeout(lwM2MClient)).build();
         defaultLwM2MDownlinkMsgHandler.sendReadRequest(lwM2MClient, request, callback);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendObserveRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendObserveRequest(LwM2mClient lwM2MClient, String versionedId) {
         sendObserveRequest(lwM2MClient, versionedId, new TbLwM2MObserveCallback(this, logService, lwM2MClient, versionedId));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendObserveRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendObserveRequest(LwM2mClient lwM2MClient, String versionedId, DownlinkRequestCallback<ObserveRequest, ObserveResponse> callback) {
         TbLwM2MObserveRequest request = TbLwM2MObserveRequest.builder().versionedId(versionedId).timeout(clientContext.getRequestTimeout(lwM2MClient)).build();
         defaultLwM2MDownlinkMsgHandler.sendObserveRequest(lwM2MClient, request, callback);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendWriteAttributesRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendWriteAttributesRequest(LwM2mClient lwM2MClient, String targetId, ObjectAttributes params) {
         TbLwM2MWriteAttributesRequest request = TbLwM2MWriteAttributesRequest.builder().versionedId(targetId).attributes(params).timeout(clientContext.getRequestTimeout(lwM2MClient)).build();
         defaultLwM2MDownlinkMsgHandler.sendWriteAttributesRequest(lwM2MClient, request, new TbLwM2MWriteAttributesCallback(logService, lwM2MClient, targetId));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendCancelObserveRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void sendCancelObserveRequest(String versionedId, LwM2mClient client) {
         TbLwM2MCancelObserveRequest request = TbLwM2MCancelObserveRequest.builder().versionedId(versionedId).timeout(clientContext.getRequestTimeout(client)).build();
         defaultLwM2MDownlinkMsgHandler.sendCancelObserveRequest(client, request, new TbLwM2MCancelObserveCallback(logService, client, versionedId));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `updateObjectResourceValue` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void updateObjectResourceValue(LwM2mClient client, LwM2mObject lwM2mObject, String pathIdVer, int code) {
         LwM2mPath pathIds = new LwM2mPath(fromVersionedIdToObjectId(pathIdVer));
         lwM2mObject.getInstances().forEach((instanceId, instance) -> {
@@ -554,6 +930,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         });
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `updateObjectInstanceResourceValue` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void updateObjectInstanceResourceValue(LwM2mClient client, LwM2mObjectInstance lwM2mObjectInstance, String pathIdVer, int code) {
         LwM2mPath pathIds = new LwM2mPath(fromVersionedIdToObjectId(pathIdVer));
         lwM2mObjectInstance.getResources().forEach((resourceId, resource) -> {
@@ -572,6 +958,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param lwM2mResource - LwM2mSingleResource response.getContent()
      * @param path          - resource
      * @param mode          - Replace, Update
+     */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `updateResourcesValue` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
      */
     private void updateResourcesValue(LwM2mClient lwM2MClient, LwM2mResource lwM2mResource, String path, Mode mode, int code) {
         Registration registration = lwM2MClient.getRegistration();
@@ -617,6 +1013,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      *
      * @param registration - Registration LwM2M Client
      */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `updateAttrTelemetry` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void updateAttrTelemetry(Registration registration, Set<String> paths) {
         try {
             ResultsAddKeyValueProto results = this.getParametersFromProfile(registration, paths);
@@ -634,6 +1040,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `isSupportedTargetId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private boolean isSupportedTargetId(Set<String> supportedIds, String targetId) {
         String[] targetIdParts = targetId.split(LWM2M_SEPARATOR_PATH);
         if (targetIdParts.length <= 1) {
@@ -649,6 +1065,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         return false;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getPathForWriteAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ConcurrentHashMap<String, Object> getPathForWriteAttributes(JsonObject objectJson) {
         ConcurrentHashMap<String, Object> pathAttributes = new Gson().fromJson(objectJson.toString(),
                 new TypeToken<ConcurrentHashMap<String, Object>>() {
@@ -656,6 +1082,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         return pathAttributes;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onDeviceUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void onDeviceUpdate(LwM2mClient lwM2MClient, Device device, Optional<DeviceProfile> deviceProfileOpt) {
         var oldProfile = clientContext.getProfile(lwM2MClient.getProfileId());
         deviceProfileOpt.ifPresent(deviceProfile -> this.onDeviceProfileUpdate(Collections.singletonList(lwM2MClient), oldProfile, deviceProfile));
@@ -668,6 +1104,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      *
      * @param registration - Registration LwM2M Client
      * @param path         -
+     */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getParametersFromProfile` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
      */
     private ResultsAddKeyValueProto getParametersFromProfile(Registration registration, Set<String> path) {
         if (path != null && path.size() > 0) {
@@ -702,6 +1148,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         return null;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getKvToThingsBoard` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private TransportProtos.KeyValueProto getKvToThingsBoard(String pathIdVer, Registration registration) {
         LwM2mClient lwM2MClient = this.clientContext.getClientByEndpoint(registration.getEndpoint());
         Map<String, String> names = clientContext.getProfile(lwM2MClient.getProfileId()).getObserveAttr().getKeyName();
@@ -746,6 +1202,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onWriteResponseOk` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onWriteResponseOk(LwM2mClient client, String path, WriteRequest request, int code) {
         if (request.getNode() instanceof LwM2mResource) {
             this.updateResourcesValue(client, ((LwM2mResource) request.getNode()), path, request.isReplaceRequest() ? Mode.REPLACE : Mode.UPDATE, code);
@@ -760,6 +1226,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onCreateResponseOk` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onCreateResponseOk(LwM2mClient client, String path, CreateRequest request) {
         if (request.getObjectInstances() != null && request.getObjectInstances().size() > 0) {
             request.getObjectInstances().forEach(instance ->
@@ -770,6 +1246,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onWriteCompositeResponseOk` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onWriteCompositeResponseOk(LwM2mClient client, WriteCompositeRequest request, int code) {
         log.trace("ReadCompositeResponse: [{}]", request.getNodes());
         request.getNodes().forEach((k, v) -> {
@@ -784,6 +1270,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
     //TODO: review and optimize the logic to minimize number of the requests to device.
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onDeviceProfileUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void onDeviceProfileUpdate(List<LwM2mClient> clients, Lwm2mDeviceProfileTransportConfiguration oldProfile, DeviceProfile deviceProfile) {
         if (clientContext.profileUpdate(deviceProfile) != null) {
             TelemetryMappingConfiguration oldTelemetryParams = oldProfile.getObserveAttr();
@@ -859,6 +1355,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getAnalyzerKeyName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ParametersAnalyzeResult getAnalyzerKeyName(Map<String, String> keyNameOld, Map<String, String> keyNameNew) {
         ParametersAnalyzeResult analyzerParameters = new ParametersAnalyzeResult();
         Set<String> paths = keyNameNew.entrySet()
@@ -869,6 +1375,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         return analyzerParameters;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getAttributesAnalyzer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ParametersAnalyzeResult getAttributesAnalyzer(Map<String, ObjectAttributes> attributeLwm2mOld, Map<String, ObjectAttributes> attributeLwm2mNew) {
         ParametersAnalyzeResult analyzerParameters = new ParametersAnalyzeResult();
         Set<String> pathOld = attributeLwm2mOld.keySet();
@@ -885,6 +1401,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         return analyzerParameters;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `compareAndSetWriteAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void compareAndSetWriteAttributes(LwM2mClient client, ParametersAnalyzeResult analyzerParameters, Map<String, ObjectAttributes> lwm2mAttributesNew, LwM2MModelConfig modelConfig) {
 
     }
@@ -894,6 +1420,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param updateCredentials - Credentials include config only security Client (without config attr/telemetry...)
      */
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `onToTransportUpdateCredentials` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void onToTransportUpdateCredentials(SessionInfoProto sessionInfo, TransportProtos.ToTransportUpdateCredentialsProto updateCredentials) {
         log.info("[{}] updateCredentials", sessionInfo);
         clearAndUnregister(clientContext.getClientBySessionInfo(sessionInfo));
@@ -902,6 +1438,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     /**
      * @param lwM2MClient -
      * @return SessionInfoProto -
+     */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getSessionInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
      */
     private SessionInfoProto getSessionInfo(LwM2mClient lwM2MClient) {
         if (lwM2MClient != null && lwM2MClient.getSession() != null) {
@@ -914,6 +1460,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param registration - Registration LwM2M Client
      * @return - sessionInfo after access connect client
      */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getSessionInfoOrCloseSession` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public SessionInfoProto getSessionInfoOrCloseSession(Registration registration) {
         return getSessionInfo(clientContext.getClientByEndpoint(registration.getEndpoint()));
     }
@@ -923,6 +1479,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      *
      * @param sessionInfo -
      */
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `reportActivityAndRegister` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void reportActivityAndRegister(SessionInfoProto sessionInfo) {
         if (sessionInfo != null && !transportService.hasSession(sessionInfo)) {
             sessionManager.register(sessionInfo);
@@ -930,6 +1496,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `reportActivity` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void reportActivity() {
         clientContext.getLwM2mClients().forEach(client -> reportActivityAndRegister(client.getSession()));
     }
@@ -945,6 +1521,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
      * @param lwM2MClient - LwM2M Client
      */
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `initAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void initAttributes(LwM2mClient lwM2MClient, boolean logFailedUpdateOfNonChangedValue) {
         Map<String, String> keyNamesMap = this.getNamesFromProfileForSharedAttributes(lwM2MClient);
         if (!keyNamesMap.isEmpty()) {
@@ -958,15 +1544,45 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getNamesFromProfileForSharedAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private Map<String, String> getNamesFromProfileForSharedAttributes(LwM2mClient lwM2MClient) {
         Lwm2mDeviceProfileTransportConfiguration profile = clientContext.getProfile(lwM2MClient.getProfileId());
         return profile.getObserveAttr().getKeyName();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getConfig` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public LwM2MTransportServerConfig getConfig() {
         return this.config;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `reportActivitySubscription` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void reportActivitySubscription(SessionInfoProto sessionInfo) {
         transportService.process(sessionInfo, TransportProtos.SubscriptionInfoProto.newBuilder()
                 .setAttributeSubscription(true)
@@ -975,6 +1591,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
                 .build(), TransportServiceCallback.EMPTY);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `clearAndUnregister` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void clearAndUnregister(LwM2mClient client) {
         client.lock();
         try {
@@ -987,6 +1613,16 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `tryAwake` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void tryAwake(LwM2mClient lwM2MClient) {
         if (clientContext.awake(lwM2MClient)) {
             // clientContext.awake calls clientContext.update
@@ -997,3 +1633,11 @@ public class DefaultLwM2mUplinkMsgHandler extends LwM2MExecutorAwareService impl
     }
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`DefaultLwM2mUplinkMsgHandler` 在 ThingsBoard Common 模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
+ * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+ * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

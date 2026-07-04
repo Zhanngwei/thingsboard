@@ -26,50 +26,155 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
+/**
+ * 中文说明：
+ * 1. 类目的：`InMemoryTbQueueConsumer` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
+ * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
+ * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
+ * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ */
 public class InMemoryTbQueueConsumer<T extends TbQueueMsg> implements TbQueueConsumer<T> {
+    /**
+     * 字段说明：
+     * 1. 保存 `storage` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final InMemoryStorage storage;
     private volatile Set<TopicPartitionInfo> partitions;
+    /**
+     * 字段说明：
+     * 1. 保存 `stopped` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private volatile boolean stopped;
     private volatile boolean subscribed;
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `InMemoryTbQueueConsumer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public InMemoryTbQueueConsumer(InMemoryStorage storage, String topic) {
         this.storage = storage;
         this.topic = topic;
         stopped = false;
     }
 
+    /**
+     * 字段说明：
+     * 1. 保存 `topic` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final String topic;
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getTopic` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public String getTopic() {
         return topic;
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `subscribe` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void subscribe() {
         partitions = Collections.singleton(new TopicPartitionInfo(topic, null, null, true));
         subscribed = true;
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `subscribe` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void subscribe(Set<TopicPartitionInfo> partitions) {
         this.partitions = partitions;
         subscribed = true;
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `stop` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void stop() {
         stopped = true;
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `unsubscribe` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void unsubscribe() {
         stopped = true;
         subscribed = false;
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `poll` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public List<T> poll(long durationInMillis) {
+        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (subscribed) {
             @SuppressWarnings("unchecked")
             List<T> messages = partitions
@@ -77,7 +182,9 @@ public class InMemoryTbQueueConsumer<T extends TbQueueMsg> implements TbQueueCon
                     .map(tpi -> {
                         try {
                             return storage.get(tpi.getFullTopicName());
+                        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                         } catch (InterruptedException e) {
+                            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                             if (!stopped) {
                                 log.error("Queue was interrupted.", e);
                             }
@@ -86,12 +193,15 @@ public class InMemoryTbQueueConsumer<T extends TbQueueMsg> implements TbQueueCon
                     })
                     .flatMap(List::stream)
                     .map(msg -> (T) msg).collect(Collectors.toList());
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (messages.size() > 0) {
                 return messages;
             }
             try {
                 Thread.sleep(durationInMillis);
+            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (InterruptedException e) {
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!stopped) {
                     log.error("Failed to sleep.", e);
                 }
@@ -101,17 +211,55 @@ public class InMemoryTbQueueConsumer<T extends TbQueueMsg> implements TbQueueCon
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `commit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void commit() {
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `isStopped` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public boolean isStopped() {
         return stopped;
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getFullTopicNames` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public List<String> getFullTopicNames() {
         return partitions.stream().map(TopicPartitionInfo::getFullTopicName).collect(Collectors.toList());
     }
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`InMemoryTbQueueConsumer` 在 ThingsBoard Common 模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
+ * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+ * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

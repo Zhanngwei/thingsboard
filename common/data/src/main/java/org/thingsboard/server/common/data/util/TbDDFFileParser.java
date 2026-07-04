@@ -40,9 +40,29 @@ import java.util.List;
 import java.util.Map;
 
 @Slf4j
+/**
+ * 中文说明：
+ * 1. 类目的：`TbDDFFileParser` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
+ * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
+ * 3. 协作对象：主要协作对象包括REST Controller、DAO、Rule Engine、Transport、Edge 同步、缓存和 JSON 序列化框架。
+ * 4. 生命周期：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 DTO / Value Object / Builder。
+ */
 public class TbDDFFileParser {
     private static final DDFFileValidator ddfFileValidator = new DefaultDDFFileValidator();
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `parse` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public List<ObjectModel> parse(InputStream inputStream, String streamName)
             throws InvalidDDFFileException, IOException {
         streamName = streamName == null ? "" : streamName;
@@ -65,22 +85,36 @@ public class TbDDFFileParser {
             // Build list of ObjectModel
             ArrayList<ObjectModel> objects = new ArrayList<>();
             NodeList nodeList = document.getDocumentElement().getElementsByTagName("Object");
+            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (int i = 0; i < nodeList.getLength(); i++) {
                 objects.add(parseObject(nodeList.item(i), streamName, lwm2mVersion, true));
             }
             return objects;
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (InvalidDDFFileException | SAXException e) {
             throw new InvalidDDFFileException(e, "Invalid DDF file %s", streamName);
         }
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         catch (ParserConfigurationException e) {
             throw new IllegalStateException("Unable to create Document Builder", e);
         }
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `parseObject` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ObjectModel parseObject(Node object, String streamName, LwM2m.LwM2mVersion schemaVersion, boolean validate)
             throws InvalidDDFFileException {
 
         Node objectType = object.getAttributes().getNamedItem("ObjectType");
+        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (validate && (objectType == null || !"MODefinition".equals(objectType.getTextContent()))) {
             throw new InvalidDDFFileException(
                     "Object element in %s MUST have a ObjectType attribute equals to 'MODefinition'.", streamName);
@@ -97,11 +131,14 @@ public class TbDDFFileParser {
         String description2 = null;
         String lwm2mVersion = ObjectModel.DEFAULT_VERSION;
 
+        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < object.getChildNodes().getLength(); i++) {
             Node field = object.getChildNodes().item(i);
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (field.getNodeType() != Node.ELEMENT_NODE)
                 continue;
 
+            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (field.getNodeName()) {
                 case "ObjectID":
                     id = Integer.valueOf(field.getTextContent());
@@ -113,20 +150,25 @@ public class TbDDFFileParser {
                     description = field.getTextContent();
                     break;
                 case "ObjectVersion":
+                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!StringUtils.isEmpty(field.getTextContent())) {
                         version = field.getTextContent();
                     }
                     break;
                 case "MultipleInstances":
+                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if ("Multiple".equals(field.getTextContent())) {
                         multiple = true;
+                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     } else if ("Single".equals(field.getTextContent())) {
                         multiple = false;
                     }
                     break;
                 case "Mandatory":
+                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if ("Mandatory".equals(field.getTextContent())) {
                         mandatory = true;
+                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     } else if ("Optional".equals(field.getTextContent())) {
                         mandatory = false;
                     }
@@ -175,6 +217,16 @@ public class TbDDFFileParser {
 
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `parseResource` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ResourceModel parseResource(Node item, String streamName) throws DOMException, InvalidDDFFileException {
 
         Integer id = Integer.valueOf(item.getAttributes().getNamedItem("ID").getTextContent());
@@ -269,4 +321,12 @@ public class TbDDFFileParser {
         }
         return new ResourceModel(id, name, operations, multiple, mandatory, type, rangeEnumeration, units, description);
     }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`TbDDFFileParser` 在 ThingsBoard Common 模块 中承担公共数据模型类型职责，核心目的是承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
+ * 2. 核心流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
+ * 3. 关键依赖：主要依赖或协作对象包括REST Controller、DAO、Rule Engine、Transport、Edge 同步、缓存和 JSON 序列化框架。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */
 }

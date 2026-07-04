@@ -24,3 +24,11 @@ import java.lang.annotation.RetentionPolicy;
 @ConditionalOnProperty(prefix = "database.ts", value = "type", havingValue = "cassandra")
 public @interface NoSqlTsDao {
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`NoSqlTsDao` 在 ThingsBoard Common 模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
+ * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
+ * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */
