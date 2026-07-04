@@ -52,15 +52,31 @@ import java.util.UUID;
         configDirective = "tbActionNodeRpcReplyConfig",
         icon = "call_merge"
 )
+/**
+ * 设备到服务端 RPC 回复节点，根据元数据定位 RPC 会话并发送回复。
+ * 普通路径直接委托 RpcService；Edge 路径会异步保存 EdgeEvent，本类本身不直接管理底层传输连接。
+ */
 public class TbSendRPCReplyNode implements TbNode {
 
+    /**
+     * RPC 回复节点配置，定义 serviceId、sessionId 和 requestId 的元数据字段名。
+     */
     private TbSendRpcReplyNodeConfiguration config;
 
+    /**
+     * 初始化 RPC 回复节点配置。
+     * 本方法不直接发送 RPC、不访问数据库或缓存，也不处理消息确认。
+     */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = TbNodeUtils.convert(configuration, TbSendRpcReplyNodeConfiguration.class);
     }
 
+    /**
+     * 校验 RPC 回复所需元数据并发送到设备会话。
+     * 非 Edge 场景直接调用 RpcService 并成功路由；Edge 场景保存 EdgeEvent 后由数据库回调决定成功或失败。
+     * RpcService 的 Actor/MQTT/传输细节不在本类直接实现，具体调用链可能间接涉及。
+     */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         String serviceIdStr = msg.getMetaData().getValue(config.getServiceIdMetaDataAttribute());
@@ -86,6 +102,10 @@ public class TbSendRPCReplyNode implements TbNode {
         }
     }
 
+    /**
+     * 将 RPC 回复保存为 EdgeEvent，等待 Edge 同步链路处理。
+     * 本方法直接调用 EdgeEventService.saveAsync，属于数据库/持久化边界；保存结果通过 dbCallbackExecutor 回调路由。
+     */
     private void saveRpcResponseToEdgeQueue(TbContext ctx, TbMsg msg, String serviceIdStr, String sessionIdStr, String requestIdStr) {
         EdgeId edgeId;
         DeviceId deviceId;
@@ -107,12 +127,20 @@ public class TbSendRPCReplyNode implements TbNode {
                         EdgeEventActionType.RPC_CALL, deviceId, JacksonUtil.valueToTree(body));
         ListenableFuture<Void> future = ctx.getEdgeEventService().saveAsync(edgeEvent);
         Futures.addCallback(future, new FutureCallback<>() {
+            /**
+             * EdgeEvent 保存成功后通知 Edge 更新并走 Success。
+             * 本回调运行在 dbCallbackExecutor 上。
+             */
             @Override
             public void onSuccess(Void result) {
                 ctx.onEdgeEventUpdate(ctx.getTenantId(), edgeId);
                 ctx.tellSuccess(msg);
             }
 
+            /**
+             * EdgeEvent 保存失败后走 Failure。
+             * 失败通常来自数据库/持久化或 EdgeEventService 调用链。
+             */
             @Override
             public void onFailure(Throwable t) {
                 ctx.tellFailure(msg, t);
@@ -120,3 +148,10 @@ public class TbSendRPCReplyNode implements TbNode {
         }, ctx.getDbCallbackExecutor());
     }
 }
+
+/*
+ * 本类总结：
+ * 本类负责发送设备 RPC 回复：普通路径调用 RpcService，Edge 路径把回复保存到 EdgeEvent 队列。
+ * 普通路径本身不直接访问数据库或缓存；Edge 路径通过 EdgeEventService.saveAsync 直接进入异步持久化边界。
+ * RpcService、Actor、MQTT/传输和 Edge 同步的具体实现/调用链可能间接涉及其它系统组件。
+ */

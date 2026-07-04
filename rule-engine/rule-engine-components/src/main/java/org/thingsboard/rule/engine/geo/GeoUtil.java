@@ -40,9 +40,19 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * 中文说明：`GeoUtil` 是地理工具辅助类，用于执行 GPS 地理围栏、距离和多边形判断及状态跟踪。
+ * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+ */
 public class GeoUtil {
 
+    /**
+     * 常量字段：定义 `distCtx`，用于规则引擎上下文，本身不触发外部系统调用。
+     */
     private static final SpatialContext distCtx = SpatialContext.GEO;
+    /**
+     * 常量字段：定义 `jtsCtx`，用于规则引擎上下文，本身不触发外部系统调用。
+     */
     private static final JtsSpatialContext jtsCtx;
 
     static {
@@ -51,12 +61,20 @@ public class GeoUtil {
         jtsCtx = factory.newSpatialContext();
     }
 
+    /**
+     * 方法说明：执行 `distance` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public static synchronized double distance(Coordinates x, Coordinates y, RangeUnit unit) {
         Point xLL = distCtx.getShapeFactory().pointXY(x.getLongitude(), x.getLatitude());
         Point yLL = distCtx.getShapeFactory().pointXY(y.getLongitude(), y.getLatitude());
         return unit.fromKm(distCtx.getDistCalc().distance(xLL, yLL) * DistanceUtils.DEG_TO_KM);
     }
 
+    /**
+     * 方法说明：执行 `contains` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public static synchronized boolean contains(@NonNull String polygonInString, @NonNull Coordinates coordinates) {
         if (polygonInString.isEmpty() || polygonInString.isBlank()) {
             throw new RuntimeException("Polygon string can't be empty or null!");
@@ -74,6 +92,10 @@ public class GeoUtil {
         return globalGeometry.contains(point);
     }
 
+    /**
+     * 方法说明：执行 `unionToGlobalGeometry` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static Geometry unionToGlobalGeometry(List<Geometry> polygons, Set<Geometry> holes) {
         Geometry globalPolygon = polygons.stream().reduce(Geometry::union).orElseThrow(() ->
                 new RuntimeException("Error while calculating globalPolygon - the result of all polygons union is null"));
@@ -85,12 +107,20 @@ public class GeoUtil {
         }
     }
 
+    /**
+     * 方法说明：执行 `normalizePolygonsJson` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static JsonArray normalizePolygonsJson(JsonArray polygonsJsonArray) {
         JsonArray result = new JsonArray();
         normalizePolygonsJson(polygonsJsonArray, result);
         return result;
     }
 
+    /**
+     * 方法说明：执行 `normalizePolygonsJson` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static void normalizePolygonsJson(JsonArray polygonsJsonArray, JsonArray result) {
         if (containsArrayWithPrimitives(polygonsJsonArray)) {
             result.add(polygonsJsonArray);
@@ -105,6 +135,10 @@ public class GeoUtil {
         }
     }
 
+    /**
+     * 方法说明：执行 `extractHolesFrom` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static Set<Geometry> extractHolesFrom(List<Geometry> polygons) {
         Map<Geometry, List<Geometry>> polygonsHoles = new HashMap<>();
 
@@ -135,6 +169,10 @@ public class GeoUtil {
         return polygonsHoles.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
     }
 
+    /**
+     * 方法说明：构造告警详情、SSL 上下文或输出对象，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static List<Geometry> buildPolygonsFromJson(JsonArray polygonsJsonArray) {
         List<Geometry> polygons = new LinkedList<>();
 
@@ -147,6 +185,10 @@ public class GeoUtil {
         return polygons;
     }
 
+    /**
+     * 方法说明：构造告警详情、SSL 上下文或输出对象，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static Geometry buildPolygonFromCoordinates(List<Coordinate> coordinates) {
         if (coordinates.size() == 2) {
             Coordinate a = coordinates.get(0);
@@ -167,6 +209,10 @@ public class GeoUtil {
         return GeometryFixer.fix(jtsCtx.getShapeFactory().getGeometryFactory().createPolygon(coordinateSequence));
     }
 
+    /**
+     * 方法说明：执行 `parseCoordinates` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static List<Coordinate> parseCoordinates(JsonArray coordinatesJson) {
         List<Coordinate> result = new LinkedList<>();
 
@@ -183,6 +229,10 @@ public class GeoUtil {
         return result;
     }
 
+    /**
+     * 方法说明：执行 `containsPrimitives` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static boolean containsPrimitives(JsonArray array) {
         for (JsonElement element : array) {
             return element.isJsonPrimitive();
@@ -191,6 +241,10 @@ public class GeoUtil {
         return false;
     }
 
+    /**
+     * 方法说明：执行 `containsArrayWithPrimitives` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private static boolean containsArrayWithPrimitives(JsonArray array) {
         for (JsonElement element : array) {
             if (!containsPrimitives(element.getAsJsonArray())) {
@@ -201,4 +255,8 @@ public class GeoUtil {
         return true;
     }
 
+    /*
+     * 本类总结：`GeoUtil` 负责执行 GPS 地理围栏、距离和多边形判断及状态跟踪；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

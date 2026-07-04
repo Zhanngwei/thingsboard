@@ -43,8 +43,8 @@ rg --files rule-engine -g '*.java' | Measure-Object | Select-Object -ExpandPrope
 当前批次分布：
 
 - `rule-engine-api`: 32 个 Java 文件。
-- `rule-engine-components/src/main/java`: 210 个 Java 文件。
-- `rule-engine-components/src/test/java`: 63 个 Java 文件。
+- `rule-engine-components/src/main/java`: 211 个 Java 文件。
+- `rule-engine-components/src/test/java`: 62 个 Java 文件。
 
 注释模板：
 
@@ -392,7 +392,7 @@ Run:
 rg --files rule-engine\rule-engine-components\src\test\java -g '*.java' | Sort-Object
 ```
 
-Expected: 输出 63 个测试 Java 文件。
+Expected: 输出 62 个测试 Java 文件。
 
 - [ ] **Step 2: Annotate tests**
 

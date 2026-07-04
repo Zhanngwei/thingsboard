@@ -15,6 +15,17 @@
  */
 package org.thingsboard.rule.engine.geo;
 
+/**
+ * 中文说明：`PerimeterType` 是围栏类型枚举，用于限定执行 GPS 地理围栏、距离和多边形判断及状态跟踪时可选择的固定值。
+ * 调用边界：本枚举本身不直接涉及数据库、缓存、Rule Engine、Actor、MQTT 或事务，只作为配置或流程判断的类型值。
+ */
 public enum PerimeterType {
+    /**
+     * 枚举项说明：本行枚举常量定义 `PerimeterType` 支持的取值，用于配置或处理流程中的分支判断。
+     */
     CIRCLE, POLYGON
+    /*
+     * 本类总结：`PerimeterType` 负责执行 GPS 地理围栏、距离和多边形判断及状态跟踪；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

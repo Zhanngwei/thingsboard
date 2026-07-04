@@ -21,8 +21,16 @@ import org.thingsboard.server.common.data.DataConstants;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
+/**
+ * Push to Edge 节点配置，继承基础 scope 配置。
+ * 配置类本身不直接保存 EdgeEvent、不访问数据库/缓存，也不涉及异步回调。
+ */
 public class TbMsgPushToEdgeNodeConfiguration extends BaseTbMsgPushNodeConfiguration {
 
+    /**
+     * 构造 Push to Edge 节点默认配置。
+     * 本方法只设置 SERVER_SCOPE，不直接查询 Edge 或保存事件。
+     */
     @Override
     public TbMsgPushToEdgeNodeConfiguration defaultConfiguration() {
         TbMsgPushToEdgeNodeConfiguration configuration = new TbMsgPushToEdgeNodeConfiguration();
@@ -30,3 +38,9 @@ public class TbMsgPushToEdgeNodeConfiguration extends BaseTbMsgPushNodeConfigura
         return configuration;
     }
 }
+
+/*
+ * 本类总结：
+ * 本类描述 push to edge 节点的配置默认值，实际 EdgeEvent 构造、保存、数据库回调和 Edge 通知由 TbMsgPushToEdgeNode 完成。
+ * 它不直接涉及外部调用、数据库、缓存或异步回调。
+ */

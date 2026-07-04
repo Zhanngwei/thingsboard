@@ -22,11 +22,25 @@ import org.thingsboard.server.common.msg.TbMsg;
 import javax.annotation.Nullable;
 import java.util.List;
 
+/**
+ * 中文说明：`AttributesUpdateNodeCallback` 是属性更新节点回调辅助类，用于保存、删除或通知属性与时间序列遥测数据。
+ * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+ */
 public class AttributesUpdateNodeCallback extends TelemetryNodeCallback {
 
+    /**
+     * 字段说明：保存 `scope`，表示属性作用域，供本类方法在规则节点处理流程中使用。
+     */
     private final String scope;
+    /**
+     * 字段说明：保存 `attributes`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     */
     private final List<AttributeKvEntry> attributes;
 
+    /**
+     * 方法说明：构造 `AttributesUpdateNodeCallback` 实例并初始化必要字段。
+     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     */
     public AttributesUpdateNodeCallback(TbContext ctx, TbMsg msg, String scope, List<AttributeKvEntry> attributes) {
         super(ctx, msg);
         this.scope = scope;
@@ -34,6 +48,10 @@ public class AttributesUpdateNodeCallback extends TelemetryNodeCallback {
     }
 
     @Override
+    /**
+     * 方法说明：处理异步调用成功回调并继续规则链投递。
+     * 调用边界：由异步 Future 或消息回调触发；本方法本身只衔接规则链结果，数据库、缓存、MQTT 或事务通常发生在触发该回调的上游调用链中。
+     */
     public void onSuccess(@Nullable Void result) {
         TbContext ctx = this.getCtx();
         TbMsg tbMsg = this.getMsg();
@@ -41,4 +59,8 @@ public class AttributesUpdateNodeCallback extends TelemetryNodeCallback {
                 () -> ctx.tellSuccess(tbMsg),
                 throwable -> ctx.tellFailure(tbMsg, throwable));
     }
+    /*
+     * 本类总结：`AttributesUpdateNodeCallback` 负责保存、删除或通知属性与时间序列遥测数据；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

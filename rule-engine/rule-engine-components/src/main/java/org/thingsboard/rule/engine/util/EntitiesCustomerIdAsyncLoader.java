@@ -26,8 +26,20 @@ import org.thingsboard.server.common.data.id.DeviceId;
 import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.id.UserId;
 
+/**
+ * 异步解析实体所属客户 ID 的工具类。
+ * 本类无共享可变字段；服务层读取可能访问数据库或缓存，转换回调使用 TbContext 提供的数据库回调执行器。
+ */
 public class EntitiesCustomerIdAsyncLoader {
 
+    /**
+     * 根据实体 ID 查找其所属客户 ID。
+     * CUSTOMER 类型会立即返回自身；USER、ASSET、DEVICE 通过对应服务读取实体后转换，方法本身不直接发送 Rule Engine 消息。
+     *
+     * @param ctx 规则节点上下文，提供租户、实体服务和回调执行器
+     * @param originator 当前消息来源实体
+     * @return 客户 ID 的异步结果
+     */
     public static ListenableFuture<CustomerId> findEntityIdAsync(TbContext ctx, EntityId originator) {
         switch (originator.getEntityType()) {
             case CUSTOMER:
@@ -43,8 +55,22 @@ public class EntitiesCustomerIdAsyncLoader {
         }
     }
 
+    /**
+     * 将带客户归属的实体异步结果转换为客户 ID。
+     * Futures.transform 的回调在 ctx.getDbCallbackExecutor() 上执行，避免在服务返回线程中执行后续转换；空实体会转换为 null。
+     *
+     * @param ctx 规则节点上下文，提供数据库回调执行器
+     * @param future 实体异步读取结果
+     * @param <T> 实现 HasCustomerId 的实体类型
+     * @return 客户 ID 的异步结果
+     */
     private static <T extends HasCustomerId> ListenableFuture<CustomerId> toCustomerIdAsync(TbContext ctx, ListenableFuture<T> future) {
         return Futures.transform(future, in -> in != null ? in.getCustomerId() : null, ctx.getDbCallbackExecutor());
     }
 
 }
+
+/*
+ * 本类总结：
+ * 本类为规则节点提供客户归属解析的异步 helper；具体数据库/缓存读取由服务层决定，本类只做 Future 转换且不持有跨消息状态。
+ */

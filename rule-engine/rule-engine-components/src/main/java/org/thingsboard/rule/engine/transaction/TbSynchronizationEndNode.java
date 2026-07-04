@@ -25,6 +25,10 @@ import org.thingsboard.rule.engine.api.TbNodeException;
 import org.thingsboard.server.common.data.plugin.ComponentType;
 import org.thingsboard.server.common.msg.TbMsg;
 
+/**
+ * 已废弃的同步结束节点，保留用于兼容旧规则链配置。
+ * 本节点不会直接结束数据库事务，也不会提交或回滚数据；当前实现仅把消息继续发送到成功链路。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.ACTION,
@@ -38,10 +42,25 @@ import org.thingsboard.server.common.msg.TbMsg;
 @Deprecated
 public class TbSynchronizationEndNode implements TbNode {
 
+    /**
+     * 初始化同步结束节点。
+     * 当前节点没有配置状态，不访问数据库或缓存，也不创建事务资源。
+     *
+     * @param ctx 规则节点上下文
+     * @param configuration 空配置
+     * @throws TbNodeException 初始化异常，当前实现不会主动抛出
+     */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
     }
 
+    /**
+     * 处理进入同步结束节点的消息。
+     * 当前实现只记录废弃告警并向成功链路转发；它只表达旧规则链同步边界，不直接关闭数据库事务。
+     *
+     * @param ctx 规则节点上下文
+     * @param msg 待处理消息
+     */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         log.warn("Synchronization Start/End nodes are deprecated since TB 2.5. Use queue with submit strategy SEQUENTIAL_BY_ORIGINATOR instead.");
@@ -49,3 +68,8 @@ public class TbSynchronizationEndNode implements TbNode {
     }
 
 }
+
+/*
+ * 本类总结：
+ * 本类是 deprecated 同步结束节点的兼容实现；它不直接涉及数据库事务生命周期，只在 Rule Engine 消息流中继续传递消息。
+ */

@@ -20,10 +20,21 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 import org.thingsboard.server.common.data.DataConstants;
 
 @Data
+/**
+ * Edge/Cloud 推送节点基础配置，提供属性 scope 默认值。
+ * 配置类本身不直接保存 EdgeEvent、不访问数据库/缓存，也不涉及异步回调。
+ */
 public class BaseTbMsgPushNodeConfiguration implements NodeConfiguration<BaseTbMsgPushNodeConfiguration> {
 
+    /**
+     * 属性事件使用的 scope，消息元数据未提供时作为默认值。
+     */
     private String scope;
 
+    /**
+     * 构造基础推送节点默认配置。
+     * 本方法只设置 SERVER_SCOPE，不直接处理消息或持久化事件。
+     */
     @Override
     public BaseTbMsgPushNodeConfiguration defaultConfiguration() {
         BaseTbMsgPushNodeConfiguration configuration = new BaseTbMsgPushNodeConfiguration();
@@ -31,3 +42,9 @@ public class BaseTbMsgPushNodeConfiguration implements NodeConfiguration<BaseTbM
         return configuration;
     }
 }
+
+/*
+ * 本类总结：
+ * 本类只保存 Edge/Cloud 推送节点共用的 scope 配置。
+ * 实际消息处理、事件保存、数据库回调和远端同步由具体节点类完成。
+ */

@@ -15,8 +15,19 @@
  */
 package org.thingsboard.rule.engine.deduplication;
 
+/**
+ * 中文说明：`DeduplicationId` 是去重标识枚举，用于限定按配置聚合、去重、延迟和输出消息时可选择的固定值。
+ * 调用边界：本枚举本身不直接涉及数据库、缓存、Rule Engine、Actor、MQTT 或事务，只作为配置或流程判断的类型值。
+ */
 public enum DeduplicationId {
 
+    /**
+     * 枚举项说明：本行枚举常量定义 `DeduplicationId` 支持的取值，用于配置或处理流程中的分支判断。
+     */
     ORIGINATOR, TENANT, CUSTOMER
 
+    /*
+     * 本类总结：`DeduplicationId` 负责按配置聚合、去重、延迟和输出消息；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

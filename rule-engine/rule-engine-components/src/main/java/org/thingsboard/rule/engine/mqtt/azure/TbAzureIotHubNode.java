@@ -45,7 +45,16 @@ import javax.net.ssl.SSLException;
         uiResources = {"static/rulenode/rulenode-core-config.js"},
         configDirective = "tbExternalNodeAzureIotHubConfig"
 )
+/**
+ * Azure IoT Hub MQTT 发布节点，复用 TbMqttNode 的 MQTT 客户端发布流程并补充 Azure 特定连接参数。
+ * 本类直接影响 MQTT 客户端配置和连接生命周期；实际发布、QoS 和 Rule Engine 确认关系由父类实现。
+ */
 public class TbAzureIotHubNode extends TbMqttNode {
+    /**
+     * 初始化 Azure IoT Hub 节点并强制使用 8883、cleanSession 和 Azure 默认 CA 证书。
+     * 本方法直接创建 MQTT 客户端连接；Topic 模板和凭据来自节点配置，QoS 固定逻辑继承自父类。
+     * 本方法本身不直接访问数据库或缓存，Azure 证书/凭据解析由配置对象和工具类完成。
+     */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         super.init(ctx);
@@ -66,6 +75,10 @@ public class TbAzureIotHubNode extends TbMqttNode {
         }
     }
 
+    /**
+     * 准备 Azure IoT Hub 所需的 MQTT 协议版本、用户名和 SAS 密码。
+     * 本方法只写入 MQTT 客户端配置，不直接发布消息；连接建立仍由父类 initClient 完成。
+     */
     protected void prepareMqttClientConfig(MqttClientConfig config) throws SSLException {
         config.setProtocolVersion(MqttVersion.MQTT_3_1_1);
         config.setUsername(AzureIotHubUtil.buildUsername(mqttNodeConfiguration.getHost(), config.getClientId()));
@@ -75,3 +88,10 @@ public class TbAzureIotHubNode extends TbMqttNode {
         }
     }
 }
+
+/*
+ * 本类总结：
+ * 本类是 Azure IoT Hub 的 MQTT 特化节点，直接复用父类 MQTT 客户端连接与发布机制，并覆盖 Azure 所需的 TLS、用户名和 SAS Token 配置。
+ * Rule Engine 消息确认、AT_LEAST_ONCE QoS、Topic 解析和成功/失败路由均沿用 TbMqttNode。
+ * 本类本身不直接涉及数据库或缓存，相关依赖只可能通过 Rule Engine 上下文或凭据工具链间接涉及。
+ */

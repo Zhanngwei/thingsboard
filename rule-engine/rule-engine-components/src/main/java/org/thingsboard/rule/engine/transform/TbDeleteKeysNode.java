@@ -50,13 +50,34 @@ import java.util.stream.Collectors;
         configDirective = "tbTransformationNodeDeleteKeysConfig",
         icon = "remove_circle"
 )
+/**
+ * 中文说明：`TbDeleteKeysNode` 是删除键节点规则节点，用于转换消息体、元数据、发起实体或拆分/包装规则链消息。
+ * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
+ * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
+ * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
+ * 配置对象：`TbDeleteKeysNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
+ * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ */
 public class TbDeleteKeysNode extends TbAbstractTransformNodeWithTbMsgSource {
 
+    /**
+     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     */
     private TbDeleteKeysNodeConfiguration config;
+    /**
+     * 字段说明：保存 `deleteFrom`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     */
     private TbMsgSource deleteFrom;
+    /**
+     * 字段说明：保存 `compiledKeyPatterns`，表示消息体、元数据、属性或遥测中的键名，供本类方法在规则节点处理流程中使用。
+     */
     private List<Pattern> compiledKeyPatterns;
 
     @Override
+    /**
+     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
+     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = TbNodeUtils.convert(configuration, TbDeleteKeysNodeConfiguration.class);
         this.deleteFrom = config.getDeleteFrom();
@@ -67,6 +88,11 @@ public class TbDeleteKeysNode extends TbAbstractTransformNodeWithTbMsgSource {
     }
 
     @Override
+    /**
+     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
+     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
+     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void onMsg(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException, TbNodeException {
         var metaDataCopy = msg.getMetaData().copy();
         var msgDataStr = msg.getData();
@@ -104,17 +130,33 @@ public class TbDeleteKeysNode extends TbAbstractTransformNodeWithTbMsgSource {
     }
 
     @Override
+    /**
+     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbDeleteKeysNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected String getNewKeyForUpgradeFromVersionZero() {
         return "deleteFrom";
     }
 
     @Override
+    /**
+     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbDeleteKeysNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected String getKeyToUpgradeFromVersionOne() {
         return "dataToFetch";
     }
 
+    /**
+     * 方法说明：判断消息、实体或地理位置是否匹配配置条件，供 `TbDeleteKeysNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     boolean matches(String key) {
         return compiledKeyPatterns.stream().anyMatch(pattern -> pattern.matcher(key).matches());
     }
 
+    /*
+     * 本类总结：`TbDeleteKeysNode` 负责转换消息体、元数据、发起实体或拆分/包装规则链消息；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

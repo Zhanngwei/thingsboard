@@ -38,16 +38,32 @@ import java.util.concurrent.ExecutionException;
         configDirective = "tbExternalNodeSlackConfig",
         iconUrl = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTYsMTVBMiwyIDAgMCwxIDQsMTdBMiwyIDAgMCwxIDIsMTVBMiwyIDAgMCwxIDQsMTNINlYxNU03LDE1QTIsMiAwIDAsMSA5LDEzQTIsMiAwIDAsMSAxMSwxNVYyMEEyLDIgMCAwLDEgOSwyMkEyLDIgMCAwLDEgNywyMFYxNU05LDdBMiwyIDAgMCwxIDcsNUEyLDIgMCAwLDEgOSwzQTIsMiAwIDAsMSAxMSw1VjdIOU05LDhBMiwyIDAgMCwxIDExLDEwQTIsMiAwIDAsMSA5LDEySDRBMiwyIDAgMCwxIDIsMTBBMiwyIDAgMCwxIDQsOEg5TTE3LDEwQTIsMiAwIDAsMSAxOSw4QTIsMiAwIDAsMSAyMSwxMEEyLDIgMCAwLDEgMTksMTJIMTdWMTBNMTYsMTBBMiwyIDAgMCwxIDE0LDEyQTIsMiAwIDAsMSAxMiwxMFY1QTIsMiAwIDAsMSAxNCwzQTIsMiAwIDAsMSAxNiw1VjEwTTE0LDE4QTIsMiAwIDAsMSAxNiwyMEEyLDIgMCAwLDEgMTQsMjJBMiwyIDAgMCwxIDEyLDIwVjE4SDE0TTE0LDE3QTIsMiAwIDAsMSAxMiwxNUEyLDIgMCAwLDEgMTQsMTNIMTlBMiwyIDAgMCwxIDIxLDE1QTIsMiAwIDAsMSAxOSwxN0gxNFoiIC8+PC9zdmc+"
 )
+/**
+ * Slack 外部发送节点，解析消息模板后通过 SlackService 发送到指定会话。
+ * 本类不直接访问数据库或缓存；系统 Slack token 获取和发送实现/调用链可能间接涉及配置存储、缓存或外部 Slack API。
+ */
 public class TbSlackNode extends TbAbstractExternalNode {
 
+    /**
+     * Slack 节点配置，包含 token 来源、消息模板和目标会话。
+     */
     private TbSlackNodeConfiguration config;
 
+    /**
+     * 初始化 Slack 节点配置。
+     * 本方法不直接调用 Slack API，也不直接访问数据库或缓存。
+     */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         super.init(ctx);
         this.config = TbNodeUtils.convert(configuration, TbSlackNodeConfiguration.class);
     }
 
+    /**
+     * 解析 Slack token 和消息内容，并异步发送到 Slack。
+     * 消息先经 ackIfNeeded 处理确认关系；发送成功走 Success，异常走 Failure。
+     * 外部调用边界在 SlackService.sendMessage，线程由 externalCallExecutor 承载。
+     */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException, TbNodeException {
         String token;
@@ -63,6 +79,7 @@ public class TbSlackNode extends TbAbstractExternalNode {
         String message = TbNodeUtils.processPattern(config.getMessageTemplate(), msg);
         var tbMsg = ackIfNeeded(ctx, msg);
         DonAsynchron.withCallback(ctx.getExternalCallExecutor().executeAsync(() -> {
+                    // Slack API 调用可能阻塞或失败，因此放入外部调用执行器。
                     ctx.getSlackService().sendMessage(ctx.getTenantId(), token, config.getConversation().getId(), message);
                 }),
                 r -> tellSuccess(ctx, tbMsg),
@@ -70,3 +87,9 @@ public class TbSlackNode extends TbAbstractExternalNode {
     }
 
 }
+
+/*
+ * 本类总结：
+ * 本类是 Slack 外部发送节点，负责 token 选择、消息模板解析、异步调用 SlackService 和成功/失败路由。
+ * 本类本身不直接访问数据库或缓存；系统设置 token 获取、SlackService 内部发送和配置读取的调用链可能间接涉及。
+ */

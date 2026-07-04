@@ -59,14 +59,35 @@ import java.util.concurrent.TimeUnit;
         uiResources = {"static/rulenode/rulenode-core-config.js"},
         configDirective = "tbDeviceProfileConfig"
 )
+/**
+ * 中文说明：`TbDeviceProfileNode` 是设备配置节点规则节点，用于维护设备配置、告警规则、快照和设备运行状态。
+ * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
+ * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
+ * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
+ * 配置对象：`TbDeviceProfileNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
+ * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ */
 public class TbDeviceProfileNode implements TbNode {
 
+    /**
+     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     */
     private TbDeviceProfileNodeConfiguration config;
+    /**
+     * 字段说明：保存 `cache` 本地缓存、队列或并发状态，用于协调本类处理流程。
+     */
     private RuleEngineDeviceProfileCache cache;
+    /**
+     * 字段说明：保存 Rule Engine 上下文引用；本字段本身不直接代表数据库、MQTT 或事务资源。
+     */
     private TbContext ctx;
     private final Map<DeviceId, DeviceState> deviceStates = new ConcurrentHashMap<>();
 
     @Override
+    /**
+     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
+     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = TbNodeUtils.convert(configuration, TbDeviceProfileNodeConfiguration.class);
         this.cache = ctx.getDeviceProfileCache();
@@ -76,6 +97,10 @@ public class TbDeviceProfileNode implements TbNode {
         initAlarmRuleState(false);
     }
 
+    /**
+     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private void initAlarmRuleState(boolean printNewlyAddedDeviceStates) {
         if (config.isFetchAlarmRulesStateOnStart()) {
             log.info("[{}] Fetching alarm rule state", ctx.getSelfId());
@@ -106,6 +131,11 @@ public class TbDeviceProfileNode implements TbNode {
     }
 
     @Override
+    /**
+     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
+     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
+     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void onMsg(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException {
         EntityType originatorType = msg.getOriginator().getEntityType();
         if (msg.isTypeOf(TbMsgType.DEVICE_PROFILE_PERIODIC_SELF_MSG)) {
@@ -146,6 +176,10 @@ public class TbDeviceProfileNode implements TbNode {
     }
 
     @Override
+    /**
+     * 方法说明：执行 `onPartitionChangeMsg` 对应的辅助逻辑，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void onPartitionChangeMsg(TbContext ctx, PartitionChangeMsg msg) {
         // Cleanup the cache for all entities that are no longer assigned to current server partitions
         deviceStates.entrySet().removeIf(entry -> !ctx.isLocalEntity(entry.getKey()));
@@ -153,11 +187,19 @@ public class TbDeviceProfileNode implements TbNode {
     }
 
     @Override
+    /**
+     * 方法说明：在节点生命周期销毁阶段释放缓存、脚本引擎、监听器或本地状态。
+     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void destroy() {
         ctx.removeListeners();
         deviceStates.clear();
     }
 
+    /**
+     * 方法说明：创建实体、告警、关系或辅助对象，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected DeviceState getOrCreateDeviceState(TbContext ctx, DeviceId deviceId, RuleNodeState rns, boolean printNewlyAddedDeviceStates) {
         DeviceState deviceState = deviceStates.get(deviceId);
         if (deviceState == null) {
@@ -173,17 +215,30 @@ public class TbDeviceProfileNode implements TbNode {
         return deviceState;
     }
 
+    /**
+     * 方法说明：执行 `scheduleAlarmHarvesting` 对应的辅助逻辑，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected void scheduleAlarmHarvesting(TbContext ctx, TbMsg msg) {
         TbMsg periodicCheck = TbMsg.newMsg(TbMsgType.DEVICE_PROFILE_PERIODIC_SELF_MSG, ctx.getTenantId(), msg != null ? msg.getCustomerId() : null, TbMsgMetaData.EMPTY, TbMsg.EMPTY_JSON_OBJECT);
+        // 通过规则引擎上下文安排后续消息投递或自身定时消息。
         ctx.tellSelf(periodicCheck, TimeUnit.MINUTES.toMillis(1));
     }
 
+    /**
+     * 方法说明：执行 `harvestAlarms` 对应的辅助逻辑，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected void harvestAlarms(TbContext ctx, long ts) throws ExecutionException, InterruptedException {
         for (DeviceState state : deviceStates.values()) {
             state.harvestAlarms(ctx, ts);
         }
     }
 
+    /**
+     * 方法说明：执行 `updateProfile` 对应的辅助逻辑，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected void updateProfile(TbContext ctx, DeviceProfileId deviceProfileId) throws ExecutionException, InterruptedException {
         DeviceProfile deviceProfile = cache.get(ctx.getTenantId(), deviceProfileId);
         if (deviceProfile != null) {
@@ -198,19 +253,33 @@ public class TbDeviceProfileNode implements TbNode {
         }
     }
 
+    /**
+     * 方法说明：执行 `onProfileUpdate` 对应的辅助逻辑，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected void onProfileUpdate(DeviceProfile profile) {
+        // 通过规则引擎上下文安排后续消息投递或自身定时消息。
         ctx.tellSelf(TbMsg.newMsg(TbMsgType.DEVICE_PROFILE_UPDATE_SELF_MSG, ctx.getTenantId(), TbMsgMetaData.EMPTY, profile.getId().getId().toString()), 0L);
     }
 
+    /**
+     * 方法说明：执行 `onDeviceUpdate` 对应的辅助逻辑，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private void onDeviceUpdate(DeviceId deviceId, DeviceProfile deviceProfile) {
         ObjectNode msgData = JacksonUtil.newObjectNode();
         msgData.put("deviceId", deviceId.getId().toString());
         if (deviceProfile != null) {
             msgData.put("deviceProfileId", deviceProfile.getId().getId().toString());
         }
+        // 通过规则引擎上下文安排后续消息投递或自身定时消息。
         ctx.tellSelf(TbMsg.newMsg(TbMsgType.DEVICE_UPDATE_SELF_MSG, ctx.getTenantId(), TbMsgMetaData.EMPTY, JacksonUtil.toString(msgData)), 0L);
     }
 
+    /**
+     * 方法说明：校验配置或数据是否满足节点要求，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected void invalidateDeviceProfileCache(DeviceId deviceId, String deviceJson) {
         DeviceState deviceState = deviceStates.get(deviceId);
         if (deviceState != null) {
@@ -226,6 +295,10 @@ public class TbDeviceProfileNode implements TbNode {
         }
     }
 
+    /**
+     * 方法说明：校验配置或数据是否满足节点要求，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected void invalidateDeviceProfileCache(DeviceId deviceId, DeviceProfileId deviceProfileId) {
         DeviceState deviceState = deviceStates.get(deviceId);
         if (deviceState != null) {
@@ -235,10 +308,18 @@ public class TbDeviceProfileNode implements TbNode {
         }
     }
 
+    /**
+     * 方法说明：从集合、缓存或配置结构中移除数据，供 `TbDeviceProfileNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private void removeDeviceState(DeviceId deviceId) {
         DeviceState state = deviceStates.remove(deviceId);
         if (config.isPersistAlarmRulesState() && (state != null || !config.isFetchAlarmRulesStateOnStart())) {
             ctx.removeRuleNodeStateForEntity(deviceId);
         }
     }
+    /*
+     * 本类总结：`TbDeviceProfileNode` 负责维护设备配置、告警规则、快照和设备运行状态；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

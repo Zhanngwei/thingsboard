@@ -47,20 +47,38 @@ import org.thingsboard.server.common.msg.TbMsg;
         configDirective = "tbActionNodeClearAlarmConfig",
         icon = "notifications_off"
 )
+/**
+ * 中文说明：`TbClearAlarmNode` 是清除告警节点规则节点，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
+ * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
+ * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
+ * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
+ * 配置对象：`TbClearAlarmNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
+ * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ */
 public class TbClearAlarmNode extends TbAbstractAlarmNode<TbClearAlarmNodeConfiguration> {
 
     @Override
+    /**
+     * 方法说明：加载或解析本类处理所需的配置、实体或辅助数据，供 `TbClearAlarmNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected TbClearAlarmNodeConfiguration loadAlarmNodeConfig(TbNodeConfiguration configuration) throws TbNodeException {
         return TbNodeUtils.convert(configuration, TbClearAlarmNodeConfiguration.class);
     }
 
     @Override
+    /**
+     * 方法说明：执行本类核心处理流程，供 `TbClearAlarmNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AlarmService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     protected ListenableFuture<TbAlarmResult> processAlarm(TbContext ctx, TbMsg msg) {
         String alarmType = TbNodeUtils.processPattern(this.config.getAlarmType(), msg);
         Alarm alarm;
         if (msg.getOriginator().getEntityType().equals(EntityType.ALARM)) {
+            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             alarm = ctx.getAlarmService().findAlarmById(ctx.getTenantId(), new AlarmId(msg.getOriginator().getId()));
         } else {
+            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             alarm = ctx.getAlarmService().findLatestActiveByOriginatorAndType(ctx.getTenantId(), msg.getOriginator(), alarmType);
         }
         if (alarm != null && !alarm.getStatus().isCleared()) {
@@ -69,9 +87,14 @@ public class TbClearAlarmNode extends TbAbstractAlarmNode<TbClearAlarmNodeConfig
         return Futures.immediateFuture(new TbAlarmResult(false, false, false, null));
     }
 
+    /**
+     * 方法说明：清除告警或本地状态，供 `TbClearAlarmNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AlarmService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private ListenableFuture<TbAlarmResult> clearAlarm(TbContext ctx, TbMsg msg, Alarm alarm) {
         ctx.logJsEvalRequest();
         ListenableFuture<JsonNode> asyncDetails = buildAlarmDetails(msg, alarm.getDetails());
+        // 异步聚合或转换服务返回值，完成后再继续规则链处理。
         return Futures.transform(asyncDetails, details -> {
             ctx.logJsEvalResponse();
             AlarmApiCallResult result = ctx.getAlarmService().clearAlarm(ctx.getTenantId(), alarm.getId(), System.currentTimeMillis(), details);
@@ -82,4 +105,8 @@ public class TbClearAlarmNode extends TbAbstractAlarmNode<TbClearAlarmNodeConfig
             }
         }, ctx.getDbCallbackExecutor());
     }
+    /*
+     * 本类总结：`TbClearAlarmNode` 负责执行告警、客户归属、关系、设备状态、日志或外部存储等动作；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

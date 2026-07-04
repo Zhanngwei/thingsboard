@@ -59,17 +59,36 @@ import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
+/**
+ * 测试目标：验证 {@code TbHttpClientTest} 覆盖的 REST 调用组件 行为，重点说明配置、消息和断言路径。
+ * 所属生产节点/组件：{@code TbHttpClient}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
+ * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
+ * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
+ * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ */
 public class TbHttpClientTest {
 
+    /** 可变 fixture 字段：{@code eventLoop} 保存 {@code EventLoopGroup} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
     EventLoopGroup eventLoop;
+    /** 可变 fixture 字段：{@code client} 保存 {@code TbHttpClient} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
     TbHttpClient client;
 
+    /**
+     * 生命周期方法：{@code setUp} 在 JUnit 用例前后准备或清理测试环境。
+     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     @BeforeEach
     public void setUp() throws Exception {
         client = mock(TbHttpClient.class);
         when(client.getSharedOrCreateEventLoopGroup(any())).thenCallRealMethod();
     }
 
+    /**
+     * 生命周期方法：{@code tearDown} 在 JUnit 用例前后准备或清理测试环境。
+     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     @AfterEach
     public void tearDown() throws Exception {
         if (eventLoop != null) {
@@ -77,42 +96,90 @@ public class TbHttpClientTest {
         }
     }
 
+    /**
+     * 测试方法：覆盖 {@code givenSharedEventLoop_whenGetEventLoop_ThenReturnShared} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void givenSharedEventLoop_whenGetEventLoop_ThenReturnShared() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         eventLoop = mock(EventLoopGroup.class);
         assertThat(client.getSharedOrCreateEventLoopGroup(eventLoop), is(eventLoop));
     }
 
+    /**
+     * 测试方法：覆盖 {@code givenNull_whenGetEventLoop_ThenReturnShared} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void givenNull_whenGetEventLoop_ThenReturnShared() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         eventLoop = client.getSharedOrCreateEventLoopGroup(null);
         assertThat(eventLoop, instanceOf(NioEventLoopGroup.class));
     }
 
+    /**
+     * 测试方法：覆盖 {@code testBuildSimpleUri} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testBuildSimpleUri() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Mockito.when(client.buildEncodedUri(any())).thenCallRealMethod();
         String url = "http://localhost:8080/";
         URI uri = client.buildEncodedUri(url);
         Assertions.assertEquals(url, uri.toString());
     }
 
+    /**
+     * 测试方法：覆盖 {@code testBuildUriWithoutProtocol} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testBuildUriWithoutProtocol() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Mockito.when(client.buildEncodedUri(any())).thenCallRealMethod();
         String url = "localhost:8080/";
         assertThatThrownBy(() -> client.buildEncodedUri(url));
     }
 
+    /**
+     * 测试方法：覆盖 {@code testBuildInvalidUri} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testBuildInvalidUri() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Mockito.when(client.buildEncodedUri(any())).thenCallRealMethod();
         String url = "aaa";
         assertThatThrownBy(() -> client.buildEncodedUri(url));
     }
 
+    /**
+     * 测试方法：覆盖 {@code testBuildUriWithSpecialSymbols} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testBuildUriWithSpecialSymbols() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Mockito.when(client.buildEncodedUri(any())).thenCallRealMethod();
         String url = "http://192.168.1.1/data?d={\"a\": 12}";
         String expected = "http://192.168.1.1/data?d=%7B%22a%22:%2012%7D";
@@ -120,8 +187,16 @@ public class TbHttpClientTest {
         Assertions.assertEquals(expected, uri.toString());
     }
 
+    /**
+     * 测试方法：覆盖 {@code testProcessMessageWithJsonInUrlVariable} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testProcessMessageWithJsonInUrlVariable() throws Exception {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         String host = "localhost";
         String path = "/api";
         String paramKey = "data";
@@ -188,12 +263,22 @@ public class TbHttpClientTest {
         Assertions.assertEquals(successResponseBody, capturedData.getValue());
     }
 
+    /**
+     * 辅助方法：{@code setUpDummyServer} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     private ClientAndServer setUpDummyServer(String host, String path, String paramKey, String paramVal, String successResponseBody) {
         var server = startClientAndServer(host, 1080);
         createGetMethodExpectations(server, path, paramKey, paramVal, successResponseBody);
         return server;
     }
 
+    /**
+     * 辅助方法：{@code createGetMethodExpectations} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     private void createGetMethodExpectations(ClientAndServer server, String path, String paramKey, String paramVal, String successResponseBody) {
         server.when(
                 request()
@@ -207,8 +292,16 @@ public class TbHttpClientTest {
         );
     }
 
+    /**
+     * 测试方法：覆盖 {@code testHeadersToMetaData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testHeadersToMetaData() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Map<String, List<String>> headers = new LinkedMultiValueMap<>();
         headers.put("Content-Type", List.of("binary"));
         headers.put("Set-Cookie", List.of("sap-context=sap-client=075; path=/", "sap-token=sap-client=075; path=/"));
@@ -231,6 +324,11 @@ public class TbHttpClientTest {
             "First line\nSecond line\n\nFourth line", "Before\rAfter", "Tab\tSeparated\tValues", "Test\bbackspace", "[]",
             "[1, 2, 3]", "{\"key\": \"value\"}", "{\n\"temperature\": 25.5,\n\"humidity\": 50.2\n\"}", "Expression: (a + b) * c",
             "世界", "Україна", "\u1F1FA\u1F1E6", "🇺🇦"})
+    /**
+     * 辅助方法：{@code testParseJsonStringToPlainText} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     public void testParseJsonStringToPlainText(String original) {
         Mockito.when(client.parseJsonStringToPlainText(anyString())).thenCallRealMethod();
 
@@ -239,3 +337,7 @@ public class TbHttpClientTest {
         Assertions.assertEquals(original, client.parseJsonStringToPlainText(serialized));
     }
 }
+/*
+ * 本类总结：{@code TbHttpClientTest} 为 {@code TbHttpClient} 的 REST 调用组件 测试提供中文注释，说明测试目标、fixture 生命周期、Mock 来源和断言流程。
+ * 本文件中的数据库、缓存、MQTT、Actor 或完整 Rule Engine 运行时均不由测试本身直接启动；相关行为通过 Mock、内存 fixture 或被测生产逻辑间接覆盖。
+ */

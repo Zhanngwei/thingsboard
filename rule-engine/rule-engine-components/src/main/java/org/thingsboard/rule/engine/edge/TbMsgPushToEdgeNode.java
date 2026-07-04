@@ -64,10 +64,21 @@ import java.util.UUID;
         icon = "cloud_download",
         ruleChainTypes = RuleChainType.CORE
 )
+/**
+ * Cloud 侧推送到 Edge 的节点，把消息转换为 EdgeEvent 并保存到 Edge 队列。
+ * 本类不直接通过网络推送到 Edge；外部同步由 EdgeEventService 保存后触发的 Edge 通知链路完成。
+ */
 public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNodeConfiguration, EdgeEvent, EdgeEventType> {
 
+    /**
+     * 查询实体关联 Edge 时使用的默认分页大小。
+     */
     static final int DEFAULT_PAGE_SIZE = 100;
 
+    /**
+     * 构造 EdgeEvent 对象。
+     * 本方法只填充本地事件字段，不直接保存数据库或触发远端同步。
+     */
     @Override
     EdgeEvent buildEvent(TenantId tenantId, EdgeEventActionType eventAction, UUID entityId,
                          EdgeEventType eventType, JsonNode entityBody) {
@@ -80,26 +91,45 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
         return edgeEvent;
     }
 
+    /**
+     * 将实体类型映射为 EdgeEventType。
+     * 本方法只调用工具类进行本地映射，不直接访问数据库或缓存。
+     */
     @Override
     EdgeEventType getEventTypeByEntityType(EntityType entityType) {
         return EdgeUtils.getEdgeEventTypeByEntityType(entityType);
     }
 
+    /**
+     * 返回告警消息对应的 EdgeEventType。
+     */
     @Override
     EdgeEventType getAlarmEventType() {
         return EdgeEventType.ALARM;
     }
 
+    /**
+     * 返回需要忽略的消息来源，避免处理来自 Edge 的回流消息。
+     */
     @Override
     String getIgnoredMessageSource() {
         return DataConstants.EDGE_MSG_SOURCE;
     }
 
+    /**
+     * 返回 Push to Edge 节点配置类。
+     * 本方法只用于配置转换，不直接访问数据库或缓存。
+     */
     @Override
     protected Class<TbMsgPushToEdgeNodeConfiguration> getConfigClazz() {
         return TbMsgPushToEdgeNodeConfiguration.class;
     }
 
+    /**
+     * 将消息保存为一个或多个 EdgeEvent，并根据保存结果路由消息。
+     * 如果 originator 本身是 EDGE，则保存到该 Edge；否则查询关联 Edge 并分别保存。
+     * 本方法直接进入 EdgeEventService/EdgeService 调用链，数据库和缓存可能在这些服务内部涉及。
+     */
     @Override
     protected void processMsg(TbContext ctx, TbMsg msg) {
         try {
@@ -108,11 +138,19 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                 EdgeId edgeId = new EdgeId(msg.getOriginator().getId());
                 ListenableFuture<Void> future = notifyEdge(ctx, edgeEvent, edgeId);
                 FutureCallback<Void> futureCallback = new FutureCallback<>() {
+                    /**
+                     * 单个 EdgeEvent 保存成功后路由 Success。
+                     * 本回调运行在 dbCallbackExecutor 上。
+                     */
                     @Override
                     public void onSuccess(@Nullable Void result) {
                         ctx.tellSuccess(msg);
                     }
 
+                    /**
+                     * 单个 EdgeEvent 保存失败后路由 Failure。
+                     * 失败通常来自数据库持久化或 EdgeEventService 调用链。
+                     */
                     @Override
                     public void onFailure(Throwable t) {
                         ctx.tellFailure(msg, t);
@@ -124,6 +162,7 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                 PageDataIterableByTenantIdEntityId<EdgeId> edgeIds = new PageDataIterableByTenantIdEntityId<>(
                         ctx.getEdgeService()::findRelatedEdgeIdsByEntityId, ctx.getTenantId(), msg.getOriginator(), DEFAULT_PAGE_SIZE);
                 for (EdgeId edgeId : edgeIds) {
+                    // 对每个关联 Edge 单独构造并保存事件，全部成功后才走 Success。
                     EdgeEvent edgeEvent = buildEvent(msg, ctx);
                     futures.add(notifyEdge(ctx, edgeEvent, edgeId));
                 }
@@ -133,11 +172,17 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                     ctx.ack(msg);
                 } else {
                     Futures.addCallback(Futures.allAsList(futures), new FutureCallback<>() {
+                        /**
+                         * 所有关联 EdgeEvent 保存成功后路由 Success。
+                         */
                         @Override
                         public void onSuccess(@Nullable List<Void> voids) {
                             ctx.tellSuccess(msg);
                         }
 
+                        /**
+                         * 任一关联 EdgeEvent 保存失败后路由 Failure。
+                         */
                         @Override
                         public void onFailure(Throwable t) {
                             ctx.tellFailure(msg, t);
@@ -151,6 +196,10 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
         }
     }
 
+    /**
+     * 保存 EdgeEvent 并触发 Edge 更新通知。
+     * 本方法直接调用 EdgeEventService.saveAsync，属于数据库/持久化边界；转换回调运行在 dbCallbackExecutor。
+     */
     private ListenableFuture<Void> notifyEdge(TbContext ctx, EdgeEvent edgeEvent, EdgeId edgeId) {
         edgeEvent.setEdgeId(edgeId);
         ListenableFuture<Void> future = ctx.getEdgeEventService().saveAsync(edgeEvent);
@@ -160,3 +209,10 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
         }, ctx.getDbCallbackExecutor());
     }
 }
+
+/*
+ * 本类总结：
+ * 本类把 Cloud 侧消息转换为 EdgeEvent，并保存到一个或多个 Edge 的事件队列。
+ * 它不直接向 Edge 发起网络推送；EdgeEventService.saveAsync 和 onEdgeEventUpdate 触发后续同步，数据库/缓存可能在服务调用链中涉及。
+ * 成功和失败路由由 dbCallbackExecutor 上的异步回调决定。
+ */

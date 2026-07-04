@@ -36,8 +36,20 @@ import org.thingsboard.server.common.data.id.UserId;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 
+/**
+ * 异步加载实体字段数据的工具类。
+ * 本类按实体类型调用对应服务并转换为 EntityFieldsData；数据库读取、缓存读取和服务层线程模型由 TbContext 暴露的服务实现决定。
+ */
 public class EntitiesFieldsAsyncLoader {
 
+    /**
+     * 根据来源实体 ID 异步加载可用于规则处理的实体字段。
+     * 本方法不直接发送、确认或修改 Rule Engine 消息；它只返回 Future 供调用方在消息流中继续使用。
+     *
+     * @param ctx 规则节点上下文，提供租户、实体服务和数据库回调执行器
+     * @param originatorId 当前消息来源实体 ID
+     * @return EntityFieldsData 的异步结果
+     */
     public static ListenableFuture<EntityFieldsData> findAsync(TbContext ctx, EntityId originatorId) {
         switch (originatorId.getEntityType()) {  // TODO: use EntityServiceRegistry
             case TENANT:
@@ -72,6 +84,16 @@ public class EntitiesFieldsAsyncLoader {
         }
     }
 
+    /**
+     * 将服务层异步读取到的实体转换为 EntityFieldsData。
+     * 回调在 ctx.getDbCallbackExecutor() 上执行；实体不存在时返回失败 Future，调用方需要在 Rule Engine 消息流中处理该失败。
+     *
+     * @param future 服务层实体异步读取结果
+     * @param converter 实体到字段数据的转换函数
+     * @param ctx 规则节点上下文，提供数据库回调执行器
+     * @param <T> 带 UUID 主键的实体类型
+     * @return EntityFieldsData 的异步结果
+     */
     private static <T extends BaseData<? extends UUIDBased>> ListenableFuture<EntityFieldsData> toEntityFieldsDataAsync(
             ListenableFuture<T> future,
             Function<T, EntityFieldsData> converter,
@@ -83,3 +105,8 @@ public class EntitiesFieldsAsyncLoader {
     }
 
 }
+
+/*
+ * 本类总结：
+ * 本类是实体字段异步加载 helper，不保存共享状态；服务读取可能落到数据库或缓存，Future 回调和失败传播由调用方接入 Rule Engine 消息流。
+ */

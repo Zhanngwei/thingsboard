@@ -82,14 +82,35 @@ import static org.thingsboard.rule.engine.math.TbMathArgumentType.CONSTANT;
         icon = "calculate"
 
 )
+/**
+ * 中文说明：`TbMathNode` 是数学节点规则节点，用于解析数学参数、计算结果并可写回消息、属性或时间序列。
+ * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
+ * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
+ * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
+ * 配置对象：`TbMathNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
+ * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ */
 public class TbMathNode implements TbNode {
 
     private static final ConcurrentMap<EntityId, SemaphoreWithQueue<TbMsgTbContextBiFunction>> locks = new ConcurrentReferenceHashMap<>(16, ConcurrentReferenceHashMap.ReferenceType.WEAK);
+    /**
+     * 字段说明：保存 `customExpression`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     */
     private final ThreadLocal<Expression> customExpression = new ThreadLocal<>();
+    /**
+     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     */
     private TbMathNodeConfiguration config;
+    /**
+     * 字段说明：保存 `msgBodyToJsonConversionRequired`，表示JavaScript 脚本文本，供本类方法在规则节点处理流程中使用。
+     */
     private boolean msgBodyToJsonConversionRequired;
 
     @Override
+    /**
+     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
+     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = TbNodeUtils.convert(configuration, TbMathNodeConfiguration.class);
         var operation = config.getOperation();
@@ -109,6 +130,11 @@ public class TbMathNode implements TbNode {
     }
 
     @Override
+    /**
+     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
+     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
+     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void onMsg(TbContext ctx, TbMsg msg) {
         var semaphoreWithQueue = locks.computeIfAbsent(msg.getOriginator(), SemaphoreWithQueue::new);
         semaphoreWithQueue.getQueue().add(new TbMsgTbContextBiFunction(msg, ctx, this::processMsgAsync));
@@ -116,12 +142,17 @@ public class TbMathNode implements TbNode {
         tryProcessQueue(semaphoreWithQueue);
     }
 
+    /**
+     * 方法说明：执行本类核心处理流程，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     void tryProcessQueue(SemaphoreWithQueue<TbMsgTbContextBiFunction> lockAndQueue) {
         final Semaphore semaphore = lockAndQueue.getSemaphore();
         final Queue<TbMsgTbContextBiFunction> queue = lockAndQueue.getQueue();
         while (!queue.isEmpty()) {
             // The semaphore have to be acquired before EACH poll and released before NEXT poll.
             // Otherwise, some message will remain unprocessed in queue
+            // 信号量用于按实体串行化处理，避免同一发起实体的计算并发交错。
             if (!semaphore.tryAcquire()) {
                 return;
             }
@@ -141,6 +172,7 @@ public class TbMathNode implements TbNode {
                 //DO PROCESSING
                 final TbContext ctx = tbMsgTbContext.getCtx();
                 final ListenableFuture<TbMsg> resultMsgFuture = tbMsgTbContext.getBiFunction().apply(ctx, msg);
+                // 异步回调用于把服务或转换结果映射为规则链成功/失败关系。
                 DonAsynchron.withCallback(resultMsgFuture, resultMsg -> {
                     try {
                         ctx.tellSuccess(resultMsg);
@@ -172,16 +204,26 @@ public class TbMathNode implements TbNode {
         }
     }
 
+    /**
+     * 方法说明：执行本类核心处理流程，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     ListenableFuture<TbMsg> processMsgAsync(TbContext ctx, TbMsg msg) {
         var arguments = config.getArguments();
         Optional<ObjectNode> msgBodyOpt = convertMsgBodyIfRequired(msg);
+        // 异步聚合或转换服务返回值，完成后再继续规则链处理。
         var argumentValues = Futures.allAsList(arguments.stream()
                 .map(arg -> resolveArguments(ctx, msg, msgBodyOpt, arg)).collect(Collectors.toList()));
+        // 异步串联后续服务调用，避免阻塞当前规则节点处理线程。
         ListenableFuture<TbMsg> resultMsgFuture = Futures.transformAsync(argumentValues, args ->
                 updateMsgAndDb(ctx, msg, msgBodyOpt, calculateResult(args)), ctx.getDbCallbackExecutor());
         return resultMsgFuture;
     }
 
+    /**
+     * 方法说明：执行 `updateMsgAndDb` 对应的辅助逻辑，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private ListenableFuture<TbMsg> updateMsgAndDb(TbContext ctx, TbMsg msg, Optional<ObjectNode> msgBodyOpt, double result) {
         TbMathResult mathResultDef = config.getResult();
         String mathResultKey = getKeyFromTemplate(msg, mathResultDef.getType(), mathResultDef.getKey());
@@ -192,46 +234,75 @@ public class TbMathNode implements TbNode {
                 return Futures.immediateFuture(addToMeta(msg, mathResultDef, mathResultKey, result));
             case ATTRIBUTE:
                 ListenableFuture<Void> attrSave = saveAttribute(ctx, msg, result, mathResultDef);
+                // 异步聚合或转换服务返回值，完成后再继续规则链处理。
                 return Futures.transform(attrSave, attr -> addToBodyAndMeta(msg, msgBodyOpt, result, mathResultDef, mathResultKey), ctx.getDbCallbackExecutor());
             case TIME_SERIES:
                 ListenableFuture<Void> tsSave = saveTimeSeries(ctx, msg, result, mathResultDef);
+                // 异步聚合或转换服务返回值，完成后再继续规则链处理。
                 return Futures.transform(tsSave, ts -> addToBodyAndMeta(msg, msgBodyOpt, result, mathResultDef, mathResultKey), ctx.getDbCallbackExecutor());
             default:
                 throw new RuntimeException("Result type is not supported: " + mathResultDef.getType() + "!");
         }
     }
 
+    /**
+     * 方法说明：通过服务层保存实体、属性、遥测或关系数据，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `TelemetryService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private ListenableFuture<Void> saveTimeSeries(TbContext ctx, TbMsg msg, double result, TbMathResult mathResultDef) {
 
+        // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
         return ctx.getTelemetryService().saveAndNotify(ctx.getTenantId(), msg.getOriginator(),
                 new BasicTsKvEntry(System.currentTimeMillis(), new DoubleDataEntry(mathResultDef.getKey(), result)));
     }
 
+    /**
+     * 方法说明：通过服务层保存实体、属性、遥测或关系数据，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `TelemetryService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private ListenableFuture<Void> saveAttribute(TbContext ctx, TbMsg msg, double result, TbMathResult mathResultDef) {
         String attributeScope = getAttributeScope(mathResultDef.getAttributeScope());
         if (isIntegerResult(mathResultDef, config.getOperation())) {
             var value = toIntValue(result);
+            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             return ctx.getTelemetryService().saveAttrAndNotify(
                     ctx.getTenantId(), msg.getOriginator(), attributeScope, mathResultDef.getKey(), value);
         } else {
             var value = toDoubleValue(mathResultDef, result);
+            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             return ctx.getTelemetryService().saveAttrAndNotify(
                     ctx.getTenantId(), msg.getOriginator(), attributeScope, mathResultDef.getKey(), value);
         }
     }
 
+    /**
+     * 方法说明：执行 `isIntegerResult` 对应的辅助逻辑，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private boolean isIntegerResult(TbMathResult mathResultDef, TbRuleNodeMathFunctionType function) {
         return function.isIntegerResult() || mathResultDef.getResultValuePrecision() == 0;
     }
 
+    /**
+     * 方法说明：执行 `toIntValue` 对应的辅助逻辑，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private long toIntValue(double value) {
         return (long) value;
     }
 
+    /**
+     * 方法说明：执行 `toDoubleValue` 对应的辅助逻辑，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private double toDoubleValue(TbMathResult mathResultDef, double value) {
         return BigDecimal.valueOf(value).setScale(mathResultDef.getResultValuePrecision(), RoundingMode.HALF_UP).doubleValue();
     }
 
+    /**
+     * 方法说明：执行消息体、配置或数据类型转换，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private Optional<ObjectNode> convertMsgBodyIfRequired(TbMsg msg) {
         Optional<ObjectNode> msgBodyOpt;
         if (msgBodyToJsonConversionRequired) {
@@ -247,6 +318,10 @@ public class TbMathNode implements TbNode {
         return msgBodyOpt;
     }
 
+    /**
+     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private TbMsg addToBodyAndMeta(TbMsg msg, Optional<ObjectNode> msgBodyOpt, double result, TbMathResult mathResultDef, String mathResultKey) {
         TbMsg tmpMsg = msg;
         if (mathResultDef.isAddToBody()) {
@@ -258,6 +333,10 @@ public class TbMathNode implements TbNode {
         return tmpMsg;
     }
 
+    /**
+     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private TbMsg addToBody(TbMsg msg, TbMathResult mathResultDef, String mathResultKey, Optional<ObjectNode> msgBodyOpt, double result) {
         ObjectNode body = msgBodyOpt.get();
         if (isIntegerResult(mathResultDef, config.getOperation())) {
@@ -268,6 +347,10 @@ public class TbMathNode implements TbNode {
         return TbMsg.transformMsgData(msg, JacksonUtil.toString(body));
     }
 
+    /**
+     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private TbMsg addToMeta(TbMsg msg, TbMathResult mathResultDef, String mathResultKey, double result) {
         var md = msg.getMetaData();
         if (isIntegerResult(mathResultDef, config.getOperation())) {
@@ -278,6 +361,10 @@ public class TbMathNode implements TbNode {
         return TbMsg.transformMsgMetadata(msg, md);
     }
 
+    /**
+     * 方法说明：执行数学或业务结果计算，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private double calculateResult(List<TbMathArgumentValue> args) {
         switch (config.getOperation()) {
             case ADD:
@@ -366,14 +453,26 @@ public class TbMathNode implements TbNode {
         }
     }
 
+    /**
+     * 方法说明：把函数应用到已解析的参数值，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private double apply(TbMathArgumentValue arg, Function<Double, Double> function) {
         return function.apply(arg.getValue());
     }
 
+    /**
+     * 方法说明：把函数应用到已解析的参数值，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private double apply(TbMathArgumentValue arg1, TbMathArgumentValue arg2, BiFunction<Double, Double, Double> function) {
         return function.apply(arg1.getValue(), arg2.getValue());
     }
 
+    /**
+     * 方法说明：解析配置模板、消息字段或参数值，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AttributesService`, `TimeseriesService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     ListenableFuture<TbMathArgumentValue> resolveArguments(TbContext ctx, TbMsg msg, Optional<ObjectNode> msgBodyOpt, TbMathArgument arg) {
         String argKey = getKeyFromTemplate(msg, arg.getType(), arg.getKey());
         switch (arg.getType()) {
@@ -385,10 +484,12 @@ public class TbMathNode implements TbNode {
                 return Futures.immediateFuture(TbMathArgumentValue.fromMessageMetadata(arg, argKey, msg.getMetaData()));
             case ATTRIBUTE:
                 String scope = getAttributeScope(arg.getAttributeScope());
+                // 异步聚合或转换服务返回值，完成后再继续规则链处理。
                 return Futures.transform(ctx.getAttributesService().find(ctx.getTenantId(), msg.getOriginator(), scope, argKey),
                         opt -> getTbMathArgumentValue(arg, opt, "Attribute: " + argKey + " with scope: " + scope + " not found for entity: " + msg.getOriginator())
                         , MoreExecutors.directExecutor());
             case TIME_SERIES:
+                // 异步聚合或转换服务返回值，完成后再继续规则链处理。
                 return Futures.transform(ctx.getTimeseriesService().findLatest(ctx.getTenantId(), msg.getOriginator(), argKey),
                         opt -> getTbMathArgumentValue(arg, opt, "Time-series: " + argKey + " not found for entity: " + msg.getOriginator())
                         , MoreExecutors.directExecutor());
@@ -398,14 +499,26 @@ public class TbMathNode implements TbNode {
 
     }
 
+    /**
+     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private String getKeyFromTemplate(TbMsg msg, TbMathArgumentType type, String keyPattern) {
         return CONSTANT.equals(type) ? keyPattern : TbNodeUtils.processPattern(keyPattern, msg);
     }
 
+    /**
+     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private String getAttributeScope(String attrScope) {
         return StringUtils.isEmpty(attrScope) ? DataConstants.SERVER_SCOPE : attrScope;
     }
 
+    /**
+     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbMathNode` 的规则节点处理或辅助流程调用。
+     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     private TbMathArgumentValue getTbMathArgumentValue(TbMathArgument arg, Optional<? extends KvEntry> kvOpt, String error) {
         if (kvOpt != null && kvOpt.isPresent()) {
             var kv = kvOpt.get();
@@ -427,23 +540,54 @@ public class TbMathNode implements TbNode {
     }
 
     @Override
+    /**
+     * 方法说明：在节点生命周期销毁阶段释放缓存、脚本引擎、监听器或本地状态。
+     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     */
     public void destroy() {
     }
 
     @Data
     @RequiredArgsConstructor
+    /**
+     * 中文说明：`SemaphoreWithQueue` 是SemaphoreWithQueue辅助类，用于解析数学参数、计算结果并可写回消息、属性或时间序列。
+     * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+     */
     static public class SemaphoreWithQueue<T> {
+        /**
+         * 字段说明：保存 `entityId`，表示目标实体类型、名称或标识，供本类方法在规则节点处理流程中使用。
+         */
         final EntityId entityId;
+        /**
+         * 字段说明：保存 `semaphore` 本地缓存、队列或并发状态，用于协调本类处理流程。
+         */
         final Semaphore semaphore = new Semaphore(1);
+        /**
+         * 字段说明：保存 `queue` 本地缓存、队列或并发状态，用于协调本类处理流程。
+         */
         final Queue<T> queue = new ConcurrentLinkedQueue<>();
     }
 
     @Data
     @RequiredArgsConstructor
+    /**
+     * 中文说明：`TbMsgTbContextBiFunction` 是消息上下文Bi函数辅助类，用于解析数学参数、计算结果并可写回消息、属性或时间序列。
+     * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+     */
     static public class TbMsgTbContextBiFunction {
+        /**
+         * 字段说明：保存 `msg`，表示当前规则链消息，供本类方法在规则节点处理流程中使用。
+         */
         final TbMsg msg;
+        /**
+         * 字段说明：保存 Rule Engine 上下文引用；本字段本身不直接代表数据库、MQTT 或事务资源。
+         */
         final TbContext ctx;
         final BiFunction<TbContext, TbMsg, ListenableFuture<TbMsg>> biFunction;
     }
 
+    /*
+     * 本类总结：`TbMathNode` 负责解析数学参数、计算结果并可写回消息、属性或时间序列；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
+     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
+     */
 }

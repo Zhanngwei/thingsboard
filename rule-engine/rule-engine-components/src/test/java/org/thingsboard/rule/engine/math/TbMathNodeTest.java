@@ -88,27 +88,50 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * 测试目标：验证 {@code TbMathNodeTest} 覆盖的 数学计算节点 行为，重点说明配置、消息和断言路径。
+ * 所属生产节点/组件：{@code TbMathNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
+ * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
+ * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
+ * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ */
 @Slf4j
 @ExtendWith(MockitoExtension.class)
 public class TbMathNodeTest {
 
+    /** 测试常量字段：{@code RULE_DISPATCHER_POOL_SIZE} 保存 {@code int} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
     static final int RULE_DISPATCHER_POOL_SIZE = 2;
+    /** 测试常量字段：{@code DB_CALLBACK_POOL_SIZE} 保存 {@code int} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
     static final int DB_CALLBACK_POOL_SIZE = 3;
+    /** 测试常量字段：{@code TIMEOUT} 保存 {@code long} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
     static final long TIMEOUT = TimeUnit.SECONDS.toMillis(5);
+    /** 固定 fixture 字段：{@code originator} 保存 {@code EntityId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
     private final EntityId originator = DeviceId.fromString("ccd71696-0586-422d-940e-755a41ec3b0d");
+    /** 固定 fixture 字段：{@code tenantId} 保存 {@code TenantId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
     private final TenantId tenantId = TenantId.fromUUID(UUID.fromString("e7f46b23-0c7d-42f5-9b06-fc35ab17af8a"));
 
+    /** Mock 依赖字段：{@code ctx} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
     @Mock(lenient = true)
     private TbContext ctx;
+    /** Mock 依赖字段：{@code attributesService} 保存 {@code AttributesService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
     @Mock
     private AttributesService attributesService;
+    /** Mock 依赖字段：{@code tsService} 保存 {@code TimeseriesService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
     @Mock
     private TimeseriesService tsService;
+    /** Mock 依赖字段：{@code telemetryService} 保存 {@code RuleEngineTelemetryService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
     @Mock
     private RuleEngineTelemetryService telemetryService;
+    /** 可变 fixture 字段：{@code dbCallbackExecutor} 保存 {@code AbstractListeningExecutor} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
     private AbstractListeningExecutor dbCallbackExecutor;
+    /** 可变 fixture 字段：{@code ruleEngineDispatcherExecutor} 保存 {@code AbstractListeningExecutor} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
     private AbstractListeningExecutor ruleEngineDispatcherExecutor;
 
+    /**
+     * 生命周期方法：{@code before} 在 JUnit 用例前后准备或清理测试环境。
+     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     @BeforeEach
     public void before() {
         dbCallbackExecutor = new DBCallbackExecutor();
@@ -123,28 +146,58 @@ public class TbMathNodeTest {
         willReturn(tenantId).given(ctx).getTenantId();
     }
 
+    /**
+     * 生命周期方法：{@code after} 在 JUnit 用例前后准备或清理测试环境。
+     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     @AfterEach
     public void after() {
         ruleEngineDispatcherExecutor.executor().shutdownNow();
         dbCallbackExecutor.executor().shutdownNow();
     }
 
+    /**
+     * 辅助方法：{@code initNode} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     private TbMathNode initNode(TbRuleNodeMathFunctionType operation, TbMathResult result, TbMathArgument... arguments) {
         return initNode(operation, null, result, arguments);
     }
 
+    /**
+     * 辅助方法：{@code initNodeWithCustomFunction} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     private TbMathNode initNodeWithCustomFunction(String expression, TbMathResult result, TbMathArgument... arguments) {
         return initNode(TbRuleNodeMathFunctionType.CUSTOM, expression, result, arguments);
     }
 
+    /**
+     * 辅助方法：{@code initNodeWithCustomFunction} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     private TbMathNode initNodeWithCustomFunction(TbContext ctx, String expression, TbMathResult result, TbMathArgument... arguments) {
         return initNode(ctx, TbRuleNodeMathFunctionType.CUSTOM, expression, result, arguments);
     }
 
+    /**
+     * 辅助方法：{@code initNode} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     private TbMathNode initNode(TbRuleNodeMathFunctionType operation, String expression, TbMathResult result, TbMathArgument... arguments) {
         return initNode(this.ctx, operation, expression, result, arguments);
     }
 
+    /**
+     * 辅助方法：{@code initNode} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
+     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
+     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     */
     private TbMathNode initNode(TbContext ctx, TbRuleNodeMathFunctionType operation, String expression, TbMathResult result, TbMathArgument... arguments) {
         try {
             TbMathNodeConfiguration configuration = new TbMathNodeConfiguration();
@@ -162,8 +215,16 @@ public class TbMathNodeTest {
         }
     }
 
+    /**
+     * 测试方法：覆盖 {@code testExp4j} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testExp4j() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNodeWithCustomFunction("2a+3b",
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "${key1}", 2, false, false, null),
                 new TbMathArgument("a", TbMathArgumentType.MESSAGE_BODY, "${key2}"),
@@ -205,6 +266,7 @@ public class TbMathNodeTest {
         }
     }
 
+    /** 参数源方法：{@code testSimpleTwoArgumentFunction} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
     private static Stream<Arguments> testSimpleTwoArgumentFunction() {
         return Stream.of(
                 Arguments.of(TbRuleNodeMathFunctionType.ADD, 2.1, 2.2, 4.3),
@@ -221,9 +283,17 @@ public class TbMathNodeTest {
         );
     }
 
+    /**
+     * 测试方法：覆盖 {@code testSimpleTwoArgumentFunction} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @ParameterizedTest
     @MethodSource
     public void testSimpleTwoArgumentFunction(TbRuleNodeMathFunctionType function, double arg1, double arg2, double result) {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(function,
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 2, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a"),
@@ -245,6 +315,7 @@ public class TbMathNodeTest {
         assertEquals(result, resultJson.get("result").asDouble(), 0d);
     }
 
+    /** 参数源方法：{@code testSimpleOneArgumentFunction} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
     private static Stream<Arguments> testSimpleOneArgumentFunction() {
         return Stream.of(
                 Arguments.of(TbRuleNodeMathFunctionType.SIN, Math.toRadians(30), 0.5),
@@ -285,9 +356,17 @@ public class TbMathNodeTest {
         );
     }
 
+    /**
+     * 测试方法：覆盖 {@code testSimpleOneArgumentFunction} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @ParameterizedTest
     @MethodSource
     public void testSimpleOneArgumentFunction(TbRuleNodeMathFunctionType function, double arg1, double result) {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(function,
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 2, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a")
@@ -308,8 +387,16 @@ public class TbMathNodeTest {
         assertEquals(result, resultJson.get("result").asDouble(), 0d);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_2_plus_2_body} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_2_plus_2_body() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.ADD,
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 2, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a"),
@@ -331,8 +418,16 @@ public class TbMathNodeTest {
         assertEquals(4, resultJson.get("result").asInt());
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_2_plus_2_meta} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_2_plus_2_meta() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.ADD,
                 new TbMathResult(TbMathArgumentType.MESSAGE_METADATA, "result", 0, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a"),
@@ -355,8 +450,16 @@ public class TbMathNodeTest {
         assertEquals("4", result);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_2_plus_2_attr_and_ts} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_2_plus_2_attr_and_ts() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.ADD,
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 2, false, false, null),
                 new TbMathArgument(TbMathArgumentType.ATTRIBUTE, "a"),
@@ -384,8 +487,16 @@ public class TbMathNodeTest {
         assertEquals(4, resultJson.get("result").asInt());
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_sqrt_5_body} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_sqrt_5_body() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 3, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a")
@@ -406,8 +517,16 @@ public class TbMathNodeTest {
         assertEquals(2.236, resultJson.get("result").asDouble(), 0.0);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_sqrt_5_meta} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_sqrt_5_meta() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
                 new TbMathResult(TbMathArgumentType.MESSAGE_METADATA, "result", 3, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a")
@@ -428,8 +547,16 @@ public class TbMathNodeTest {
         assertEquals("2.236", result);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_sqrt_5_to_attribute_and_metadata} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_sqrt_5_to_attribute_and_metadata() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
                 new TbMathResult(TbMathArgumentType.ATTRIBUTE, "result", 3, false, true, DataConstants.SERVER_SCOPE),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a")
@@ -454,8 +581,16 @@ public class TbMathNodeTest {
         assertEquals("2.236", result);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_sqrt_5_to_timeseries_and_data} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_sqrt_5_to_timeseries_and_data() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
                 new TbMathResult(TbMathArgumentType.TIME_SERIES, "result", 3, true, false, DataConstants.SERVER_SCOPE),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a")
@@ -479,8 +614,16 @@ public class TbMathNodeTest {
         assertEquals(2.236, resultJson.get("result").asDouble(), 0.0);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_sqrt_5_to_timeseries_and_metadata_and_data} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_sqrt_5_to_timeseries_and_metadata_and_data() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
                 new TbMathResult(TbMathArgumentType.TIME_SERIES, "result", 3, true, true, DataConstants.SERVER_SCOPE),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a")
@@ -509,8 +652,16 @@ public class TbMathNodeTest {
         assertEquals("2.236", resultMetadata);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_sqrt_5_default_value} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_sqrt_5_default_value() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         TbMathArgument tbMathArgument = new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "TestKey");
         tbMathArgument.setDefaultValue(5.0);
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
@@ -531,8 +682,16 @@ public class TbMathNodeTest {
         assertEquals("2.236", result);
     }
 
+    /**
+     * 测试方法：覆盖 {@code test_sqrt_5_default_value_failure} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void test_sqrt_5_default_value_failure() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
                 new TbMathResult(TbMathArgumentType.TIME_SERIES, "result", 3, true, false, DataConstants.SERVER_SCOPE),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "TestKey")
@@ -545,8 +704,16 @@ public class TbMathNodeTest {
         Assert.assertNotNull(tCaptor.getValue().getMessage());
     }
 
+    /**
+     * 测试方法：覆盖 {@code testConvertMsgBodyIfRequiredFailure} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testConvertMsgBodyIfRequiredFailure() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var node = initNode(TbRuleNodeMathFunctionType.SQRT,
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 3, true, false, DataConstants.SERVER_SCOPE),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a")
@@ -560,8 +727,16 @@ public class TbMathNodeTest {
         Assert.assertNotNull(tCaptor.getValue().getMessage());
     }
 
+    /**
+     * 测试方法：覆盖 {@code testExp4j_concurrent} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testExp4j_concurrent() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         TbMathNode node = spy(initNodeWithCustomFunction("2a+3b",
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 2, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a"),
@@ -628,8 +803,16 @@ public class TbMathNodeTest {
         verify(ctx, never()).tellFailure(any(), any());
     }
 
+    /**
+     * 测试方法：覆盖 {@code testExp4j_concurrentBySingleOriginator_processMsgAsyncException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testExp4j_concurrentBySingleOriginator_processMsgAsyncException() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         TbMathNode node = spy(initNodeWithCustomFunction("2a+3b",
                 new TbMathResult(TbMathArgumentType.MESSAGE_BODY, "result", 2, false, false, null),
                 new TbMathArgument(TbMathArgumentType.MESSAGE_BODY, "a"),
@@ -681,8 +864,16 @@ public class TbMathNodeTest {
 
     }
 
+    /**
+     * 测试方法：覆盖 {@code testExp4j_concurrentBySingleOriginator_SingleMsg_manyNodesWithDifferentOutput} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
+     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
+     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
+     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
+     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     */
     @Test
     public void testExp4j_concurrentBySingleOriginator_SingleMsg_manyNodesWithDifferentOutput() {
+        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         assertThat(RULE_DISPATCHER_POOL_SIZE).as("dispatcher pool size have to be > 1").isGreaterThan(1);
         CountDownLatch processingLatch = new CountDownLatch(1);
         List<Triple<TbContext, String, TbMathNode>> ctxNodes = IntStream.range(0, RULE_DISPATCHER_POOL_SIZE * 2)
@@ -737,14 +928,30 @@ public class TbMathNodeTest {
         verify(ctx, never()).tellFailure(any(), any());
     }
 
+    /**
+     * 测试目标：验证 {@code RuleDispatcherExecutor} 覆盖的 数学计算节点 行为，重点说明配置、消息和断言路径。
+     * 所属生产节点/组件：{@code RuleDispatcherExecutor}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
+     * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
+     * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
+     * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+     */
     static class RuleDispatcherExecutor extends AbstractListeningExecutor {
+        /** 实现方法：{@code getThreadPollSize} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
         @Override
         protected int getThreadPollSize() {
             return RULE_DISPATCHER_POOL_SIZE;
         }
     }
 
+    /**
+     * 测试目标：验证 {@code DBCallbackExecutor} 覆盖的 数学计算节点 行为，重点说明配置、消息和断言路径。
+     * 所属生产节点/组件：{@code DBCallbackExecutor}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
+     * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
+     * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
+     * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+     */
     static class DBCallbackExecutor extends AbstractListeningExecutor {
+        /** 实现方法：{@code getThreadPollSize} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
         @Override
         protected int getThreadPollSize() {
             return DB_CALLBACK_POOL_SIZE;
@@ -752,3 +959,7 @@ public class TbMathNodeTest {
     }
 
 }
+/*
+ * 本类总结：{@code TbMathNodeTest} 为 {@code TbMathNode} 的 数学计算节点 测试提供中文注释，说明测试目标、fixture 生命周期、Mock 来源和断言流程。
+ * 本文件中的数据库、缓存、MQTT、Actor 或完整 Rule Engine 运行时均不由测试本身直接启动；相关行为通过 Mock、内存 fixture 或被测生产逻辑间接覆盖。
+ */

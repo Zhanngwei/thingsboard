@@ -69,21 +69,60 @@ import java.util.function.Consumer;
 @Data
 @Slf4j
 @SuppressWarnings("deprecation")
+/**
+ * REST API 节点的 HTTP 客户端封装，负责构造 AsyncRestTemplate、发起异步请求并转换响应。
+ * 本类直接触达外部 HTTP 服务；本身不直接访问数据库或缓存，Rule Engine 后续路由通过回调传入。
+ */
 public class TbHttpClient {
 
+    /**
+     * HTTP 响应状态名称写入消息元数据时使用的键名。
+     */
     private static final String STATUS = "status";
+    /**
+     * HTTP 响应状态码写入消息元数据时使用的键名。
+     */
     private static final String STATUS_CODE = "statusCode";
+    /**
+     * HTTP 响应原因短语写入消息元数据时使用的键名。
+     */
     private static final String STATUS_REASON = "statusReason";
+    /**
+     * HTTP 异常写入消息元数据时使用的键名。
+     */
     private static final String ERROR = "error";
+    /**
+     * HTTP 非成功响应体或异常响应体写入消息元数据时使用的键名。
+     */
     private static final String ERROR_BODY = "error_body";
+    /**
+     * 使用系统代理但缺少必要 JVM 属性时的错误说明。
+     */
     private static final String ERROR_SYSTEM_PROPERTIES = "Didn't set any system proxy properties. Should be added next system proxy properties: \"http.proxyHost\" and \"http.proxyPort\" or  \"https.proxyHost\" and \"https.proxyPort\" or \"socksProxyHost\" and \"socksProxyPort\"";
 
+    /**
+     * REST 节点配置，包含 endpoint、方法、Header、代理、TLS 和并发限制。
+     */
     private final TbRestApiCallNodeConfiguration config;
 
+    /**
+     * 本客户端独占创建的 Netty 事件循环；使用共享事件循环时为空。
+     */
     private EventLoopGroup eventLoopGroup;
+    /**
+     * 实际执行异步 HTTP 请求的 Spring AsyncRestTemplate。
+     */
     private AsyncRestTemplate httpClient;
+    /**
+     * 用于限制并发请求数量的未完成 future 队列。
+     */
     private Deque<ListenableFuture<ResponseEntity<String>>> pendingFutures;
 
+    /**
+     * 根据配置创建 HTTP 客户端实现。
+     * 代理模式使用 Apache async client，简单模式使用默认 AsyncRestTemplate，默认模式使用 Netty4 客户端和配置凭据。
+     * 本构造方法不发起外部 HTTP 请求；数据库/缓存不在本类中直接涉及，凭据解析或系统属性读取可能由调用链间接完成。
+     */
     TbHttpClient(TbRestApiCallNodeConfiguration config, EventLoopGroup eventLoopGroupShared) throws TbNodeException {
         try {
             this.config = config;
@@ -110,7 +149,12 @@ public class TbHttpClient {
                     proxyPassword = System.getProperty("tb.proxy.password");
 
                     if (useAuth(proxyUser, proxyPassword)) {
+                        // 系统代理认证使用 JVM 全局 Authenticator，影响范围由底层 JDK HTTP 客户端决定。
                         Authenticator.setDefault(new Authenticator() {
+                            /**
+                             * 为系统代理认证提供用户名和密码。
+                             * 本方法由 JDK 认证流程回调，不直接访问数据库或缓存。
+                             */
                             protected PasswordAuthentication getPasswordAuthentication() {
                                 return new PasswordAuthentication(proxyUser, proxyPassword.toCharArray());
                             }
@@ -155,6 +199,10 @@ public class TbHttpClient {
         }
     }
 
+    /**
+     * 选择共享 EventLoopGroup，或在没有共享对象时创建本客户端独占事件循环。
+     * 本方法只管理 HTTP 客户端线程资源，不直接发起 REST 请求。
+     */
     EventLoopGroup getSharedOrCreateEventLoopGroup(EventLoopGroup eventLoopGroupShared) {
         if (eventLoopGroupShared != null) {
             return eventLoopGroupShared;
@@ -162,6 +210,10 @@ public class TbHttpClient {
         return this.eventLoopGroup = new NioEventLoopGroup();
     }
 
+    /**
+     * 校验 JVM 系统代理属性是否足够构造代理连接。
+     * 本方法只读取系统属性，不直接访问外部 HTTP 服务、数据库或缓存。
+     */
     private void checkSystemProxyProperties() throws TbNodeException {
         boolean useHttpProxy = !StringUtils.isEmpty(System.getProperty("http.proxyHost")) && !StringUtils.isEmpty(System.getProperty("http.proxyPort"));
         boolean useHttpsProxy = !StringUtils.isEmpty(System.getProperty("https.proxyHost")) && !StringUtils.isEmpty(System.getProperty("https.proxyPort"));
@@ -172,16 +224,29 @@ public class TbHttpClient {
         }
     }
 
+    /**
+     * 判断代理认证用户名和密码是否同时存在。
+     * 本方法是纯本地判断，不涉及外部调用。
+     */
     private boolean useAuth(String proxyUser, String proxyPassword) {
         return !StringUtils.isEmpty(proxyUser) && !StringUtils.isEmpty(proxyPassword);
     }
 
+    /**
+     * 关闭本客户端独占创建的 Netty 事件循环。
+     * 使用共享事件循环时本方法不会关闭共享资源。
+     */
     void destroy() {
         if (this.eventLoopGroup != null) {
             this.eventLoopGroup.shutdownGracefully(0, 5, TimeUnit.SECONDS);
         }
     }
 
+    /**
+     * 处理 Rule Engine 消息并发起异步 HTTP 请求。
+     * endpoint、Header、HTTP 方法和请求体都由配置模板和当前 TbMsg 解析得到；外部调用边界是 httpClient.exchange。
+     * AsyncRestTemplate 回调中 2xx 响应走成功，非 2xx 或异常走失败；本方法本身不直接访问数据库或缓存。
+     */
     public void processMessage(TbContext ctx, TbMsg msg,
                                Consumer<TbMsg> onSuccess,
                                BiConsumer<TbMsg, Throwable> onFailure) {
@@ -198,14 +263,23 @@ public class TbHttpClient {
         }
 
         URI uri = buildEncodedUri(endpointUrl);
+        // exchange 返回 ListenableFuture，HTTP 响应在线程池回调中映射到 Rule Engine 成功或失败路由。
         ListenableFuture<ResponseEntity<String>> future = httpClient.exchange(
                 uri, method, entity, String.class);
         future.addCallback(new ListenableFutureCallback<>() {
+            /**
+             * HTTP 客户端异常回调，将异常转换为 Failure 路由消息。
+             * 本方法运行在线程池回调中，不直接访问数据库或缓存。
+             */
             @Override
             public void onFailure(Throwable throwable) {
                 onFailure.accept(processException(msg, throwable), throwable);
             }
 
+            /**
+             * HTTP 客户端成功收到响应后的回调。
+             * 2xx 响应走 Success，非 2xx 响应转换为 Failure 消息但 Throwable 为空。
+             */
             @Override
             public void onSuccess(ResponseEntity<String> responseEntity) {
                 if (responseEntity.getStatusCode().is2xxSuccessful()) {
@@ -220,6 +294,10 @@ public class TbHttpClient {
         }
     }
 
+    /**
+     * 校验并编码 endpoint URL。
+     * 本方法仅解析 URI，不直接发起 HTTP 请求；非法 URL 会同步抛出异常并由调用方失败路由。
+     */
     public URI buildEncodedUri(String endpointUrl) {
         if (endpointUrl == null) {
             throw new RuntimeException("Url string cannot be null!");
@@ -242,6 +320,10 @@ public class TbHttpClient {
         return uri;
     }
 
+    /**
+     * 根据配置决定请求体内容，必要时把 JSON 字符串转换为纯文本。
+     * 本方法只处理消息载荷，不涉及外部调用、数据库或缓存。
+     */
     private String getData(TbMsg tbMsg, boolean ignoreBody, boolean parseToPlainText) {
         if (!ignoreBody && parseToPlainText) {
             return parseJsonStringToPlainText(tbMsg.getData());
@@ -249,6 +331,10 @@ public class TbHttpClient {
         return tbMsg.getData();
     }
 
+    /**
+     * 将 JSON 字符串形式的文本值去掉外层引号。
+     * 本方法用于兼容旧 trimDoubleQuotes 行为，不直接触发外部调用。
+     */
     protected String parseJsonStringToPlainText(String data) {
         if (data.startsWith("\"") && data.endsWith("\"") && data.length() >= 2) {
             final String dataBefore = data;
@@ -261,6 +347,10 @@ public class TbHttpClient {
         return data;
     }
 
+    /**
+     * 将 2xx HTTP 响应转换为新的 TbMsg。
+     * 状态、状态码、原因短语和响应 Header 写入元数据，响应体写入消息体；本方法不直接访问外部系统。
+     */
     private TbMsg processResponse(TbContext ctx, TbMsg origMsg, ResponseEntity<String> response) {
         TbMsgMetaData metaData = origMsg.getMetaData();
         metaData.putValue(STATUS, response.getStatusCode().name());
@@ -271,6 +361,10 @@ public class TbHttpClient {
         return ctx.transformMsg(origMsg, metaData, body);
     }
 
+    /**
+     * 将 HTTP Header 列表写入消息元数据。
+     * 多值 Header 会序列化为 JSON 字符串；本方法只处理本地数据。
+     */
     void headersToMetaData(Map<String, List<String>> headers, BiConsumer<String, String> consumer) {
         if (headers == null) {
             return;
@@ -286,6 +380,10 @@ public class TbHttpClient {
         });
     }
 
+    /**
+     * 将非 2xx HTTP 响应转换为 Failure 路由使用的 TbMsg。
+     * 状态和响应体写入元数据；Throwable 可能为空，因为 HTTP 调用本身已成功返回响应。
+     */
     private TbMsg processFailureResponse(TbMsg origMsg, ResponseEntity<String> response) {
         TbMsgMetaData metaData = origMsg.getMetaData();
         metaData.putValue(STATUS, response.getStatusCode().name());
@@ -296,6 +394,10 @@ public class TbHttpClient {
         return TbMsg.transformMsgMetadata(origMsg, metaData);
     }
 
+    /**
+     * 将 HTTP 客户端异常转换为 Failure 路由使用的 TbMsg。
+     * RestClientResponseException 会额外携带状态码和响应体；本方法不直接访问数据库或缓存。
+     */
     private TbMsg processException(TbMsg origMsg, Throwable e) {
         TbMsgMetaData metaData = origMsg.getMetaData();
         metaData.putValue(ERROR, e.getClass() + ": " + e.getMessage());
@@ -308,6 +410,10 @@ public class TbHttpClient {
         return TbMsg.transformMsgMetadata(origMsg, metaData);
     }
 
+    /**
+     * 基于配置模板和消息内容准备 HTTP Header。
+     * Basic 凭据会被编码为 Authorization Header；本方法不直接发起 HTTP 请求。
+     */
     private HttpHeaders prepareHeaders(TbMsg msg) {
         HttpHeaders headers = new HttpHeaders();
         config.getHeaders().forEach((k, v) -> headers.add(TbNodeUtils.processPattern(k, msg), TbNodeUtils.processPattern(v, msg)));
@@ -321,6 +427,10 @@ public class TbHttpClient {
         return headers;
     }
 
+    /**
+     * 对未完成 HTTP future 进行简单并发控制。
+     * 当队列超过配置上限时等待并取消较早请求；队列使用 ConcurrentLinkedDeque，适配异步回调并发访问。
+     */
     private void processParallelRequests(ListenableFuture<ResponseEntity<String>> future) {
         pendingFutures.add(future);
         if (pendingFutures.size() > config.getMaxParallelRequestsCount()) {
@@ -340,12 +450,20 @@ public class TbHttpClient {
         }
     }
 
+    /**
+     * 校验代理主机配置。
+     * 本方法只做本地参数校验，不直接访问代理服务器。
+     */
     private static void checkProxyHost(String proxyHost) throws TbNodeException {
         if (StringUtils.isEmpty(proxyHost)) {
             throw new TbNodeException("Proxy host can't be empty");
         }
     }
 
+    /**
+     * 校验代理端口范围。
+     * 本方法只做本地参数校验，不直接访问代理服务器。
+     */
     private static void checkProxyPort(int proxyPort) throws TbNodeException {
         if (proxyPort < 0 || proxyPort > 65535) {
             throw new TbNodeException("Proxy port out of range:" + proxyPort);
@@ -353,3 +471,10 @@ public class TbHttpClient {
     }
 
 }
+
+/*
+ * 本类总结：
+ * 本类封装 REST 外部调用的 HTTP 客户端生命周期、请求构造、异步回调、失败元数据和并发限制。
+ * 它直接调用外部 HTTP 服务，但不直接访问数据库或缓存；数据库/缓存只可能在 Rule Engine 上下文、凭据实现或调用链内部间接涉及。
+ * 成功和失败路由由调用方传入的回调完成，线程安全依赖 AsyncRestTemplate、Netty/Apache 客户端和并发队列实现。
+ */

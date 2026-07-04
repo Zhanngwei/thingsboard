@@ -40,11 +40,25 @@ import static org.thingsboard.common.util.DonAsynchron.withCallback;
         configDirective = "tbExternalNodeSendSmsConfig",
         icon = "sms"
 )
+/**
+ * SMS 外部发送节点，根据模板生成手机号和短信正文，并通过系统 SMS 服务或自定义 SmsSender 发送。
+ * 本类不直接访问数据库或缓存；外部调用在 smsExecutor 中执行，withCallback 决定成功或失败路由。
+ */
 public class TbSendSmsNode extends TbAbstractExternalNode {
 
+    /**
+     * SMS 节点配置，包含手机号模板、短信正文模板和系统/自定义 provider 配置。
+     */
     private TbSendSmsNodeConfiguration config;
+    /**
+     * 自定义 SMS provider 模式下使用的发送器。
+     */
     private SmsSender smsSender;
 
+    /**
+     * 初始化 SMS 节点配置和可选自定义 SmsSender。
+     * 本方法不直接发送短信；系统 SMS 服务或 provider 工厂的具体实现/调用链可能间接涉及缓存或外部配置。
+     */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         super.init(ctx);
@@ -58,11 +72,16 @@ public class TbSendSmsNode extends TbAbstractExternalNode {
         }
     }
 
+    /**
+     * 处理 Rule Engine 消息并异步发送短信。
+     * 消息先经 ackIfNeeded 处理确认关系；发送成功走 Success，异常走 Failure。
+     */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         var tbMsg = ackIfNeeded(ctx, msg);
         try {
             withCallback(ctx.getSmsExecutor().executeAsync(() -> {
+                        // SMS 发送可能触达外部 provider，因此放入专用 smsExecutor。
                         sendSms(ctx, tbMsg);
                         return null;
                     }),
@@ -73,6 +92,11 @@ public class TbSendSmsNode extends TbAbstractExternalNode {
         }
     }
 
+    /**
+     * 执行实际 SMS 发送外部调用。
+     * 手机号和正文来自配置模板解析；系统模式委托 SmsService，自定义模式逐个调用 SmsSender。
+     * 本方法本身不直接访问数据库或缓存，SmsService/provider 的具体实现/调用链可能间接涉及。
+     */
     private void sendSms(TbContext ctx, TbMsg msg) throws Exception {
         String numbersTo = TbNodeUtils.processPattern(this.config.getNumbersToTemplate(), msg);
         String message = TbNodeUtils.processPattern(this.config.getSmsMessageTemplate(), msg);
@@ -86,6 +110,10 @@ public class TbSendSmsNode extends TbAbstractExternalNode {
         }
     }
 
+    /**
+     * 销毁自定义 SmsSender。
+     * 本方法直接结束 provider 发送器生命周期，不处理消息确认或失败路由。
+     */
     @Override
     public void destroy() {
         if (this.smsSender != null) {
@@ -93,8 +121,19 @@ public class TbSendSmsNode extends TbAbstractExternalNode {
         }
     }
 
+    /**
+     * 通过上下文中的工厂创建自定义 SmsSender。
+     * 本方法不直接发送短信；provider 配置由节点配置提供。
+     */
     private SmsSender createSmsSender(TbContext ctx) {
         return ctx.getSmsSenderFactory().createSmsSender(this.config.getSmsProviderConfiguration());
     }
 
 }
+
+/*
+ * 本类总结：
+ * 本类是短信外部发送节点，负责模板解析、SMS 发送器生命周期和异步发送回调。
+ * 消息确认在发送前由 ackIfNeeded 处理，smsExecutor 回调决定成功或失败路由。
+ * 本类本身不直接涉及数据库或缓存；系统 SMS 服务、provider 工厂或具体 SmsSender 的实现/调用链可能间接涉及。
+ */
