@@ -45,21 +45,75 @@ import java.util.UUID;
 
 @Slf4j
 @RunWith(MockitoJUnitRunner.class)
+/**
+ * 中文说明：
+ * 1. 类目的：`RuleChainMsgConstructorTest` 是ThingsBoard Application 测试模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
+ * 4. 生命周期：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
+ */
 public class RuleChainMsgConstructorTest {
 
+    /**
+     * 字段说明：
+     * 1. 保存 `RPC_CONNECTION_TYPE` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private static final String RPC_CONNECTION_TYPE = "RPC";
 
+    /**
+     * 字段说明：
+     * 1. 保存 `ruleChainMsgConstructorV1` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private RuleChainMsgConstructorV1 ruleChainMsgConstructorV1;
 
+    /**
+     * 字段说明：
+     * 1. 保存 `tenantId` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private TenantId tenantId;
 
     @Before
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `setup` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void setup() {
         ruleChainMsgConstructorV1 = new RuleChainMsgConstructorV1();
         tenantId = new TenantId(UUID.randomUUID());
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testConstructRuleChainMetadataUpdatedMsg_V_3_4_0` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testConstructRuleChainMetadataUpdatedMsg_V_3_4_0() {
         RuleChainId ruleChainId = new RuleChainId(UUID.randomUUID());
         RuleChainMetaData ruleChainMetaData = createRuleChainMetaData(
@@ -79,6 +133,16 @@ public class RuleChainMsgConstructorTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testConstructRuleChainMetadataUpdatedMsg_V_3_3_3` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testConstructRuleChainMetadataUpdatedMsg_V_3_3_3() {
         RuleChainId ruleChainId = new RuleChainId(UUID.randomUUID());
         RuleChainMetaData ruleChainMetaData = createRuleChainMetaData(
@@ -97,6 +161,16 @@ public class RuleChainMsgConstructorTest {
                 "{\"queueName\":\"HighPriority\"}");
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `assetV_3_3_3_and_V_3_4_0` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void assetV_3_3_3_and_V_3_4_0(RuleChainMetadataUpdateMsg ruleChainMetadataUpdateMsg) {
         Assert.assertEquals("First rule node index incorrect!", 3, ruleChainMetadataUpdateMsg.getFirstNodeIndex());
         Assert.assertEquals("Nodes count incorrect!", 12, ruleChainMetadataUpdateMsg.getNodesCount());
@@ -119,6 +193,16 @@ public class RuleChainMsgConstructorTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testConstructRuleChainMetadataUpdatedMsg_V_3_3_0` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testConstructRuleChainMetadataUpdatedMsg_V_3_3_0() {
         RuleChainId ruleChainId = new RuleChainId(UUID.randomUUID());
         RuleChainMetaData ruleChainMetaData = createRuleChainMetaData(ruleChainId, 3, createRuleNodes(ruleChainId), createConnections());
@@ -160,6 +244,16 @@ public class RuleChainMsgConstructorTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testConstructRuleChainMetadataUpdatedMsg_V_3_3_0_inDifferentOrder` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testConstructRuleChainMetadataUpdatedMsg_V_3_3_0_inDifferentOrder() {
         // same rule chain metadata, but different order of rule nodes
         RuleChainId ruleChainId = new RuleChainId(UUID.randomUUID());
@@ -201,6 +295,16 @@ public class RuleChainMsgConstructorTest {
                 "{\"queueName\":\"HighPriority\"}");
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `assertCheckpointRuleNodeConfiguration` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void assertCheckpointRuleNodeConfiguration(List<RuleNodeProto> nodesList,
                                                        String expectedConfiguration) {
         Optional<RuleNodeProto> checkpointRuleNodeOpt = nodesList.stream()
@@ -211,12 +315,32 @@ public class RuleChainMsgConstructorTest {
         Assert.assertEquals(expectedConfiguration, checkpointRuleNode.getConfiguration());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `compareNodeConnectionInfoAndProto` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void compareNodeConnectionInfoAndProto(NodeConnectionInfo expected, org.thingsboard.server.gen.edge.v1.NodeConnectionInfoProto actual) {
         Assert.assertEquals(expected.getFromIndex(), actual.getFromIndex());
         Assert.assertEquals(expected.getToIndex(), actual.getToIndex());
         Assert.assertEquals(expected.getType(), actual.getType());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createRuleChainMetaData` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleChainMetaData createRuleChainMetaData(RuleChainId ruleChainId, Integer firstNodeIndex, List<RuleNode> nodes, List<NodeConnectionInfo> connections) {
         RuleChainMetaData ruleChainMetaData = new RuleChainMetaData();
         ruleChainMetaData.setRuleChainId(ruleChainId);
@@ -227,6 +351,16 @@ public class RuleChainMsgConstructorTest {
         return ruleChainMetaData;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createConnections` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private List<NodeConnectionInfo> createConnections() {
         List<NodeConnectionInfo> result = new ArrayList<>();
         result.add(createNodeConnectionInfo(3, 6, TbNodeConnectionType.SUCCESS));
@@ -245,6 +379,16 @@ public class RuleChainMsgConstructorTest {
         return result;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createNodeConnectionInfo` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private NodeConnectionInfo createNodeConnectionInfo(int fromIndex, int toIndex, String type) {
         NodeConnectionInfo result = new NodeConnectionInfo();
         result.setFromIndex(fromIndex);
@@ -253,6 +397,16 @@ public class RuleChainMsgConstructorTest {
         return result;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createRuleNodes` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private List<RuleNode> createRuleNodes(RuleChainId ruleChainId) {
         List<RuleNode> result = new ArrayList<>();
         result.add(getOutputNode(ruleChainId));
@@ -270,6 +424,16 @@ public class RuleChainMsgConstructorTest {
         return result;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createRuleNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode createRuleNode(RuleChainId ruleChainId, String type, String name, JsonNode configuration, JsonNode additionalInfo) {
         RuleNode e = new RuleNode();
         e.setRuleChainId(ruleChainId);
@@ -282,6 +446,16 @@ public class RuleChainMsgConstructorTest {
         return e;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createConnectionsInDifferentOrder` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private List<NodeConnectionInfo> createConnectionsInDifferentOrder() {
         List<NodeConnectionInfo> result = new ArrayList<>();
         result.add(createNodeConnectionInfo(0, 2, RPC_CONNECTION_TYPE));
@@ -300,6 +474,16 @@ public class RuleChainMsgConstructorTest {
         return result;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createRuleNodesInDifferentOrder` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private List<RuleNode> createRuleNodesInDifferentOrder(RuleChainId ruleChainId) {
         List<RuleNode> result = new ArrayList<>();
         result.add(getPushToAnalyticsNode(ruleChainId));
@@ -318,6 +502,16 @@ public class RuleChainMsgConstructorTest {
     }
 
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getOutputNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getOutputNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.flow.TbRuleChainOutputNode",
@@ -326,6 +520,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"description\":\"\",\"layoutX\":178,\"layoutY\":592}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getCheckpointNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getCheckpointNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.flow.TbCheckpointNode",
@@ -334,6 +538,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"description\":\"\",\"layoutX\":178,\"layoutY\":647}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getSaveTimeSeriesNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getSaveTimeSeriesNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
@@ -342,6 +556,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"layoutX\":823,\"layoutY\":157}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getMessageTypeSwitchNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getMessageTypeSwitchNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
@@ -350,6 +574,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"layoutX\":347,\"layoutY\":149}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getLogOtherNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getLogOtherNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.action.TbLogNode",
@@ -358,6 +592,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"layoutX\":824,\"layoutY\":378}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getPushToCloudNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getPushToCloudNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.edge.TbMsgPushToCloudNode",
@@ -366,6 +610,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"layoutX\":1129,\"layoutY\":52}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getAcknowledgeNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getAcknowledgeNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.flow.TbAckNode",
@@ -374,6 +628,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"description\":\"\",\"layoutX\":177,\"layoutY\":703}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getDeviceProfileNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getDeviceProfileNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.profile.TbDeviceProfileNode",
@@ -382,6 +646,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"description\":\"Process incoming messages from devices with the alarm rules defined in the device profile. Dispatch all incoming messages with \\\"Success\\\" relation type.\",\"layoutX\":187,\"layoutY\":468}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getSaveClientAttributesNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getSaveClientAttributesNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
@@ -390,6 +664,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"layoutX\":824,\"layoutY\":52}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getLogRpcFromDeviceNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getLogRpcFromDeviceNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.action.TbLogNode",
@@ -398,6 +682,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"layoutX\":825,\"layoutY\":266}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getRpcCallRequestNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getRpcCallRequestNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.rpc.TbSendRPCRequestNode",
@@ -406,6 +700,16 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"layoutX\":824,\"layoutY\":466}"));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getPushToAnalyticsNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private RuleNode getPushToAnalyticsNode(RuleChainId ruleChainId) {
         return createRuleNode(ruleChainId,
                 "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
@@ -414,3 +718,11 @@ public class RuleChainMsgConstructorTest {
                 JacksonUtil.toJsonNode("{\"description\":\"\",\"layoutX\":477,\"layoutY\":560}"));
     }
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`RuleChainMsgConstructorTest` 在 ThingsBoard Application 测试模块 中承担Edge 同步服务类型职责，核心目的是处理云端与边缘端之间的实体、事件和 RPC 数据同步。
+ * 2. 核心流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+ * 3. 关键依赖：主要依赖或协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

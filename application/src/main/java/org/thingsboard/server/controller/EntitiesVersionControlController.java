@@ -80,11 +80,37 @@ import static org.thingsboard.server.controller.ControllerConstants.VERSION_ID_P
 @RequestMapping("/api/entities/vc")
 @PreAuthorize("hasAuthority('TENANT_ADMIN')")
 @RequiredArgsConstructor
+/**
+ * 中文说明：
+ * 1. 类目的：`EntitiesVersionControlController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
+ * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 MVC Controller / Facade。
+ */
 public class EntitiesVersionControlController extends BaseController {
 
+    /**
+     * 字段说明：
+     * 1. 保存 `versionControlService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final EntitiesVersionControlService versionControlService;
 
     @Value("${queue.vc.request-timeout:180000}")
+    /**
+     * 字段说明：
+     * 1. 保存 `vcRequestTimeout` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private int vcRequestTimeout;
 
     @ApiOperation(value = "Save entities version (saveEntitiesVersion)", notes = "" +
@@ -159,9 +185,20 @@ public class EntitiesVersionControlController extends BaseController {
             "status of operation via `getVersionCreateRequestStatus`.\n" +
             TENANT_AUTHORITY_PARAGRAPH)
     @PostMapping("/version")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `saveEntitiesVersion` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<UUID> saveEntitiesVersion(@RequestBody VersionCreateRequest request) throws Exception {
         SecurityUser user = getCurrentUser();
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.WRITE);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.saveEntitiesVersion(user, request));
     }
 
@@ -192,6 +229,16 @@ public class EntitiesVersionControlController extends BaseController {
             MARKDOWN_CODE_BLOCK_END +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/version/{requestId}/status")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getVersionCreateRequestStatus` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public VersionCreationResult getVersionCreateRequestStatus(@ApiParam(value = VC_REQUEST_ID_PARAM_DESCRIPTION, required = true)
                                                                @PathVariable UUID requestId) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.WRITE);
@@ -235,6 +282,16 @@ public class EntitiesVersionControlController extends BaseController {
             MARKDOWN_CODE_BLOCK_END +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/version/{entityType}/{externalEntityUuid}", params = {"branch", "pageSize", "page"})
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `listEntityVersions` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<PageData<EntityVersion>> listEntityVersions(@ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true)
                                                                       @PathVariable EntityType entityType,
                                                                       @ApiParam(value = "A string value representing external entity id. This is `externalId` property of an entity, or otherwise if not set - simply id of this entity.")
@@ -254,6 +311,7 @@ public class EntitiesVersionControlController extends BaseController {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
         EntityId externalEntityId = EntityIdFactory.getByTypeAndUuid(entityType, externalEntityUuid);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.listEntityVersions(getTenantId(), branch, externalEntityId, pageLink));
     }
 
@@ -264,6 +322,16 @@ public class EntitiesVersionControlController extends BaseController {
             "The response structure is the same as for `listEntityVersions` API method." +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/version/{entityType}", params = {"branch", "pageSize", "page"})
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `listEntityTypeVersions` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<PageData<EntityVersion>> listEntityTypeVersions(@ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true)
                                                                           @PathVariable EntityType entityType,
                                                                           @ApiParam(value = BRANCH_PARAM_DESCRIPTION, required = true)
@@ -280,6 +348,7 @@ public class EntitiesVersionControlController extends BaseController {
                                                                           @RequestParam(required = false) String sortOrder) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.listEntityTypeVersions(getTenantId(), branch, entityType, pageLink));
     }
 
@@ -289,6 +358,16 @@ public class EntitiesVersionControlController extends BaseController {
             "The response format is the same as for `listEntityVersions` API method." +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/version", params = {"branch", "pageSize", "page"})
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `listVersions` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<PageData<EntityVersion>> listVersions(@ApiParam(value = BRANCH_PARAM_DESCRIPTION, required = true)
                                                                 @RequestParam String branch,
                                                                 @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
@@ -303,6 +382,7 @@ public class EntitiesVersionControlController extends BaseController {
                                                                 @RequestParam(required = false) String sortOrder) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.listVersions(getTenantId(), branch, pageLink));
     }
 
@@ -313,11 +393,22 @@ public class EntitiesVersionControlController extends BaseController {
             "Entities order will be the same as in the repository." +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/entity/{entityType}/{versionId}")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `listEntitiesAtVersion` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<List<VersionedEntityInfo>> listEntitiesAtVersion(@ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true)
                                                                            @PathVariable EntityType entityType,
                                                                            @ApiParam(value = VERSION_ID_PARAM_DESCRIPTION, required = true)
                                                                            @PathVariable String versionId) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.listEntitiesAtVersion(getTenantId(), versionId, entityType));
     }
 
@@ -327,9 +418,20 @@ public class EntitiesVersionControlController extends BaseController {
             "Returned entities order will be the same as in the repository." +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/entity/{versionId}")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `listAllEntitiesAtVersion` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<List<VersionedEntityInfo>> listAllEntitiesAtVersion(@ApiParam(value = VERSION_ID_PARAM_DESCRIPTION, required = true)
                                                                               @PathVariable String versionId) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.listAllEntitiesAtVersion(getTenantId(), versionId));
     }
 
@@ -340,6 +442,16 @@ public class EntitiesVersionControlController extends BaseController {
             "`hasCredentials` (whether stored device data has credentials)." +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping("/info/{versionId}/{entityType}/{externalEntityUuid}")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getEntityDataInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<EntityDataInfo> getEntityDataInfo(@ApiParam(value = VERSION_ID_PARAM_DESCRIPTION, required = true)
                                                             @PathVariable String versionId,
                                                             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true)
@@ -348,6 +460,7 @@ public class EntitiesVersionControlController extends BaseController {
                                                             @PathVariable UUID externalEntityUuid) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
         EntityId entityId = EntityIdFactory.getByTypeAndUuid(entityType, externalEntityUuid);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.getEntityDataInfo(getCurrentUser(), entityId, versionId));
     }
 
@@ -356,6 +469,16 @@ public class EntitiesVersionControlController extends BaseController {
             "Entity data structure is the same as stored in a repository. " +
             TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/diff/{entityType}/{internalEntityUuid}", params = {"versionId"})
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `compareEntityDataToVersion` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<EntityDataDiff> compareEntityDataToVersion(@ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true)
                                                                      @PathVariable EntityType entityType,
                                                                      @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true)
@@ -364,6 +487,7 @@ public class EntitiesVersionControlController extends BaseController {
                                                                      @RequestParam String versionId) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
         EntityId entityId = EntityIdFactory.getByTypeAndUuid(entityType, internalEntityUuid);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(versionControlService.compareEntityDataToVersion(getCurrentUser(), entityId, versionId));
     }
 
@@ -427,6 +551,16 @@ public class EntitiesVersionControlController extends BaseController {
             "via `getVersionLoadRequestStatus`." +
             TENANT_AUTHORITY_PARAGRAPH)
     @PostMapping("/entity")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `loadEntitiesVersion` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public UUID loadEntitiesVersion(@RequestBody VersionLoadRequest request) throws Exception {
         SecurityUser user = getCurrentUser();
         accessControlService.checkPermission(user, Resource.VERSION_CONTROL, Operation.WRITE);
@@ -469,6 +603,16 @@ public class EntitiesVersionControlController extends BaseController {
             TENANT_AUTHORITY_PARAGRAPH
     )
     @GetMapping(value = "/entity/{requestId}/status")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getVersionLoadRequestStatus` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public VersionLoadResult getVersionLoadRequestStatus(@ApiParam(value = VC_REQUEST_ID_PARAM_DESCRIPTION, required = true)
                                                          @PathVariable UUID requestId) throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.WRITE);
@@ -496,19 +640,33 @@ public class EntitiesVersionControlController extends BaseController {
             "]" +
             MARKDOWN_CODE_BLOCK_END)
     @GetMapping("/branches")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `listBranches` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DeferredResult<List<BranchInfo>> listBranches() throws Exception {
         accessControlService.checkPermission(getCurrentUser(), Resource.VERSION_CONTROL, Operation.READ);
         final TenantId tenantId = getTenantId();
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         ListenableFuture<List<BranchInfo>> branches = versionControlService.listBranches(tenantId);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return wrapFuture(Futures.transform(branches, remoteBranches -> {
             List<BranchInfo> infos = new ArrayList<>();
             BranchInfo defaultBranch;
             String defaultBranchName = versionControlService.getVersionControlSettings(tenantId).getDefaultBranch();
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (StringUtils.isNotEmpty(defaultBranchName)) {
                 defaultBranch = new BranchInfo(defaultBranchName, true);
             } else {
                 defaultBranch = remoteBranches.stream().filter(BranchInfo::isDefault).findFirst().orElse(null);
             }
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (defaultBranch != null) {
                 infos.add(defaultBranch);
             }
@@ -519,8 +677,26 @@ public class EntitiesVersionControlController extends BaseController {
     }
 
     @Override
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `wrapFuture` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected <T> DeferredResult<T> wrapFuture(ListenableFuture<T> future) {
         return wrapFuture(future, vcRequestTimeout);
     }
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`EntitiesVersionControlController` 在 ThingsBoard Application 模块 中承担REST/WebSocket 控制层类型职责，核心目的是承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
+ * 2. 核心流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+ * 3. 关键依赖：主要依赖或协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

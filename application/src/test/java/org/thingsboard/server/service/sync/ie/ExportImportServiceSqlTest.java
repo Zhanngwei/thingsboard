@@ -83,16 +83,60 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 
 @DaoSqlTest
+/**
+ * 中文说明：
+ * 1. 类目的：`ExportImportServiceSqlTest` 是ThingsBoard Application 测试模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括Version Control、DAO、队列、缓存和事件监听器。
+ * 4. 生命周期：由 Spring 服务、事件监听或同步任务触发。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 Service / Observer。
+ */
 public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
     @Autowired
+    /**
+     * 字段说明：
+     * 1. 保存 `deviceCredentialsService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private DeviceCredentialsService deviceCredentialsService;
     @SpyBean
+    /**
+     * 字段说明：
+     * 1. 保存 `entityActionService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private EntityActionService entityActionService;
     @SpyBean
+    /**
+     * 字段说明：
+     * 1. 保存 `otaPackageStateService` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private OtaPackageStateService otaPackageStateService;
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportAssetWithProfile_betweenTenants` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportAssetWithProfile_betweenTenants() throws Exception {
         AssetProfile assetProfile = createAssetProfile(tenantId1, null, null, "Asset profile of tenant 1");
         Asset asset = createAsset(tenantId1, null, assetProfile.getId(), "Asset of tenant 1");
@@ -114,6 +158,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportAsset_sameTenant` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportAsset_sameTenant() throws Exception {
         AssetProfile assetProfile = createAssetProfile(tenantId1, null, null, "Asset profile v1.0");
         Asset asset = createAsset(tenantId1, null, assetProfile.getId(), "Asset v1.0");
@@ -125,6 +179,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportAsset_sameTenant_withCustomer` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportAsset_sameTenant_withCustomer() throws Exception {
         AssetProfile assetProfile = createAssetProfile(tenantId1, null, null, "Asset profile v1.0");
         Customer customer = createCustomer(tenantId1, "My customer");
@@ -136,6 +200,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportCustomer_betweenTenants` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportCustomer_betweenTenants() throws Exception {
         Customer customer = createCustomer(tenantAdmin1.getTenantId(), "Customer of tenant 1");
         EntityExportData<Customer> exportData = exportEntity(tenantAdmin1, customer.getId());
@@ -146,6 +220,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportCustomer_sameTenant` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportCustomer_sameTenant() throws Exception {
         Customer customer = createCustomer(tenantAdmin1.getTenantId(), "Customer v1.0");
         EntityExportData<Customer> exportData = exportEntity(tenantAdmin1, customer.getId());
@@ -157,6 +241,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportDeviceWithProfile_betweenTenants` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportDeviceWithProfile_betweenTenants() throws Exception {
         DeviceProfile deviceProfile = createDeviceProfile(tenantId1, null, null, "Device profile of tenant 1");
         Device device = createDevice(tenantId1, null, deviceProfile.getId(), "Device of tenant 1");
@@ -187,6 +281,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportDevice_sameTenant` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportDevice_sameTenant() throws Exception {
         DeviceProfile deviceProfile = createDeviceProfile(tenantId1, null, null, "Device profile v1.0");
         OtaPackage firmware = createOtaPackage(tenantId1, deviceProfile.getId(), OtaPackageType.FIRMWARE);
@@ -212,6 +316,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportDashboard_betweenTenants` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportDashboard_betweenTenants() throws Exception {
         Dashboard dashboard = createDashboard(tenantAdmin1.getTenantId(), null, "Dashboard of tenant 1");
         EntityExportData<Dashboard> exportData = exportEntity(tenantAdmin1, dashboard.getId());
@@ -222,6 +336,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportDashboard_sameTenant` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportDashboard_sameTenant() throws Exception {
         Dashboard dashboard = createDashboard(tenantAdmin1.getTenantId(), null, "Dashboard v1.0");
         EntityExportData<Dashboard> exportData = exportEntity(tenantAdmin1, dashboard.getId());
@@ -232,6 +356,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportDashboard_betweenTenants_withCustomer_updated` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportDashboard_betweenTenants_withCustomer_updated() throws Exception {
         Dashboard dashboard = createDashboard(tenantAdmin1.getTenantId(), null, "Dashboard of tenant 1");
         EntityExportData<Dashboard> exportData = exportEntity(tenantAdmin1, dashboard.getId());
@@ -252,6 +386,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportDashboard_betweenTenants_withEntityAliases` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportDashboard_betweenTenants_withEntityAliases() throws Exception {
         AssetProfile assetProfile = createAssetProfile(tenantId1, null, null, "A");
         Asset asset1 = createAsset(tenantId1, null, assetProfile.getId(), "Asset 1");
@@ -352,6 +496,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportRuleChain_betweenTenants` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportRuleChain_betweenTenants() throws Exception {
         RuleChain ruleChain = createRuleChain(tenantId1, "Rule chain of tenant 1");
         RuleChainMetaData metaData = ruleChainService.loadRuleChainMetaData(tenantId1, ruleChain.getId());
@@ -366,6 +520,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportRuleChain_sameTenant` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportRuleChain_sameTenant() throws Exception {
         RuleChain ruleChain = createRuleChain(tenantId1, "Rule chain v1.0");
         RuleChainMetaData metaData = ruleChainService.loadRuleChainMetaData(tenantId1, ruleChain.getId());
@@ -380,6 +544,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testImportRuleChain_ruleNodesConfigs` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testImportRuleChain_ruleNodesConfigs() throws Exception {
         Customer customer = createCustomer(tenantId1, "Customer 1");
         RuleChain ruleChain = createRuleChain(tenantId1, "Rule chain 1");
@@ -422,6 +596,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportWithInboundRelations_betweenTenants` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportWithInboundRelations_betweenTenants() throws Exception {
         Asset asset = createAsset(tenantId1, null, null, "Asset 1");
         Device device = createDevice(tenantId1, null, null, "Device 1");
@@ -457,6 +641,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportWithRelations_betweenTenants` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportWithRelations_betweenTenants() throws Exception {
         Asset asset = createAsset(tenantId1, null, null, "Asset 1");
         Device device = createDevice(tenantId1, null, null, "Device 1");
@@ -485,6 +679,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportWithRelations_sameTenant` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportWithRelations_sameTenant() throws Exception {
         Asset asset = createAsset(tenantId1, null, null, "Asset 1");
         Device device1 = createDevice(tenantId1, null, null, "Device 1");
@@ -508,6 +712,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `textExportImportWithRelations_sameTenant_removeExisting` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void textExportImportWithRelations_sameTenant_removeExisting() throws Exception {
         Asset asset1 = createAsset(tenantId1, null, null, "Asset 1");
         Device device = createDevice(tenantId1, null, null, "Device 1");
@@ -532,6 +746,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportDeviceProfile_betweenTenants_findExistingByName` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportDeviceProfile_betweenTenants_findExistingByName() throws Exception {
         DeviceProfile defaultDeviceProfile = deviceProfileService.findDefaultDeviceProfile(tenantId1);
         EntityExportData<DeviceProfile> deviceProfileExportData = exportEntity(tenantAdmin1, defaultDeviceProfile.getId());
@@ -550,12 +774,32 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
 
 
     @SuppressWarnings("rawTypes")
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getAndClone` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private static EntityExportData getAndClone(Map<EntityType, EntityExportData> map, EntityType entityType) {
         return JacksonUtil.clone(map.get(entityType));
     }
 
     @SuppressWarnings({"rawTypes", "unchecked"})
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testEntityEventsOnImport` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testEntityEventsOnImport() throws Exception {
         Customer customer = createCustomer(tenantId1, "Customer 1");
         RuleChain ruleChain = createRuleChain(tenantId1, "Rule chain 1");
@@ -572,6 +816,7 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
                         return exportEntity(tenantAdmin1, entityId, EntityExportSettings.builder()
                                 .exportCredentials(false)
                                 .build());
+                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -649,6 +894,16 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExternalIdsInExportData` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExternalIdsInExportData() throws Exception {
         Customer customer = createCustomer(tenantId1, "Customer 1");
         AssetProfile assetProfile = createAssetProfile(tenantId1, null, null, "Asset profile 1");
@@ -665,6 +920,7 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
         EntityView entityView = createEntityView(tenantId1, customer.getId(), device.getId(), "Entity view 1");
 
         Map<EntityId, EntityId> ids = new HashMap<>();
+        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (EntityId entityId : List.of(customer.getId(), ruleChain.getId(), dashboard.getId(), assetProfile.getId(), asset.getId(),
                 deviceProfile.getId(), device.getId(), entityView.getId(), ruleChain.getId(), dashboard.getId())) {
             EntityExportData exportData = exportEntity(getSecurityUser(tenantAdmin1), entityId);
@@ -715,3 +971,11 @@ public class ExportImportServiceSqlTest extends BaseExportImportServiceTest {
     }
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`ExportImportServiceSqlTest` 在 ThingsBoard Application 测试模块 中承担版本同步服务类型职责，核心目的是处理实体版本控制、同步事件和跨实例状态一致性。
+ * 2. 核心流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
+ * 3. 关键依赖：主要依赖或协作对象包括Version Control、DAO、队列、缓存和事件监听器。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

@@ -72,44 +72,100 @@ import java.util.List;
 import java.util.UUID;
 
 @Slf4j
+/**
+ * 中文说明：
+ * 1. 类目的：`BaseTelemetryProcessor` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
+ * 4. 生命周期：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
+ */
 public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
 
     private final Gson gson = new Gson();
 
+    /**
+     * 字段说明：
+     * 1. 保存 `tbCoreMsgProducer` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private TbQueueProducer<TbProtoQueueMsg<TransportProtos.ToCoreMsg>> tbCoreMsgProducer;
 
     @PostConstruct
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `init` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void init() {
         tbCoreMsgProducer = producerProvider.getTbCoreMsgProducer();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getMsgSourceKey` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     abstract protected String getMsgSourceKey();
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `processTelemetryMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public List<ListenableFuture<Void>> processTelemetryMsg(TenantId tenantId, EntityDataProto entityData) {
         log.trace("[{}] processTelemetryMsg [{}]", tenantId, entityData);
+        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<ListenableFuture<Void>> result = new ArrayList<>();
         EntityId entityId = constructEntityId(entityData.getEntityType(), entityData.getEntityIdMSB(), entityData.getEntityIdLSB());
+        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (entityId != null && isEntityExists(tenantId, entityId)) {
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if ((entityData.hasPostAttributesMsg() || entityData.hasPostTelemetryMsg() || entityData.hasAttributesUpdatedMsg())) {
                 Pair<TbMsgMetaData, CustomerId> pair = getBaseMsgMetadataAndCustomerId(tenantId, entityId);
                 TbMsgMetaData metaData = pair.getKey();
                 CustomerId customerId = pair.getValue();
                 metaData.putValue(DataConstants.MSG_SOURCE_KEY, getMsgSourceKey());
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (entityData.hasPostAttributesMsg()) {
                     result.add(processPostAttributes(tenantId, customerId, entityId, entityData.getPostAttributesMsg(), metaData));
                 }
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (entityData.hasAttributesUpdatedMsg()) {
                     metaData.putValue("scope", entityData.getPostAttributeScope());
                     result.add(processAttributesUpdate(tenantId, customerId, entityId, entityData.getAttributesUpdatedMsg(), metaData));
                 }
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (entityData.hasPostTelemetryMsg()) {
                     result.add(processPostTelemetry(tenantId, customerId, entityId, entityData.getPostTelemetryMsg(), metaData));
                 }
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (EntityType.DEVICE.equals(entityId.getEntityType())) {
                     DeviceId deviceId = new DeviceId(entityId.getId());
 
                     long currentTs = System.currentTimeMillis();
 
+                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     TransportProtos.DeviceActivityProto deviceActivityMsg = TransportProtos.DeviceActivityProto.newBuilder()
                             .setTenantIdMSB(tenantId.getId().getMostSignificantBits())
                             .setTenantIdLSB(tenantId.getId().getLeastSignificantBits())
@@ -121,9 +177,11 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
 
                     TopicPartitionInfo tpi = partitionService.resolve(ServiceType.TB_CORE, tenantId, deviceId);
                     tbCoreMsgProducer.send(tpi, new TbProtoQueueMsg<>(deviceId.getId(),
+                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             TransportProtos.ToCoreMsg.newBuilder().setDeviceActivityMsg(deviceActivityMsg).build()), null);
                 }
             }
+            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (entityData.hasAttributeDeleteMsg()) {
                 result.add(processAttributeDeleteMsg(tenantId, entityId, entityData.getAttributeDeleteMsg(), entityData.getEntityType()));
             }
@@ -133,12 +191,24 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
         return result;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getBaseMsgMetadataAndCustomerId` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private Pair<TbMsgMetaData, CustomerId> getBaseMsgMetadataAndCustomerId(TenantId tenantId, EntityId entityId) {
         TbMsgMetaData metaData = new TbMsgMetaData();
         CustomerId customerId = null;
+        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (entityId.getEntityType()) {
             case DEVICE:
                 Device device = deviceService.findDeviceById(tenantId, new DeviceId(entityId.getId()));
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (device != null) {
                     customerId = device.getCustomerId();
                     metaData.putValue("deviceName", device.getName());
@@ -176,6 +246,16 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
         return new ImmutablePair<>(metaData, customerId != null ? customerId : new CustomerId(ModelConstants.NULL_UUID));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `processPostTelemetry` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ListenableFuture<Void> processPostTelemetry(TenantId tenantId, CustomerId customerId, EntityId entityId, TransportProtos.PostTelemetryMsg msg, TbMsgMetaData metaData) {
         SettableFuture<Void> futureToSet = SettableFuture.create();
         for (TransportProtos.TsKvListProto tsKv : msg.getTsKvListList()) {
@@ -199,6 +279,16 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
         return futureToSet;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getDefaultQueueNameAndRuleChainId` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private Pair<String, RuleChainId> getDefaultQueueNameAndRuleChainId(TenantId tenantId, EntityId entityId) {
         RuleChainId ruleChainId = null;
         String queueName = null;
@@ -222,6 +312,16 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
         return new ImmutablePair<>(queueName, ruleChainId);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `processPostAttributes` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ListenableFuture<Void> processPostAttributes(TenantId tenantId, CustomerId customerId, EntityId entityId, TransportProtos.PostAttributeMsg msg, TbMsgMetaData metaData) {
         SettableFuture<Void> futureToSet = SettableFuture.create();
         JsonObject json = JsonUtils.getJsonObject(msg.getKvList());
@@ -242,6 +342,16 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
         return futureToSet;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `processAttributesUpdate` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ListenableFuture<Void> processAttributesUpdate(TenantId tenantId,
                                                            CustomerId customerId,
                                                            EntityId entityId,
@@ -280,6 +390,16 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
         return futureToSet;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `processAttributeDeleteMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private ListenableFuture<Void> processAttributeDeleteMsg(TenantId tenantId, EntityId entityId, AttributeDeleteMsg attributeDeleteMsg,
                                                              String entityType) {
 
@@ -309,6 +429,16 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
         }, dbCallbackExecutorService);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `convertTelemetryEventToEntityDataProto` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public EntityDataProto convertTelemetryEventToEntityDataProto(TenantId tenantId,
                                                                   EntityType entityType,
                                                                   UUID entityUUID,
@@ -349,3 +479,11 @@ public abstract class BaseTelemetryProcessor extends BaseEdgeProcessor {
                 entityDataMsgConstructor.constructEntityDataMsg(tenantId, entityId, actionType, JsonParser.parseString(bodyJackson));
     }
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`BaseTelemetryProcessor` 在 ThingsBoard Application 模块 中承担Edge 同步服务类型职责，核心目的是处理云端与边缘端之间的实体、事件和 RPC 数据同步。
+ * 2. 核心流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+ * 3. 关键依赖：主要依赖或协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

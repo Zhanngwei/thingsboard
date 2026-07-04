@@ -76,48 +76,204 @@ import static org.thingsboard.server.transport.lwm2m.Lwm2mTestHelper.RESOURCE_ID
 
 @DaoSqlTest
 @Slf4j
+/**
+ * 中文说明：
+ * 1. 类目的：`AbstractSecurityLwM2MIntegrationTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
+ * 4. 生命周期：由 JUnit 测试生命周期创建，随单个测试方法准备和清理。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 Integration Test / Fixture。
+ */
 public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2MIntegrationTest {
 
+    /**
+     * 字段说明：
+     * 1. 保存 `CREDENTIALS_PATH` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected final String CREDENTIALS_PATH = "lwm2m/credentials/";                              // client public key or id used for PSK
     //             Get keys PSK
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_PSK_IDENTITY` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected final String CLIENT_PSK_IDENTITY = "SOME_PSK_ID";                                  // client public key or id used for PSK
     protected final String CLIENT_PSK_IDENTITY_BS = "SOME_PSK_ID_BS";                            // client public key or id used for PSK
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_PSK_KEY` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected final String CLIENT_PSK_KEY = "73656372657450534b73656372657450";                  // client private/secret key used for PSK
 
     // Server
+    /**
+     * 字段说明：
+     * 1. 保存 `SERVER_JKS_FOR_TEST` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String SERVER_JKS_FOR_TEST = "lwm2mserver";
     protected static final String SERVER_STORE_PWD = "server_ks_password";
+    /**
+     * 字段说明：
+     * 1. 保存 `SERVER_CERT_ALIAS` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String SERVER_CERT_ALIAS = "server";
     protected static final String SERVER_CERT_ALIAS_BS = "bootstrap";
+    /**
+     * 字段说明：
+     * 1. 保存 `serverX509Cert;` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected final X509Certificate serverX509Cert;                                               // server certificate signed by rootCA
     protected final X509Certificate serverX509CertBs;                                             // serverBs certificate signed by rootCA
+    /**
+     * 字段说明：
+     * 1. 保存 `serverPublicKeyFromCert;` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected final PublicKey serverPublicKeyFromCert;                                            // server public key used for RPK
     protected final PublicKey serverPublicKeyFromCertBs;                                          // serverBs public key used for RPK
 
     // Client
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_ENDPOINT_NO_SEC` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String CLIENT_ENDPOINT_NO_SEC = "LwNoSec00000000";
     protected static final String CLIENT_ENDPOINT_NO_SEC_BS = "LwNoSecBs00000000";
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_ENDPOINT_PSK` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String CLIENT_ENDPOINT_PSK = "LwPsk00000000";
     protected static final String CLIENT_ENDPOINT_PSK_BS = "LwPskBs00000000";
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_ENDPOINT_RPK` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String CLIENT_ENDPOINT_RPK = "LwRpk00000000";
     protected static final String CLIENT_ENDPOINT_RPK_BS = "LwRpkBs00000000";
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_ENDPOINT_X509_TRUST` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String CLIENT_ENDPOINT_X509_TRUST = "LwX50900000000";
     protected static final String CLIENT_ENDPOINT_X509_TRUST_NO = "LwX509TrustNo";
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_JKS_FOR_TEST` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String CLIENT_JKS_FOR_TEST = "lwm2mclient";
     protected static final String CLIENT_STORE_PWD = "client_ks_password";
+    /**
+     * 字段说明：
+     * 1. 保存 `CLIENT_ALIAS_CERT_TRUST` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected static final String CLIENT_ALIAS_CERT_TRUST = "client_alias_00000000";
     protected static final String CLIENT_ALIAS_CERT_TRUST_NO = "client_alias_trust_no";
 
+    /**
+     * 字段说明：
+     * 1. 保存 `clientX509CertTrust;` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected final X509Certificate clientX509CertTrust;                                        // client certificate signed by intermediate, rootCA with a good CN ("host name")
     protected final PrivateKey clientPrivateKeyFromCertTrust;                                   // client private key used for X509 and RPK
+    /**
+     * 字段说明：
+     * 1. 保存 `clientX509CertTrustNo;` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     protected final X509Certificate clientX509CertTrustNo;                                      // client certificate signed by intermediate, rootCA with a good CN ("host name")
     protected final PrivateKey clientPrivateKeyFromCertTrustNo;                                 // client private key used for X509 and RPK
+    /**
+     * 字段说明：
+     * 1. 保存 `RESOURCES_SECURITY` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final String[] RESOURCES_SECURITY = new String[]{"1.xml", "2.xml", "3.xml", "5.xml", "9.xml"};
 
 
+    /**
+     * 字段说明：
+     * 1. 保存 `defaultBootstrapCredentials` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private final LwM2MBootstrapClientCredentials defaultBootstrapCredentials;
 
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `AbstractSecurityLwM2MIntegrationTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public AbstractSecurityLwM2MIntegrationTest() {
         // create client credentials
         setResources(this.RESOURCES_SECURITY);
@@ -134,6 +290,7 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
             // No trust
             clientPrivateKeyFromCertTrustNo = (PrivateKey) clientKeyStore.getKey(CLIENT_ALIAS_CERT_TRUST_NO, clientKeyStorePwd);
             clientX509CertTrustNo = (X509Certificate) clientKeyStore.getCertificate(CLIENT_ALIAS_CERT_TRUST_NO);
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (GeneralSecurityException | IOException e) {
             throw new RuntimeException(e);
         }
@@ -152,6 +309,7 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
             serverX509CertBs = (X509Certificate) serverKeyStore.getCertificate(SERVER_CERT_ALIAS_BS);
             serverPublicKeyFromCertBs = serverX509CertBs.getPublicKey();
 
+        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (GeneralSecurityException | IOException e) {
             throw new RuntimeException(e);
         }
@@ -164,17 +322,29 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         defaultBootstrapCredentials.setLwm2mServer(serverCredentials);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `basicTestConnectionBefore` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void basicTestConnectionBefore(String clientEndpoint,
                                           String awaitAlias,
                                           LwM2MProfileBootstrapConfigType type,
                                           Set<LwM2MClientState> expectedStatuses,
                                           LwM2MClientState finishState) throws Exception {
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Lwm2mDeviceProfileTransportConfiguration transportConfiguration = getTransportConfiguration(OBSERVE_ATTRIBUTES_WITHOUT_PARAMS, getBootstrapServerCredentialsNoSec(type));
         LwM2MDeviceCredentials deviceCredentials = getDeviceCredentialsNoSec(createNoSecClientCredentials(clientEndpoint));
         this.basicTestConnection(noSecBootstap(URI_BS),
                 deviceCredentials,
                 COAP_CONFIG_BS,
                 clientEndpoint,
+                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 transportConfiguration,
                 awaitAlias,
                 expectedStatuses,
@@ -183,6 +353,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
                 false);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `basicTestConnection` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected void basicTestConnection(Security security,
                                        LwM2MDeviceCredentials deviceCredentials,
                                        Configuration coapConfig,
@@ -193,6 +373,7 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
                                        boolean isBootstrap,
                                        LwM2MClientState finishState,
                                        boolean isStartLw) throws Exception {
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         createDeviceProfile(transportConfiguration);
         final Device device = createDevice(deviceCredentials, endpoint);
         device.getId().getId().toString();
@@ -215,7 +396,18 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
     }
 
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `basicTestConnectionBootstrapRequestTriggerBefore` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void basicTestConnectionBootstrapRequestTriggerBefore(String clientEndpoint, String awaitAlias, LwM2MProfileBootstrapConfigType type) throws Exception {
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Lwm2mDeviceProfileTransportConfiguration transportConfiguration = getTransportConfiguration(OBSERVE_ATTRIBUTES_WITHOUT_PARAMS, getBootstrapServerCredentialsNoSec(type));
         LwM2MDeviceCredentials deviceCredentials = getDeviceCredentialsNoSec(createNoSecClientCredentials(clientEndpoint));
         this.basicTestConnectionBootstrapRequestTrigger(
@@ -223,6 +415,7 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
                 deviceCredentials,
                 COAP_CONFIG,
                 clientEndpoint,
+                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 transportConfiguration,
                 awaitAlias,
                 expectedStatusesRegistrationLwm2mSuccess,
@@ -231,6 +424,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
                 SECURITY_NO_SEC_BS);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `basicTestConnectionBootstrapRequestTrigger` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void basicTestConnectionBootstrapRequestTrigger(Security security,
                                                             LwM2MDeviceCredentials deviceCredentials,
                                                             Configuration coapConfig,
@@ -242,6 +445,7 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
                                                             boolean isBootstrap,
                                                             Security securityBs) throws Exception {
 
+        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         createDeviceProfile(transportConfiguration);
         final Device device = createDevice(deviceCredentials, endpoint);
         String deviceIdStr = device.getId().getId().toString();
@@ -267,6 +471,7 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         lwM2MTestClient.setClientStates(new HashSet<>());
         String actualResult = sendRPCSecurityExecuteById(executedPath, deviceIdStr, endpoint);
         ObjectNode rpcActualResult = JacksonUtil.fromString(actualResult, ObjectNode.class);
+        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!(rpcActualResult.get("result").asText().equals(ResponseCode.CHANGED.getName()))) {
             actualResult = sendRPCSecurityExecuteById(executedPath, deviceIdStr, endpoint);
             rpcActualResult = JacksonUtil.fromString(actualResult, ObjectNode.class);
@@ -289,8 +494,19 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         Assert.assertTrue(lwM2MTestClient.getClientStates().containsAll(expectedStatusesBs));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getBootstrapServerCredentialsSecure` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected List<LwM2MBootstrapServerCredential> getBootstrapServerCredentialsSecure(LwM2MSecurityMode mode, LwM2MProfileBootstrapConfigType bootstrapConfigType) {
         List<LwM2MBootstrapServerCredential> bootstrap = new ArrayList<>();
+        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (bootstrapConfigType) {
             case BOTH:
                 bootstrap.add(getBootstrapServerCredential(mode, false));
@@ -307,8 +523,19 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         return bootstrap;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getBootstrapServerCredential` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private AbstractLwM2MBootstrapServerCredential getBootstrapServerCredential(LwM2MSecurityMode mode, boolean isBootstrap) {
         AbstractLwM2MBootstrapServerCredential bootstrapServerCredential;
+        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (mode) {
             case PSK:
                 bootstrapServerCredential = new PSKLwM2MBootstrapServerCredential();
@@ -316,6 +543,7 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
                 break;
             case RPK:
                 bootstrapServerCredential = new RPKLwM2MBootstrapServerCredential();
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (isBootstrap) {
                     bootstrapServerCredential.setServerPublicKey(Base64.encodeBase64String(serverPublicKeyFromCertBs.getEncoded()));
                 } else {
@@ -345,6 +573,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
     }
 
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getDeviceCredentialsSecure` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected LwM2MDeviceCredentials getDeviceCredentialsSecure(LwM2MClientCredential clientCredentials,
                                                                 PrivateKey privateKey,
                                                                 X509Certificate certificate,
@@ -370,6 +608,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         return credentials;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getBootstrapClientCredentialsPsk` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private LwM2MBootstrapClientCredentials getBootstrapClientCredentialsPsk(LwM2MClientCredential clientCredentials) {
         LwM2MBootstrapClientCredentials bootstrapCredentials = new LwM2MBootstrapClientCredentials();
         PSKBootstrapClientCredential serverCredentials = new PSKBootstrapClientCredential();
@@ -382,6 +630,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         return bootstrapCredentials;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getBootstrapClientCredentialsRpk` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private LwM2MBootstrapClientCredentials getBootstrapClientCredentialsRpk(X509Certificate certificate, PrivateKey privateKey, boolean privateKeyIsBad) {
         LwM2MBootstrapClientCredentials bootstrapCredentials = new LwM2MBootstrapClientCredentials();
         RPKBootstrapClientCredential serverCredentials = new RPKBootstrapClientCredential();
@@ -399,6 +657,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         return bootstrapCredentials;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getBootstrapClientCredentialsX509` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private LwM2MBootstrapClientCredentials getBootstrapClientCredentialsX509(X509Certificate certificate, PrivateKey privateKey, boolean privateKeyIsBad) {
         LwM2MBootstrapClientCredentials bootstrapCredentials = new LwM2MBootstrapClientCredentials();
         X509BootstrapClientCredential serverCredentials = new X509BootstrapClientCredential();
@@ -419,6 +687,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         return bootstrapCredentials;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `createDeviceWithMvcResult` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected MvcResult createDeviceWithMvcResult(LwM2MDeviceCredentials credentials, String endpoint) throws Exception {
         Device device = new Device();
         device.setName(endpoint);
@@ -435,6 +713,16 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         return doPost("/api/device/credentials", deviceCredentials).andReturn();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendRPCSecurityExecuteById` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     protected String sendRPCSecurityExecuteById(String path, String deviceId, String endpoint) throws Exception {
         log.info("endpoint1: [{}]", endpoint);
 
@@ -443,3 +731,11 @@ public abstract class AbstractSecurityLwM2MIntegrationTest extends AbstractLwM2M
         return doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
     }
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`AbstractSecurityLwM2MIntegrationTest` 在 ThingsBoard Application 测试模块 中承担传输层测试或适配类型职责，核心目的是验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
+ * 2. 核心流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+ * 3. 关键依赖：主要依赖或协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

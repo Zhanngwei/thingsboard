@@ -42,6 +42,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @DaoSqlTest
+/**
+ * 中文说明：
+ * 1. 类目的：`ImageControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
+ * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 MVC Controller / Facade。
+ */
 public class ImageControllerTest extends AbstractControllerTest {
 
     private static final byte[] PNG_IMAGE = Base64.getDecoder().decode("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");
@@ -49,19 +59,58 @@ public class ImageControllerTest extends AbstractControllerTest {
     private static final byte[] SVG_IMAGE = Base64.getDecoder().decode("PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJzdmc0NDA4IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHg9IjAiIHk9IjAiIHZpZXdCb3g9IjAgMCAxNTAgMTUwIiB4bWw6c3BhY2U9InByZXNlcnZlIj48c3R5bGU+LnN0MntmaWxsOiMyNzg2MjJ9PC9zdHlsZT48ZyBpZD0ibGF5ZXIxIj48ZyBpZD0icGF0aDY4ODEtMy01LTUtMS04LTQtNC03LTgiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNDYuNDM4IC0yNzYuMDI4KSIgb3BhY2l0eT0iLjg5MiI+PHJhZGlhbEdyYWRpZW50IGlkPSJTVkdJRF8xXyIgY3g9IjMwODUuMjE1IiBjeT0iMzE3OC40NTgiIHI9IjQ5LjkwMSIgZ3JhZGllbnRUcmFuc2Zvcm09Im1hdHJpeCguNjc5MyAuMDA3NiAtLjUwOSAuNTYxMiAtMjMyLjYyOSAtMTQxMS43MjUpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLW9wYWNpdHk9Ii4xODgiLz48L3JhZGlhbEdyYWRpZW50PjxwYXRoIGQ9Ik0yODUuNiAzODguNWMxMC4zLTEyLjQgNC40LTIyLjQtMTQuNC0yMi40LTE4LjkgMC00Mi40IDEwLTUzLjkgMjIuNC0xNi44IDE4IC40IDIzLjUtLjIgMzUtLjEgMS44IDMuOSAxLjggNyAwIDE5LjgtMTEuNSA0Ni41LTE3IDYxLjUtMzUiIGZpbGw9InVybCgjU1ZHSURfMV8pIi8+PC9nPjxwYXRoIGlkPSJwYXRoNjg4MS0zLTUtNS0xLTgtNC00IiBjbGFzcz0ic3QyIiBkPSJNMTI0LjcgNjkuMWMtLjktMjcuNS0yMi4zLTQ5LjgtNDkuOC00OS44cy00OSAyMi4zLTQ5LjggNDkuOGMtMS4zIDQwLjEgMzAuNyA1Mi4yIDQ0LjcgNzggMi4yIDQgOCA0IDEwLjEgMCAxNC4xLTI1LjggNDYuMS0zNy45IDQ0LjgtNzgiLz48L2c+PGcgaWQ9Imc0OTI4Ij48Y2lyY2xlIGlkPSJwYXRoNDk3OCIgY2xhc3M9InN0MiIgY3g9Ijc0LjkiIGN5PSI2OS4xIiByPSI0OS45Ii8+PGcgaWQ9Imc0OTE1Ij48cGF0aCBpZD0icGF0aDY4ODMtMi0zLTUtMi00LTktNC05IiBkPSJNNzQuOCAxMDYuNGMtMjAuNiAwLTM3LjQtMTYuNy0zNy40LTM3LjQgMC0yMC42IDE2LjctMzcuNCAzNy40LTM3LjQgMjAuNiAwIDM3LjQgMTYuNyAzNy40IDM3LjRzLTE2LjcgMzcuNC0zNy40IDM3LjQiIGZpbGw9IiNmZmYiLz48L2c+PC9nPjxwYXRoIGNsYXNzPSJzdDIiIGQ9Ik05NS45IDQ2LjZWNDloLTEwdi0yLjVsMTAgLjF6bS0yIDUuM2gtOHYyLjVoOHYtMi41em0tOCA3LjloNnYtMi41aC02djIuNXptNCAyLjloLTR2Mi41aDR2LTIuNXptLTQgNy44aDJWNjhoLTJ2Mi41em0xLjUgMTRjMCA2LjktNS41IDEyLjUtMTIuMyAxMi41cy0xMi4zLTUuNi0xMi4zLTEyLjVjMC00LjUgMi4zLTguNSA2LjEtMTAuN1Y0NS41YzAtMy41IDIuOC02LjMgNi4yLTYuM3M2LjIgMi44IDYuMiA2LjN2MjguM2MzLjggMi4yIDYuMSA2LjMgNi4xIDEwLjd6bS0yLjQgMGMwLTMuOC0yLjEtNy4yLTUuNC04LjlsLS43LS4zVjQ1LjVjMC0yLjEtMS43LTMuOC0zLjgtMy44LTIuMSAwLTMuOCAxLjctMy44IDMuOHYyOS44bC0uNy4zYy0zLjMgMS43LTUuNCA1LjEtNS40IDguOSAwIDUuNSA0LjQgMTAgOS45IDEwUzg1IDkwIDg1IDg0LjV6bS0yLjEgMGMwIDQuNC0zLjUgOC03LjggOHMtNy44LTMuNi03LjgtOGMwLTMuNiAyLjQtNi44IDUuOC03LjdsLjUtLjFWNjEuNWgzLjF2MTUuMmwuNS4xYzMuMyAxIDUuNyA0LjEgNS43IDcuN3ptLTcuNC01LjNjLS4yLS44LTEtMS40LTEuOS0xLjItMyAuNy01IDMuMy01IDYuNCAwIC45LjcgMS42IDEuNiAxLjZzMS42LS43IDEuNi0xLjZjMC0xLjYgMS4xLTMgMi42LTMuMy43LS4yIDEuMy0xIDEuMS0xLjl6Ii8+PC9zdmc+Cg==");
 
     @Autowired
+    /**
+     * 字段说明：
+     * 1. 保存 `resourceRepository` 对应的配置、依赖、上下文或运行期状态。
+     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
+     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
+     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
+     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     */
     private TbResourceRepository resourceRepository;
 
     @Before
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `beforeEach` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void beforeEach() throws Exception {
         loginTenantAdmin();
     }
 
     @After
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `afterEach` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void afterEach() {
+        // DAO 调用是数据库访问边界，事务和缓存一致性由上层服务约定控制。
         resourceRepository.deleteAll();
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testUploadPngImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testUploadPngImage() throws Exception {
         String filename = "my_png_image.png";
         TbResourceInfo imageInfo = uploadImage(HttpMethod.POST, "/api/image", filename, "image/png", PNG_IMAGE);
@@ -81,6 +130,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testUploadJpegImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testUploadJpegImage() throws Exception {
         String filename = "my_jpeg_image.jpg";
         TbResourceInfo imageInfo = uploadImage(HttpMethod.POST, "/api/image", filename, "image/jpeg", JPEG_IMAGE);
@@ -93,6 +152,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testUploadSvgImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testUploadSvgImage() throws Exception {
         String filename = "my_svg_image.svg";
         TbResourceInfo imageInfo = uploadImage(HttpMethod.POST, "/api/image", filename, "image/svg+xml", SVG_IMAGE);
@@ -105,6 +174,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testUploadImageWithSameFilename` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testUploadImageWithSameFilename() throws Exception {
         String filename = "my_jpeg_image.jpg";
         TbResourceInfo imageInfo1 = uploadImage(HttpMethod.POST, "/api/image", filename, "image/jpeg", JPEG_IMAGE);
@@ -124,6 +203,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testUpdateImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testUpdateImage() throws Exception {
         String filename = "my_png_image.png";
         TbResourceInfo imageInfo = uploadImage(HttpMethod.POST, "/api/image", filename, "image/png", PNG_IMAGE);
@@ -145,6 +234,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testUpdateImageInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testUpdateImageInfo() throws Exception {
         String filename = "my_png_image.png";
         TbResourceInfo imageInfo = uploadImage(HttpMethod.POST, "/api/image", filename, "image/png", PNG_IMAGE);
@@ -167,6 +266,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testExportImportImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testExportImportImage() throws Exception {
         String filename = "my_png_image.png";
         uploadImage(HttpMethod.POST, "/api/image", filename, "image/png", PNG_IMAGE);
@@ -193,6 +302,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testGetImages` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testGetImages() throws Exception {
         loginSysAdmin();
         String systemImageName = "my_system_png_image.png";
@@ -215,6 +334,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testUploadPublicImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testUploadPublicImage() throws Exception {
         String filename = "my_public_image.png";
         TbResourceInfo imageInfo = uploadImage(HttpMethod.POST, "/api/image", filename, "image/png", PNG_IMAGE);
@@ -229,6 +358,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testMakeImagePublic` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testMakeImagePublic() throws Exception {
         String filename = "my_public_image.png";
         TbResourceInfo imageInfo = uploadImage(HttpMethod.POST, "/api/image", filename, "image/png", PNG_IMAGE);
@@ -248,6 +387,16 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testGetImageUploadSpecs` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testGetImageUploadSpecs() throws Exception {
         SystemParams systemParams = doGet("/api/system/params", SystemParams.class);
         assertThat(systemParams.getMaxResourceSize()).isZero();
@@ -269,10 +418,30 @@ public class ImageControllerTest extends AbstractControllerTest {
         assertThat(systemParams.getMaxResourceSize()).isEqualTo(0);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `updateImagePublicStatus` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private TbResourceInfo updateImagePublicStatus(String filename, boolean isPublic) throws Exception {
         return doPut("/api/images/tenant/" + filename + "/public/" + isPublic, "", TbResourceInfo.class);
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `checkPngImageDescriptor` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void checkPngImageDescriptor(ImageDescriptor imageDescriptor) {
         assertThat(imageDescriptor.getMediaType()).isEqualTo("image/png");
         assertThat(imageDescriptor.getWidth()).isEqualTo(200);
@@ -288,6 +457,16 @@ public class ImageControllerTest extends AbstractControllerTest {
         assertThat(previewDescriptor.getEtag()).isEqualTo(imageDescriptor.getEtag());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `checkJpegImageDescriptor` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void checkJpegImageDescriptor(ImageDescriptor imageDescriptor) {
         assertThat(imageDescriptor.getMediaType()).isEqualTo("image/jpeg");
         assertThat(imageDescriptor.getWidth()).isEqualTo(225);
@@ -303,6 +482,16 @@ public class ImageControllerTest extends AbstractControllerTest {
         assertThat(previewDescriptor.getEtag()).isEqualTo("c909e20ba942f95f4ed1ddfcf4307ce846b4a689195c629cd85f2517f46e84f9");
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `checkSvgImageDescriptor` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private void checkSvgImageDescriptor(ImageDescriptor imageDescriptor) {
         assertThat(imageDescriptor.getMediaType()).isEqualTo("image/svg+xml");
         assertThat(imageDescriptor.getWidth()).isEqualTo(150);
@@ -311,26 +500,76 @@ public class ImageControllerTest extends AbstractControllerTest {
         assertThat(imageDescriptor.getEtag()).isEqualTo(Hashing.sha256().hashBytes(SVG_IMAGE).toString());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `getImages` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private List<TbResourceInfo> getImages(String searchText, boolean includeSystemImages, int limit) throws Exception {
         PageData<TbResourceInfo> images = doGetTypedWithPageLink("/api/images?includeSystemImages=" + includeSystemImages + "&", new TypeReference<>() {}, new PageLink(limit, 0, searchText));
         return images.getData();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `downloadImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private byte[] downloadImage(String type, String key) throws Exception {
         return doGet("/api/images/" + type + "/" + key).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `downloadImagePreview` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private byte[] downloadImagePreview(String type, String key) throws Exception {
         return doGet("/api/images/" + type + "/" + key + "/preview").andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `downloadPublicImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private byte[] downloadPublicImage(String publicKey) throws Exception {
         return doGet("/api/images/public/" + publicKey).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `uploadImage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private <R> TbResourceInfo uploadImage(HttpMethod httpMethod, String url, String filename, String mediaType, byte[] content) throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", filename, mediaType, content);
         var request = MockMvcRequestBuilders.multipart(httpMethod, url).file(file);
@@ -339,3 +578,11 @@ public class ImageControllerTest extends AbstractControllerTest {
     }
 
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`ImageControllerTest` 在 ThingsBoard Application 测试模块 中承担REST/WebSocket 控制层类型职责，核心目的是承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
+ * 2. 核心流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
+ * 3. 关键依赖：主要依赖或协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */

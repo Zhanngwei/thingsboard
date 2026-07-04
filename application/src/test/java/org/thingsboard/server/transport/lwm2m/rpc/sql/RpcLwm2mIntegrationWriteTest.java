@@ -35,6 +35,16 @@ import static org.thingsboard.server.transport.lwm2m.Lwm2mTestHelper.RESOURCE_ID
 import static org.thingsboard.server.transport.lwm2m.Lwm2mTestHelper.RESOURCE_ID_NAME_3_14;
 import static org.thingsboard.server.transport.lwm2m.Lwm2mTestHelper.RESOURCE_INSTANCE_ID_2;
 
+/**
+ * 中文说明：
+ * 1. 类目的：`RpcLwm2mIntegrationWriteTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
+ * 4. 生命周期：由 JUnit 测试生命周期创建，随单个测试方法准备和清理。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 Integration Test / Fixture。
+ */
 public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTest {
 
 
@@ -44,6 +54,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"CHANGED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteReplaceValueSingleResourceById_Result_CHANGED` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteReplaceValueSingleResourceById_Result_CHANGED() throws Exception {
         String expectedPath = objectInstanceIdVer_3 + "/" + RESOURCE_ID_14;
         String expectedValue = "+12";
@@ -63,6 +83,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"CHANGED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteReplaceValueSingleResourceByKey_Result_CHANGED` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteReplaceValueSingleResourceByKey_Result_CHANGED() throws Exception {
         String expectedKey = RESOURCE_ID_NAME_3_14;
         String expectedValue = "+09";
@@ -83,6 +113,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"CHANGED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteReplaceValueMultipleResource_Result_CHANGED_Value_Multi_Instance_Resource_must_in_Json_format` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteReplaceValueMultipleResource_Result_CHANGED_Value_Multi_Instance_Resource_must_in_Json_format() throws Exception {
         String expectedPath = objectIdVer_19 + "/" + OBJECT_INSTANCE_ID_0 + "/" + RESOURCE_ID_0;
         int resourceInstanceId0 = 0;
@@ -113,6 +153,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"METHOD_NOT_ALLOWED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteReplaceValueSingleResourceR_ById_Result_CHANGED` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteReplaceValueSingleResourceR_ById_Result_CHANGED() throws Exception {
         String expectedPath = objectInstanceIdVer_3 + "/" + RESOURCE_ID_9;
         Integer expectedValue = 90;
@@ -127,6 +177,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"CHANGED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteUpdateValueSingleResourceById_Result_CHANGED` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteUpdateValueSingleResourceById_Result_CHANGED() throws Exception {
         String expectedPath = objectInstanceIdVer_3;
         String expectedValue14 = "+5";
@@ -155,6 +215,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"CHANGED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteUpdateValueMultipleResourceById_Result_CHANGED` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteUpdateValueMultipleResourceById_Result_CHANGED() throws Exception {
         String expectedPath = objectIdVer_19 + "/" + OBJECT_INSTANCE_ID_0;
         int resourceInstanceId0 = 0;
@@ -185,6 +255,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"CHANGED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteCompositeValueSingleResourceResourceInstanceByIdKey_Result_CHANGED` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteCompositeValueSingleResourceResourceInstanceByIdKey_Result_CHANGED() throws Exception {
         int resourceInstanceId2 = 2;
         String expectedPath19_1_0_2 = objectIdVer_19 + "/" + OBJECT_INSTANCE_ID_1 + "/" + RESOURCE_ID_0 + "/" + resourceInstanceId2;
@@ -221,6 +301,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * WriteComposite {"nodes":{"/19/0/0":{"0":"abcd5678", "10":"abcd5678"}}}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteCompositeValueSingleMultipleResourceByIdKey_Result_BAD_REQUEST_WriteComposite_operation_for_SingleResources_or_and_ResourceInstance` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteCompositeValueSingleMultipleResourceByIdKey_Result_BAD_REQUEST_WriteComposite_operation_for_SingleResources_or_and_ResourceInstance() throws Exception {
         String nodes = "{\"/19/0/0\":{\"0\":\"abcd5678\", \"10\":\"abcd5678\"}}";
         String actualResult = sendCompositeRPC(nodes);
@@ -244,6 +334,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"CHANGED"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteCompositeCreateResourceInstanceUpdateSingleResourceByIdKey_Result_CHANGED` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteCompositeCreateResourceInstanceUpdateSingleResourceByIdKey_Result_CHANGED() throws Exception {
         String expectedPath19_1_0_2 = objectIdVer_19 + "/" + OBJECT_INSTANCE_ID_1 + "/" + RESOURCE_ID_0 + "/" + RESOURCE_INSTANCE_ID_2;
         String expectedValue19_1_0_2 = "00001234";
@@ -283,6 +383,16 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
      * {"result":"BAD_REQUEST","error":"object instance /19/2 not found"}
      */
     @Test
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `testWriteCompositeCreateObjectInstanceUpdateSingleResourceByIdKey_Result_BAD_REQUEST` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public void testWriteCompositeCreateObjectInstanceUpdateSingleResourceByIdKey_Result_BAD_REQUEST() throws Exception {
         String expectedPath19_1_2_2 = objectIdVer_19 + "/" + OBJECT_INSTANCE_ID_2 + "/" + RESOURCE_ID_0 + "/" + RESOURCE_INSTANCE_ID_2;
         String expectedValue19_1_0_2 = "00001234";
@@ -302,33 +412,101 @@ public class RpcLwm2mIntegrationWriteTest extends AbstractRpcLwM2MIntegrationTes
         assertTrue(actual.equals(expected));
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendRPCWriteStringById` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private String sendRPCWriteStringById(String method, String path, String value) throws Exception {
         String setRpcRequest = "{\"method\": \"" + method + "\", \"params\": {\"id\": \"" + path + "\", \"value\": \"" + value + "\" }}";
         return doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendRPCWriteObjectById` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private String sendRPCWriteObjectById(String method, String path, Object value) throws Exception {
         String setRpcRequest = "{\"method\": \"" + method + "\", \"params\": {\"id\": \"" + path + "\", \"value\": " + value + " }}";
         return doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendRPCReadById` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private String sendRPCReadById(String id) throws Exception {
         String setRpcRequest = "{\"method\": \"Read\", \"params\": {\"id\": \"" + id + "\"}}";
         return doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendRPCWriteByKey` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private String sendRPCWriteByKey(String method, String key, String value) throws Exception {
         String setRpcRequest = "{\"method\": \"" + method + "\", \"params\": {\"key\": \"" + key + "\", \"value\": \"" + value + "\" }}";
         return doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendRPCReadByKey` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private String sendRPCReadByKey(String key) throws Exception {
         String setRpcRequest = "{\"method\": \"Read\", \"params\": {\"key\": \"" + key + "\"}}";
         return doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `sendCompositeRPC` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     private String sendCompositeRPC(String nodes) throws Exception {
         String setRpcRequest = "{\"method\": \"WriteComposite\", \"params\": {\"nodes\":" + nodes + "}}";
         return doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
     }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`RpcLwm2mIntegrationWriteTest` 在 ThingsBoard Application 测试模块 中承担传输层测试或适配类型职责，核心目的是验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
+ * 2. 核心流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
+ * 3. 关键依赖：主要依赖或协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */
 }

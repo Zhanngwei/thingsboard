@@ -44,15 +44,37 @@ import java.util.UUID;
 @Slf4j
 @Component
 @TbCoreComponent
+/**
+ * 中文说明：
+ * 1. 类目的：`EdgeProcessor` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
+ * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
+ * 3. 协作对象：主要协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
+ * 4. 生命周期：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行。
+ * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
+ * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
+ * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
+ */
 public class EdgeProcessor extends BaseEdgeProcessor {
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `convertEdgeEventToDownlink` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public DownlinkMsg convertEdgeEventToDownlink(EdgeEvent edgeEvent) {
         EdgeId edgeId = new EdgeId(edgeEvent.getEntityId());
         DownlinkMsg downlinkMsg = null;
+        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (edgeEvent.getAction()) {
             case ASSIGNED_TO_CUSTOMER:
             case UNASSIGNED_FROM_CUSTOMER:
                 Edge edge = edgeService.findEdgeById(edgeEvent.getTenantId(), edgeId);
+                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (edge != null) {
                     EdgeConfiguration edgeConfigMsg =
                             edgeMsgConstructor.constructEdgeConfiguration(edge);
@@ -66,29 +88,49 @@ public class EdgeProcessor extends BaseEdgeProcessor {
         return downlinkMsg;
     }
 
+    /**
+     * 方法说明：
+     * 1. 职责：执行 `processEdgeNotification` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
+     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
+     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
+     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
+     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
+     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     */
     public ListenableFuture<Void> processEdgeNotification(TenantId tenantId, TransportProtos.EdgeNotificationMsgProto edgeNotificationMsg) {
         try {
             EdgeEventActionType actionType = EdgeEventActionType.valueOf(edgeNotificationMsg.getAction());
             EdgeId edgeId = new EdgeId(new UUID(edgeNotificationMsg.getEntityIdMSB(), edgeNotificationMsg.getEntityIdLSB()));
+            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (actionType) {
                 case ASSIGNED_TO_CUSTOMER:
                     CustomerId customerId = JacksonUtil.fromString(edgeNotificationMsg.getBody(), CustomerId.class);
                     Edge edge = edgeService.findEdgeById(tenantId, edgeId);
+                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (customerId != null && (edge == null || customerId.isNullUid())) {
+                        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                         return Futures.immediateFuture(null);
                     }
+                    // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                     List<ListenableFuture<Void>> futures = new ArrayList<>();
+                    // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                     futures.add(saveEdgeEvent(edge.getTenantId(), edge.getId(), EdgeEventType.CUSTOMER, EdgeEventActionType.ADDED, customerId, null));
+                    // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                     futures.add(saveEdgeEvent(edge.getTenantId(), edge.getId(), EdgeEventType.EDGE, EdgeEventActionType.ASSIGNED_TO_CUSTOMER, edgeId, null));
                     PageLink pageLink = new PageLink(DEFAULT_PAGE_SIZE);
                     PageData<User> pageData;
                     do {
                         pageData = userService.findCustomerUsers(tenantId, customerId, pageLink);
+                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (pageData != null && pageData.getData() != null && !pageData.getData().isEmpty()) {
                             log.trace("[{}][{}][{}] user(s) are going to be added to edge.", tenantId, edge.getId(), pageData.getData().size());
+                            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                             for (User user : pageData.getData()) {
+                                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                                 futures.add(saveEdgeEvent(edge.getTenantId(), edge.getId(), EdgeEventType.USER, EdgeEventActionType.ADDED, user.getId(), null));
                             }
+                            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                             if (pageData.hasNext()) {
                                 pageLink = pageLink.nextPageLink();
                             }
@@ -113,3 +155,11 @@ public class EdgeProcessor extends BaseEdgeProcessor {
         }
     }
 }
+
+/*
+ * 本类总结：
+ * 1. 核心职责：`EdgeProcessor` 在 ThingsBoard Application 模块 中承担Edge 同步服务类型职责，核心目的是处理云端与边缘端之间的实体、事件和 RPC 数据同步。
+ * 2. 核心流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
+ * 3. 关键依赖：主要依赖或协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
+ * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
+ */
