@@ -41,14 +41,14 @@ import java.util.function.Consumer;
 public class AsyncCallbackTemplate {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `withCallbackAndTimeout` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `withCallbackAndTimeout` 对应的处理。
+     * 参数：
+     * - `future`：数据列表。
+     * - `onSuccess`：`onSuccess` 参数。
+     * - `onFailure`：`onFailure` 参数。
+     * - `timeoutInMs`：`timeoutInMs` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     public static <T> void withCallbackAndTimeout(ListenableFuture<T> future,
                                                   Consumer<T> onSuccess,
@@ -56,31 +56,26 @@ public class AsyncCallbackTemplate {
                                                   long timeoutInMs,
                                                   ScheduledExecutorService timeoutExecutor,
                                                   Executor callbackExecutor) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         future = Futures.withTimeout(future, timeoutInMs, TimeUnit.MILLISECONDS, timeoutExecutor);
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         withCallback(future, onSuccess, onFailure, callbackExecutor);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `withCallback` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `withCallback` 对应的处理。
+     * 参数：
+     * - `future`：数据列表。
+     * - `onSuccess`：`onSuccess` 参数。
+     * - `onFailure`：`onFailure` 参数。
+     * - `executor`：`executor` 参数。
+     * 返回：无。
      */
     public static <T> void withCallback(ListenableFuture<T> future, Consumer<T> onSuccess,
                                         Consumer<Throwable> onFailure, Executor executor) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         FutureCallback<T> callback = new FutureCallback<T>() {
             @Override
             public void onSuccess(T result) {
                 try {
                     onSuccess.accept(result);
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (Throwable th) {
                     onFailure(th);
                 }
@@ -91,12 +86,9 @@ public class AsyncCallbackTemplate {
                 onFailure.accept(t);
             }
         };
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (executor != null) {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             Futures.addCallback(future, callback, executor);
         } else {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             Futures.addCallback(future, callback, MoreExecutors.directExecutor());
         }
     }

@@ -27,152 +27,77 @@ package org.thingsboard.server.common.data;
  */
 public class CacheConstants {
     /**
-     * 字段说明：
-     * 1. 保存 `DEVICE_CREDENTIALS_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备凭据常量，用于统一引用固定值。
      */
     public static final String DEVICE_CREDENTIALS_CACHE = "deviceCredentials";
     public static final String RELATIONS_CACHE = "relations";
     /**
-     * 字段说明：
-     * 1. 保存 `DEVICE_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备常量，用于统一引用固定值。
      */
     public static final String DEVICE_CACHE = "devices";
     public static final String SESSIONS_CACHE = "sessions";
     /**
-     * 字段说明：
-     * 1. 保存 `ASSET_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 资产常量，用于统一引用固定值。
      */
     public static final String ASSET_CACHE = "assets";
     public static final String ENTITY_VIEW_CACHE = "entityViews";
     /**
-     * 字段说明：
-     * 1. 保存 `EDGE_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 边缘节点常量，用于统一引用固定值。
      */
     public static final String EDGE_CACHE = "edges";
     public static final String CLAIM_DEVICES_CACHE = "claimDevices";
     /**
-     * 字段说明：
-     * 1. 保存 `SECURITY_SETTINGS_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置常量，用于统一引用固定值。
      */
     public static final String SECURITY_SETTINGS_CACHE = "securitySettings";
     public static final String TENANT_PROFILE_CACHE = "tenantProfiles";
     /**
-     * 字段说明：
-     * 1. 保存 `TENANTS_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `TENANTS_CACHE`常量，用于统一引用固定值。
      */
     public static final String TENANTS_CACHE = "tenants";
     public static final String TENANTS_EXIST_CACHE = "tenantsExist";
     /**
-     * 字段说明：
-     * 1. 保存 `DEVICE_PROFILE_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备配置常量，用于统一引用固定值。
      */
     public static final String DEVICE_PROFILE_CACHE = "deviceProfiles";
     public static final String NOTIFICATION_SETTINGS_CACHE = "notificationSettings";
     /**
-     * 字段说明：
-     * 1. 保存 `SENT_NOTIFICATIONS_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `SENT_NOTIFICATIONS_CACHE`常量，用于统一引用固定值。
      */
     public static final String SENT_NOTIFICATIONS_CACHE = "sentNotifications";
 
     /**
-     * 字段说明：
-     * 1. 保存 `ASSET_PROFILE_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 资产配置常量，用于统一引用固定值。
      */
     public static final String ASSET_PROFILE_CACHE = "assetProfiles";
     public static final String ATTRIBUTES_CACHE = "attributes";
     /**
-     * 字段说明：
-     * 1. 保存 `USERS_SESSION_INVALIDATION_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 会话常量，用于统一引用固定值。
      */
     public static final String USERS_SESSION_INVALIDATION_CACHE = "userSessionsInvalidation";
     public static final String OTA_PACKAGE_CACHE = "otaPackages";
     /**
-     * 字段说明：
-     * 1. 保存 `OTA_PACKAGE_DATA_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数据常量，用于统一引用固定值。
      */
     public static final String OTA_PACKAGE_DATA_CACHE = "otaPackagesData";
     public static final String REPOSITORY_SETTINGS_CACHE = "repositorySettings";
     /**
-     * 字段说明：
-     * 1. 保存 `AUTO_COMMIT_SETTINGS_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置常量，用于统一引用固定值。
      */
     public static final String AUTO_COMMIT_SETTINGS_CACHE = "autoCommitSettings";
     public static final String TWO_FA_VERIFICATION_CODES_CACHE = "twoFaVerificationCodes";
     /**
-     * 字段说明：
-     * 1. 保存 `VERSION_CONTROL_TASK_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 版本号常量，用于统一引用固定值。
      */
     public static final String VERSION_CONTROL_TASK_CACHE = "versionControlTask";
     public static final String USER_SETTINGS_CACHE = "userSettings";
     /**
-     * 字段说明：
-     * 1. 保存 `DASHBOARD_TITLES_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 仪表盘常量，用于统一引用固定值。
      */
     public static final String DASHBOARD_TITLES_CACHE = "dashboardTitles";
     public static final String ENTITY_COUNT_CACHE = "entityCount";
     /**
-     * 字段说明：
-     * 1. 保存 `RESOURCE_INFO_CACHE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 信息对象常量，用于统一引用固定值。
      */
     public static final String RESOURCE_INFO_CACHE = "resourceInfo";
     public static final String ALARM_TYPES_CACHE = "alarmTypes";

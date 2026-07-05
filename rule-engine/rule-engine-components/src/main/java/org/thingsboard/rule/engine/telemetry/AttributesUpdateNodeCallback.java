@@ -29,17 +29,22 @@ import java.util.List;
 public class AttributesUpdateNodeCallback extends TelemetryNodeCallback {
 
     /**
-     * 字段说明：保存 `scope`，表示属性作用域，供本类方法在规则节点处理流程中使用。
+     * `scope` 字段，保存当前对象的对应属性。
      */
     private final String scope;
     /**
-     * 字段说明：保存 `attributes`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * `attributes`列表，用于保存一组待处理对象。
      */
     private final List<AttributeKvEntry> attributes;
 
     /**
-     * 方法说明：构造 `AttributesUpdateNodeCallback` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `AttributesUpdateNodeCallback` 实例，并初始化必要字段。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `scope`：`scope` 参数。
+     * - `attributes`：数据列表。
+     * 返回：新创建的对象实例。
      */
     public AttributesUpdateNodeCallback(TbContext ctx, TbMsg msg, String scope, List<AttributeKvEntry> attributes) {
         super(ctx, msg);
@@ -47,11 +52,13 @@ public class AttributesUpdateNodeCallback extends TelemetryNodeCallback {
         this.attributes = attributes;
     }
 
-    @Override
     /**
-     * 方法说明：处理异步调用成功回调并继续规则链投递。
-     * 调用边界：由异步 Future 或消息回调触发；本方法本身只衔接规则链结果，数据库、缓存、MQTT 或事务通常发生在触发该回调的上游调用链中。
+     * 功能：处理`on Success`。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：无。
      */
+    @Override
     public void onSuccess(@Nullable Void result) {
         TbContext ctx = this.getCtx();
         TbMsg tbMsg = this.getMsg();

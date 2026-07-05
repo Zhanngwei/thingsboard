@@ -76,23 +76,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationStore, Startable, Stoppable, Destroyable {
     /** Default time in seconds between 2 cleaning tasks (used to remove expired registration). */
     /**
-     * 字段说明：
-     * 1. 保存 `DEFAULT_CLEAN_PERIOD` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `DEFAULT_CLEAN_PERIOD`常量，用于统一引用固定值。
      */
     public static final long DEFAULT_CLEAN_PERIOD = 60;
     public static final int DEFAULT_CLEAN_LIMIT = 500;
     /** Defaut Extra time for registration lifetime in seconds */
     /**
-     * 字段说明：
-     * 1. 保存 `DEFAULT_GRACE_PERIOD` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `DEFAULT_GRACE_PERIOD`常量，用于统一引用固定值。
      */
     public static final long DEFAULT_GRACE_PERIOD = 0;
 
@@ -100,141 +90,81 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
 
     // Redis key prefixes
     /**
-     * 字段说明：
-     * 1. 保存 `REG_EP` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `REG_EP`常量，用于统一引用固定值。
      */
     private static final String REG_EP = "REG:EP:"; // (Endpoint => Registration)
     private static final String REG_EP_REGID_IDX = "EP:REGID:"; // secondary index key (Registration ID => Endpoint)
     /**
-     * 字段说明：
-     * 1. 保存 `REG_EP_ADDR_IDX` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `REG_EP_ADDR_IDX`常量，用于统一引用固定值。
      */
     private static final String REG_EP_ADDR_IDX = "EP:ADDR:"; // secondary index key (Socket Address => Endpoint)
     private static final String REG_EP_IDENTITY = "EP:IDENTITY:"; // secondary index key (Identity => Endpoint)
     /**
-     * 字段说明：
-     * 1. 保存 `LOCK_EP` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 锁常量，用于统一引用固定值。
      */
     private static final String LOCK_EP = "LOCK:EP:";
     private static final byte[] OBS_TKN = "OBS:TKN:".getBytes(UTF_8);
     /**
-     * 字段说明：
-     * 1. 保存 `OBS_TKNS_REGID_IDX` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `OBS_TKNS_REGID_IDX`常量，用于统一引用固定值。
      */
     private static final String OBS_TKNS_REGID_IDX = "TKNS:REGID:"; // secondary index (token list by registration)
     private static final byte[] EXP_EP = "EXP:EP".getBytes(UTF_8); // a sorted set used for registration expiration
     // (expiration date, Endpoint)
 
     /**
-     * 字段说明：
-     * 1. 保存 `connectionFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
     private final RedisConnectionFactory connectionFactory;
 
     // Listener use to notify when a registration expires
     /**
-     * 字段说明：
-     * 1. 保存 `expirationListener` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 监听器列表，用于保存一组待处理对象。
      */
     private ExpirationListener expirationListener;
 
     /**
-     * 字段说明：
-     * 1. 保存 `schedExecutor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     private final ScheduledExecutorService schedExecutor;
     private ScheduledFuture<?> cleanerTask;
     /**
-     * 字段说明：
-     * 1. 保存 `started` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前处理是否已经启动。
      */
     private boolean started = false;
 
     /**
-     * 字段说明：
-     * 1. 保存 `cleanPeriod;` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `cleanPeriod` 字段，保存当前对象的对应属性。
      */
     private final long cleanPeriod; // in seconds
     private final int cleanLimit; // maximum number to clean in a clean period
     /**
-     * 字段说明：
-     * 1. 保存 `gracePeriod;` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `gracePeriod` 字段，保存当前对象的对应属性。
      */
     private final long gracePeriod; // in seconds
 
     /**
-     * 字段说明：
-     * 1. 保存 `redisLock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 锁，用于保护并发读写的共享状态。
      */
     private final RedisLockRegistry redisLock;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbLwM2mRedisRegistrationStore` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbLwM2mRedisRegistrationStore` 实例，并初始化必要字段。
+     * 参数：
+     * - `connectionFactory`：`connectionFactory` 参数。
+     * 返回：新创建的对象实例。
      */
     public TbLwM2mRedisRegistrationStore(RedisConnectionFactory connectionFactory) {
         this(connectionFactory, DEFAULT_CLEAN_PERIOD, DEFAULT_GRACE_PERIOD, DEFAULT_CLEAN_LIMIT); // default clean period 60s
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbLwM2mRedisRegistrationStore` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbLwM2mRedisRegistrationStore` 实例，并初始化必要字段。
+     * 参数：
+     * - `connectionFactory`：`connectionFactory` 参数。
+     * - `cleanPeriodInSec`：`cleanPeriodInSec` 参数。
+     * - `lifetimeGracePeriodInSec`：`lifetimeGracePeriodInSec` 参数。
+     * - `cleanLimit`：数量限制。
+     * 返回：新创建的对象实例。
      */
     public TbLwM2mRedisRegistrationStore(RedisConnectionFactory connectionFactory, long cleanPeriodInSec, long lifetimeGracePeriodInSec, int cleanLimit) {
         this(connectionFactory, Executors.newScheduledThreadPool(1,
@@ -243,14 +173,14 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbLwM2mRedisRegistrationStore` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbLwM2mRedisRegistrationStore` 实例，并初始化必要字段。
+     * 参数：
+     * - `connectionFactory`：`connectionFactory` 参数。
+     * - `schedExecutor`：`schedExecutor` 参数。
+     * - `cleanPeriodInSec`：`cleanPeriodInSec` 参数。
+     * - `lifetimeGracePeriodInSec`：`lifetimeGracePeriodInSec` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public TbLwM2mRedisRegistrationStore(RedisConnectionFactory connectionFactory, ScheduledExecutorService schedExecutor, long cleanPeriodInSec,
                                          long lifetimeGracePeriodInSec, int cleanLimit) {
@@ -259,14 +189,14 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbLwM2mRedisRegistrationStore` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbLwM2mRedisRegistrationStore` 实例，并初始化必要字段。
+     * 参数：
+     * - `connectionFactory`：`connectionFactory` 参数。
+     * - `schedExecutor`：`schedExecutor` 参数。
+     * - `cleanPeriodInSec`：`cleanPeriodInSec` 参数。
+     * - `lifetimeGracePeriodInSec`：`lifetimeGracePeriodInSec` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public TbLwM2mRedisRegistrationStore(RedisConnectionFactory connectionFactory, ScheduledExecutorService schedExecutor, long cleanPeriodInSec,
                                          long lifetimeGracePeriodInSec, int cleanLimit, RedisLockRegistry lockRegistry) {
@@ -281,14 +211,11 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     /* *************** Redis Key utility function **************** */
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toKey` 对应的处理。
+     * 参数：
+     * - `prefix`：`prefix` 参数。
+     * - `key`：键。
+     * 返回：处理结果。
      */
     private byte[] toKey(byte[] prefix, byte[] key) {
         byte[] result = new byte[prefix.length + key.length];
@@ -298,42 +225,31 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toKey` 对应的处理。
+     * 参数：
+     * - `prefix`：`prefix` 参数。
+     * - `registrationID`：`registrationID`ID。
+     * 返回：处理结果。
      */
     private byte[] toKey(String prefix, String registrationID) {
         return (prefix + registrationID).getBytes();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toLockKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toLockKey` 对应的处理。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：文本结果。
      */
     private String toLockKey(String endpoint) {
         return new String(toKey(LOCK_EP, endpoint));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toLockKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toLockKey` 对应的处理。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：文本结果。
      */
     private String toLockKey(byte[] endpoint) {
         return new String(toKey(LOCK_EP.getBytes(UTF_8), endpoint));
@@ -341,17 +257,13 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
 
     /* *************** Leshan Registration API **************** */
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addRegistration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Registration`。
+     * 参数：
+     * - `registration`：`registration` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Deregistration addRegistration(Registration registration) {
         Lock lock = null;
         try (var connection = connectionFactory.getConnection()) {
@@ -375,17 +287,14 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
                 // Add or update expiration
                 addOrUpdateExpiration(connection, registration);
 
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (old != null) {
                     Registration oldRegistration = deserializeReg(old);
                     // remove old secondary index
                     if (!registration.getId().equals(oldRegistration.getId()))
                         connection.del(toRegIdKey(oldRegistration.getId()));
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!oldRegistration.getSocketAddress().equals(registration.getSocketAddress())) {
                         removeAddrIndex(connection, oldRegistration);
                     }
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (registrationsHaveDifferentIdentities(oldRegistration, registration)) {
                         removeIdentityIndex(connection, oldRegistration);
                     }
@@ -397,7 +306,6 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
 
                 return null;
             } finally {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (lock != null) {
                     lock.unlock();
                 }
@@ -405,24 +313,19 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateRegistration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Registration`。
+     * 参数：
+     * - `update`：`update` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public UpdatedRegistration updateRegistration(RegistrationUpdate update) {
         Lock lock = null;
         try (var connection = connectionFactory.getConnection()) {
 
             // Fetch the registration ep by registration ID index
             byte[] ep = connection.get(toRegIdKey(update.getRegistrationId()));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ep == null) {
                 return null;
             }
@@ -434,7 +337,6 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
 
                 // Fetch the registration
                 byte[] data = connection.get(toEndpointKey(ep));
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (data == null) {
                     return null;
                 }
@@ -454,11 +356,9 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
                  * recent binding. */
                 byte[] addr_idx = toRegAddrKey(updatedRegistration.getSocketAddress());
                 connection.set(addr_idx, updatedRegistration.getEndpoint().getBytes(UTF_8));
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!r.getSocketAddress().equals(updatedRegistration.getSocketAddress())) {
                     removeAddrIndex(connection, r);
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (registrationsHaveDifferentIdentities(r, updatedRegistration)) {
                     removeIdentityIndex(connection, r);
                 }
@@ -466,7 +366,6 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
                 return new UpdatedRegistration(r, updatedRegistration);
 
             } finally {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (lock != null) {
                     lock.unlock();
                 }
@@ -474,39 +373,30 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRegistration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Registration`。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * 返回：处理结果。
      */
+    @Override
     public Registration getRegistration(String registrationId) {
         try (var connection = connectionFactory.getConnection()) {
             return getRegistration(connection, registrationId);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRegistrationByEndpoint` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Registration By Endpoint`。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Registration getRegistrationByEndpoint(String endpoint) {
         Validate.notNull(endpoint);
         try (var connection = connectionFactory.getConnection()) {
             byte[] data = connection.get(toEndpointKey(endpoint));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (data == null) {
                 return null;
             }
@@ -514,27 +404,21 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRegistrationByAdress` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Registration By Adress`。
+     * 参数：
+     * - `address`：`address` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Registration getRegistrationByAdress(InetSocketAddress address) {
         Validate.notNull(address);
         try (var connection = connectionFactory.getConnection()) {
             byte[] ep = connection.get(toRegAddrKey(address));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ep == null) {
                 return null;
             }
             byte[] data = connection.get(toEndpointKey(ep));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (data == null) {
                 return null;
             }
@@ -542,17 +426,13 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRegistrationByIdentity` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Registration By Identity`。
+     * 参数：
+     * - `identity`：实体对象。
+     * 返回：处理结果。
      */
+    @Override
     public Registration getRegistrationByIdentity(Identity identity) {
         Validate.notNull(identity);
         try (var connection = connectionFactory.getConnection()) {
@@ -568,17 +448,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAllRegistrations` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`All Registrations`。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public Iterator<Registration> getAllRegistrations() {
         try (var connection = connectionFactory.getConnection()) {
             Collection<Registration> list = new LinkedList<>();
@@ -602,17 +477,13 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeRegistration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Registration`。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * 返回：处理结果。
      */
+    @Override
     public Deregistration removeRegistration(String registrationId) {
         try (var connection = connectionFactory.getConnection()) {
             return removeRegistration(connection, registrationId, false);
@@ -620,14 +491,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeRegistration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Registration`。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `registrationId`：`registrationId`ID。
+     * - `removeOnlyIfNotAlive`：`removeOnlyIfNotAlive` 参数。
+     * 返回：处理结果。
      */
     private Deregistration removeRegistration(RedisConnection connection, String registrationId, boolean removeOnlyIfNotAlive) {
         // fetch the client ep by registration ID index
@@ -669,28 +538,22 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeAddrIndex` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理索引。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `r`：`r` 参数。
+     * 返回：无。
      */
     private void removeAddrIndex(RedisConnection connection, Registration r) {
         removeSecondaryIndex(connection, toRegAddrKey(r.getSocketAddress()), r.getEndpoint());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeIdentityIndex` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理索引。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `r`：`r` 参数。
+     * 返回：无。
      */
     private void removeIdentityIndex(RedisConnection connection, Registration r) {
         removeSecondaryIndex(connection, toRegIdentityKey(r.getIdentity()), r.getEndpoint());
@@ -698,14 +561,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
 
     //TODO: JedisCluster didn't implement Transaction, maybe should use some advanced key creation strategies
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeSecondaryIndex` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理索引。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `indexKey`：键。
+     * - `endpointName`：名称。
+     * 返回：无。
      */
     private void removeSecondaryIndex(RedisConnection connection, byte[] indexKey, String endpointName) {
         // Watch the key to remove.
@@ -727,42 +588,33 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addOrUpdateExpiration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Or Update Expiration`。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `registration`：`registration` 参数。
+     * 返回：无。
      */
     private void addOrUpdateExpiration(RedisConnection connection, Registration registration) {
         connection.zAdd(EXP_EP, registration.getExpirationTimeStamp(gracePeriod), registration.getEndpoint().getBytes(UTF_8));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeExpiration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Expiration`。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `registration`：`registration` 参数。
+     * 返回：无。
      */
     private void removeExpiration(RedisConnection connection, Registration registration) {
         connection.zRem(EXP_EP, registration.getEndpoint().getBytes(UTF_8));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registrationsHaveDifferentIdentities` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `registrationsHaveDifferentIdentities` 对应的处理。
+     * 参数：
+     * - `first`：`first` 参数。
+     * - `second`：`second` 参数。
+     * 返回：判断结果。
      */
     private boolean registrationsHaveDifferentIdentities(Registration first, Registration second){
         var first_identity_string = LwM2MIdentitySerDes.serialize(first.getIdentity()).toString();
@@ -771,98 +623,70 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toRegIdKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toRegIdKey` 对应的处理。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * 返回：处理结果。
      */
     private byte[] toRegIdKey(String registrationId) {
         return toKey(REG_EP_REGID_IDX, registrationId);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toRegAddrKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toRegAddrKey` 对应的处理。
+     * 参数：
+     * - `addr`：`addr` 参数。
+     * 返回：处理结果。
      */
     private byte[] toRegAddrKey(InetSocketAddress addr) {
         return toKey(REG_EP_ADDR_IDX, addr.getAddress().toString() + ":" + addr.getPort());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toRegIdentityKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toRegIdentityKey` 对应的处理。
+     * 参数：
+     * - `identity`：实体对象。
+     * 返回：处理结果。
      */
     private byte[] toRegIdentityKey(Identity identity) {
         return toKey(REG_EP_IDENTITY, LwM2MIdentitySerDes.serialize(identity).toString());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toEndpointKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toEndpointKey` 对应的处理。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：处理结果。
      */
     private byte[] toEndpointKey(String endpoint) {
         return toKey(REG_EP, endpoint);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toEndpointKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toEndpointKey` 对应的处理。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：处理结果。
      */
     private byte[] toEndpointKey(byte[] endpoint) {
         return toKey(REG_EP.getBytes(UTF_8), endpoint);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `serializeReg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `serializeReg` 对应的处理。
+     * 参数：
+     * - `registration`：`registration` 参数。
+     * 返回：处理结果。
      */
     private byte[] serializeReg(Registration registration) {
         return RegistrationSerDes.bSerialize(registration);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deserializeReg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `deserializeReg` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：处理结果。
      */
     private Registration deserializeReg(byte[] data) {
         return RegistrationSerDes.deserialize(data);
@@ -874,17 +698,14 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
      * The observation is not persisted here, it is done by the Californium layer (in the implementation of the
      * org.eclipse.californium.core.observe.ObservationStore#add method)
      */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Observation`。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * - `observation`：`observation` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Collection<Observation> addObservation(String registrationId, Observation observation) {
         List<Observation> removed = new ArrayList<>();
         try (var connection = connectionFactory.getConnection()) {
@@ -921,17 +742,14 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         return removed;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Observation`。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * - `observationId`：`observationId`ID。
+     * 返回：处理结果。
      */
+    @Override
     public Observation removeObservation(String registrationId, byte[] observationId) {
         try (var connection = connectionFactory.getConnection()) {
 
@@ -963,32 +781,25 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Observation`。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * - `observationId`：`observationId`ID。
+     * 返回：处理结果。
      */
+    @Override
     public Observation getObservation(String registrationId, byte[] observationId) {
         return build(get(new Token(observationId)));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getObservations` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Observations`。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Collection<Observation> getObservations(String registrationId) {
         try (var connection = connectionFactory.getConnection()) {
             return getObservations(connection, registrationId);
@@ -996,14 +807,11 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getObservations` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Observations`。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `registrationId`：`registrationId`ID。
+     * 返回：匹配的数据集合。
      */
     private Collection<Observation> getObservations(RedisConnection connection, String registrationId) {
         Collection<Observation> result = new ArrayList<>();
@@ -1016,17 +824,13 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         return result;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeObservations` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Observations`。
+     * 参数：
+     * - `registrationId`：`registrationId`ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Collection<Observation> removeObservations(String registrationId) {
         try (var connection = connectionFactory.getConnection()) {
             // check registration exists
@@ -1052,47 +856,38 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
 
     /* *************** Californium ObservationStore API **************** */
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `putIfAbsent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `putIfAbsent` 对应的处理。
+     * 参数：
+     * - `token`：`token` 参数。
+     * - `obs`：`obs` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public org.eclipse.californium.core.observe.Observation putIfAbsent(Token token,
                                                                         org.eclipse.californium.core.observe.Observation obs) throws ObservationStoreException {
         return add(obs, true);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `put` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `put` 对应的处理。
+     * 参数：
+     * - `token`：`token` 参数。
+     * - `obs`：`obs` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public org.eclipse.californium.core.observe.Observation put(Token token,
                                                                 org.eclipse.californium.core.observe.Observation obs) throws ObservationStoreException {
         return add(obs, false);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `add` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `add` 对应的处理。
+     * 参数：
+     * - `obs`：`obs` 参数。
+     * - `ifAbsent`：`ifAbsent` 参数。
+     * 返回：处理结果。
      */
     private org.eclipse.californium.core.observe.Observation add(org.eclipse.californium.core.observe.Observation obs, boolean ifAbsent) throws ObservationStoreException {
         String endpoint = ObserveUtil.validateCoapObservation(obs);
@@ -1141,17 +936,13 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         return previousObservation;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `remove` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `remove` 对应的处理。
+     * 参数：
+     * - `token`：`token` 参数。
+     * 返回：无。
      */
+    @Override
     public void remove(Token token) {
         try (var connection = connectionFactory.getConnection()) {
             byte[] tokenKey = toKey(OBS_TKN, token.getBytes());
@@ -1187,17 +978,13 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
 
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `get` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `token`：`token` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public org.eclipse.californium.core.observe.Observation get(Token token) {
         try (var connection = connectionFactory.getConnection()) {
             byte[] obs = connection.get(toKey(OBS_TKN, token.getBytes()));
@@ -1212,14 +999,11 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     /* *************** Observation utility functions **************** */
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRegistration` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Registration`。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `registrationId`：`registrationId`ID。
+     * 返回：处理结果。
      */
     private Registration getRegistration(RedisConnection connection, String registrationId) {
         byte[] ep = connection.get(toRegIdKey(registrationId));
@@ -1235,14 +1019,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unsafeRemoveObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `unsafeRemoveObservation` 对应的处理。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `registrationId`：`registrationId`ID。
+     * - `observationId`：`observationId`ID。
+     * 返回：无。
      */
     private void unsafeRemoveObservation(RedisConnection connection, String registrationId, byte[] observationId) {
         if (connection.del(toKey(OBS_TKN, observationId)) > 0L) {
@@ -1251,14 +1033,11 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unsafeRemoveAllObservations` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `unsafeRemoveAllObservations` 对应的处理。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * - `registrationId`：`registrationId`ID。
+     * 返回：匹配的数据集合。
      */
     private Collection<Observation> unsafeRemoveAllObservations(RedisConnection connection, String registrationId) {
         Collection<Observation> removed = new ArrayList<>();
@@ -1277,58 +1056,43 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         return removed;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setContext` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新上下文。
+     * 参数：
+     * - `token`：`token` 参数。
+     * - `correlationContext`：处理上下文。
+     * 返回：无。
      */
+    @Override
     public void setContext(Token token, EndpointContext correlationContext) {
         // In Leshan we always set context when we send the request, so this should not be needed to implement this.
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `serializeObs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `serializeObs` 对应的处理。
+     * 参数：
+     * - `obs`：`obs` 参数。
+     * 返回：处理结果。
      */
     private byte[] serializeObs(org.eclipse.californium.core.observe.Observation obs) {
         return ObservationSerDes.serialize(obs);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deserializeObs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `deserializeObs` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：处理结果。
      */
     private org.eclipse.californium.core.observe.Observation deserializeObs(byte[] data) {
         return ObservationSerDes.deserialize(data);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `build` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `build` 对应的处理。
+     * 参数：
+     * - `cfObs`：`cfObs` 参数。
+     * 返回：处理结果。
      */
     private Observation build(org.eclipse.californium.core.observe.Observation cfObs) {
         if (cfObs == null)
@@ -1342,17 +1106,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     /**
      * Start regular cleanup of dead registrations.
      */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `start` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `start` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public synchronized void start() {
         if (!started) {
             started = true;
@@ -1363,17 +1122,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     /**
      * Stop the underlying cleanup of the registrations.
      */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stop` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `stop` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public synchronized void stop() {
         if (started) {
             started = false;
@@ -1387,17 +1141,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
     /**
      * Destroy "cleanup" scheduler.
      */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public synchronized void destroy() {
         started = false;
         schedExecutor.shutdownNow();
@@ -1420,17 +1169,12 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
      */
     private class Cleaner implements Runnable {
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `run` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `run` 对应的处理。
+         * 参数：无。
+         * 返回：无。
          */
+        @Override
         public void run() {
             try (var connection = connectionFactory.getConnection()) {
                 Set<byte[]> endpointsExpired = connection.zRangeByScore(EXP_EP, Double.NEGATIVE_INFINITY,
@@ -1450,32 +1194,24 @@ public class TbLwM2mRedisRegistrationStore implements CaliforniumRegistrationSto
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setExpirationListener` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新监听器。
+     * 参数：
+     * - `listener`：数据列表。
+     * 返回：无。
      */
+    @Override
     public void setExpirationListener(ExpirationListener listener) {
         expirationListener = listener;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setExecutor` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新执行器。
+     * 参数：
+     * - `executor`：`executor` 参数。
+     * 返回：无。
      */
+    @Override
     public void setExecutor(ScheduledExecutorService executor) {
         // TODO should we reuse californium executor ?
     }

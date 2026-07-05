@@ -34,7 +34,6 @@ import static org.thingsboard.server.transport.mqtt.util.sparkplug.SparkplugMess
 import static org.thingsboard.server.transport.mqtt.util.sparkplug.SparkplugMessageType.NCMD;
 import static org.thingsboard.server.transport.mqtt.util.sparkplug.SparkplugTopicUtil.NAMESPACE;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractMqttV5RpcSparkplugTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -45,35 +44,25 @@ import static org.thingsboard.server.transport.mqtt.util.sparkplug.SparkplugTopi
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@Slf4j
 public abstract class AbstractMqttV5RpcSparkplugTest  extends AbstractMqttV5ClientSparkplugTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `metricBirthValue_Int32` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 值常量，用于统一引用固定值。
      */
     private static final int metricBirthValue_Int32 = 123456;
     private static final String sparkplugRpcRequest = "{\"metricName\":\"" + metricBirthName_Int32 + "\",\"value\":" + metricBirthValue_Int32 + "}";
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processClientNodeWithCorrectAccessTokenPublish_TwoWayRpc_Success` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理RPC。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void processClientNodeWithCorrectAccessTokenPublish_TwoWayRpc_Success() throws Exception {
         clientWithCorrectNodeAccessTokenWithNDEATH();
         connectionWithNBirth(metricBirthDataType_Int32, metricBirthName_Int32, nextInt32());
         Assert.assertTrue("Connection node is failed", client.isConnected());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         client.subscribeAndWait(NAMESPACE + "/" + groupId + "/" + NCMD.name() + "/" + edgeNode + "/#", MqttQoS.AT_MOST_ONCE);
         awaitForDeviceActorToReceiveSubscription(savedGateway.getId(), FeatureType.RPC, 1);
         String expected = "{\"result\":\"Success: " + SparkplugMessageType.NCMD.name() + "\"}";
@@ -81,27 +70,19 @@ public abstract class AbstractMqttV5RpcSparkplugTest  extends AbstractMqttV5Clie
         await(alias + SparkplugMessageType.NCMD.name())
                 .atMost(40, TimeUnit.SECONDS)
                 .until(() -> {
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return mqttCallback.getMessageArrivedMetrics().size() == 1;
                 });
         Assert.assertEquals(expected, actual);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals(metricBirthName_Int32, mqttCallback.getMessageArrivedMetrics().get(0).getName());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertTrue(metricBirthValue_Int32 == mqttCallback.getMessageArrivedMetrics().get(0).getIntValue());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processClientDeviceWithCorrectAccessTokenPublish_TwoWayRpc_Success` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理设备。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void processClientDeviceWithCorrectAccessTokenPublish_TwoWayRpc_Success() throws Exception {
         long ts = calendar.getTimeInMillis();
         List<Device> devices = connectClientWithCorrectAccessTokenWithNDEATHCreatedDevices(1, ts);
@@ -110,32 +91,23 @@ public abstract class AbstractMqttV5RpcSparkplugTest  extends AbstractMqttV5Clie
         await(alias + NCMD.name())
                 .atMost(40, TimeUnit.SECONDS)
                 .until(() -> {
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return mqttCallback.getMessageArrivedMetrics().size() == 1;
                 });
         Assert.assertEquals(expected, actual);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals(metricBirthName_Int32, mqttCallback.getMessageArrivedMetrics().get(0).getName());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertTrue(metricBirthValue_Int32 == mqttCallback.getMessageArrivedMetrics().get(0).getIntValue());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processClientNodeWithCorrectAccessTokenPublish_TwoWayRpc_InvalidTypeMessage_INVALID_ARGUMENTS` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理RPC。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void processClientNodeWithCorrectAccessTokenPublish_TwoWayRpc_InvalidTypeMessage_INVALID_ARGUMENTS() throws Exception {
         clientWithCorrectNodeAccessTokenWithNDEATH();
         connectionWithNBirth(metricBirthDataType_Int32, metricBirthName_Int32, nextInt32());
         Assert.assertTrue("Connection node is failed", client.isConnected());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         client.subscribeAndWait(NAMESPACE + "/" + groupId + "/" + NCMD.name() + "/" + edgeNode + "/#", MqttQoS.AT_MOST_ONCE);
         awaitForDeviceActorToReceiveSubscription(savedGateway.getId(), FeatureType.RPC, 1);
         String invalidateTypeMessageName = "RCMD";
@@ -145,22 +117,16 @@ public abstract class AbstractMqttV5RpcSparkplugTest  extends AbstractMqttV5Clie
         Assert.assertEquals(expected, actual);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processClientNodeWithCorrectAccessTokenPublish_TwoWayRpc_InBirthNotHaveMetric_BAD_REQUEST_PARAMS` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理RPC。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void processClientNodeWithCorrectAccessTokenPublish_TwoWayRpc_InBirthNotHaveMetric_BAD_REQUEST_PARAMS() throws Exception {
         clientWithCorrectNodeAccessTokenWithNDEATH();
         connectionWithNBirth(metricBirthDataType_Int32, metricBirthName_Int32, nextInt32());
         Assert.assertTrue("Connection node is failed", client.isConnected());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         client.subscribeAndWait(NAMESPACE + "/" + groupId + "/" + NCMD.name() + "/" + edgeNode + "/#", MqttQoS.AT_MOST_ONCE);
         awaitForDeviceActorToReceiveSubscription(savedGateway.getId(), FeatureType.RPC, 1);
         String metricNameBad = metricBirthName_Int32 + "_Bad";
@@ -172,14 +138,12 @@ public abstract class AbstractMqttV5RpcSparkplugTest  extends AbstractMqttV5Clie
      }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRPCSparkplug` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交RPC。
+     * 参数：
+     * - `nameTypeMessage`：待处理消息。
+     * - `keyValue`：键。
+     * - `device`：设备信息或设备标识。
+     * 返回：文本结果。
      */
     private String sendRPCSparkplug(String nameTypeMessage, String keyValue, Device device) throws Exception {
         String setRpcRequest = "{\"method\": \"" + nameTypeMessage + "\", \"params\": " + keyValue + "}";

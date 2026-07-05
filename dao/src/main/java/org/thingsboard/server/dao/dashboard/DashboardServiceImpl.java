@@ -60,9 +60,6 @@ import java.util.Optional;
 
 import static org.thingsboard.server.dao.service.Validator.validateId;
 
-@Service("DashboardDaoService")
-@Slf4j
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`DashboardServiceImpl` 是 ThingsBoard DAO 模块 中的持久化实现层类型，用于承载服务端实体、关系、属性、遥测、事件和配置数据的持久化访问实现。
@@ -74,317 +71,203 @@ import static org.thingsboard.server.dao.service.Validator.validateId;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Service / Template。
  */
+@Service("DashboardDaoService")
+@Slf4j
+@RequiredArgsConstructor
 public class DashboardServiceImpl extends AbstractEntityService implements DashboardService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `INCORRECT_DASHBOARD_ID` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 仪表盘ID常量，用于统一引用固定值。
      */
     public static final String INCORRECT_DASHBOARD_ID = "Incorrect dashboardId ";
     public static final String INCORRECT_TENANT_ID = "Incorrect tenantId ";
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `dashboardDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 仪表盘，用于读取或保存对应领域对象。
      */
+    @Autowired
     private DashboardDao dashboardDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `dashboardInfoDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 仪表盘，用于读取或保存对应领域对象。
      */
+    @Autowired
     private DashboardInfoDao dashboardInfoDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `customerDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 客户，用于读取或保存对应领域对象。
      */
+    @Autowired
     private CustomerDao customerDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `edgeDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 边缘节点，用于读取或保存对应领域对象。
      */
+    @Autowired
     private EdgeDao edgeDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `imageService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private ImageService imageService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `dashboardValidator` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 仪表盘对象，用于描述当前业务场景。
      */
+    @Autowired
     private DataValidator<Dashboard> dashboardValidator;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `cache` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * `cache` 字段，保存当前对象的对应属性。
      */
+    @Autowired
     protected TbTransactionalCache<DashboardId, String> cache;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `countService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private EntityCountService countService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `eventPublisher` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 事件，表示当前对象的对应属性。
      */
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `publishEvictEvent` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：发送或提交事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
     protected void publishEvictEvent(DashboardTitleEvictEvent event) {
-        // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
             eventPublisher.publishEvent(event);
         } else {
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             handleEvictEvent(event);
         }
     }
 
-    @TransactionalEventListener(classes = DashboardTitleEvictEvent.class)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleEvictEvent` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @TransactionalEventListener(classes = DashboardTitleEvictEvent.class)
     public void handleEvictEvent(DashboardTitleEvictEvent event) {
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         cache.evict(event.getKey());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardById` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * 返回：处理结果。
      */
+    @Override
     public Dashboard findDashboardById(TenantId tenantId, DashboardId dashboardId) {
         log.trace("Executing findDashboardById [{}]", dashboardId);
         Validator.validateId(dashboardId, INCORRECT_DASHBOARD_ID + dashboardId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return dashboardDao.findById(tenantId, dashboardId.getId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardByIdAsync` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Dashboard> findDashboardByIdAsync(TenantId tenantId, DashboardId dashboardId) {
         log.trace("Executing findDashboardByIdAsync [{}]", dashboardId);
         validateId(dashboardId, INCORRECT_DASHBOARD_ID + dashboardId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return dashboardDao.findByIdAsync(tenantId, dashboardId.getId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardInfoById` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * 返回：处理结果。
      */
+    @Override
     public DashboardInfo findDashboardInfoById(TenantId tenantId, DashboardId dashboardId) {
         log.trace("Executing findDashboardInfoById [{}]", dashboardId);
         Validator.validateId(dashboardId, INCORRECT_DASHBOARD_ID + dashboardId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return dashboardInfoDao.findById(tenantId, dashboardId.getId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardTitleById` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * 返回：文本结果。
      */
+    @Override
     public String findDashboardTitleById(TenantId tenantId, DashboardId dashboardId) {
-        // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
         return cache.getAndPutInTransaction(dashboardId,
-                // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
                 () -> dashboardInfoDao.findTitleById(tenantId.getId(), dashboardId.getId()), true);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardInfoByIdAsync` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<DashboardInfo> findDashboardInfoByIdAsync(TenantId tenantId, DashboardId dashboardId) {
         log.trace("Executing findDashboardInfoByIdAsync [{}]", dashboardId);
         validateId(dashboardId, INCORRECT_DASHBOARD_ID + dashboardId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return dashboardInfoDao.findByIdAsync(tenantId, dashboardId.getId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDashboard` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：保存或创建仪表盘。
+     * 参数：
+     * - `dashboard`：`dashboard` 参数。
+     * - `doValidate`：`doValidate` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Dashboard saveDashboard(Dashboard dashboard, boolean doValidate) {
         return doSaveDashboard(dashboard, doValidate);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDashboard` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：保存或创建仪表盘。
+     * 参数：
+     * - `dashboard`：`dashboard` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Dashboard saveDashboard(Dashboard dashboard) {
         return doSaveDashboard(dashboard, true);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doSaveDashboard` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `doSaveDashboard` 对应的处理。
+     * 参数：
+     * - `dashboard`：`dashboard` 参数。
+     * - `doValidate`：`doValidate` 参数。
+     * 返回：处理结果。
      */
     private Dashboard doSaveDashboard(Dashboard dashboard, boolean doValidate) {
         log.trace("Executing saveDashboard [{}]", dashboard);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (doValidate) {
             dashboardValidator.validate(dashboard, DashboardInfo::getTenantId);
         }
         try {
             imageService.replaceBase64WithImageUrl(dashboard);
-            // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
             var saved = dashboardDao.save(dashboard.getTenantId(), dashboard);
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             publishEvictEvent(new DashboardTitleEvictEvent(saved.getId()));
-            // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
             eventPublisher.publishEvent(SaveEntityEvent.builder().tenantId(saved.getTenantId())
                     .entityId(saved.getId()).created(dashboard.getId() == null).build());
             if (dashboard.getId() == null) {
@@ -402,19 +285,15 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
 
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDashboardToCustomer` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `assignDashboardToCustomer` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * - `customerId`：客户IDID。
+     * 返回：处理结果。
      */
+    @Override
     public Dashboard assignDashboardToCustomer(TenantId tenantId, DashboardId dashboardId, CustomerId customerId) {
         Dashboard dashboard = findDashboardById(tenantId, dashboardId);
         Customer customer = customerDao.findById(tenantId, customerId.getId());
@@ -437,19 +316,15 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDashboardFromCustomer` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `unassignDashboardFromCustomer` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * - `customerId`：客户IDID。
+     * 返回：处理结果。
      */
+    @Override
     public Dashboard unassignDashboardFromCustomer(TenantId tenantId, DashboardId dashboardId, CustomerId customerId) {
         Dashboard dashboard = findDashboardById(tenantId, dashboardId);
         Customer customer = customerDao.findById(tenantId, customerId.getId());
@@ -470,16 +345,12 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateAssignedCustomer` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：更新客户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * - `customer`：`customer` 参数。
+     * 返回：处理结果。
      */
     private Dashboard updateAssignedCustomer(TenantId tenantId, DashboardId dashboardId, Customer customer) {
         Dashboard dashboard = findDashboardById(tenantId, dashboardId);
@@ -490,20 +361,15 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         }
     }
 
+    /**
+     * 功能：删除或清理仪表盘。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * 返回：无。
+     */
     @Override
     @Transactional
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDashboard` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void deleteDashboard(TenantId tenantId, DashboardId dashboardId) {
         log.trace("Executing deleteDashboard [{}]", dashboardId);
         Validator.validateId(dashboardId, INCORRECT_DASHBOARD_ID + dashboardId);
@@ -523,19 +389,14 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardsByTenantId` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<DashboardInfo> findDashboardsByTenantId(TenantId tenantId, PageLink pageLink) {
         log.trace("Executing findDashboardsByTenantId, tenantId [{}], pageLink [{}]", tenantId, pageLink);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -543,19 +404,14 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         return dashboardInfoDao.findDashboardsByTenantId(tenantId.getId(), pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findMobileDashboardsByTenantId` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<DashboardInfo> findMobileDashboardsByTenantId(TenantId tenantId, PageLink pageLink) {
         log.trace("Executing findMobileDashboardsByTenantId, tenantId [{}], pageLink [{}]", tenantId, pageLink);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -563,38 +419,28 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         return dashboardInfoDao.findMobileDashboardsByTenantId(tenantId.getId(), pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDashboardsByTenantId` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：删除或清理租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
+    @Override
     public void deleteDashboardsByTenantId(TenantId tenantId) {
         log.trace("Executing deleteDashboardsByTenantId, tenantId [{}]", tenantId);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
         tenantDashboardsRemover.removeEntities(tenantId, tenantId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardsByTenantIdAndCustomerId` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<DashboardInfo> findDashboardsByTenantIdAndCustomerId(TenantId tenantId, CustomerId customerId, PageLink pageLink) {
         log.trace("Executing findDashboardsByTenantIdAndCustomerId, tenantId [{}], customerId [{}], pageLink [{}]", tenantId, customerId, pageLink);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -603,19 +449,15 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         return dashboardInfoDao.findDashboardsByTenantIdAndCustomerId(tenantId.getId(), customerId.getId(), pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findMobileDashboardsByTenantIdAndCustomerId` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<DashboardInfo> findMobileDashboardsByTenantIdAndCustomerId(TenantId tenantId, CustomerId customerId, PageLink pageLink) {
         log.trace("Executing findMobileDashboardsByTenantIdAndCustomerId, tenantId [{}], customerId [{}], pageLink [{}]", tenantId, customerId, pageLink);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -624,19 +466,14 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         return dashboardInfoDao.findMobileDashboardsByTenantIdAndCustomerId(tenantId.getId(), customerId.getId(), pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignCustomerDashboards` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `unassignCustomerDashboards` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * 返回：无。
      */
+    @Override
     public void unassignCustomerDashboards(TenantId tenantId, CustomerId customerId) {
         log.trace("Executing unassignCustomerDashboards, customerId [{}]", customerId);
         Validator.validateId(customerId, "Incorrect customerId " + customerId);
@@ -647,19 +484,14 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         new CustomerDashboardsUnassigner(customer).removeEntities(tenantId, customer);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateCustomerDashboards` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：更新客户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * 返回：无。
      */
+    @Override
     public void updateCustomerDashboards(TenantId tenantId, CustomerId customerId) {
         log.trace("Executing updateCustomerDashboards, customerId [{}]", customerId);
         Validator.validateId(customerId, "Incorrect customerId " + customerId);
@@ -670,19 +502,15 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         new CustomerDashboardsUpdater(customer).removeEntities(tenantId, customer);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDashboardToEdge` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `assignDashboardToEdge` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * - `edgeId`：边缘节点ID。
+     * 返回：处理结果。
      */
+    @Override
     public Dashboard assignDashboardToEdge(TenantId tenantId, DashboardId dashboardId, EdgeId edgeId) {
         Dashboard dashboard = findDashboardById(tenantId, dashboardId);
         Edge edge = edgeDao.findById(tenantId, edgeId.getId());
@@ -703,19 +531,15 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         return dashboard;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDashboardFromEdge` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `unassignDashboardFromEdge` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardId`：仪表盘IDID。
+     * - `edgeId`：边缘节点ID。
+     * 返回：处理结果。
      */
+    @Override
     public Dashboard unassignDashboardFromEdge(TenantId tenantId, DashboardId dashboardId, EdgeId edgeId) {
         Dashboard dashboard = findDashboardById(tenantId, dashboardId);
         Edge edge = edgeDao.findById(tenantId, edgeId.getId());
@@ -733,19 +557,15 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         return dashboard;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDashboardsByTenantIdAndEdgeId` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<DashboardInfo> findDashboardsByTenantIdAndEdgeId(TenantId tenantId, EdgeId edgeId, PageLink pageLink) {
         log.trace("Executing findDashboardsByTenantIdAndEdgeId, tenantId [{}], edgeId [{}], pageLink [{}]", tenantId, edgeId, pageLink);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -754,36 +574,26 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         return dashboardInfoDao.findDashboardsByTenantIdAndEdgeId(tenantId.getId(), edgeId.getId(), pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findFirstDashboardInfoByTenantIdAndName` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `name`：名称。
+     * 返回：处理结果。
      */
+    @Override
     public DashboardInfo findFirstDashboardInfoByTenantIdAndName(TenantId tenantId, String name) {
         return dashboardInfoDao.findFirstByTenantIdAndName(tenantId.getId(), name);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenantDashboardsByTitle` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `title`：`title` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<Dashboard> findTenantDashboardsByTitle(TenantId tenantId, String title) {
         return dashboardDao.findByTenantIdAndTitle(tenantId.getId(), title);
     }
@@ -801,71 +611,48 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
         }
     };
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findEntity` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * 返回：可能存在的结果。
      */
+    @Override
     public Optional<HasId<?>> findEntity(TenantId tenantId, EntityId entityId) {
         return Optional.ofNullable(findDashboardById(tenantId, new DashboardId(entityId.getId())));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `countByTenantId` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：统计租户ID数量。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：数值结果。
      */
+    @Override
     public long countByTenantId(TenantId tenantId) {
         return dashboardDao.countByTenantId(tenantId);
     }
 
+    /**
+     * 功能：删除或清理实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `id`：`id`ID。
+     * 返回：无。
+     */
     @Override
     @Transactional
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteEntity` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void deleteEntity(TenantId tenantId, EntityId id) {
         deleteDashboard(tenantId, (DashboardId) id);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityType` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public EntityType getEntityType() {
         return EntityType.DASHBOARD;
     }
@@ -884,61 +671,41 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
     private class CustomerDashboardsUnassigner extends PaginatedRemover<Customer, DashboardInfo> {
 
         /**
-         * 字段说明：
-         * 1. 保存 `customer` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-         * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-         * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-         * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+         * 客户对象，用于描述当前业务场景。
          */
         private Customer customer;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `CustomerDashboardsUnassigner` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-         * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-         * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-         * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-         * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-         * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-         * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-         * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-         * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+         * 功能：创建 `DashboardServiceImpl` 实例，并初始化必要字段。
+         * 参数：
+         * - `customer`：`customer` 参数。
+         * 返回：新创建的对象实例。
          */
         CustomerDashboardsUnassigner(Customer customer) {
             this.customer = customer;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `findEntities` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-         * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-         * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-         * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-         * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-         * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-         * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-         * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-         * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+         * 功能：获取`Entities`。
+         * 参数：
+         * - `tenantId`：租户IDID。
+         * - `customer`：`customer` 参数。
+         * - `pageLink`：`pageLink` 参数。
+         * 返回：匹配的数据集合。
          */
+        @Override
         protected PageData<DashboardInfo> findEntities(TenantId tenantId, Customer customer, PageLink pageLink) {
             return dashboardInfoDao.findDashboardsByTenantIdAndCustomerId(customer.getTenantId().getId(), customer.getId().getId(), pageLink);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `removeEntity` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-         * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-         * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-         * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-         * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-         * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-         * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-         * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-         * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+         * 功能：删除或清理实体。
+         * 参数：
+         * - `tenantId`：租户IDID。
+         * - `entity`：实体对象。
+         * 返回：无。
          */
+        @Override
         protected void removeEntity(TenantId tenantId, DashboardInfo entity) {
             unassignDashboardFromCustomer(customer.getTenantId(), new DashboardId(entity.getUuidId()), this.customer.getId());
         }
@@ -959,61 +726,41 @@ public class DashboardServiceImpl extends AbstractEntityService implements Dashb
     private class CustomerDashboardsUpdater extends PaginatedRemover<Customer, DashboardInfo> {
 
         /**
-         * 字段说明：
-         * 1. 保存 `customer` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-         * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-         * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-         * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+         * 客户对象，用于描述当前业务场景。
          */
         private Customer customer;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `CustomerDashboardsUpdater` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-         * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-         * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-         * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-         * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-         * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-         * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-         * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-         * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+         * 功能：创建 `DashboardServiceImpl` 实例，并初始化必要字段。
+         * 参数：
+         * - `customer`：`customer` 参数。
+         * 返回：新创建的对象实例。
          */
         CustomerDashboardsUpdater(Customer customer) {
             this.customer = customer;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `findEntities` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-         * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-         * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-         * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-         * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-         * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-         * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-         * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-         * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+         * 功能：获取`Entities`。
+         * 参数：
+         * - `tenantId`：租户IDID。
+         * - `customer`：`customer` 参数。
+         * - `pageLink`：`pageLink` 参数。
+         * 返回：匹配的数据集合。
          */
+        @Override
         protected PageData<DashboardInfo> findEntities(TenantId tenantId, Customer customer, PageLink pageLink) {
             return dashboardInfoDao.findDashboardsByTenantIdAndCustomerId(customer.getTenantId().getId(), customer.getId().getId(), pageLink);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `removeEntity` 对应的持久化实现层类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-         * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-         * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-         * 4. 调用时机：由 Spring 容器创建为 DAO、Repository、Service 或配置 Bean，并随应用生命周期参与请求处理时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-         * 5. 使用流程：接收上层服务的租户、实体和查询上下文，完成校验、缓存处理、数据库读写或测试断言后返回结果。
-         * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-         * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-         * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-         * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+         * 功能：删除或清理实体。
+         * 参数：
+         * - `tenantId`：租户IDID。
+         * - `entity`：实体对象。
+         * 返回：无。
          */
+        @Override
         protected void removeEntity(TenantId tenantId, DashboardInfo entity) {
             updateAssignedCustomer(customer.getTenantId(), new DashboardId(entity.getUuidId()), this.customer);
         }

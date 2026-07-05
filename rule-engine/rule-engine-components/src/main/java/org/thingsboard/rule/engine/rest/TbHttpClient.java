@@ -66,62 +66,63 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+/**
+ * `TbHttpClient` 类，封装当前模块中的一组相关职责。
+ */
 @Data
 @Slf4j
 @SuppressWarnings("deprecation")
-/**
- * REST API 节点的 HTTP 客户端封装，负责构造 AsyncRestTemplate、发起异步请求并转换响应。
- * 本类直接触达外部 HTTP 服务；本身不直接访问数据库或缓存，Rule Engine 后续路由通过回调传入。
- */
 public class TbHttpClient {
 
     /**
-     * HTTP 响应状态名称写入消息元数据时使用的键名。
+     * 状态常量，用于统一引用固定值。
      */
     private static final String STATUS = "status";
     /**
-     * HTTP 响应状态码写入消息元数据时使用的键名。
+     * 状态常量，用于统一引用固定值。
      */
     private static final String STATUS_CODE = "statusCode";
     /**
-     * HTTP 响应原因短语写入消息元数据时使用的键名。
+     * 状态常量，用于统一引用固定值。
      */
     private static final String STATUS_REASON = "statusReason";
     /**
-     * HTTP 异常写入消息元数据时使用的键名。
+     * 错误信息常量，用于统一引用固定值。
      */
     private static final String ERROR = "error";
     /**
-     * HTTP 非成功响应体或异常响应体写入消息元数据时使用的键名。
+     * 错误信息常量，用于统一引用固定值。
      */
     private static final String ERROR_BODY = "error_body";
     /**
-     * 使用系统代理但缺少必要 JVM 属性时的错误说明。
+     * 错误信息常量，用于统一引用固定值。
      */
     private static final String ERROR_SYSTEM_PROPERTIES = "Didn't set any system proxy properties. Should be added next system proxy properties: \"http.proxyHost\" and \"http.proxyPort\" or  \"https.proxyHost\" and \"https.proxyPort\" or \"socksProxyHost\" and \"socksProxyPort\"";
 
     /**
-     * REST 节点配置，包含 endpoint、方法、Header、代理、TLS 和并发限制。
+     * 配置，保存当前对象的配置选项。
      */
     private final TbRestApiCallNodeConfiguration config;
 
     /**
-     * 本客户端独占创建的 Netty 事件循环；使用共享事件循环时为空。
+     * 事件循环，用于支撑当前网络或外部服务交互。
      */
     private EventLoopGroup eventLoopGroup;
     /**
-     * 实际执行异步 HTTP 请求的 Spring AsyncRestTemplate。
+     * 客户端，用于发起外部调用或协议交互。
      */
     private AsyncRestTemplate httpClient;
     /**
-     * 用于限制并发请求数量的未完成 future 队列。
+     * `pendingFutures`列表，用于保存一组待处理对象。
      */
     private Deque<ListenableFuture<ResponseEntity<String>>> pendingFutures;
 
     /**
-     * 根据配置创建 HTTP 客户端实现。
-     * 代理模式使用 Apache async client，简单模式使用默认 AsyncRestTemplate，默认模式使用 Netty4 客户端和配置凭据。
-     * 本构造方法不发起外部 HTTP 请求；数据库/缓存不在本类中直接涉及，凭据解析或系统属性读取可能由调用链间接完成。
+     * 功能：创建 `TbHttpClient` 实例，并初始化必要字段。
+     * 参数：
+     * - `config`：配置对象。
+     * - `eventLoopGroupShared`：`eventLoopGroupShared` 参数。
+     * 返回：新创建的对象实例。
      */
     TbHttpClient(TbRestApiCallNodeConfiguration config, EventLoopGroup eventLoopGroupShared) throws TbNodeException {
         try {
@@ -149,11 +150,11 @@ public class TbHttpClient {
                     proxyPassword = System.getProperty("tb.proxy.password");
 
                     if (useAuth(proxyUser, proxyPassword)) {
-                        // 系统代理认证使用 JVM 全局 Authenticator，影响范围由底层 JDK HTTP 客户端决定。
                         Authenticator.setDefault(new Authenticator() {
                             /**
-                             * 为系统代理认证提供用户名和密码。
-                             * 本方法由 JDK 认证流程回调，不直接访问数据库或缓存。
+                             * 功能：获取密码。
+                             * 参数：无。
+                             * 返回：处理结果。
                              */
                             protected PasswordAuthentication getPasswordAuthentication() {
                                 return new PasswordAuthentication(proxyUser, proxyPassword.toCharArray());
@@ -200,8 +201,10 @@ public class TbHttpClient {
     }
 
     /**
-     * 选择共享 EventLoopGroup，或在没有共享对象时创建本客户端独占事件循环。
-     * 本方法只管理 HTTP 客户端线程资源，不直接发起 REST 请求。
+     * 功能：获取事件循环。
+     * 参数：
+     * - `eventLoopGroupShared`：`eventLoopGroupShared` 参数。
+     * 返回：处理结果。
      */
     EventLoopGroup getSharedOrCreateEventLoopGroup(EventLoopGroup eventLoopGroupShared) {
         if (eventLoopGroupShared != null) {
@@ -211,8 +214,9 @@ public class TbHttpClient {
     }
 
     /**
-     * 校验 JVM 系统代理属性是否足够构造代理连接。
-     * 本方法只读取系统属性，不直接访问外部 HTTP 服务、数据库或缓存。
+     * 功能：校验Actor 系统。
+     * 参数：无。
+     * 返回：无。
      */
     private void checkSystemProxyProperties() throws TbNodeException {
         boolean useHttpProxy = !StringUtils.isEmpty(System.getProperty("http.proxyHost")) && !StringUtils.isEmpty(System.getProperty("http.proxyPort"));
@@ -225,16 +229,20 @@ public class TbHttpClient {
     }
 
     /**
-     * 判断代理认证用户名和密码是否同时存在。
-     * 本方法是纯本地判断，不涉及外部调用。
+     * 功能：执行 `useAuth` 对应的处理。
+     * 参数：
+     * - `proxyUser`：`proxyUser` 参数。
+     * - `proxyPassword`：`proxyPassword` 参数。
+     * 返回：判断结果。
      */
     private boolean useAuth(String proxyUser, String proxyPassword) {
         return !StringUtils.isEmpty(proxyUser) && !StringUtils.isEmpty(proxyPassword);
     }
 
     /**
-     * 关闭本客户端独占创建的 Netty 事件循环。
-     * 使用共享事件循环时本方法不会关闭共享资源。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     void destroy() {
         if (this.eventLoopGroup != null) {
@@ -243,9 +251,13 @@ public class TbHttpClient {
     }
 
     /**
-     * 处理 Rule Engine 消息并发起异步 HTTP 请求。
-     * endpoint、Header、HTTP 方法和请求体都由配置模板和当前 TbMsg 解析得到；外部调用边界是 httpClient.exchange。
-     * AsyncRestTemplate 回调中 2xx 响应走成功，非 2xx 或异常走失败；本方法本身不直接访问数据库或缓存。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `onSuccess`：`onSuccess` 参数。
+     * - `onFailure`：`onFailure` 参数。
+     * 返回：无。
      */
     public void processMessage(TbContext ctx, TbMsg msg,
                                Consumer<TbMsg> onSuccess,
@@ -263,13 +275,14 @@ public class TbHttpClient {
         }
 
         URI uri = buildEncodedUri(endpointUrl);
-        // exchange 返回 ListenableFuture，HTTP 响应在线程池回调中映射到 Rule Engine 成功或失败路由。
         ListenableFuture<ResponseEntity<String>> future = httpClient.exchange(
                 uri, method, entity, String.class);
         future.addCallback(new ListenableFutureCallback<>() {
             /**
-             * HTTP 客户端异常回调，将异常转换为 Failure 路由消息。
-             * 本方法运行在线程池回调中，不直接访问数据库或缓存。
+             * 功能：处理失败信息。
+             * 参数：
+             * - `throwable`：`throwable` 参数。
+             * 返回：无。
              */
             @Override
             public void onFailure(Throwable throwable) {
@@ -277,8 +290,10 @@ public class TbHttpClient {
             }
 
             /**
-             * HTTP 客户端成功收到响应后的回调。
-             * 2xx 响应走 Success，非 2xx 响应转换为 Failure 消息但 Throwable 为空。
+             * 功能：处理`on Success`。
+             * 参数：
+             * - `responseEntity`：响应对象。
+             * 返回：无。
              */
             @Override
             public void onSuccess(ResponseEntity<String> responseEntity) {
@@ -295,8 +310,10 @@ public class TbHttpClient {
     }
 
     /**
-     * 校验并编码 endpoint URL。
-     * 本方法仅解析 URI，不直接发起 HTTP 请求；非法 URL 会同步抛出异常并由调用方失败路由。
+     * 功能：构建URI 地址。
+     * 参数：
+     * - `endpointUrl`：`endpointUrl` 参数。
+     * 返回：处理结果。
      */
     public URI buildEncodedUri(String endpointUrl) {
         if (endpointUrl == null) {
@@ -321,8 +338,12 @@ public class TbHttpClient {
     }
 
     /**
-     * 根据配置决定请求体内容，必要时把 JSON 字符串转换为纯文本。
-     * 本方法只处理消息载荷，不涉及外部调用、数据库或缓存。
+     * 功能：获取数据。
+     * 参数：
+     * - `tbMsg`：待处理消息。
+     * - `ignoreBody`：`ignoreBody` 参数。
+     * - `parseToPlainText`：`parseToPlainText` 参数。
+     * 返回：文本结果。
      */
     private String getData(TbMsg tbMsg, boolean ignoreBody, boolean parseToPlainText) {
         if (!ignoreBody && parseToPlainText) {
@@ -332,8 +353,10 @@ public class TbHttpClient {
     }
 
     /**
-     * 将 JSON 字符串形式的文本值去掉外层引号。
-     * 本方法用于兼容旧 trimDoubleQuotes 行为，不直接触发外部调用。
+     * 功能：解析JSON。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：文本结果。
      */
     protected String parseJsonStringToPlainText(String data) {
         if (data.startsWith("\"") && data.endsWith("\"") && data.length() >= 2) {
@@ -348,8 +371,12 @@ public class TbHttpClient {
     }
 
     /**
-     * 将 2xx HTTP 响应转换为新的 TbMsg。
-     * 状态、状态码、原因短语和响应 Header 写入元数据，响应体写入消息体；本方法不直接访问外部系统。
+     * 功能：处理响应。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `origMsg`：待处理消息。
+     * - `response`：响应对象。
+     * 返回：处理结果。
      */
     private TbMsg processResponse(TbContext ctx, TbMsg origMsg, ResponseEntity<String> response) {
         TbMsgMetaData metaData = origMsg.getMetaData();
@@ -362,8 +389,11 @@ public class TbHttpClient {
     }
 
     /**
-     * 将 HTTP Header 列表写入消息元数据。
-     * 多值 Header 会序列化为 JSON 字符串；本方法只处理本地数据。
+     * 功能：执行 `headersToMetaData` 对应的处理。
+     * 参数：
+     * - `headers`：数据列表。
+     * - `consumer`：`consumer` 参数。
+     * 返回：无。
      */
     void headersToMetaData(Map<String, List<String>> headers, BiConsumer<String, String> consumer) {
         if (headers == null) {
@@ -381,8 +411,11 @@ public class TbHttpClient {
     }
 
     /**
-     * 将非 2xx HTTP 响应转换为 Failure 路由使用的 TbMsg。
-     * 状态和响应体写入元数据；Throwable 可能为空，因为 HTTP 调用本身已成功返回响应。
+     * 功能：处理响应。
+     * 参数：
+     * - `origMsg`：待处理消息。
+     * - `response`：响应对象。
+     * 返回：处理结果。
      */
     private TbMsg processFailureResponse(TbMsg origMsg, ResponseEntity<String> response) {
         TbMsgMetaData metaData = origMsg.getMetaData();
@@ -395,8 +428,11 @@ public class TbHttpClient {
     }
 
     /**
-     * 将 HTTP 客户端异常转换为 Failure 路由使用的 TbMsg。
-     * RestClientResponseException 会额外携带状态码和响应体；本方法不直接访问数据库或缓存。
+     * 功能：处理`Exception`。
+     * 参数：
+     * - `origMsg`：待处理消息。
+     * - `e`：`e` 参数。
+     * 返回：处理结果。
      */
     private TbMsg processException(TbMsg origMsg, Throwable e) {
         TbMsgMetaData metaData = origMsg.getMetaData();
@@ -411,8 +447,10 @@ public class TbHttpClient {
     }
 
     /**
-     * 基于配置模板和消息内容准备 HTTP Header。
-     * Basic 凭据会被编码为 Authorization Header；本方法不直接发起 HTTP 请求。
+     * 功能：执行 `prepareHeaders` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private HttpHeaders prepareHeaders(TbMsg msg) {
         HttpHeaders headers = new HttpHeaders();
@@ -428,8 +466,10 @@ public class TbHttpClient {
     }
 
     /**
-     * 对未完成 HTTP future 进行简单并发控制。
-     * 当队列超过配置上限时等待并取消较早请求；队列使用 ConcurrentLinkedDeque，适配异步回调并发访问。
+     * 功能：处理`Parallel Requests`。
+     * 参数：
+     * - `future`：数据列表。
+     * 返回：无。
      */
     private void processParallelRequests(ListenableFuture<ResponseEntity<String>> future) {
         pendingFutures.add(future);
@@ -451,8 +491,10 @@ public class TbHttpClient {
     }
 
     /**
-     * 校验代理主机配置。
-     * 本方法只做本地参数校验，不直接访问代理服务器。
+     * 功能：校验主机地址。
+     * 参数：
+     * - `proxyHost`：`proxyHost` 参数。
+     * 返回：无。
      */
     private static void checkProxyHost(String proxyHost) throws TbNodeException {
         if (StringUtils.isEmpty(proxyHost)) {
@@ -461,8 +503,10 @@ public class TbHttpClient {
     }
 
     /**
-     * 校验代理端口范围。
-     * 本方法只做本地参数校验，不直接访问代理服务器。
+     * 功能：校验端口号。
+     * 参数：
+     * - `proxyPort`：`proxyPort` 参数。
+     * 返回：无。
      */
     private static void checkProxyPort(int proxyPort) throws TbNodeException {
         if (proxyPort < 0 || proxyPort > 65535) {

@@ -46,8 +46,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Repository
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultAlarmQueryRepository` 是 ThingsBoard DAO 模块 中的SQL/JPA 持久化实现类型，用于把 DAO API 的领域操作落到 PostgreSQL、TimescaleDB 或 JPA Repository 的具体 SQL 访问路径。
@@ -59,60 +57,38 @@ import java.util.stream.Collectors;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / DAO / Adapter。
  */
+@Repository
+@Slf4j
 public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
 
     private static final Map<String, String> alarmFieldColumnMap = new HashMap<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `ASSIGNEE_EMAIL_KEY` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 键常量，用于统一引用固定值。
      */
     private static final String ASSIGNEE_EMAIL_KEY = "assigneeEmail";
     private static final String ASSIGNEE_LAST_NAME_KEY = "assigneeLastName";
     /**
-     * 字段说明：
-     * 1. 保存 `ASSIGNEE_FIRST_NAME_KEY` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 键常量，用于统一引用固定值。
      */
     private static final String ASSIGNEE_FIRST_NAME_KEY = "assigneeFirstName";
     private static final String ASSIGNEE_ID_KEY = "assigneeId";
     /**
-     * 字段说明：
-     * 1. 保存 `ASSIGNEE_KEY` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 键常量，用于统一引用固定值。
      */
     private static final String ASSIGNEE_KEY = "assignee";
 
     static {
         alarmFieldColumnMap.put("createdTime", ModelConstants.CREATED_TIME_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("ackTs", ModelConstants.ALARM_ACK_TS_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("ackTime", ModelConstants.ALARM_ACK_TS_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("clearTs", ModelConstants.ALARM_CLEAR_TS_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("clearTime", ModelConstants.ALARM_CLEAR_TS_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("assignTime", ModelConstants.ALARM_ASSIGN_TS_PROPERTY);
         alarmFieldColumnMap.put("details", ModelConstants.ADDITIONAL_INFO_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("endTs", ModelConstants.ALARM_END_TS_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("endTime", ModelConstants.ALARM_END_TS_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("startTs", ModelConstants.ALARM_START_TS_PROPERTY);
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         alarmFieldColumnMap.put("startTime", ModelConstants.ALARM_START_TS_PROPERTY);
         alarmFieldColumnMap.put("acknowledged", ModelConstants.ALARM_ACKNOWLEDGED_PROPERTY);
         alarmFieldColumnMap.put("cleared", ModelConstants.ALARM_CLEARED_PROPERTY);
@@ -156,70 +132,45 @@ public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
             " a.acknowledged as acknowledged, ";
 
     /**
-     * 字段说明：
-     * 1. 保存 `JOIN_ENTITY_ALARMS` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 实体常量，用于统一引用固定值。
      */
     private static final String JOIN_ENTITY_ALARMS = "inner join entity_alarm ea on a.id = ea.alarm_id ";
 
     /**
-     * 字段说明：
-     * 1. 保存 `jdbcTemplate` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * JDBC 访问模板，表示当前对象的对应属性。
      */
     protected final NamedParameterJdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
 
     /**
-     * 字段说明：
-     * 1. 保存 `queryLog` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 查询日志组件，表示当前对象的对应属性。
      */
     private final DefaultQueryLogComponent queryLog;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultAlarmQueryRepository` 对应的SQL/JPA 持久化实现类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 SQL DAO 或 Repository Bean，随事务上下文执行查询、保存、删除和分页读取时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：将领域查询参数转换为 Repository 或原生 SQL 调用，再把数据库记录映射回 Common 数据对象。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `DefaultAlarmQueryRepository` 实例，并初始化必要字段。
+     * 参数：
+     * - `jdbcTemplate`：`jdbcTemplate` 参数。
+     * - `transactionTemplate`：`transactionTemplate` 参数。
+     * - `queryLog`：`queryLog` 参数。
+     * 返回：新创建的对象实例。
      */
     public DefaultAlarmQueryRepository(NamedParameterJdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate, DefaultQueryLogComponent queryLog) {
         this.jdbcTemplate = jdbcTemplate;
-        // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
         this.transactionTemplate = transactionTemplate;
         this.queryLog = queryLog;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAlarmDataByQueryForEntities` 对应的SQL/JPA 持久化实现类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 SQL DAO 或 Repository Bean，随事务上下文执行查询、保存、删除和分页读取时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：将领域查询参数转换为 Repository 或原生 SQL 调用，再把数据库记录映射回 Common 数据对象。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `query`：`query` 参数。
+     * - `orderedEntityIds`：实体对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<AlarmData> findAlarmDataByQueryForEntities(TenantId tenantId, AlarmDataQuery query, Collection<EntityId> orderedEntityIds) {
-        // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
         return transactionTemplate.execute(trStatus -> {
             AlarmDataPageLink pageLink = query.getPageLink();
             QueryContext ctx = new QueryContext(new QuerySecurityContext(tenantId, null, EntityType.ALARM));
@@ -230,7 +181,6 @@ public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
             StringBuilder sortPart = new StringBuilder(" order by ");
             StringBuilder joinPart = new StringBuilder();
             boolean addAnd = false;
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (pageLink.isSearchPropagatedAlarms()) {
                 selectPart.append(" ea.entity_id as entity_id ");
                 fromPart.append(JOIN_ENTITY_ALARMS);
@@ -241,13 +191,11 @@ public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
             }
             EntityDataSortOrder sortOrder = pageLink.getSortOrder();
 
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (sortOrder != null && EntityKeyType.ALARM_FIELD.equals(sortOrder.getKey().getType()) && ASSIGNEE_KEY.equalsIgnoreCase(sortOrder.getKey().getKey())) {
                 sortOrder = new EntityDataSortOrder(new EntityKey(EntityKeyType.ALARM_FIELD, ASSIGNEE_EMAIL_KEY), sortOrder.getDirection());
             }
 
             List<EntityKey> alarmFields = new ArrayList<>();
-            // 循环处理批量实体、属性、遥测或测试数据时，需要关注单项失败对整体事务和缓存状态的影响。
             for (EntityKey key : query.getAlarmFields()) {
                 if (EntityKeyType.ALARM_FIELD.equals(key.getType()) && ASSIGNEE_KEY.equalsIgnoreCase(key.getKey())) {
                     alarmFields.add(new EntityKey(EntityKeyType.ALARM_FIELD, ASSIGNEE_ID_KEY));
@@ -405,19 +353,15 @@ public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `countAlarmsByQuery` 对应的SQL/JPA 持久化实现类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 SQL DAO 或 Repository Bean，随事务上下文执行查询、保存、删除和分页读取时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：将领域查询参数转换为 Repository 或原生 SQL 调用，再把数据库记录映射回 Common 数据对象。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：统计查询条件数量。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `query`：`query` 参数。
+     * 返回：数值结果。
      */
+    @Override
     public long countAlarmsByQuery(TenantId tenantId, CustomerId customerId, AlarmCountQuery query) {
         QueryContext ctx = new QueryContext(new QuerySecurityContext(tenantId, null, EntityType.ALARM));
 
@@ -507,16 +451,12 @@ public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildTextSearchQuery` 对应的SQL/JPA 持久化实现类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 SQL DAO 或 Repository Bean，随事务上下文执行查询、保存、删除和分页读取时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：将领域查询参数转换为 Repository 或原生 SQL 调用，再把数据库记录映射回 Common 数据对象。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：构建搜索文本。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `selectionMapping`：数据列表。
+     * - `searchText`：`searchText` 参数。
+     * 返回：文本结果。
      */
     private String buildTextSearchQuery(QueryContext ctx, List<EntityKey> selectionMapping, String searchText) {
         if (!StringUtils.isEmpty(searchText) && selectionMapping != null && !selectionMapping.isEmpty()) {
@@ -537,16 +477,11 @@ public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildPermissionsQuery` 对应的SQL/JPA 持久化实现类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 SQL DAO 或 Repository Bean，随事务上下文执行查询、保存、删除和分页读取时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：将领域查询参数转换为 Repository 或原生 SQL 调用，再把数据库记录映射回 Common 数据对象。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：构建查询条件。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `ctx`：处理上下文。
+     * 返回：文本结果。
      */
     private String buildPermissionsQuery(TenantId tenantId, QueryContext ctx) {
         StringBuilder permissionsQuery = new StringBuilder();
@@ -556,16 +491,11 @@ public class DefaultAlarmQueryRepository implements AlarmQueryRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addAndIfNeeded` 对应的SQL/JPA 持久化实现类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring 容器创建为 SQL DAO 或 Repository Bean，随事务上下文执行查询、保存、删除和分页读取时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：将领域查询参数转换为 Repository 或原生 SQL 调用，再把数据库记录映射回 Common 数据对象。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：保存或创建`And If Needed`。
+     * 参数：
+     * - `wherePart`：`wherePart` 参数。
+     * - `addAnd`：`addAnd` 参数。
+     * 返回：无。
      */
     private void addAndIfNeeded(StringBuilder wherePart, boolean addAnd) {
         if (addAnd) {

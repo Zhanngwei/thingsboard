@@ -21,27 +21,26 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 import java.util.Collections;
 import java.util.Map;
 
-@Data
 /**
- * AWS SQS 节点配置模型，保存队列类型、Queue URL 模板、消息属性、凭据和区域。
- * 配置类本身不直接创建 SQS 客户端、不发送消息，也不涉及异步回调、数据库或缓存。
+ * `TbSqsNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbSqsNodeConfiguration implements NodeConfiguration<TbSqsNodeConfiguration> {
 
     /**
-     * SQS 队列类型，决定发送请求中的标准队列延迟或 FIFO 去重/分组字段。
+     * 队列，用于区分不同处理分支。
      */
     private QueueType queueType;
     /**
-     * SQS Queue URL 模板，运行时基于 TbMsg 解析。
+     * 队列，用于标识消息投递或消费的队列。
      */
     private String queueUrlPattern;
     /**
-     * 标准队列的延迟发送秒数。
+     * 延迟时间，用于控制时间范围或等待时长。
      */
     private int delaySeconds;
     /**
-     * SQS 消息属性模板集合，键和值都可基于消息解析。
+     * 消息映射关系，用于按键查找对应值。
      */
     private Map<String, String> messageAttributes;
     /**
@@ -58,8 +57,9 @@ public class TbSqsNodeConfiguration implements NodeConfiguration<TbSqsNodeConfig
     private String region;
 
     /**
-     * 构造 AWS SQS 节点默认配置。
-     * 本方法只设置默认值，不直接调用 SQS 或处理 Rule Engine 消息确认。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbSqsNodeConfiguration defaultConfiguration() {
@@ -73,15 +73,15 @@ public class TbSqsNodeConfiguration implements NodeConfiguration<TbSqsNodeConfig
     }
 
     /**
-     * SQS 队列类型枚举，区分标准队列和 FIFO 队列发送语义。
+     * `QueueType` 枚举，定义当前流程使用的固定取值。
      */
     public enum QueueType {
         /**
-         * 标准队列，支持 delaySeconds。
+         * `STANDARD`常量，用于统一引用固定值。
          */
         STANDARD,
         /**
-         * FIFO 队列，需要 messageDeduplicationId 和 messageGroupId。
+         * 字段名，表示当前对象的对应属性。
          */
         FIFO
     }

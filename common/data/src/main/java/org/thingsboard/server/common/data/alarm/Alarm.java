@@ -45,12 +45,6 @@ import java.util.UUID;
 /**
  * Created by ashvayka on 11.05.17.
  */
-@ApiModel
-@Data
-@EqualsAndHashCode(callSuper = true)
-@Builder
-@AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true)
 /**
  * 中文说明：
  * 1. 类目的：`Alarm` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -61,232 +55,135 @@ import java.util.UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@ApiModel
+@Data
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Alarm extends BaseData<AlarmId> implements HasName, HasTenantId, HasCustomerId {
 
-    @ApiModelProperty(position = 3, value = "JSON object with Tenant Id", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     /**
-     * 字段说明：
-     * 1. 保存 `tenantId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户ID，用于定位对应业务对象。
      */
+    @ApiModelProperty(position = 3, value = "JSON object with Tenant Id", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     private TenantId tenantId;
 
-    @ApiModelProperty(position = 4, value = "JSON object with Customer Id", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     /**
-     * 字段说明：
-     * 1. 保存 `customerId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户ID，用于定位对应业务对象。
      */
+    @ApiModelProperty(position = 4, value = "JSON object with Customer Id", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     private CustomerId customerId;
 
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @NoXss
     @ApiModelProperty(position = 6, required = true, value = "representing type of the Alarm", example = "High Temperature Alarm")
     @Length(fieldName = "type")
-    /**
-     * 字段说明：
-     * 1. 保存 `type` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String type;
+    /**
+     * `originator` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(position = 7, required = true, value = "JSON object with alarm originator id")
-    /**
-     * 字段说明：
-     * 1. 保存 `originator` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private EntityId originator;
+    /**
+     * `severity` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(position = 8, required = true, value = "Alarm severity", example = "CRITICAL")
-    /**
-     * 字段说明：
-     * 1. 保存 `severity` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private AlarmSeverity severity;
+    /**
+     * 当前告警是否已经确认。
+     */
     @ApiModelProperty(position = 9, required = true, value = "Acknowledged", example = "true")
-    /**
-     * 字段说明：
-     * 1. 保存 `acknowledged` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean acknowledged;
+    /**
+     * 当前告警是否已经清除。
+     */
     @ApiModelProperty(position = 10, required = true, value = "Cleared", example = "false")
-    /**
-     * 字段说明：
-     * 1. 保存 `cleared` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean cleared;
+    /**
+     * `assigneeId`ID，用于定位对应业务对象。
+     */
     @ApiModelProperty(position = 11, value = "Alarm assignee user id")
-    /**
-     * 字段说明：
-     * 1. 保存 `assigneeId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private UserId assigneeId;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @ApiModelProperty(position = 12, value = "Timestamp of the alarm start time, in milliseconds", example = "1634058704565")
-    /**
-     * 字段说明：
-     * 1. 保存 `startTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long startTs;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @ApiModelProperty(position = 13, value = "Timestamp of the alarm end time(last time update), in milliseconds", example = "1634111163522")
-    /**
-     * 字段说明：
-     * 1. 保存 `endTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long endTs;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @ApiModelProperty(position = 14, value = "Timestamp of the alarm acknowledgement, in milliseconds", example = "1634115221948")
-    /**
-     * 字段说明：
-     * 1. 保存 `ackTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long ackTs;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @ApiModelProperty(position = 15, value = "Timestamp of the alarm clearing, in milliseconds", example = "1634114528465")
-    /**
-     * 字段说明：
-     * 1. 保存 `clearTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long clearTs;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @ApiModelProperty(position = 16, value = "Timestamp of the alarm assignment, in milliseconds", example = "1634115928465")
-    /**
-     * 字段说明：
-     * 1. 保存 `assignTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long assignTs;
+    /**
+     * `details` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(position = 17, value = "JSON object with alarm details")
-    /**
-     * 字段说明：
-     * 1. 保存 `details` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private transient JsonNode details;
+    /**
+     * 是否向关联对象传播当前状态。
+     */
     @ApiModelProperty(position = 18, value = "Propagation flag to specify if alarm should be propagated to parent entities of alarm originator", example = "true")
-    /**
-     * 字段说明：
-     * 1. 保存 `propagate` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean propagate;
+    /**
+     * 是否向关联对象传播当前状态。
+     */
     @ApiModelProperty(position = 19, value = "Propagation flag to specify if alarm should be propagated to the owner (tenant or customer) of alarm originator", example = "true")
-    /**
-     * 字段说明：
-     * 1. 保存 `propagateToOwner` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean propagateToOwner;
-    @ApiModelProperty(position = 20, value = "Propagation flag to specify if alarm should be propagated to the tenant entity", example = "true")
     /**
-     * 字段说明：
-     * 1. 保存 `propagateToTenant` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否向关联对象传播当前状态。
      */
+    @ApiModelProperty(position = 20, value = "Propagation flag to specify if alarm should be propagated to the tenant entity", example = "true")
     private boolean propagateToTenant;
+    /**
+     * 关系列表，用于保存一组待处理对象。
+     */
     @ApiModelProperty(position = 21, value = "JSON array of relation types that should be used for propagation. " +
             "By default, 'propagateRelationTypes' array is empty which means that the alarm will be propagated based on any relation type to parent entities. " +
             "This parameter should be used only in case when 'propagate' parameter is set to true, otherwise, 'propagateRelationTypes' array will be ignored.")
-    /**
-     * 字段说明：
-     * 1. 保存 `propagateRelationTypes` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private List<String> propagateRelationTypes;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `Alarm` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `Alarm` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public Alarm() {
         super();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `Alarm` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `Alarm` 实例，并初始化必要字段。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：新创建的对象实例。
      */
     public Alarm(AlarmId id) {
         super(id);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `Alarm` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `Alarm` 实例，并初始化必要字段。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * 返回：新创建的对象实例。
      */
     public Alarm(Alarm alarm) {
         super(alarm.getId());
@@ -311,87 +208,63 @@ public class Alarm extends BaseData<AlarmId> implements HasName, HasTenantId, Ha
         this.propagateRelationTypes = alarm.getPropagateRelationTypes();
     }
 
+    /**
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
+     */
     @Override
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @ApiModelProperty(position = 5, required = true, value = "representing type of the Alarm", example = "High Temperature Alarm")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getName` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public String getName() {
         return type;
     }
 
+    /**
+     * 功能：获取`Id`。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiModelProperty(position = 1, value = "JSON object with the alarm Id. " +
             "Specify this field to update the alarm. " +
             "Referencing non-existing alarm Id will cause error. " +
             "Omit this field to create new alarm.")
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getId` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AlarmId getId() {
         return super.getId();
     }
 
 
+    /**
+     * 功能：获取创建时间。
+     * 参数：无。
+     * 返回：数值结果。
+     */
     @ApiModelProperty(position = 2, value = "Timestamp of the alarm creation, in milliseconds", example = "1634058704567", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getCreatedTime` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public long getCreatedTime() {
         return super.getCreatedTime();
     }
 
+    /**
+     * 功能：获取状态。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @ApiModelProperty(position = 22, required = true, value = "status of the Alarm", example = "ACTIVE_UNACK", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getStatus` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AlarmStatus getStatus() {
         return toStatus(cleared, acknowledged);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toStatus` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toStatus` 对应的处理。
+     * 参数：
+     * - `cleared`：`cleared` 参数。
+     * - `acknowledged`：`acknowledged` 参数。
+     * 返回：处理结果。
      */
     public static AlarmStatus toStatus(boolean cleared, boolean acknowledged) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (cleared) {
             return acknowledged ? AlarmStatus.CLEARED_ACK : AlarmStatus.CLEARED_UNACK;
         } else {
@@ -399,17 +272,12 @@ public class Alarm extends BaseData<AlarmId> implements HasName, HasTenantId, Ha
         }
     }
 
-    @JsonIgnore
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDashboardId` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取仪表盘ID。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @JsonIgnore
     public DashboardId getDashboardId() {
         return Optional.ofNullable(getDetails()).map(details -> details.get("dashboardId"))
                 .filter(JsonNode::isTextual).map(id -> new DashboardId(UUID.fromString(id.asText()))).orElse(null);

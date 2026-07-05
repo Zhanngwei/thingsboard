@@ -30,22 +30,12 @@ package org.thingsboard.server.controller;
  */
 public class TbUrlConstants {
     /**
-     * 字段说明：
-     * 1. 保存 `TELEMETRY_URL_PREFIX` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 遥测常量，用于统一引用固定值。
      */
     public static final String TELEMETRY_URL_PREFIX = "/api/plugins/telemetry";
     public static final String RPC_V1_URL_PREFIX = "/api/plugins/rpc";
     /**
-     * 字段说明：
-     * 1. 保存 `RPC_V2_URL_PREFIX` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * RPC常量，用于统一引用固定值。
      */
     public static final String RPC_V2_URL_PREFIX = "/api/rpc";
 }

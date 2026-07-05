@@ -29,31 +29,38 @@ import java.util.Optional;
  */
 public class TbMathArgumentValue {
 
-    @Getter
     /**
-     * 字段说明：保存 `value`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
+    @Getter
     private final double value;
 
     /**
-     * 方法说明：构造 `TbMathArgumentValue` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `TbMathArgumentValue` 实例，并初始化必要字段。
+     * 参数：
+     * - `value`：值。
+     * 返回：新创建的对象实例。
      */
     private TbMathArgumentValue(double value) {
         this.value = value;
     }
 
     /**
-     * 方法说明：执行 `constant` 对应的辅助逻辑，供 `TbMathArgumentValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `constant` 对应的处理。
+     * 参数：
+     * - `arg`：`arg` 参数。
+     * 返回：处理结果。
      */
     public static TbMathArgumentValue constant(TbMathArgument arg) {
         return fromString(arg.getKey());
     }
 
     /**
-     * 方法说明：执行 `defaultOrThrow` 对应的辅助逻辑，供 `TbMathArgumentValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `defaultOrThrow` 对应的处理。
+     * 参数：
+     * - `defaultValue`：值。
+     * - `error`：错误信息。
+     * 返回：处理结果。
      */
     private static TbMathArgumentValue defaultOrThrow(Double defaultValue, String error) {
         if (defaultValue != null) {
@@ -63,8 +70,12 @@ public class TbMathArgumentValue {
     }
 
     /**
-     * 方法说明：执行 `fromMessageBody` 对应的辅助逻辑，供 `TbMathArgumentValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromMessageBody` 对应的处理。
+     * 参数：
+     * - `arg`：`arg` 参数。
+     * - `argKey`：键。
+     * - `jsonNodeOpt`：`jsonNodeOpt` 参数。
+     * 返回：处理结果。
      */
     public static TbMathArgumentValue fromMessageBody(TbMathArgument arg, String argKey, Optional<ObjectNode> jsonNodeOpt) {
         Double defaultValue = arg.getDefaultValue();
@@ -100,8 +111,12 @@ public class TbMathArgumentValue {
     }
 
     /**
-     * 方法说明：执行 `fromMessageMetadata` 对应的辅助逻辑，供 `TbMathArgumentValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromMessageMetadata` 对应的处理。
+     * 参数：
+     * - `arg`：`arg` 参数。
+     * - `argKey`：键。
+     * - `metaData`：待处理数据。
+     * 返回：处理结果。
      */
     public static TbMathArgumentValue fromMessageMetadata(TbMathArgument arg, String argKey, TbMsgMetaData metaData) {
         Double defaultValue = arg.getDefaultValue();
@@ -116,24 +131,30 @@ public class TbMathArgumentValue {
     }
 
     /**
-     * 方法说明：执行 `fromLong` 对应的辅助逻辑，供 `TbMathArgumentValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromLong` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static TbMathArgumentValue fromLong(long value) {
         return new TbMathArgumentValue(value);
     }
 
     /**
-     * 方法说明：执行 `fromDouble` 对应的辅助逻辑，供 `TbMathArgumentValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromDouble` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static TbMathArgumentValue fromDouble(double value) {
         return new TbMathArgumentValue(value);
     }
 
     /**
-     * 方法说明：执行 `fromString` 对应的辅助逻辑，供 `TbMathArgumentValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromString` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static TbMathArgumentValue fromString(String value) {
         try {

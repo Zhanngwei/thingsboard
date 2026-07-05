@@ -25,11 +25,6 @@ import org.thingsboard.server.dao.util.mapping.JsonStringType;
 import javax.persistence.Entity;
 import javax.persistence.Table;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
-@Entity
-@TypeDef(name = "json", typeClass = JsonStringType.class)
-@Table(name = ModelConstants.TENANT_TABLE_NAME)
 /**
  * 中文说明：
  * 1. 类目的：`TenantEntity` 是 ThingsBoard DAO 模块 中的持久化实体映射类型，用于描述 ThingsBoard 领域对象与 SQL/Cassandra 存储结构之间的字段映射、索引关系和序列化边界。
@@ -41,53 +36,38 @@ import javax.persistence.Table;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Entity / Mapper / Value Object。
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@Entity
+@TypeDef(name = "json", typeClass = JsonStringType.class)
+@Table(name = ModelConstants.TENANT_TABLE_NAME)
 public final class TenantEntity extends AbstractTenantEntity<Tenant> {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TenantEntity` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `TenantEntity` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public TenantEntity() {
         super();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TenantEntity` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `TenantEntity` 实例，并初始化必要字段。
+     * 参数：
+     * - `tenant`：租户信息或租户标识。
+     * 返回：新创建的对象实例。
      */
     public TenantEntity(Tenant tenant) {
         super(tenant);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toData` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toData` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public Tenant toData() {
         return super.toTenant();
     }

@@ -34,8 +34,7 @@ import lombok.Data;
 public final class TbNodeConfiguration {
 
     /**
-     * 中文说明：保存节点配置的 JSON 树，来源于规则节点持久化配置或升级后的配置；生命周期与本包装对象一致。
-     * 设计为 final 字段是为了保证初始化流程中配置输入不可被替换。
+     * 数据，保存当前步骤读取或计算得到的内容。
      */
     private final JsonNode data;
 

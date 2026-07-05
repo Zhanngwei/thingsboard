@@ -43,11 +43,6 @@ import javax.persistence.Enumerated;
 import javax.persistence.Table;
 import java.util.UUID;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
-@Entity
-@TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
-@Table(name = ModelConstants.DEVICE_PROFILE_TABLE_NAME)
 /**
  * 中文说明：
  * 1. 类目的：`DeviceProfileEntity` 是 ThingsBoard DAO 模块 中的持久化实体映射类型，用于描述 ThingsBoard 领域对象与 SQL/Cassandra 存储结构之间的字段映射、索引关系和序列化边界。
@@ -59,233 +54,138 @@ import java.util.UUID;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Entity / Mapper / Value Object。
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@Entity
+@TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
+@Table(name = ModelConstants.DEVICE_PROFILE_TABLE_NAME)
 public final class DeviceProfileEntity extends BaseSqlEntity<DeviceProfile> {
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_TENANT_ID_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `tenantId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户ID，用于定位对应业务对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_TENANT_ID_PROPERTY)
     private UUID tenantId;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_NAME_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `name` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 名称，用于标识或展示当前对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_NAME_PROPERTY)
     private String name;
 
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = ModelConstants.DEVICE_PROFILE_TYPE_PROPERTY)
-    /**
-     * 字段说明：
-     * 1. 保存 `type` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private DeviceProfileType type;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_IMAGE_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `image` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 图片资源，表示当前对象的对应属性。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_IMAGE_PROPERTY)
     private String image;
 
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = ModelConstants.DEVICE_PROFILE_TRANSPORT_TYPE_PROPERTY)
-    /**
-     * 字段说明：
-     * 1. 保存 `transportType` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private DeviceTransportType transportType;
 
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = ModelConstants.DEVICE_PROFILE_PROVISION_TYPE_PROPERTY)
-    /**
-     * 字段说明：
-     * 1. 保存 `provisionType` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private DeviceProfileProvisionType provisionType;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_DESCRIPTION_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `description` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 描述信息，用于展示或标识当前对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_DESCRIPTION_PROPERTY)
     private String description;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_IS_DEFAULT_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `isDefault` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 当前对象是否为默认项。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_IS_DEFAULT_PROPERTY)
     private boolean isDefault;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_RULE_CHAIN_ID_PROPERTY, columnDefinition = "uuid")
     /**
-     * 字段说明：
-     * 1. 保存 `defaultRuleChainId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 规则链ID，用于定位对应业务对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_RULE_CHAIN_ID_PROPERTY, columnDefinition = "uuid")
     private UUID defaultRuleChainId;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_DASHBOARD_ID_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `defaultDashboardId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 仪表盘ID，用于定位对应业务对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_DASHBOARD_ID_PROPERTY)
     private UUID defaultDashboardId;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_QUEUE_NAME_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `defaultQueueName` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 队列名称，用于标识或展示当前对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_QUEUE_NAME_PROPERTY)
     private String defaultQueueName;
 
+    /**
+     * 配置，保存当前步骤读取或计算得到的内容。
+     */
     @Type(type = "jsonb")
     @Column(name = ModelConstants.DEVICE_PROFILE_PROFILE_DATA_PROPERTY, columnDefinition = "jsonb")
-    /**
-     * 字段说明：
-     * 1. 保存 `profileData` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private JsonNode profileData;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_PROVISION_DEVICE_KEY)
     /**
-     * 字段说明：
-     * 1. 保存 `provisionDeviceKey` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备，用于定位映射、配置或数据项。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_PROVISION_DEVICE_KEY)
     private String provisionDeviceKey;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_FIRMWARE_ID_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `firmwareId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * `firmwareId`ID，用于定位对应业务对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_FIRMWARE_ID_PROPERTY)
     private UUID firmwareId;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_SOFTWARE_ID_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `softwareId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * `softwareId`ID，用于定位对应业务对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_SOFTWARE_ID_PROPERTY)
     private UUID softwareId;
 
-    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_EDGE_RULE_CHAIN_ID_PROPERTY, columnDefinition = "uuid")
     /**
-     * 字段说明：
-     * 1. 保存 `defaultEdgeRuleChainId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 规则链ID，用于定位对应业务对象。
      */
+    @Column(name = ModelConstants.DEVICE_PROFILE_DEFAULT_EDGE_RULE_CHAIN_ID_PROPERTY, columnDefinition = "uuid")
     private UUID defaultEdgeRuleChainId;
 
-    @Column(name = ModelConstants.EXTERNAL_ID_PROPERTY)
     /**
-     * 字段说明：
-     * 1. 保存 `externalId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * `externalId`ID，用于定位对应业务对象。
      */
+    @Column(name = ModelConstants.EXTERNAL_ID_PROPERTY)
     private UUID externalId;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DeviceProfileEntity` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `DeviceProfileEntity` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public DeviceProfileEntity() {
         super();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DeviceProfileEntity` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `DeviceProfileEntity` 实例，并初始化必要字段。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：新创建的对象实例。
      */
     public DeviceProfileEntity(DeviceProfile deviceProfile) {
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getId() != null) {
             this.setUuid(deviceProfile.getId().getId());
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getTenantId() != null) {
             this.tenantId = deviceProfile.getTenantId().getId();
         }
@@ -298,51 +198,37 @@ public final class DeviceProfileEntity extends BaseSqlEntity<DeviceProfile> {
         this.description = deviceProfile.getDescription();
         this.isDefault = deviceProfile.isDefault();
         this.profileData = JacksonUtil.convertValue(deviceProfile.getProfileData(), ObjectNode.class);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getDefaultRuleChainId() != null) {
             this.defaultRuleChainId = deviceProfile.getDefaultRuleChainId().getId();
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getDefaultDashboardId() != null) {
             this.defaultDashboardId = deviceProfile.getDefaultDashboardId().getId();
         }
         this.defaultQueueName = deviceProfile.getDefaultQueueName();
         this.provisionDeviceKey = deviceProfile.getProvisionDeviceKey();
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getFirmwareId() != null) {
             this.firmwareId = deviceProfile.getFirmwareId().getId();
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getSoftwareId() != null) {
             this.softwareId = deviceProfile.getSoftwareId().getId();
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getDefaultEdgeRuleChainId() != null) {
             this.defaultEdgeRuleChainId = deviceProfile.getDefaultEdgeRuleChainId().getId();
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfile.getExternalId() != null) {
             this.externalId = deviceProfile.getExternalId().getId();
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toData` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toData` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public DeviceProfile toData() {
         DeviceProfile deviceProfile = new DeviceProfile(new DeviceProfileId(this.getUuid()));
         deviceProfile.setCreatedTime(createdTime);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenantId != null) {
             deviceProfile.setTenantId(TenantId.fromUUID(tenantId));
         }
@@ -355,25 +241,20 @@ public final class DeviceProfileEntity extends BaseSqlEntity<DeviceProfile> {
         deviceProfile.setDefault(isDefault);
         deviceProfile.setDefaultQueueName(defaultQueueName);
         deviceProfile.setProfileData(JacksonUtil.convertValue(profileData, DeviceProfileData.class));
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (defaultRuleChainId != null) {
             deviceProfile.setDefaultRuleChainId(new RuleChainId(defaultRuleChainId));
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (defaultDashboardId != null) {
             deviceProfile.setDefaultDashboardId(new DashboardId(defaultDashboardId));
         }
         deviceProfile.setProvisionDeviceKey(provisionDeviceKey);
 
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (firmwareId != null) {
             deviceProfile.setFirmwareId(new OtaPackageId(firmwareId));
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (softwareId != null) {
             deviceProfile.setSoftwareId(new OtaPackageId(softwareId));
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (defaultEdgeRuleChainId != null) {
             deviceProfile.setDefaultEdgeRuleChainId(new RuleChainId(defaultEdgeRuleChainId));
         }

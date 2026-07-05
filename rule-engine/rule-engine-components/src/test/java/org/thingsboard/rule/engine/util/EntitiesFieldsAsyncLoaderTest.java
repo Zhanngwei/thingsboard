@@ -74,58 +74,82 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 /**
- * 测试目标：验证 {@code EntitiesFieldsAsyncLoaderTest} 覆盖的 规则引擎工具组件 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code EntitiesFieldsAsyncLoader}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `EntitiesFieldsAsyncLoaderTest` 测试类，用于验证 `EntitiesFieldsAsyncLoader` 相关行为。
  */
 @ExtendWith(MockitoExtension.class)
 public class EntitiesFieldsAsyncLoaderTest {
 
-    /** 测试常量字段：{@code DB_EXECUTOR} 保存 {@code ListeningExecutor} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 执行器常量，用于统一引用固定值。
+     */
     private static final ListeningExecutor DB_EXECUTOR = new TestDbCallbackExecutor();
-    /** 可变 fixture 字段：{@code SUPPORTED_ENTITY_TYPES} 保存 {@code EnumSet<EntityType>} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 实体常量，用于统一引用固定值。
+     */
     private static EnumSet<EntityType> SUPPORTED_ENTITY_TYPES;
-    /** 可变 fixture 字段：{@code RANDOM_UUID} 保存 {@code UUID} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * `RANDOM_UUID`常量，用于统一引用固定值。
+     */
     private static UUID RANDOM_UUID;
-    /** 可变 fixture 字段：{@code TENANT_ID} 保存 {@code TenantId} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 租户ID常量，用于统一引用固定值。
+     */
     private static TenantId TENANT_ID;
-    /** Mock 依赖字段：{@code ctxMock} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctxMock;
-    /** Mock 依赖字段：{@code tenantServiceMock} 保存 {@code TenantService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 租户，提供当前类调用的业务操作。
+     */
     @Mock
     private TenantService tenantServiceMock;
-    /** Mock 依赖字段：{@code customerServiceMock} 保存 {@code CustomerService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 客户，提供当前类调用的业务操作。
+     */
     @Mock
     private CustomerService customerServiceMock;
-    /** Mock 依赖字段：{@code userServiceMock} 保存 {@code UserService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 用户，提供当前类调用的业务操作。
+     */
     @Mock
     private UserService userServiceMock;
-    /** Mock 依赖字段：{@code assetServiceMock} 保存 {@code AssetService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 资产集合，用于去重保存或快速判断对象是否存在。
+     */
     @Mock
     private AssetService assetServiceMock;
-    /** Mock 依赖字段：{@code deviceServiceMock} 保存 {@code DeviceService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 设备，提供当前类调用的业务操作。
+     */
     @Mock
     private DeviceService deviceServiceMock;
-    /** Mock 依赖字段：{@code ruleEngineAlarmServiceMock} 保存 {@code RuleEngineAlarmService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 规则引擎，提供当前类调用的业务操作。
+     */
     @Mock
     private RuleEngineAlarmService ruleEngineAlarmServiceMock;
-    /** Mock 依赖字段：{@code ruleChainServiceMock} 保存 {@code RuleChainService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 规则链，提供当前类调用的业务操作。
+     */
     @Mock
     private RuleChainService ruleChainServiceMock;
-    /** Mock 依赖字段：{@code entityViewServiceMock} 保存 {@code EntityViewService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 实体视图，提供当前类调用的业务操作。
+     */
     @Mock
     private EntityViewService entityViewServiceMock;
-    /** Mock 依赖字段：{@code edgeServiceMock} 保存 {@code EdgeService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 边缘节点，提供当前类调用的业务操作。
+     */
     @Mock
     private EdgeService edgeServiceMock;
 
     /**
-     * 生命周期方法：{@code setup} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
     @BeforeAll
     public static void setup() {
@@ -145,15 +169,12 @@ public class EntitiesFieldsAsyncLoaderTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenSupportedEntityTypes_whenFindAsync_thenOK} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证 `givenSupportedEntityTypes_whenFindAsync_thenOK` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenSupportedEntityTypes_whenFindAsync_thenOK() throws ExecutionException, InterruptedException {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         for (var entityType : SUPPORTED_ENTITY_TYPES) {
             var entityId = EntityIdFactory.getByTypeAndUuid(entityType, RANDOM_UUID);
 
@@ -169,15 +190,12 @@ public class EntitiesFieldsAsyncLoaderTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenUnsupportedEntityTypes_whenFindAsync_thenException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证 `givenUnsupportedEntityTypes_whenFindAsync_thenException` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenUnsupportedEntityTypes_whenFindAsync_thenException() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         for (var entityType : EntityType.values()) {
             if (!SUPPORTED_ENTITY_TYPES.contains(entityType)) {
                 var entityId = EntityIdFactory.getByTypeAndUuid(entityType, RANDOM_UUID);
@@ -194,15 +212,12 @@ public class EntitiesFieldsAsyncLoaderTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenSupportedTypeButEntityDoesNotExist_whenFindAsync_thenException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证 `givenSupportedTypeButEntityDoesNotExist_whenFindAsync_thenException` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenSupportedTypeButEntityDoesNotExist_whenFindAsync_thenException() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         for (var entityType : SUPPORTED_ENTITY_TYPES) {
             var entityId = EntityIdFactory.getByTypeAndUuid(entityType, RANDOM_UUID);
 
@@ -220,9 +235,11 @@ public class EntitiesFieldsAsyncLoaderTest {
     }
 
     /**
-     * 辅助方法：{@code initMocks} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化或启动`Mocks`。
+     * 参数：
+     * - `entityType`：实体对象。
+     * - `entityDoesNotExist`：实体对象。
+     * 返回：无。
      */
     private void initMocks(EntityType entityType, boolean entityDoesNotExist) {
         switch (entityType) {
@@ -304,9 +321,10 @@ public class EntitiesFieldsAsyncLoaderTest {
     }
 
     /**
-     * 辅助方法：{@code getEntityFromEntityId} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取实体ID。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
     private BaseData<? extends UUIDBased> getEntityFromEntityId(EntityId entityId) {
         switch (entityId.getEntityType()) {

@@ -19,7 +19,6 @@ import lombok.Data;
 
 import java.time.chrono.IsoChronology;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`TbDateTestEntity` 是ThingsBoard Common 测试模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -30,45 +29,33 @@ import java.time.chrono.IsoChronology;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Data
 public class TbDateTestEntity {
     /**
-     * 字段说明：
-     * 1. 保存 `year` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `year` 字段，保存当前对象的对应属性。
      */
     private int year;
     private int month;
     /**
-     * 字段说明：
-     * 1. 保存 `date` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `date` 字段，保存当前对象的对应属性。
      */
     private int date;
     private int hours;
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbDateTestEntity` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbDateTestEntity` 实例，并初始化必要字段。
+     * 参数：
+     * - `year`：`year` 参数。
+     * - `month`：`month` 参数。
+     * - `date`：`date` 参数。
+     * - `hours`：`hours` 参数。
+     * 返回：新创建的对象实例。
      */
     public TbDateTestEntity(int year, int month, int date, int hours) {
         this.year = year;
         this.month = month;
         this.date = date;
         this.hours = hours;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (hours > 23) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (date == 31) {
                 this.year++;
                 this.month = 1;
@@ -77,9 +64,7 @@ public class TbDateTestEntity {
                 this.date++;
             }
             this.hours = hours - 24;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (hours < 0) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (month== 1 && date == 1) {
                 this.year--;
                 this.month = 12;
@@ -90,10 +75,8 @@ public class TbDateTestEntity {
             this.hours = hours + 24;
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (this.date > 28) {
             int dom = 31;
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (month) {
                 case 2:
                     dom = IsoChronology.INSTANCE.isLeapYear((long) year) ? 29 : 28;
@@ -110,7 +93,6 @@ public class TbDateTestEntity {
                 case 11:
                     dom = 30;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (this.date > dom) {
                 this.date = this.date - dom;
                 this.month++;
@@ -118,56 +100,36 @@ public class TbDateTestEntity {
         }
     }
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getYear` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Year`。
+     * 参数：无。
+     * 返回：数值结果。
      */
     public int getYear(){
         return year < 70 ? 2000 + year : year <= 99 ? 1900 + year : year;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `geMonthStr` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `geMonthStr` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String geMonthStr(){
         return String.format("%02d", month);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `geDateStr` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `geDateStr` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String geDateStr(){
         return String.format("%02d", date);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `geHoursStr` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `geHoursStr` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String geHoursStr(){
         return String.format("%02d", hours);

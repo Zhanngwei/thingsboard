@@ -40,6 +40,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * `TbMsgPushToEdgeNode` 类，封装当前模块中的一组相关职责。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.ACTION,
@@ -64,20 +67,22 @@ import java.util.UUID;
         icon = "cloud_download",
         ruleChainTypes = RuleChainType.CORE
 )
-/**
- * Cloud 侧推送到 Edge 的节点，把消息转换为 EdgeEvent 并保存到 Edge 队列。
- * 本类不直接通过网络推送到 Edge；外部同步由 EdgeEventService 保存后触发的 Edge 通知链路完成。
- */
 public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNodeConfiguration, EdgeEvent, EdgeEventType> {
 
     /**
-     * 查询实体关联 Edge 时使用的默认分页大小。
+     * `DEFAULT_PAGE_SIZE`常量，用于统一引用固定值。
      */
     static final int DEFAULT_PAGE_SIZE = 100;
 
     /**
-     * 构造 EdgeEvent 对象。
-     * 本方法只填充本地事件字段，不直接保存数据库或触发远端同步。
+     * 功能：构建事件。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `eventAction`：`eventAction` 参数。
+     * - `entityId`：实体IDID。
+     * - `eventType`：类型。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     @Override
     EdgeEvent buildEvent(TenantId tenantId, EdgeEventActionType eventAction, UUID entityId,
@@ -92,8 +97,10 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
     }
 
     /**
-     * 将实体类型映射为 EdgeEventType。
-     * 本方法只调用工具类进行本地映射，不直接访问数据库或缓存。
+     * 功能：获取实体。
+     * 参数：
+     * - `entityType`：实体对象。
+     * 返回：处理结果。
      */
     @Override
     EdgeEventType getEventTypeByEntityType(EntityType entityType) {
@@ -101,7 +108,9 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
     }
 
     /**
-     * 返回告警消息对应的 EdgeEventType。
+     * 功能：获取告警。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     EdgeEventType getAlarmEventType() {
@@ -109,7 +118,9 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
     }
 
     /**
-     * 返回需要忽略的消息来源，避免处理来自 Edge 的回流消息。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：文本结果。
      */
     @Override
     String getIgnoredMessageSource() {
@@ -117,8 +128,9 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
     }
 
     /**
-     * 返回 Push to Edge 节点配置类。
-     * 本方法只用于配置转换，不直接访问数据库或缓存。
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     protected Class<TbMsgPushToEdgeNodeConfiguration> getConfigClazz() {
@@ -126,9 +138,11 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
     }
 
     /**
-     * 将消息保存为一个或多个 EdgeEvent，并根据保存结果路由消息。
-     * 如果 originator 本身是 EDGE，则保存到该 Edge；否则查询关联 Edge 并分别保存。
-     * 本方法直接进入 EdgeEventService/EdgeService 调用链，数据库和缓存可能在这些服务内部涉及。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     protected void processMsg(TbContext ctx, TbMsg msg) {
@@ -139,8 +153,10 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                 ListenableFuture<Void> future = notifyEdge(ctx, edgeEvent, edgeId);
                 FutureCallback<Void> futureCallback = new FutureCallback<>() {
                     /**
-                     * 单个 EdgeEvent 保存成功后路由 Success。
-                     * 本回调运行在 dbCallbackExecutor 上。
+                     * 功能：处理`on Success`。
+                     * 参数：
+                     * - `result`：`result` 参数。
+                     * 返回：无。
                      */
                     @Override
                     public void onSuccess(@Nullable Void result) {
@@ -148,8 +164,10 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                     }
 
                     /**
-                     * 单个 EdgeEvent 保存失败后路由 Failure。
-                     * 失败通常来自数据库持久化或 EdgeEventService 调用链。
+                     * 功能：处理失败信息。
+                     * 参数：
+                     * - `t`：`t` 参数。
+                     * 返回：无。
                      */
                     @Override
                     public void onFailure(Throwable t) {
@@ -162,7 +180,6 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                 PageDataIterableByTenantIdEntityId<EdgeId> edgeIds = new PageDataIterableByTenantIdEntityId<>(
                         ctx.getEdgeService()::findRelatedEdgeIdsByEntityId, ctx.getTenantId(), msg.getOriginator(), DEFAULT_PAGE_SIZE);
                 for (EdgeId edgeId : edgeIds) {
-                    // 对每个关联 Edge 单独构造并保存事件，全部成功后才走 Success。
                     EdgeEvent edgeEvent = buildEvent(msg, ctx);
                     futures.add(notifyEdge(ctx, edgeEvent, edgeId));
                 }
@@ -173,7 +190,10 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                 } else {
                     Futures.addCallback(Futures.allAsList(futures), new FutureCallback<>() {
                         /**
-                         * 所有关联 EdgeEvent 保存成功后路由 Success。
+                         * 功能：处理`on Success`。
+                         * 参数：
+                         * - `voids`：数据列表。
+                         * 返回：无。
                          */
                         @Override
                         public void onSuccess(@Nullable List<Void> voids) {
@@ -181,7 +201,10 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
                         }
 
                         /**
-                         * 任一关联 EdgeEvent 保存失败后路由 Failure。
+                         * 功能：处理失败信息。
+                         * 参数：
+                         * - `t`：`t` 参数。
+                         * 返回：无。
                          */
                         @Override
                         public void onFailure(Throwable t) {
@@ -197,8 +220,12 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
     }
 
     /**
-     * 保存 EdgeEvent 并触发 Edge 更新通知。
-     * 本方法直接调用 EdgeEventService.saveAsync，属于数据库/持久化边界；转换回调运行在 dbCallbackExecutor。
+     * 功能：通知边缘节点。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `edgeEvent`：`edgeEvent` 参数。
+     * - `edgeId`：边缘节点ID。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Void> notifyEdge(TbContext ctx, EdgeEvent edgeEvent, EdgeId edgeId) {
         edgeEvent.setEdgeId(edgeId);

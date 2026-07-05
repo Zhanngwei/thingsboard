@@ -38,9 +38,6 @@ import java.net.InetSocketAddress;
 /**
  * @author Andrew Shvayka
  */
-@Service("MqttTransportService")
-@ConditionalOnExpression("'${service.type:null}'=='tb-transport' || ('${service.type:null}'=='monolith' && '${transport.api_enabled:true}'=='true' && '${transport.mqtt.enabled}'=='true')")
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`MqttTransportService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -51,147 +48,85 @@ import java.net.InetSocketAddress;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Service("MqttTransportService")
+@ConditionalOnExpression("'${service.type:null}'=='tb-transport' || ('${service.type:null}'=='monolith' && '${transport.api_enabled:true}'=='true' && '${transport.mqtt.enabled}'=='true')")
+@Slf4j
 public class MqttTransportService implements TbTransportService {
 
     public static AttributeKey<InetSocketAddress> ADDRESS = AttributeKey.newInstance("SRC_ADDRESS");
 
+    /**
+     * 主机地址，用于描述服务监听或访问地址。
+     */
     @Value("${transport.mqtt.bind_address}")
-    /**
-     * 字段说明：
-     * 1. 保存 `host` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String host;
-    @Value("${transport.mqtt.bind_port}")
     /**
-     * 字段说明：
-     * 1. 保存 `port` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 端口号，用于描述服务监听或访问地址。
      */
+    @Value("${transport.mqtt.bind_port}")
     private Integer port;
 
-    @Value("${transport.mqtt.ssl.enabled}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否启用 SSL。
      */
+    @Value("${transport.mqtt.ssl.enabled}")
     private boolean sslEnabled;
 
+    /**
+     * 主机地址，用于描述服务监听或访问地址。
+     */
     @Value("${transport.mqtt.ssl.bind_address}")
-    /**
-     * 字段说明：
-     * 1. 保存 `sslHost` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String sslHost;
-    @Value("${transport.mqtt.ssl.bind_port}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslPort` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 端口号，用于描述服务监听或访问地址。
      */
+    @Value("${transport.mqtt.ssl.bind_port}")
     private Integer sslPort;
 
+    /**
+     * `leakDetectorLevel` 字段，保存当前对象的对应属性。
+     */
     @Value("${transport.mqtt.netty.leak_detector_level}")
-    /**
-     * 字段说明：
-     * 1. 保存 `leakDetectorLevel` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String leakDetectorLevel;
+    /**
+     * 数量，用于控制数量、位置或分页范围。
+     */
     @Value("${transport.mqtt.netty.boss_group_thread_count}")
-    /**
-     * 字段说明：
-     * 1. 保存 `bossGroupThreadCount` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer bossGroupThreadCount;
+    /**
+     * 工作线程组，用于控制数量、位置或分页范围。
+     */
     @Value("${transport.mqtt.netty.worker_group_thread_count}")
-    /**
-     * 字段说明：
-     * 1. 保存 `workerGroupThreadCount` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer workerGroupThreadCount;
-    @Value("${transport.mqtt.netty.so_keep_alive}")
     /**
-     * 字段说明：
-     * 1. 保存 `keepAlive` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足`keepAlive`条件。
      */
+    @Value("${transport.mqtt.netty.so_keep_alive}")
     private boolean keepAlive;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `context` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @Autowired
     private MqttTransportContext context;
 
     /**
-     * 字段说明：
-     * 1. 保存 `serverChannel` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务端 Channel，表示当前网络连接使用的通道。
      */
     private Channel serverChannel;
     private Channel sslServerChannel;
     /**
-     * 字段说明：
-     * 1. 保存 `bossGroup` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `bossGroup` 字段，保存当前对象的对应属性。
      */
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() throws Exception {
         log.info("Setting resource leak detector level to {}", leakDetectorLevel);
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.valueOf(leakDetectorLevel.toUpperCase()));
@@ -202,17 +137,14 @@ public class MqttTransportService implements TbTransportService {
         ServerBootstrap b = new ServerBootstrap();
         b.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 .childHandler(new MqttTransportServerInitializer(context, false))
                 .childOption(ChannelOption.SO_KEEPALIVE, keepAlive);
 
         serverChannel = b.bind(host, port).sync().channel();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sslEnabled) {
             b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     .childHandler(new MqttTransportServerInitializer(context, true))
                     .childOption(ChannelOption.SO_KEEPALIVE, keepAlive);
             sslServerChannel = b.bind(sslHost, sslPort).sync().channel();
@@ -220,22 +152,16 @@ public class MqttTransportService implements TbTransportService {
         log.info("Mqtt transport started!");
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdown` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `shutdown` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void shutdown() throws InterruptedException {
         log.info("Stopping MQTT transport!");
         try {
             serverChannel.close().sync();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sslEnabled) {
                 sslServerChannel.close().sync();
             }
@@ -246,19 +172,13 @@ public class MqttTransportService implements TbTransportService {
         log.info("MQTT transport stopped!");
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String getName() {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return DataConstants.MQTT_TRANSPORT_NAME;
     }
 }

@@ -45,26 +45,16 @@ import static org.mvel2.MVEL.executeTbExpression;
 public class TbDateConstructorTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `executionContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private static ExecutionContext executionContext;
 
-    @BeforeAll
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setup` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
+    @BeforeAll
     public static void setup() {
         SandboxedParserConfiguration parserConfig = ParserContext.enableSandboxedMode();
         parserConfig.addImport("JSON", TbJson.class);
@@ -72,33 +62,23 @@ public class TbDateConstructorTest {
         executionContext = new ExecutionContext(parserConfig, 5 * 1024 * 1024);
     }
 
-    @AfterAll
     /**
-     * 方法说明：
-     * 1. 职责：执行 `tearDown` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `tearDown` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @AfterAll
     public static void tearDown() {
         ParserContext.disableSandboxedMode();
     }
 
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TestTbDateConstructorWithStringParameters` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证参数集合相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void TestTbDateConstructorWithStringParameters () {
             // one: date in String
         String body = "var d = new Date(\"2023-08-06T04:04:05.123Z\"); \n" +
@@ -129,17 +109,12 @@ public class TbDateConstructorTest {
         Assert.assertNotEquals("22022-10-09T18:15:30Z".length(),  res);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbDateConstructorWithStringParameters_PatternNotMatchLocale_Error` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `TbDateConstructorWithStringParameters_PatternNotMatchLocale_Error` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void TbDateConstructorWithStringParameters_PatternNotMatchLocale_Error () {
         String expectedMessage = "could not create constructor: null";
 
@@ -154,14 +129,10 @@ public class TbDateConstructorTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeScript` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Script`。
+     * 参数：
+     * - `ex`：`ex` 参数。
+     * 返回：处理结果。
      */
     private Object executeScript(String ex) {
         Serializable compiled = compileExpression(ex, new ParserContext());

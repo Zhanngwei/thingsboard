@@ -26,7 +26,6 @@ import static org.thingsboard.server.msa.ui.base.AbstractBasePage.getRandomNumbe
 import static org.thingsboard.server.msa.ui.utils.Const.EMPTY_DEVICE_MESSAGE;
 import static org.thingsboard.server.msa.ui.utils.Const.ENTITY_NAME;
 
-@Feature("Edit device")
 /**
  * 中文说明：
  * 1. 类目的：`EditDeviceTest` 是 ThingsBoard MSA 测试模块 中的MSA UI 黑盒测试类型，用于通过 Selenium 验证客户、设备、资产、规则链等页面工作流。
@@ -38,35 +37,26 @@ import static org.thingsboard.server.msa.ui.utils.Const.ENTITY_NAME;
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 End-to-End Test / Template Method。
  */
+@Feature("Edit device")
 public class EditDeviceTest extends AbstractDeviceTest {
 
+    /**
+     * 功能：执行 `changeName` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(groups = "smoke")
     @Description("Change name by edit menu")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `changeName` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void changeName() {
         String newDeviceName = "Changed" + getRandomNumber();
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME)).getName();
 
         sideBarMenuView.goToDevicesPage();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.entity(deviceName).click();
         devicePage.setHeaderName();
         String nameBefore = devicePage.getHeaderName();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.editPencilBtn().click();
         devicePage.changeNameEditMenu(newDeviceName);
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.doneBtnEditView().click();
         deviceName = newDeviceName;
         devicePage.setHeaderName();
@@ -76,84 +66,59 @@ public class EditDeviceTest extends AbstractDeviceTest {
         assertThat(nameAfter).as("The name has changed correctly").isEqualTo(newDeviceName);
     }
 
+    /**
+     * 功能：删除或清理名称。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(groups = "smoke")
     @Description("Delete name and save")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteName` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void deleteName() {
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME)).getName();
 
         sideBarMenuView.goToDevicesPage();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.entity(deviceName).click();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.editPencilBtn().click();
         devicePage.changeNameEditMenu("");
 
         assertIsDisable(devicePage.doneBtnEditViewVisible());
     }
 
+    /**
+     * 功能：保存或创建`Only With Space`。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(groups = "smoke")
     @Description("Save only with space")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveOnlyWithSpace` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void saveOnlyWithSpace() {
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME)).getName();
 
         sideBarMenuView.goToDevicesPage();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.entity(deviceName).click();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.editPencilBtn().click();
         devicePage.changeNameEditMenu(" ");
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.doneBtnEditView().click();
 
         assertIsDisplayed(devicePage.warningMessage());
         assertThat(devicePage.warningMessage().getText()).as("Text of warning message").isEqualTo(EMPTY_DEVICE_MESSAGE);
     }
 
+    /**
+     * 功能：执行 `editDescription` 对应的处理。
+     * 参数：
+     * - `description`：`description` 参数。
+     * - `newDescription`：`newDescription` 参数。
+     * - `finalDescription`：`finalDescription` 参数。
+     * 返回：无。
+     */
     @Test(groups = "smoke", dataProviderClass = DataProviderCredential.class, dataProvider = "editMenuDescription")
     @Description("Write the description and save the changes/Change the description and save the changes/Delete the description and save the changes")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `editDescription` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void editDescription(String description, String newDescription, String finalDescription) {
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME, description)).getName();
 
         sideBarMenuView.goToDevicesPage();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.entity(deviceName).click();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         devicePage.editPencilBtn().click();
         devicePage.descriptionEntityView().sendKeys(newDescription);
         devicePage.doneBtnEditView().click();
@@ -162,19 +127,14 @@ public class EditDeviceTest extends AbstractDeviceTest {
         assertThat(devicePage.getDescription()).as("The description changed correctly").isEqualTo(finalDescription);
     }
 
+    /**
+     * 功能：判断`Gateway`。
+     * 参数：
+     * - `isGateway`：`isGateway` 参数。
+     * 返回：无。
+     */
     @Test(groups = "smoke", dataProviderClass = DataProviderCredential.class, dataProvider = "enable")
     @Description("Enable gateway mode/Disable gateway")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `isGateway` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void isGateway(boolean isGateway) {
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME, isGateway)).getName();
 
@@ -193,19 +153,14 @@ public class EditDeviceTest extends AbstractDeviceTest {
         }
     }
 
+    /**
+     * 功能：判断设备。
+     * 参数：
+     * - `isOverwriteActivityTimeForConnected`：`isOverwriteActivityTimeForConnected` 参数。
+     * 返回：无。
+     */
     @Test(groups = "smoke", dataProviderClass = DataProviderCredential.class, dataProvider = "enable")
     @Description("Enable overwrite activity time for connected/Disable overwrite activity time for connected")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `isOverwriteActivityTimeForConnectedDevice` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void isOverwriteActivityTimeForConnectedDevice(boolean isOverwriteActivityTimeForConnected) {
         deviceName = testRestClient.postDevice("",
                 EntityPrototypes.defaultDevicePrototype(ENTITY_NAME, true, isOverwriteActivityTimeForConnected)).getName();
@@ -225,19 +180,13 @@ public class EditDeviceTest extends AbstractDeviceTest {
         }
     }
 
+    /**
+     * 功能：执行 `changeDeviceProfile` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(groups = "smoke")
     @Description("Change device profile")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `changeDeviceProfile` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void changeDeviceProfile() {
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME)).getName();
 
@@ -251,19 +200,13 @@ public class EditDeviceTest extends AbstractDeviceTest {
         assertThat(devicePage.deviceProfileRedirectedBtn().getText()).as("Profile changed correctly").isEqualTo("DEFAULT");
     }
 
+    /**
+     * 功能：保存或创建设备配置。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(groups = "smoke")
     @Description("Save without device profile")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveWithoutDeviceProfile` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void saveWithoutDeviceProfile() {
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME)).getName();
 
@@ -275,19 +218,16 @@ public class EditDeviceTest extends AbstractDeviceTest {
         assertIsDisable(devicePage.doneBtnEditViewVisible());
     }
 
+    /**
+     * 功能：执行 `editLabel` 对应的处理。
+     * 参数：
+     * - `label`：`label` 参数。
+     * - `newLabel`：`newLabel` 参数。
+     * - `finalLabel`：`finalLabel` 参数。
+     * 返回：无。
+     */
     @Test(groups = "smoke", dataProviderClass = DataProviderCredential.class, dataProvider = "editDeviceLabel")
     @Description("Write the label and save the changes/Change the label and save the changes/Delete the label and save the changes")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `editLabel` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void editLabel(String label, String newLabel, String finalLabel) {
         deviceName = testRestClient.postDevice("", EntityPrototypes.defaultDevicePrototype(ENTITY_NAME, "", label)).getName();
 

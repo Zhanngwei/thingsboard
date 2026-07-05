@@ -32,10 +32,6 @@ import static org.thingsboard.server.dao.model.ModelConstants.ATTRIBUTE_TYPE_COL
 import static org.thingsboard.server.dao.model.ModelConstants.ENTITY_ID_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.ENTITY_TYPE_COLUMN;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-@Embeddable
 /**
  * 中文说明：
  * 1. 类目的：`AttributeKvCompositeKey` 是 ThingsBoard DAO 模块 中的持久化实体映射类型，用于描述 ThingsBoard 领域对象与 SQL/Cassandra 存储结构之间的字段映射、索引关系和序列化边界。
@@ -47,47 +43,31 @@ import static org.thingsboard.server.dao.model.ModelConstants.ENTITY_TYPE_COLUMN
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Entity / Mapper / Value Object。
  */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Embeddable
 public class AttributeKvCompositeKey implements Serializable {
+    /**
+     * 实体，用于区分不同处理分支。
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = ENTITY_TYPE_COLUMN)
-    /**
-     * 字段说明：
-     * 1. 保存 `entityType` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private EntityType entityType;
+    /**
+     * 实体ID，用于定位对应业务对象。
+     */
     @Column(name = ENTITY_ID_COLUMN, columnDefinition = "uuid")
-    /**
-     * 字段说明：
-     * 1. 保存 `entityId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private UUID entityId;
+    /**
+     * 属性，用于区分不同处理分支。
+     */
     @Column(name = ATTRIBUTE_TYPE_COLUMN)
-    /**
-     * 字段说明：
-     * 1. 保存 `attributeType` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private String attributeType;
-    @Column(name = ATTRIBUTE_KEY_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `attributeKey` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 属性，用于定位映射、配置或数据项。
      */
+    @Column(name = ATTRIBUTE_KEY_COLUMN)
     private String attributeKey;
 }
 

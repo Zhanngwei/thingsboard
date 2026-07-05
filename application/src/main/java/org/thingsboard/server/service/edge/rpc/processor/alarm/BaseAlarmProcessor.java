@@ -45,7 +45,6 @@ import org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessor;
 
 import java.util.UUID;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`BaseAlarmProcessor` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
@@ -56,46 +55,35 @@ import java.util.UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
  */
+@Slf4j
 public abstract class BaseAlarmProcessor extends BaseEdgeProcessor {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `alarmCommentDao` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 告警，用于读取或保存对应领域对象。
      */
+    @Autowired
     protected AlarmCommentDao alarmCommentDao;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processAlarmMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmUpdateMsg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     public ListenableFuture<Void> processAlarmMsg(TenantId tenantId, AlarmUpdateMsg alarmUpdateMsg) {
         log.trace("[{}] processAlarmMsg [{}]", tenantId, alarmUpdateMsg);
         AlarmId alarmId = new AlarmId(new UUID(alarmUpdateMsg.getIdMSB(), alarmUpdateMsg.getIdLSB()));
         EntityId originatorId = getAlarmOriginatorFromMsg(tenantId, alarmUpdateMsg);
         Alarm alarm = constructAlarmFromUpdateMsg(tenantId, alarmId, originatorId, alarmUpdateMsg);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (alarm == null) {
             throw new RuntimeException("[{" + tenantId + "}] alarmUpdateMsg {" + alarmUpdateMsg + "} cannot be converted to alarm");
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (alarm.getOriginator() == null) {
             log.warn("[{}] Originator not found for the alarm msg {}", tenantId, alarmUpdateMsg);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return Futures.immediateFuture(null);
         }
         try {
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (alarmUpdateMsg.getMsgType()) {
                 case ENTITY_CREATED_RPC_MESSAGE:
                     alarmService.createAlarm(AlarmCreateOrUpdateActiveRequest.fromAlarm(alarm, null, alarmId));
@@ -105,21 +93,18 @@ public abstract class BaseAlarmProcessor extends BaseEdgeProcessor {
                     break;
                 case ALARM_ACK_RPC_MESSAGE:
                     Alarm alarmToAck = alarmService.findAlarmById(tenantId, alarmId);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (alarmToAck != null) {
                         alarmService.acknowledgeAlarm(tenantId, alarmId, alarm.getAckTs());
                     }
                     break;
                 case ALARM_CLEAR_RPC_MESSAGE:
                     Alarm alarmToClear = alarmService.findAlarmById(tenantId, alarmId);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (alarmToClear != null) {
                         alarmService.clearAlarm(tenantId, alarmId, alarm.getClearTs(), alarm.getDetails());
                     }
                     break;
                 case ENTITY_DELETED_RPC_MESSAGE:
                     Alarm alarmToDelete = alarmService.findAlarmById(tenantId, alarmId);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (alarmToDelete != null) {
                         alarmService.delAlarm(tenantId, alarmId);
                     }
@@ -128,36 +113,28 @@ public abstract class BaseAlarmProcessor extends BaseEdgeProcessor {
                 default:
                     return handleUnsupportedMsgType(alarmUpdateMsg.getMsgType());
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("[{}] Failed to process alarm update msg [{}]", tenantId, alarmUpdateMsg, e);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return Futures.immediateFailedFuture(e);
         }
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return Futures.immediateFuture(null);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processAlarmCommentMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmCommentUpdateMsg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     public ListenableFuture<Void> processAlarmCommentMsg(TenantId tenantId, AlarmCommentUpdateMsg alarmCommentUpdateMsg) {
         log.trace("[{}] processAlarmCommentMsg [{}]", tenantId, alarmCommentUpdateMsg);
         AlarmComment alarmComment = JacksonUtil.fromString(alarmCommentUpdateMsg.getEntity(), AlarmComment.class, true);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (alarmComment == null) {
             throw new RuntimeException("[{" + tenantId + "}] alarmCommentUpdateMsg {" + alarmCommentUpdateMsg + "} cannot be converted to alarm comment");
         }
         try {
             Alarm alarm = alarmService.findAlarmById(tenantId, new AlarmId(alarmComment.getAlarmId().getId()));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (alarm == null) {
                 return Futures.immediateFuture(null);
             }
@@ -187,38 +164,34 @@ public abstract class BaseAlarmProcessor extends BaseEdgeProcessor {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAlarmOriginatorFromMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmUpdateMsg`：待处理消息。
+     * 返回：处理结果。
      */
     protected abstract EntityId getAlarmOriginatorFromMsg(TenantId tenantId, AlarmUpdateMsg alarmUpdateMsg);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructAlarmFromUpdateMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructAlarmFromUpdateMsg` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `alarmUpdateMsg`：待处理消息。
+     * 返回：处理结果。
      */
     protected abstract Alarm constructAlarmFromUpdateMsg(TenantId tenantId, AlarmId alarmId, EntityId originatorId, AlarmUpdateMsg alarmUpdateMsg);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertAlarmEventToAlarmMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `actionType`：类型。
+     * - `body`：`body` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     protected AlarmUpdateMsg convertAlarmEventToAlarmMsg(TenantId tenantId, UUID entityId, EdgeEventActionType actionType, JsonNode body, EdgeVersion edgeVersion) {
         AlarmId alarmId = new AlarmId(entityId);
@@ -246,14 +219,11 @@ public abstract class BaseAlarmProcessor extends BaseEdgeProcessor {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findOriginatorEntityName` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarm`：`alarm` 参数。
+     * 返回：文本结果。
      */
     private String findOriginatorEntityName(TenantId tenantId, Alarm alarm) {
         String entityName = null;

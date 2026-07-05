@@ -22,24 +22,17 @@ import org.thingsboard.common.util.JacksonUtil;
 import org.thingsboard.server.common.data.util.TbPair;
 
 /**
- * 测试目标：验证 {@code TbGetDeviceAttrNodeTest} 覆盖的 元数据增强节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbGetDeviceAttrNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：内存 fixture、参数化数据源，以及测试体按需创建的 Mockito mock/spy；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbGetDeviceAttrNodeTest` 测试类，用于验证 `TbGetDeviceAttrNode` 相关行为。
  */
 public class TbGetDeviceAttrNodeTest {
 
     /**
-     * 测试方法：覆盖 {@code givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var defaultConfig = new TbGetDeviceAttrNodeConfiguration().defaultConfiguration();
         var node = new TbGetDeviceAttrNode();
         String oldConfig = "{\"fetchToData\":false," +
@@ -58,15 +51,12 @@ public class TbGetDeviceAttrNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenOldConfigWithNoFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOldConfigWithNoFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOldConfigWithNoFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var defaultConfig = new TbGetDeviceAttrNodeConfiguration().defaultConfiguration();
         var node = new TbGetDeviceAttrNode();
         String oldConfig = "{\"clientAttributeNames\":[]," +
@@ -84,15 +74,12 @@ public class TbGetDeviceAttrNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenOldConfigWithNullFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOldConfigWithNullFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOldConfigWithNullFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var defaultConfig = new TbGetDeviceAttrNodeConfiguration().defaultConfiguration();
         var node = new TbGetDeviceAttrNode();
         String oldConfig = "{\"fetchToData\":null," +

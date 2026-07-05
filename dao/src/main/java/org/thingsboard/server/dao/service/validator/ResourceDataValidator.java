@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
 
 import static org.thingsboard.server.common.data.EntityType.TB_RESOURCE;
 
-@Component
 /**
  * 中文说明：
  * 1. 类目的：`ResourceDataValidator` 是 ThingsBoard DAO 模块 中的DAO 服务测试或服务支撑类型，用于组织 DAO 层测试、共享服务夹具或持久化服务的公共执行流程。
@@ -51,88 +50,57 @@ import static org.thingsboard.server.common.data.EntityType.TB_RESOURCE;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Template Method / Service。
  */
+@Component
 public class ResourceDataValidator extends DataValidator<TbResource> {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `resourceDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 存取组件，用于读取或保存对应领域对象。
      */
+    @Autowired
     private TbResourceDao resourceDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `widgetTypeDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 部件类型，用于读取或保存对应领域对象。
      */
+    @Autowired
     private WidgetTypeDao widgetTypeDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户，提供当前类调用的业务操作。
      */
+    @Autowired
     private TenantService tenantService;
 
+    /**
+     * 租户对象，用于描述当前业务场景。
+     */
     @Autowired
     @Lazy
-    /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileCache` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private TbTenantProfileCache tenantProfileCache;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateCreate` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验`Create`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `resource`：`resource` 参数。
+     * 返回：无。
      */
+    @Override
     protected void validateCreate(TenantId tenantId, TbResource resource) {
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (resource.getData() == null || resource.getData().length == 0) {
             throw new DataValidationException("Resource data should be specified");
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateUpdate` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验`Update`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `resource`：`resource` 参数。
+     * 返回：判断结果。
      */
+    @Override
     protected TbResource validateUpdate(TenantId tenantId, TbResource resource) {
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (resource.getData() != null && !resource.getResourceType().isUpdatable() &&
                 tenantId != null && !tenantId.isSysTenantId()) {
             throw new DataValidationException("This type of resource can't be updated");
@@ -140,78 +108,57 @@ public class ResourceDataValidator extends DataValidator<TbResource> {
         return resource;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateDataImpl` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验数据。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `resource`：`resource` 参数。
+     * 返回：无。
      */
+    @Override
     protected void validateDataImpl(TenantId tenantId, TbResource resource) {
         validateString("Resource title", resource.getTitle());
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (resource.getTenantId() == null) {
             resource.setTenantId(TenantId.SYS_TENANT_ID);
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (!resource.getTenantId().isSysTenantId()) {
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (!tenantService.tenantExists(resource.getTenantId())) {
                 throw new DataValidationException("Resource is referencing to non-existent tenant!");
             }
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (resource.getResourceType() == null) {
             throw new DataValidationException("Resource type should be specified!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (resource.getData() != null) {
             validateResourceSize(resource.getTenantId(), resource.getId(), resource.getData().length);
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (StringUtils.isEmpty(resource.getFileName())) {
             throw new DataValidationException("Resource file name should be specified!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (StringUtils.containsAny(resource.getFileName(), "/", "\\")) {
             throw new DataValidationException("File name contains forbidden symbols");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (StringUtils.isEmpty(resource.getResourceKey())) {
             throw new DataValidationException("Resource key should be specified!");
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateResourceSize` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验`Resource Size`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `resourceId`：`resourceId`ID。
+     * - `dataSize`：待处理数据。
+     * 返回：无。
      */
     public void validateResourceSize(TenantId tenantId, TbResourceId resourceId, long dataSize) {
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (!tenantId.isSysTenantId()) {
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             DefaultTenantProfileConfiguration profileConfiguration = tenantProfileCache.get(tenantId).getDefaultProfileConfiguration();
             long maxResourceSize = profileConfiguration.getMaxResourceSize();
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (maxResourceSize > 0 && dataSize > maxResourceSize) {
                 throw new IllegalArgumentException("Resource exceeds the maximum size of " + FileUtils.byteCountToDisplaySize(maxResourceSize));
             }
             long maxSumResourcesDataInBytes = profileConfiguration.getMaxResourcesInBytes();
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (resourceId != null) {
                 long prevSize = resourceDao.getResourceSize(tenantId, resourceId);
                 dataSize -= prevSize;
@@ -220,19 +167,14 @@ public class ResourceDataValidator extends DataValidator<TbResource> {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateDelete` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验`Delete`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `resourceId`：`resourceId`ID。
+     * 返回：无。
      */
+    @Override
     public void validateDelete(TenantId tenantId, EntityId resourceId) {
         List<WidgetTypeDetails> widgets = widgetTypeDao.findWidgetTypesInfosByTenantIdAndResourceId(tenantId.getId(),
                 resourceId.getId());

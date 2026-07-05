@@ -33,25 +33,17 @@ public class AlarmStatusFilter {
     private static final AlarmStatusFilter EMPTY = new AlarmStatusFilter(Optional.empty(), Optional.empty());
 
     /**
-     * 字段说明：
-     * 1. 保存 `clearFilter` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足`clearFilter`条件。
      */
     private final Optional<Boolean> clearFilter;
     private final Optional<Boolean> ackFilter;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `AlarmStatusFilter` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `AlarmStatusFilter` 实例，并初始化必要字段。
+     * 参数：
+     * - `clearFilter`：`clearFilter` 参数。
+     * - `ackFilter`：`ackFilter` 参数。
+     * 返回：新创建的对象实例。
      */
     private AlarmStatusFilter(Optional<Boolean> clearFilter, Optional<Boolean> ackFilter) {
         this.clearFilter = clearFilter;
@@ -59,20 +51,14 @@ public class AlarmStatusFilter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `from` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `from` 对应的处理。
+     * 参数：
+     * - `query`：`query` 参数。
+     * 返回：处理结果。
      */
     public static AlarmStatusFilter from(AlarmQuery query) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (query.getSearchStatus() != null) {
             return AlarmStatusFilter.from(query.getSearchStatus());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (query.getStatus() != null) {
             return AlarmStatusFilter.from(query.getStatus());
         }
@@ -80,17 +66,12 @@ public class AlarmStatusFilter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `from` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `from` 对应的处理。
+     * 参数：
+     * - `alarmSearchStatus`：`alarmSearchStatus` 参数。
+     * 返回：处理结果。
      */
     public static AlarmStatusFilter from(AlarmSearchStatus alarmSearchStatus) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (alarmSearchStatus) {
             case ACK:
                 return new AlarmStatusFilter(Optional.empty(), Optional.of(true));
@@ -106,17 +87,12 @@ public class AlarmStatusFilter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `from` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `from` 对应的处理。
+     * 参数：
+     * - `alarmStatus`：`alarmStatus` 参数。
+     * 返回：处理结果。
      */
     public static AlarmStatusFilter from(AlarmStatus alarmStatus) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (alarmStatus) {
             case ACTIVE_UNACK:
                 return new AlarmStatusFilter(Optional.of(false), Optional.of(false));
@@ -132,84 +108,54 @@ public class AlarmStatusFilter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `empty` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `empty` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public static AlarmStatusFilter empty() {
         return EMPTY;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hasAnyFilter` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Any Filter`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean hasAnyFilter() {
         return clearFilter.isPresent() || ackFilter.isPresent();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hasClearFilter` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Clear Filter`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean hasClearFilter() {
         return clearFilter.isPresent();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hasAckFilter` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Ack Filter`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean hasAckFilter() {
         return ackFilter.isPresent();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getClearFilter` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Clear Filter`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean getClearFilter() {
         return clearFilter.orElseThrow(() -> new RuntimeException("Clear filter is not set! Use `hasClearFilter` to check."));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAckFilter` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Ack Filter`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean getAckFilter() {
         return ackFilter.orElseThrow(() -> new RuntimeException("Ack filter is not set! Use `hasAckFilter` to check."));
@@ -217,24 +163,18 @@ public class AlarmStatusFilter {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `from` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `from` 对应的处理。
+     * 参数：
+     * - `statuses`：数据列表。
+     * 返回：处理结果。
      */
     public static AlarmStatusFilter from(Collection<AlarmSearchStatus> statuses) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (statuses == null || statuses.isEmpty() || statuses.contains(AlarmSearchStatus.ANY)) {
             return EMPTY;
         }
         boolean clearFilter = statuses.contains(AlarmSearchStatus.CLEARED);
         boolean activeFilter = statuses.contains(AlarmSearchStatus.ACTIVE);
         Optional<Boolean> clear = Optional.empty();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (clearFilter && !activeFilter || !clearFilter && activeFilter) {
             clear = Optional.of(clearFilter);
         }
@@ -242,7 +182,6 @@ public class AlarmStatusFilter {
         boolean ackFilter = statuses.contains(AlarmSearchStatus.ACK);
         boolean unackFilter = statuses.contains(AlarmSearchStatus.UNACK);
         Optional<Boolean> ack = Optional.empty();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (ackFilter && !unackFilter || !ackFilter && unackFilter) {
             ack = Optional.of(ackFilter);
         }
@@ -250,14 +189,10 @@ public class AlarmStatusFilter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `matches` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `matches` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * 返回：判断结果。
      */
     public boolean matches(Alarm alarm) {
         return ackFilter.map(ackFilter -> ackFilter.equals(alarm.isAcknowledged())).orElse(true) &&

@@ -72,7 +72,6 @@ import static org.thingsboard.server.transport.mqtt.util.sparkplug.SparkplugTopi
 /**
  * Created by nickAS21 on 12.01.23
  */
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractMqttV5ClientSparkplugTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -83,15 +82,11 @@ import static org.thingsboard.server.transport.mqtt.util.sparkplug.SparkplugTopi
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@Slf4j
 public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttIntegrationTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `client` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户端，用于发起外部调用或协议交互。
      */
     protected MqttV5TestClient client;
     protected SparkplugMqttCallback mqttCallback;
@@ -99,109 +94,62 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     protected ThreadLocalRandom random = ThreadLocalRandom.current();
 
     /**
-     * 字段说明：
-     * 1. 保存 `groupId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `groupId`常量，用于统一引用固定值。
      */
     protected static final String groupId = "SparkplugBGroupId";
     protected static final String edgeNode = "SparkpluBNode";
     /**
-     * 字段说明：
-     * 1. 保存 `keysBdSeq` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 序号常量，用于统一引用固定值。
      */
     protected static final String keysBdSeq = "bdSeq";
     protected static final String alias = "Failed Telemetry/Attribute proto sparkplug payload. SparkplugMessageType ";
     /**
-     * 字段说明：
-     * 1. 保存 `deviceId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备ID，用于定位对应业务对象。
      */
     protected String deviceId = "Test Sparkplug B Device";
     protected int bdSeq = 0;
     /**
-     * 字段说明：
-     * 1. 保存 `seq` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 序号，用于控制处理规模或位置。
      */
     protected int seq = 0;
     protected static final long PUBLISH_TS_DELTA_MS = 86400000;// Publish start TS <-> 24h
 
     // NBIRTH
     /**
-     * 字段说明：
-     * 1. 保存 `keyNodeRebirth` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 键常量，用于统一引用固定值。
      */
     protected static final String keyNodeRebirth = "Node Control/Rebirth";
 
     //*BIRTH
     /**
-     * 字段说明：
-     * 1. 保存 `metricBirthDataType_Int32` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数据常量，用于统一引用固定值。
      */
     protected static final MetricDataType metricBirthDataType_Int32 = Int32;
     protected static final String metricBirthName_Int32 = "Device Metric int32";
     /**
-     * 字段说明：
-     * 1. 保存 `sparkplugAttributesMetricNames` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * Sparkplug集合，用于去重保存或快速判断对象是否存在。
      */
     protected Set<String> sparkplugAttributesMetricNames;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeSparkplugTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeSparkplugTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void beforeSparkplugTest() throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestConfigProperties configProperties = MqttTestConfigProperties.builder()
                 .gatewayName("Test Connect Sparkplug client node")
                 .isSparkplug(true)
                 .sparkplugAttributesMetricNames(sparkplugAttributesMetricNames)
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 .transportPayloadType(TransportPayloadType.PROTOBUF)
                 .build();
         processBeforeTest(configProperties);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clientWithCorrectNodeAccessTokenWithNDEATH` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `clientWithCorrectNodeAccessTokenWithNDEATH` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void clientWithCorrectNodeAccessTokenWithNDEATH() throws Exception {
         long ts = calendar.getTimeInMillis();
@@ -210,36 +158,27 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clientWithCorrectNodeAccessTokenWithNDEATH` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `clientWithCorrectNodeAccessTokenWithNDEATH` 对应的处理。
+     * 参数：
+     * - `ts`：时间戳。
+     * - `value`：值。
+     * 返回：无。
      */
     public void clientWithCorrectNodeAccessTokenWithNDEATH(long ts, long value) throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         IMqttToken connectionResult = clientConnectWithNDEATH(ts, value);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttWireMessage response = connectionResult.getResponse();
         Assert.assertEquals(MESSAGE_TYPE_CONNACK, response.getType());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttConnAck connAckMsg = (MqttConnAck) response;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals(MqttReturnCode.RETURN_CODE_SUCCESS, connAckMsg.getReturnCode());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clientConnectWithNDEATH` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `clientConnectWithNDEATH` 对应的处理。
+     * 参数：
+     * - `ts`：时间戳。
+     * - `value`：值。
+     * - `nameSpaceBad`：名称。
+     * 返回：处理结果。
      */
     public IMqttToken clientConnectWithNDEATH(long ts, long value, String... nameSpaceBad) throws Exception {
         String key = keysBdSeq;
@@ -248,18 +187,13 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
                 .setTimestamp(calendar.getTimeInMillis());
         deathPayload.addMetrics(createMetric(value, ts, key, metricDataType));
         byte[] deathBytes = deathPayload.build().toByteArray();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.client = new MqttV5TestClient();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.mqttCallback = new SparkplugMqttCallback();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.client.setCallback(this.mqttCallback);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttConnectionOptions options = new MqttConnectionOptions();
         options.setUserName(gatewayAccessToken);
         String nameSpace = nameSpaceBad.length == 0 ? NAMESPACE : nameSpaceBad[0];
         String topic = nameSpace + "/" + groupId + "/" + SparkplugMessageType.NDEATH.name() + "/" + edgeNode;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttMessage msg = new MqttMessage();
         msg.setId(0);
         msg.setPayload(deathBytes);
@@ -268,14 +202,11 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `connectClientWithCorrectAccessTokenWithNDEATHCreatedDevices` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `connectClientWithCorrectAccessTokenWithNDEATHCreatedDevices` 对应的处理。
+     * 参数：
+     * - `cntDevices`：设备信息或设备标识。
+     * - `ts`：时间戳。
+     * 返回：匹配的数据集合。
      */
     protected List<Device> connectClientWithCorrectAccessTokenWithNDEATHCreatedDevices(int cntDevices, long ts) throws Exception {
         List<Device> devices = new ArrayList<>();
@@ -289,7 +220,6 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
                 .setSeq(getBdSeqNum());
         payloadBirthNode.addMetrics(metric);
         payloadBirthNode.setTimestamp(ts);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (client.isConnected()) {
             client.publish(NAMESPACE + "/" + groupId + "/" + SparkplugMessageType.NBIRTH.name() + "/" + edgeNode,
                     payloadBirthNode.build().toByteArray(), 0, false);
@@ -324,14 +254,9 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getBdSeqNum` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取序号。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected long getBdSeqNum() throws Exception {
         if (bdSeq == 256) {
@@ -341,14 +266,9 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSeqNum` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取序号。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected long getSeqNum() throws Exception {
         if (seq == 256) {
@@ -358,14 +278,12 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `connectionWithNBirth` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `connectionWithNBirth` 对应的处理。
+     * 参数：
+     * - `metricDataType`：待处理数据。
+     * - `metricKey`：键。
+     * - `metricValue`：值。
+     * 返回：匹配的数据集合。
      */
     protected List<String> connectionWithNBirth(MetricDataType metricDataType, String metricKey, Object metricValue) throws Exception {
         List<String> listKeys = new ArrayList<>();
@@ -389,14 +307,13 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricValuePrimitiveTsKv` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricValuePrimitiveTsKv` 对应的处理。
+     * 参数：
+     * - `listTsKvEntry`：数据列表。
+     * - `listKeys`：键。
+     * - `dataPayload`：待处理数据。
+     * - `ts`：时间戳。
+     * 返回：无。
      */
     protected void createdAddMetricValuePrimitiveTsKv(List<TsKvEntry> listTsKvEntry, List<String> listKeys,
                                                       SparkplugBProto.Payload.Builder dataPayload, long ts) throws ThingsboardException {
@@ -464,14 +381,13 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricValueArraysPrimitiveTsKv` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricValueArraysPrimitiveTsKv` 对应的处理。
+     * 参数：
+     * - `listTsKvEntry`：数据列表。
+     * - `listKeys`：键。
+     * - `dataPayload`：待处理数据。
+     * - `ts`：时间戳。
+     * 返回：无。
      */
     protected void createdAddMetricValueArraysPrimitiveTsKv(List<TsKvEntry> listTsKvEntry, List<String> listKeys,
                                                             SparkplugBProto.Payload.Builder dataPayload, long ts) throws ThingsboardException {
@@ -481,14 +397,14 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricTsKvLong` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricTsKvLong` 对应的处理。
+     * 参数：
+     * - `dataPayload`：待处理数据。
+     * - `key`：键。
+     * - `value`：值。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private TsKvEntry createdAddMetricTsKvLong(SparkplugBProto.Payload.Builder dataPayload, String key, Object value,
                                                long ts, MetricDataType metricDataType) throws ThingsboardException {
@@ -498,14 +414,14 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricTsKvFloat` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricTsKvFloat` 对应的处理。
+     * 参数：
+     * - `dataPayload`：待处理数据。
+     * - `key`：键。
+     * - `value`：值。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private TsKvEntry createdAddMetricTsKvFloat(SparkplugBProto.Payload.Builder dataPayload, String key, float value,
                                                 long ts, MetricDataType metricDataType) throws ThingsboardException {
@@ -516,14 +432,14 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricTsKvDouble` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricTsKvDouble` 对应的处理。
+     * 参数：
+     * - `dataPayload`：待处理数据。
+     * - `key`：键。
+     * - `value`：值。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private TsKvEntry createdAddMetricTsKvDouble(SparkplugBProto.Payload.Builder dataPayload, String key, double value,
                                                  long ts, MetricDataType metricDataType) throws ThingsboardException {
@@ -534,14 +450,14 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricTsKvBoolean` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricTsKvBoolean` 对应的处理。
+     * 参数：
+     * - `dataPayload`：待处理数据。
+     * - `key`：键。
+     * - `value`：值。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private TsKvEntry createdAddMetricTsKvBoolean(SparkplugBProto.Payload.Builder dataPayload, String key, boolean value,
                                                   long ts, MetricDataType metricDataType) throws ThingsboardException {
@@ -551,14 +467,14 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricTsKvString` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricTsKvString` 对应的处理。
+     * 参数：
+     * - `dataPayload`：待处理数据。
+     * - `key`：键。
+     * - `value`：值。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private TsKvEntry createdAddMetricTsKvString(SparkplugBProto.Payload.Builder dataPayload, String key, String value,
                                                  long ts, MetricDataType metricDataType) throws ThingsboardException {
@@ -568,14 +484,14 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createdAddMetricTsKvJson` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `createdAddMetricTsKvJson` 对应的处理。
+     * 参数：
+     * - `dataPayload`：待处理数据。
+     * - `key`：键。
+     * - `values`：值。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void createdAddMetricTsKvJson(SparkplugBProto.Payload.Builder dataPayload, String key,
                                           Object values, long ts, MetricDataType metricDataType,
@@ -602,84 +518,54 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextInt8` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextInt8` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private byte nextInt8() {
         return (byte) random.nextInt(Byte.MIN_VALUE, Byte.MAX_VALUE);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextUInt8` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextUInt8` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private short nextUInt8() {
         return (short) random.nextInt(0, Byte.MAX_VALUE * 2 + 1);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextInt16` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextInt16` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private short nextInt16() {
         return (short) random.nextInt(Short.MIN_VALUE, Short.MAX_VALUE);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextUInt16` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextUInt16` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     private int nextUInt16() {
         return random.nextInt(0, Short.MAX_VALUE * 2 + 1);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextInt32` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextInt32` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected int nextInt32() {
         return random.nextInt(Integer.MIN_VALUE, Integer.MAX_VALUE);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextUInt32` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextUInt32` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected long nextUInt32() {
         long l = Integer.MAX_VALUE;
@@ -687,28 +573,18 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextInt64` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextInt64` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     private long nextInt64() {
         return random.nextLong(Long.MIN_VALUE, Long.MAX_VALUE);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextUInt64` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextUInt64` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     private long nextUInt64() {
         double d = Long.MAX_VALUE;
@@ -716,28 +592,18 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextDouble` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextDouble` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected double nextDouble() {
         return random.nextDouble(Long.MIN_VALUE, Long.MAX_VALUE);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextDateTime` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextDateTime` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     private long nextDateTime() {
         long min = calendar.getTimeInMillis() - PUBLISH_TS_DELTA_MS;
@@ -746,14 +612,11 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextFloat` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextFloat` 对应的处理。
+     * 参数：
+     * - `min`：`min` 参数。
+     * - `max`：`max` 参数。
+     * 返回：数值结果。
      */
     protected float nextFloat(float min, float max) {
         if (min >= max)
@@ -765,28 +628,18 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextBoolean` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextBoolean` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     protected boolean nextBoolean() {
         return random.nextBoolean();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextString` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextString` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     protected String nextString() {
         return java.util.UUID.randomUUID().toString();
@@ -805,120 +658,90 @@ public abstract class AbstractMqttV5ClientSparkplugTest extends AbstractMqttInte
     public class SparkplugMqttCallback  implements MqttCallback {
         private final List<SparkplugBProto.Payload.Metric> messageArrivedMetrics = new ArrayList<>();
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `disconnected` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `disconnected` 对应的处理。
+         * 参数：
+         * - `mqttDisconnectResponse`：响应对象。
+         * 返回：无。
          */
+        @Override
         public void disconnected(MqttDisconnectResponse mqttDisconnectResponse) {
 
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `mqttErrorOccurred` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `mqttErrorOccurred` 对应的处理。
+         * 参数：
+         * - `e`：`e` 参数。
+         * 返回：无。
          */
+        @Override
         public void mqttErrorOccurred(MqttException e) {
 
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `messageArrived` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `messageArrived` 对应的处理。
+         * 参数：
+         * - `topic`：主题名称或主题对象。
+         * - `mqttMsg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void messageArrived(String topic, MqttMessage mqttMsg) throws Exception {
             SparkplugBProto.Payload sparkplugBProtoNode = SparkplugBProto.Payload.parseFrom(mqttMsg.getPayload());
             messageArrivedMetrics.addAll(sparkplugBProtoNode.getMetricsList());
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `deliveryComplete` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `deliveryComplete` 对应的处理。
+         * 参数：
+         * - `iMqttToken`：`iMqttToken` 参数。
+         * 返回：无。
          */
+        @Override
         public void deliveryComplete(IMqttToken iMqttToken) {
 
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `connectComplete` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `connectComplete` 对应的处理。
+         * 参数：
+         * - `b`：`b` 参数。
+         * - `s`：`s` 参数。
+         * 返回：无。
          */
+        @Override
         public void connectComplete(boolean b, String s) {
 
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `authPacketArrived` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `authPacketArrived` 对应的处理。
+         * 参数：
+         * - `i`：`i` 参数。
+         * - `mqttProperties`：`mqttProperties` 参数。
+         * 返回：无。
          */
+        @Override
         public void authPacketArrived(int i, MqttProperties mqttProperties) {
 
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getMessageArrivedMetrics` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取消息。
+         * 参数：无。
+         * 返回：匹配的数据集合。
          */
         public List<SparkplugBProto.Payload.Metric> getMessageArrivedMetrics() {
             return messageArrivedMetrics;
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `deleteMessageArrivedMetrics` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：删除或清理消息。
+         * 参数：
+         * - `id`：`id`ID。
+         * 返回：无。
          */
         public void deleteMessageArrivedMetrics(int id) {
             messageArrivedMetrics.remove(id);

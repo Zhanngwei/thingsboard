@@ -67,8 +67,6 @@ import java.util.concurrent.Executors;
 /**
  * Created by ashvayka on 27.03.18.
  */
-@Service
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTelemetrySubscriptionService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -79,68 +77,45 @@ import java.util.concurrent.Executors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Slf4j
 public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionService implements TelemetrySubscriptionService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `attrService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final AttributesService attrService;
     private final TimeseriesService tsService;
     /**
-     * 字段说明：
-     * 1. 保存 `tbEntityViewService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 实体视图，提供当前类调用的业务操作。
      */
     private final TbEntityViewService tbEntityViewService;
     private final TbApiUsageReportClient apiUsageClient;
     /**
-     * 字段说明：
-     * 1. 保存 `apiUsageStateService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 状态，提供当前类调用的业务操作。
      */
     private final TbApiUsageStateService apiUsageStateService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `tsCallBackExecutor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，负责处理对应任务或消息。
      */
     private ExecutorService tsCallBackExecutor;
 
-    @Value("${sql.ts.value_no_xss_validation:false}")
     /**
-     * 字段说明：
-     * 1. 保存 `valueNoXssValidation` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足值条件。
      */
+    @Value("${sql.ts.value_no_xss_validation:false}")
     private boolean valueNoXssValidation;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultTelemetrySubscriptionService` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultTelemetrySubscriptionService` 实例，并初始化必要字段。
+     * 参数：
+     * - `attrService`：服务对象。
+     * - `tsService`：服务对象。
+     * - `tbEntityViewService`：服务对象。
+     * - `apiUsageClient`：客户端对象。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public DefaultTelemetrySubscriptionService(AttributesService attrService,
                                                TimeseriesService tsService,
@@ -154,138 +129,114 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
         this.apiUsageStateService = apiUsageStateService;
     }
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initExecutor` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void initExecutor() {
         super.initExecutor();
         tsCallBackExecutor = Executors.newSingleThreadExecutor(ThingsBoardThreadFactory.forName("ts-service-ts-callback"));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getExecutorPrefix` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取执行器。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     protected String getExecutorPrefix() {
         return "ts";
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdownExecutor` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void shutdownExecutor() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tsCallBackExecutor != null) {
             tsCallBackExecutor.shutdownNow();
         }
         super.shutdownExecutor();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Void> saveAndNotify(TenantId tenantId, EntityId entityId, TsKvEntry ts) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         SettableFuture<Void> future = SettableFuture.create();
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         saveAndNotify(tenantId, entityId, Collections.singletonList(ts), new VoidFutureCallback(future));
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return future;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void saveAndNotify(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts, FutureCallback<Void> callback) {
         saveAndNotify(tenantId, null, entityId, ts, 0L, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAndNotify(TenantId tenantId, CustomerId customerId, EntityId entityId, List<TsKvEntry> ts, long ttl, FutureCallback<Void> callback) {
         doSaveAndNotify(tenantId, customerId, entityId, ts, ttl, callback, true);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveWithoutLatestAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Without Latest And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveWithoutLatestAndNotify(TenantId tenantId, CustomerId customerId, EntityId entityId, List<TsKvEntry> ts, long ttl, FutureCallback<Void> callback) {
         doSaveAndNotify(tenantId, customerId, entityId, ts, ttl, callback, false);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doSaveAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doSaveAndNotify` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void doSaveAndNotify(TenantId tenantId, CustomerId customerId, EntityId entityId, List<TsKvEntry> ts, long ttl, FutureCallback<Void> callback, boolean saveLatest) {
         checkInternalEntity(entityId);
         boolean sysTenant = TenantId.SYS_TENANT_ID.equals(tenantId) || tenantId == null;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sysTenant || apiUsageStateService.getApiUsageState(tenantId).isDbStorageEnabled()) {
             KvUtils.validate(ts, valueNoXssValidation);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (saveLatest) {
                 saveAndNotifyInternal(tenantId, entityId, ts, ttl, getCallback(tenantId, customerId, sysTenant, callback));
             } else {
@@ -297,21 +248,18 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取回调。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `sysTenant`：租户信息或租户标识。
+     * - `callback`：处理完成后的回调。
+     * 返回：异步处理结果。
      */
     private FutureCallback<Integer> getCallback(TenantId tenantId, CustomerId customerId, boolean sysTenant, FutureCallback<Void> callback) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return new FutureCallback<>() {
             @Override
             public void onSuccess(Integer result) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!sysTenant && result != null && result > 0) {
                     apiUsageClient.report(tenantId, customerId, ApiUsageRecordKey.STORAGE_DP_COUNT, result);
                 }
@@ -325,68 +273,61 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
         };
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotifyInternal` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify Internal`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void saveAndNotifyInternal(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts, FutureCallback<Integer> callback) {
         saveAndNotifyInternal(tenantId, entityId, ts, 0L, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotifyInternal` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify Internal`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - `ttl`：`ttl` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAndNotifyInternal(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts, long ttl, FutureCallback<Integer> callback) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         ListenableFuture<Integer> saveFuture = tsService.save(tenantId, entityId, ts, ttl);
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         addMainCallback(saveFuture, callback);
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         addWsCallback(saveFuture, success -> onTimeSeriesUpdate(tenantId, entityId, ts));
         addEntityViewCallback(tenantId, entityId, ts);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveWithoutLatestAndNotifyInternal` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Without Latest And Notify Internal`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - `ttl`：`ttl` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void saveWithoutLatestAndNotifyInternal(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts, long ttl, FutureCallback<Integer> callback) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         ListenableFuture<Integer> saveFuture = tsService.saveWithoutLatest(tenantId, entityId, ts, ttl);
         addMainCallback(saveFuture, callback);
         addWsCallback(saveFuture, success -> onTimeSeriesUpdate(tenantId, entityId, ts));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addEntityViewCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建实体视图。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * 返回：无。
      */
     private void addEntityViewCallback(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts) {
         if (EntityType.DEVICE.equals(entityId.getEntityType()) || EntityType.ASSET.equals(entityId.getEntityType())) {
@@ -437,180 +378,173 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
         }
     }
 
-    @Override
-
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributes`：数据列表。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAndNotify(TenantId tenantId, EntityId entityId, String scope, List<AttributeKvEntry> attributes, FutureCallback<Void> callback) {
         saveAndNotify(tenantId, entityId, scope, attributes, true, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributes`：数据列表。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAndNotify(TenantId tenantId, EntityId entityId, String scope, List<AttributeKvEntry> attributes, boolean notifyDevice, FutureCallback<Void> callback) {
         checkInternalEntity(entityId);
         saveAndNotifyInternal(tenantId, entityId, scope, attributes, notifyDevice, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAndNotifyInternal` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`And Notify Internal`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributes`：数据列表。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAndNotifyInternal(TenantId tenantId, EntityId entityId, String scope, List<AttributeKvEntry> attributes, boolean notifyDevice, FutureCallback<Void> callback) {
         ListenableFuture<List<String>> saveFuture = attrService.save(tenantId, entityId, scope, attributes);
         addVoidCallback(saveFuture, callback);
         addWsCallback(saveFuture, success -> onAttributesUpdate(tenantId, entityId, scope, attributes, notifyDevice));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveLatestAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Latest And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void saveLatestAndNotify(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts, FutureCallback<Void> callback) {
         checkInternalEntity(entityId);
         saveLatestAndNotifyInternal(tenantId, entityId, ts, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveLatestAndNotifyInternal` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Latest And Notify Internal`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void saveLatestAndNotifyInternal(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts, FutureCallback<Void> callback) {
         ListenableFuture<List<Void>> saveFuture = tsService.saveLatest(tenantId, entityId, ts);
         addVoidCallback(saveFuture, callback);
         addWsCallback(saveFuture, success -> onTimeSeriesUpdate(tenantId, entityId, ts));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void deleteAndNotify(TenantId tenantId, EntityId entityId, String scope, List<String> keys, FutureCallback<Void> callback) {
         checkInternalEntity(entityId);
         deleteAndNotifyInternal(tenantId, entityId, scope, keys, false, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void deleteAndNotify(TenantId tenantId, EntityId entityId, String scope, List<String> keys, boolean notifyDevice, FutureCallback<Void> callback) {
         checkInternalEntity(entityId);
         deleteAndNotifyInternal(tenantId, entityId, scope, keys, notifyDevice, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAndNotifyInternal` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`And Notify Internal`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void deleteAndNotifyInternal(TenantId tenantId, EntityId entityId, String scope, List<String> keys, boolean notifyDevice, FutureCallback<Void> callback) {
         ListenableFuture<List<String>> deleteFuture = attrService.removeAll(tenantId, entityId, scope, keys);
         addVoidCallback(deleteFuture, callback);
         addWsCallback(deleteFuture, success -> onAttributesDelete(tenantId, entityId, scope, keys, notifyDevice));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteLatest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Latest`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `keys`：键。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void deleteLatest(TenantId tenantId, EntityId entityId, List<String> keys, FutureCallback<Void> callback) {
         checkInternalEntity(entityId);
         deleteLatestInternal(tenantId, entityId, keys, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteLatestInternal` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Latest Internal`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `keys`：键。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void deleteLatestInternal(TenantId tenantId, EntityId entityId, List<String> keys, FutureCallback<Void> callback) {
         ListenableFuture<List<TsKvLatestRemovingResult>> deleteFuture = tsService.removeLatest(tenantId, entityId, keys);
         addVoidCallback(deleteFuture, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAllLatest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`All Latest`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void deleteAllLatest(TenantId tenantId, EntityId entityId, FutureCallback<Collection<String>> callback) {
         ListenableFuture<Collection<String>> deleteFuture = tsService.removeAllLatest(tenantId, entityId);
         Futures.addCallback(deleteFuture, new FutureCallback<Collection<String>>() {
@@ -626,149 +560,149 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
         }, tsCallBackExecutor);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTimeseriesAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理时序数据。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `keys`：键。
+     * - `deleteTsKvQueries`：数据列表。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void deleteTimeseriesAndNotify(TenantId tenantId, EntityId entityId, List<String> keys, List<DeleteTsKvQuery> deleteTsKvQueries, FutureCallback<Void> callback) {
         ListenableFuture<List<TsKvLatestRemovingResult>> deleteFuture = tsService.remove(tenantId, entityId, deleteTsKvQueries);
         addVoidCallback(deleteFuture, callback);
         addWsCallback(deleteFuture, list -> onTimeSeriesDelete(tenantId, entityId, keys, list));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, long value, FutureCallback<Void> callback) {
         saveAndNotify(tenantId, entityId, scope, Collections.singletonList(new BaseAttributeKvEntry(new LongDataEntry(key, value)
                 , System.currentTimeMillis())), callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, String value, FutureCallback<Void> callback) {
         saveAndNotify(tenantId, entityId, scope, Collections.singletonList(new BaseAttributeKvEntry(new StringDataEntry(key, value)
                 , System.currentTimeMillis())), callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, double value, FutureCallback<Void> callback) {
         saveAndNotify(tenantId, entityId, scope, Collections.singletonList(new BaseAttributeKvEntry(new DoubleDataEntry(key, value)
                 , System.currentTimeMillis())), callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, boolean value, FutureCallback<Void> callback) {
         saveAndNotify(tenantId, entityId, scope, Collections.singletonList(new BaseAttributeKvEntry(new BooleanDataEntry(key, value)
                 , System.currentTimeMillis())), callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Void> saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, long value) {
         SettableFuture<Void> future = SettableFuture.create();
         saveAttrAndNotify(tenantId, entityId, scope, key, value, new VoidFutureCallback(future));
         return future;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Void> saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, String value) {
         SettableFuture<Void> future = SettableFuture.create();
         saveAttrAndNotify(tenantId, entityId, scope, key, value, new VoidFutureCallback(future));
         return future;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Void> saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, double value) {
         SettableFuture<Void> future = SettableFuture.create();
         saveAttrAndNotify(tenantId, entityId, scope, key, value, new VoidFutureCallback(future));
         return future;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttrAndNotify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attr And Notify`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `key`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Void> saveAttrAndNotify(TenantId tenantId, EntityId entityId, String scope, String key, boolean value) {
         SettableFuture<Void> future = SettableFuture.create();
         saveAttrAndNotify(tenantId, entityId, scope, key, value, new VoidFutureCallback(future));
@@ -776,14 +710,14 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onAttributesUpdate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Attributes Update`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributes`：数据列表。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void onAttributesUpdate(TenantId tenantId, EntityId entityId, String scope, List<AttributeKvEntry> attributes, boolean notifyDevice) {
         forwardToSubscriptionManagerService(tenantId, entityId, subscriptionManagerService -> {
@@ -794,14 +728,14 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onAttributesDelete` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Attributes Delete`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void onAttributesDelete(TenantId tenantId, EntityId entityId, String scope, List<String> keys, boolean notifyDevice) {
         forwardToSubscriptionManagerService(tenantId, entityId, subscriptionManagerService -> {
@@ -812,14 +746,12 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onTimeSeriesUpdate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理时序数据。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `ts`：时间戳。
+     * 返回：无。
      */
     private void onTimeSeriesUpdate(TenantId tenantId, EntityId entityId, List<TsKvEntry> ts) {
         forwardToSubscriptionManagerService(tenantId, entityId, subscriptionManagerService -> {
@@ -830,14 +762,13 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onTimeSeriesDelete` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理时序数据。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `keys`：键。
+     * - `ts`：时间戳。
+     * 返回：无。
      */
     private void onTimeSeriesDelete(TenantId tenantId, EntityId entityId, List<String> keys, List<TsKvLatestRemovingResult> ts) {
         forwardToSubscriptionManagerService(tenantId, entityId, subscriptionManagerService -> {
@@ -862,14 +793,11 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addVoidCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建回调。
+     * 参数：
+     * - `saveFuture`：数据列表。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     private <S> void addVoidCallback(ListenableFuture<S> saveFuture, final FutureCallback<Void> callback) {
         if (callback == null) return;
@@ -887,14 +815,11 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addMainCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建回调。
+     * 参数：
+     * - `saveFuture`：数据列表。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     private <S> void addMainCallback(ListenableFuture<S> saveFuture, final FutureCallback<S> callback) {
         Futures.addCallback(saveFuture, new FutureCallback<S>() {
@@ -911,14 +836,10 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkInternalEntity` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验实体。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：无。
      */
     private void checkInternalEntity(EntityId entityId) {
         if (EntityType.API_USAGE_STATE.equals(entityId.getEntityType())) {
@@ -938,55 +859,38 @@ public class DefaultTelemetrySubscriptionService extends AbstractSubscriptionSer
      */
     private static class VoidFutureCallback implements FutureCallback<Void> {
         /**
-         * 字段说明：
-         * 1. 保存 `future` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 异步结果集合，用于去重保存或快速判断对象是否存在。
          */
         private final SettableFuture<Void> future;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `VoidFutureCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `DefaultTelemetrySubscriptionService` 实例，并初始化必要字段。
+         * 参数：
+         * - `future`：`future` 参数。
+         * 返回：新创建的对象实例。
          */
         public VoidFutureCallback(SettableFuture<Void> future) {
             this.future = future;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `result`：`result` 参数。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(Void result) {
             future.set(null);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onFailure` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理失败信息。
+         * 参数：
+         * - `t`：`t` 参数。
+         * 返回：无。
          */
+        @Override
         public void onFailure(Throwable t) {
             future.setException(t);
         }

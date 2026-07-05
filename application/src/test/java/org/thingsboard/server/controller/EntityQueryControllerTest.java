@@ -63,7 +63,6 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`EntityQueryControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -74,30 +73,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@DaoSqlTest
 public class EntityQueryControllerTest extends AbstractControllerTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `savedTenant` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
     private Tenant savedTenant;
     private User tenantAdmin;
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeTest() throws Exception {
         loginSysAdmin();
 
@@ -116,17 +106,12 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         tenantAdmin = createUserAndLogin(tenantAdmin, "testPassword1");
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void afterTest() throws Exception {
         loginSysAdmin();
 
@@ -134,20 +119,14 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTenantCountEntitiesByQuery` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testTenantCountEntitiesByQuery() throws Exception {
         List<Device> devices = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 97; i++) {
             Device device = new Device();
             device.setName("Device" + i);
@@ -193,17 +172,12 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         Assert.assertEquals(97, count2.longValue());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSysAdminCountEntitiesByQuery` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证数量相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSysAdminCountEntitiesByQuery() throws Exception {
         loginSysAdmin();
 
@@ -215,7 +189,6 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         loginTenantAdmin();
 
         List<Device> devices = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 97; i++) {
             Device device = new Device();
             device.setName("Device" + i);
@@ -258,22 +231,16 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         Assert.assertEquals(initialCount + 97, count2.longValue());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTenantCountAlarmsByQuery` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testTenantCountAlarmsByQuery() throws Exception {
         loginTenantAdmin();
         List<Device> devices = new ArrayList<>();
         List<Alarm> alarms = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 97; i++) {
             Device device = new Device();
             device.setName("Device" + i);
@@ -283,7 +250,6 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
             Thread.sleep(1);
         }
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < devices.size(); i++) {
             Alarm alarm = new Alarm();
             alarm.setOriginator(devices.get(i).getId());
@@ -295,22 +261,16 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         testCountAlarmsByQuery(alarms);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCustomerCountAlarmsByQuery` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testCustomerCountAlarmsByQuery() throws Exception {
         loginTenantAdmin();
         List<Device> devices = new ArrayList<>();
         List<Alarm> alarms = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 97; i++) {
             Device device = new Device();
             device.setCustomerId(customerId);
@@ -323,7 +283,6 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
 
         loginCustomerUser();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < devices.size(); i++) {
             Alarm alarm = new Alarm();
             alarm.setCustomerId(customerId);
@@ -337,14 +296,10 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCountAlarmsByQuery` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证数量相关场景。
+     * 参数：
+     * - `alarms`：数据列表。
+     * 返回：无。
      */
     private void testCountAlarmsByQuery(List<Alarm> alarms) throws Exception {
         AlarmCountQuery countQuery = new AlarmCountQuery();
@@ -423,20 +378,14 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         Assert.assertEquals(0, count.longValue());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSimpleFindEntityDataByQuery` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSimpleFindEntityDataByQuery() throws Exception {
         List<Device> devices = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 97; i++) {
             Device device = new Device();
             device.setName("Device" + i);
@@ -468,7 +417,6 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         Assert.assertEquals(10, data.getData().size());
 
         List<EntityData> loadedEntities = new ArrayList<>(data.getData());
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while (data.hasNext()) {
             query = query.next();
             data = doPostWithTypedResponse("/api/entitiesQuery/find", query, new TypeReference<PageData<EntityData>>() {
@@ -522,22 +470,16 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
 
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindEntityDataByQueryWithAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindEntityDataByQueryWithAttributes() throws Exception {
         List<Device> devices = new ArrayList<>();
         List<Long> temperatures = new ArrayList<>();
         List<Long> highTemperatures = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 67; i++) {
             Device device = new Device();
             String name = "Device" + i;
@@ -548,12 +490,10 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
             Thread.sleep(1);
             long temperature = (long) (Math.random() * 100);
             temperatures.add(temperature);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (temperature > 45) {
                 highTemperatures.add(temperature);
             }
         }
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < devices.size(); i++) {
             Device device = devices.get(i);
             String payload = "{\"temperature\":" + temperatures.get(i) + "}";
@@ -577,7 +517,6 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         });
 
         List<EntityData> loadedEntities = new ArrayList<>(data.getData());
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while (data.hasNext()) {
             query = query.next();
             data = doPostWithTypedResponse("/api/entitiesQuery/find", query, new TypeReference<PageData<EntityData>>() {
@@ -620,17 +559,12 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         Assert.assertEquals(deviceHighTemperatures, loadedHighTemperatures);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindEntityDataByQueryWithDynamicValue` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindEntityDataByQueryWithDynamicValue() throws Exception {
         int numOfDevices = 2;
 
@@ -704,17 +638,12 @@ public class EntityQueryControllerTest extends AbstractControllerTest {
         }
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenInvalidEntityDataPageLink_thenReturnError` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenInvalidEntityDataPageLink_thenReturnError` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenInvalidEntityDataPageLink_thenReturnError() throws Exception {
         DeviceTypeFilter filter = new DeviceTypeFilter();
         filter.setDeviceTypes(List.of("default"));

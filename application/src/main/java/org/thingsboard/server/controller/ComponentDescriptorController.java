@@ -37,9 +37,6 @@ import java.util.Set;
 
 import static org.thingsboard.server.controller.ControllerConstants.SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
 /**
  * 中文说明：
  * 1. 类目的：`ComponentDescriptorController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -50,6 +47,9 @@ import static org.thingsboard.server.controller.ControllerConstants.SYSTEM_OR_TE
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
 public class ComponentDescriptorController extends BaseController {
 
     private static final String COMPONENT_DESCRIPTOR_DEFINITION = "Each Component Descriptor represents configuration of specific rule node (e.g. 'Save Timeseries' or 'Send Email'.). " +
@@ -57,22 +57,15 @@ public class ComponentDescriptorController extends BaseController {
             "The Component Descriptors are discovered at runtime by scanning the class path and searching for @RuleNode annotation. " +
             "Once discovered, the up to date list of descriptors is persisted to the database.";
 
+    /**
+     * `name` 类，封装当前模块中的一组相关职责。
+     */
     @ApiOperation(value = "Get Component Descriptor (getComponentDescriptorByClazz)",
             notes = "Gets the Component Descriptor object using class name from the path parameters. " +
                     COMPONENT_DESCRIPTOR_DEFINITION + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN','TENANT_ADMIN')")
     @RequestMapping(value = "/component/{componentDescriptorClazz:.+}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponentDescriptorByClazz` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ComponentDescriptor getComponentDescriptorByClazz(
             @ApiParam(value = "Component Descriptor class name", required = true)
             @PathVariable("componentDescriptorClazz") String strComponentDescriptorClazz) throws ThingsboardException {
@@ -80,22 +73,22 @@ public class ComponentDescriptorController extends BaseController {
         return checkComponentDescriptorByClazz(strComponentDescriptorClazz);
     }
 
+    /**
+     * 功能：获取类型。
+     * 参数：
+     * - `Node`：`Node` 参数。
+     * - `ENRICHMENT`：`ENRICHMENT` 参数。
+     * - `FILTER`：`FILTER` 参数。
+     * - `TRANSFORMATION`：`TRANSFORMATION` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Component Descriptors (getComponentDescriptorsByType)",
             notes = "Gets the Component Descriptors using rule node type and optional rule chain type request parameters. " +
                     COMPONENT_DESCRIPTOR_DEFINITION + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN','TENANT_ADMIN')")
     @RequestMapping(value = "/components/{componentType}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponentDescriptorsByType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<ComponentDescriptor> getComponentDescriptorsByType(
             @ApiParam(value = "Type of the Rule Node", allowableValues = "ENRICHMENT,FILTER,TRANSFORMATION,ACTION,EXTERNAL", required = true)
             @PathVariable("componentType") String strComponentType,
@@ -105,22 +98,22 @@ public class ComponentDescriptorController extends BaseController {
         return checkComponentDescriptorsByType(ComponentType.valueOf(strComponentType), getRuleChainType(strRuleChainType));
     }
 
+    /**
+     * 功能：获取`Component Descriptors By Types`。
+     * 参数：
+     * - `Nodes`：数据列表。
+     * - `ENRICHMENT`：`ENRICHMENT` 参数。
+     * - `FILTER`：`FILTER` 参数。
+     * - `TRANSFORMATION`：`TRANSFORMATION` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Component Descriptors (getComponentDescriptorsByTypes)",
             notes = "Gets the Component Descriptors using coma separated list of rule node types and optional rule chain type request parameters. " +
                     COMPONENT_DESCRIPTOR_DEFINITION + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN','TENANT_ADMIN')")
     @RequestMapping(value = "/components", params = {"componentTypes"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponentDescriptorsByTypes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<ComponentDescriptor> getComponentDescriptorsByTypes(
             @ApiParam(value = "List of types of the Rule Nodes, (ENRICHMENT, FILTER, TRANSFORMATION, ACTION or EXTERNAL)", required = true)
             @RequestParam("componentTypes") String[] strComponentTypes,
@@ -128,7 +121,6 @@ public class ComponentDescriptorController extends BaseController {
             @RequestParam(value = "ruleChainType", required = false) String strRuleChainType) throws ThingsboardException {
         checkArrayParameter("componentTypes", strComponentTypes);
         Set<ComponentType> componentTypes = new HashSet<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (String strComponentType : strComponentTypes) {
             componentTypes.add(ComponentType.valueOf(strComponentType));
         }
@@ -136,18 +128,13 @@ public class ComponentDescriptorController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleChainType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取规则链。
+     * 参数：
+     * - `strRuleChainType`：类型。
+     * 返回：处理结果。
      */
     private RuleChainType getRuleChainType(String strRuleChainType) {
         RuleChainType ruleChainType;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isEmpty(strRuleChainType)) {
             ruleChainType = RuleChainType.CORE;
         } else {

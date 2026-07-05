@@ -42,110 +42,89 @@ import javax.servlet.http.HttpServletRequest;
 public interface SystemSecurityService {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSecuritySettings` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     SecuritySettings getSecuritySettings();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveSecuritySettings` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建配置。
+     * 参数：
+     * - `securitySettings`：配置对象。
+     * 返回：匹配的数据集合。
      */
     SecuritySettings saveSecuritySettings(SecuritySettings securitySettings);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validatePasswordByPolicy` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验密码。
+     * 参数：
+     * - `password`：`password` 参数。
+     * - `passwordPolicy`：`passwordPolicy` 参数。
+     * 返回：无。
      */
     void validatePasswordByPolicy(String password, UserPasswordPolicy passwordPolicy);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateUserCredentials` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验用户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `userCredentials`：`userCredentials` 参数。
+     * - `username`：名称。
+     * - `password`：`password` 参数。
+     * 返回：无。
      */
     void validateUserCredentials(TenantId tenantId, UserCredentials userCredentials, String username, String password) throws AuthenticationException;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateTwoFaVerification` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Two Fa Verification`。
+     * 参数：
+     * - `securityUser`：`securityUser` 参数。
+     * - `verificationSuccess`：`verificationSuccess` 参数。
+     * - `twoFaSettings`：配置对象。
+     * 返回：无。
      */
     void validateTwoFaVerification(SecurityUser securityUser, boolean verificationSuccess, PlatformTwoFaSettings twoFaSettings);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validatePassword` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验密码。
+     * 参数：
+     * - `password`：`password` 参数。
+     * - `userCredentials`：`userCredentials` 参数。
+     * 返回：无。
      */
     void validatePassword(String password, UserCredentials userCredentials) throws DataValidationException;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getBaseUrl` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取基础访问地址。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `httpServletRequest`：请求对象。
+     * 返回：文本结果。
      */
     String getBaseUrl(TenantId tenantId, CustomerId customerId, HttpServletRequest httpServletRequest);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logLoginAction` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logLoginAction` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `authenticationDetails`：`authenticationDetails` 参数。
+     * - `actionType`：类型。
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
     void logLoginAction(User user, Object authenticationDetails, ActionType actionType, Exception e);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logLoginAction` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logLoginAction` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `authenticationDetails`：`authenticationDetails` 参数。
+     * - `actionType`：类型。
+     * - `provider`：`provider` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     void logLoginAction(User user, Object authenticationDetails, ActionType actionType, String provider, Exception e);
 }

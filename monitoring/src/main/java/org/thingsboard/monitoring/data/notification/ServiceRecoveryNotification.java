@@ -29,42 +29,26 @@ package org.thingsboard.monitoring.data.notification;
 public class ServiceRecoveryNotification implements Notification {
 
     /**
-     * 字段说明：
-     * 1. 保存 `serviceKey` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 键，提供当前类调用的业务操作。
      */
     private final Object serviceKey;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ServiceRecoveryNotification` 对应的通知通道类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：创建 `ServiceRecoveryNotification` 实例，并初始化必要字段。
+     * 参数：
+     * - `serviceKey`：服务对象。
+     * 返回：新创建的对象实例。
      */
     public ServiceRecoveryNotification(Object serviceKey) {
         this.serviceKey = serviceKey;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getText` 对应的通知通道类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Text`。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String getText() {
         return String.format("%s is OK", serviceKey);
     }

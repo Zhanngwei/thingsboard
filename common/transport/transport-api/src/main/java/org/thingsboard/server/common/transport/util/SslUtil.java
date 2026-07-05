@@ -35,7 +35,6 @@ import java.security.cert.X509Certificate;
 /**
  * @author Valerii Sosliuk
  */
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`SslUtil` 是ThingsBoard Common 模块中的传输协议契约或适配类型，用于抽象 MQTT、HTTP、CoAP、LwM2M、SNMP 与 ThingsBoard 核心消息之间的协议边界。
@@ -46,30 +45,22 @@ import java.security.cert.X509Certificate;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Adapter / Strategy / Command。
  */
+@Slf4j
 public class SslUtil {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `SslUtil` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `SslUtil` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     private SslUtil() {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCertificateString` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取证书。
+     * 参数：
+     * - `cert`：`cert` 参数。
+     * 返回：文本结果。
      */
     public static String getCertificateString(Certificate cert)
             throws CertificateEncodingException {
@@ -77,21 +68,16 @@ public class SslUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCertificateChainString` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取证书。
+     * 参数：
+     * - `chain`：`chain` 参数。
+     * 返回：文本结果。
      */
     public static String getCertificateChainString(Certificate[] chain)
             throws CertificateEncodingException {
         String begin = "-----BEGIN CERTIFICATE-----";
         String end = "-----END CERTIFICATE-----";
         StringBuilder stringBuilder = new StringBuilder();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Certificate cert: chain) {
             stringBuilder.append(begin).append(EncryptionUtil.certTrimNewLines(Base64Utils.encodeToString(cert.getEncoded()))).append(end).append("\n");
         }
@@ -99,19 +85,14 @@ public class SslUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `readCertFile` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `readCertFile` 对应的处理。
+     * 参数：
+     * - `fileContent`：`fileContent` 参数。
+     * 返回：处理结果。
      */
     public static X509Certificate readCertFile(String fileContent) {
         X509Certificate certificate = null;
         try {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (fileContent != null && !fileContent.trim().isEmpty()) {
                 fileContent = fileContent.replace("-----BEGIN CERTIFICATE-----", "")
                         .replace("-----END CERTIFICATE-----", "")
@@ -122,26 +103,20 @@ public class SslUtil {
                     certificate = (X509Certificate) certFactory.generateCertificate(inStream);
                 }
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception ignored) {}
         return certificate;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseCommonName` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析名称。
+     * 参数：
+     * - `certificate`：`certificate` 参数。
+     * 返回：文本结果。
      */
     public static String parseCommonName(X509Certificate certificate) {
         X500Name x500name;
         try {
             x500name = new JcaX509CertificateHolder(certificate).getSubject();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (CertificateEncodingException e) {
             log.warn("Cannot parse CN from device certificate");
             throw new RuntimeException(e);

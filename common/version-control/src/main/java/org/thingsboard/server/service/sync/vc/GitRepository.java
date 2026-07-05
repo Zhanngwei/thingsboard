@@ -100,56 +100,35 @@ import java.util.stream.Collectors;
 public class GitRepository {
 
     /**
-     * 字段说明：
-     * 1. 保存 `git` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * Git 仓库句柄，表示当前对象的对应属性。
      */
     private final Git git;
     private final AuthHandler authHandler;
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `settings` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
+    @Getter
     private final RepositorySettings settings;
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `directory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 目录，用于定位本地文件或目录。
      */
+    @Getter
     private final String directory;
 
     /**
-     * 字段说明：
-     * 1. 保存 `headId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `headId`ID，用于定位对应业务对象。
      */
     private ObjectId headId;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `GitRepository` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `GitRepository` 实例，并初始化必要字段。
+     * 参数：
+     * - `git`：`git` 参数。
+     * - `settings`：配置对象。
+     * - `authHandler`：处理器对象。
+     * - `directory`：`directory` 参数。
+     * 返回：新创建的对象实例。
      */
     private GitRepository(Git git, RepositorySettings settings, AuthHandler authHandler, String directory) {
         this.git = git;
@@ -159,14 +138,11 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clone` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `clone` 对应的处理。
+     * 参数：
+     * - `settings`：配置对象。
+     * - `directory`：`directory` 参数。
+     * 返回：处理结果。
      */
     public static GitRepository clone(RepositorySettings settings, File directory) throws GitAPIException {
         CloneCommand cloneCommand = Git.cloneRepository()
@@ -180,14 +156,11 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `open` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `open` 对应的处理。
+     * 参数：
+     * - `directory`：`directory` 参数。
+     * - `settings`：配置对象。
+     * 返回：处理结果。
      */
     public static GitRepository open(File directory, RepositorySettings settings) throws IOException {
         Git git = Git.open(directory);
@@ -196,18 +169,14 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test` 对应的处理。
+     * 参数：
+     * - `settings`：配置对象。
+     * - `directory`：`directory` 参数。
+     * 返回：无。
      */
     public static void test(RepositorySettings settings, File directory) throws Exception {
         AuthHandler authHandler = AuthHandler.createFor(settings, directory);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (settings.isReadOnly()) {
             LsRemoteCommand lsRemoteCommand = Git.lsRemoteRepository().setRemote(settings.getRepositoryUri());
             authHandler.configureCommand(lsRemoteCommand);
@@ -217,50 +186,37 @@ public class GitRepository {
             try {
                 Git git = Git.init().setDirectory(directory).call();
                 GitRepository repository = new GitRepository(git, settings, authHandler, directory.getAbsolutePath());
-                // DAO 调用是数据库访问边界，事务和缓存一致性由上层服务约定控制。
                 repository.execute(repository.git.remoteAdd()
                         .setName("origin")
                         .setUri(new URIish(settings.getRepositoryUri())));
-                // DAO 调用是数据库访问边界，事务和缓存一致性由上层服务约定控制。
                 repository.push("", UUID.randomUUID().toString()); // trying to delete non-existing branch on remote repo
             } finally {
                 try {
                     FileUtils.forceDelete(directory);
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (Exception ignored) {}
             }
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fetch` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fetch` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void fetch() throws GitAPIException {
         FetchResult result = execute(git.fetch()
                 .setRemoveDeletedRefs(true));
         Ref head = result.getAdvertisedRef(Constants.HEAD);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (head != null) {
             this.headId = head.getObjectId();
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteLocalBranchIfExists` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理分支名称。
+     * 参数：
+     * - `branch`：`branch` 参数。
+     * 返回：无。
      */
     public void deleteLocalBranchIfExists(String branch) throws GitAPIException {
         execute(git.branchDelete()
@@ -269,14 +225,9 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resetAndClean` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resetAndClean` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void resetAndClean() throws GitAPIException {
         execute(git.reset()
@@ -287,18 +238,13 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `merge` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `merge` 对应的处理。
+     * 参数：
+     * - `branch`：`branch` 参数。
+     * 返回：无。
      */
     public void merge(String branch) throws IOException, GitAPIException {
         ObjectId branchId = resolve("origin/" + branch);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (branchId == null) {
             throw new IllegalArgumentException("Branch not found");
         }
@@ -307,14 +253,9 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listRemoteBranches` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Remote Branches`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     public List<BranchInfo> listRemoteBranches() throws GitAPIException {
         return execute(git.branchList()
@@ -325,32 +266,26 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listCommits` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Commits`。
+     * 参数：
+     * - `branch`：`branch` 参数。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<Commit> listCommits(String branch, PageLink pageLink) throws IOException, GitAPIException {
         return listCommits(branch, null, pageLink);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listCommits` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Commits`。
+     * 参数：
+     * - `branch`：`branch` 参数。
+     * - `path`：文件或资源路径。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<Commit> listCommits(String branch, String path, PageLink pageLink) throws IOException, GitAPIException {
         ObjectId branchId = resolve("origin/" + branch);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (branchId == null) {
             return new PageData<>();
         }
@@ -358,7 +293,6 @@ public class GitRepository {
                 .add(branchId);
 
         command.setRevFilter(new CommitFilter(pageLink.getTextSearch(), settings.isShowMergeCommits()));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isNotEmpty(path)) {
             command.addPath(path);
         }
@@ -368,40 +302,31 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listFilesAtCommit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Files At Commit`。
+     * 参数：
+     * - `commitId`：`commitId`ID。
+     * 返回：匹配的数据集合。
      */
     public List<String> listFilesAtCommit(String commitId) throws IOException {
         return listFilesAtCommit(commitId, null);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listFilesAtCommit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Files At Commit`。
+     * 参数：
+     * - `commitId`：`commitId`ID。
+     * - `path`：文件或资源路径。
+     * 返回：匹配的数据集合。
      */
     public List<String> listFilesAtCommit(String commitId, String path) throws IOException {
         List<String> files = new ArrayList<>();
         RevCommit revCommit = resolveCommit(commitId);
         try (TreeWalk treeWalk = new TreeWalk(git.getRepository())) {
             treeWalk.reset(revCommit.getTree().getId());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (StringUtils.isNotEmpty(path)) {
                 treeWalk.setFilter(PathFilter.create(path));
             }
             treeWalk.setRecursive(true);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             while (treeWalk.next()) {
                 files.add(treeWalk.getPathString());
             }
@@ -411,19 +336,15 @@ public class GitRepository {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getFileContentAtCommit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取文件。
+     * 参数：
+     * - `file`：`file` 参数。
+     * - `commitId`：`commitId`ID。
+     * 返回：文本结果。
      */
     public String getFileContentAtCommit(String file, String commitId) throws IOException {
         RevCommit revCommit = resolveCommit(commitId);
         try (TreeWalk treeWalk = TreeWalk.forPath(git.getRepository(), file, revCommit.getTree())) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (treeWalk == null) {
                 throw new IllegalArgumentException("File not found");
             }
@@ -433,7 +354,6 @@ public class GitRepository {
                 try {
                     byte[] bytes = objectLoader.getBytes();
                     return new String(bytes, StandardCharsets.UTF_8);
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (LargeObjectException e) {
                     throw new RuntimeException("File " + file + " is too big to load");
                 }
@@ -443,14 +363,10 @@ public class GitRepository {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createAndCheckoutOrphanBranch` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建分支名称。
+     * 参数：
+     * - `name`：名称。
+     * 返回：无。
      */
     public void createAndCheckoutOrphanBranch(String name) throws GitAPIException {
         execute(git.checkout()
@@ -460,14 +376,10 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `add` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `add` 对应的处理。
+     * 参数：
+     * - `filesPattern`：`filesPattern` 参数。
+     * 返回：无。
      */
     public void add(String filesPattern) throws GitAPIException {
         execute(git.add().setUpdate(true).addFilepattern(filesPattern));
@@ -475,14 +387,9 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `status` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `status` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public Status status() throws GitAPIException {
         org.eclipse.jgit.api.Status status = execute(git.status());
@@ -493,14 +400,12 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `commit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `commit` 对应的处理。
+     * 参数：
+     * - `message`：待处理消息。
+     * - `authorName`：名称。
+     * - `authorEmail`：`authorEmail` 参数。
+     * 返回：处理结果。
      */
     public Commit commit(String message, String authorName, String authorEmail) throws GitAPIException {
         RevCommit revCommit = execute(git.commit()
@@ -511,14 +416,11 @@ public class GitRepository {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `push` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `push` 对应的处理。
+     * 参数：
+     * - `localBranch`：`localBranch` 参数。
+     * - `remoteBranch`：`remoteBranch` 参数。
+     * 返回：无。
      */
     public void push(String localBranch, String remoteBranch) throws GitAPIException {
         execute(git.push()
@@ -526,14 +428,11 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getContentsDiff` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Contents Diff`。
+     * 参数：
+     * - `content1`：`content1` 参数。
+     * - `content2`：`content2` 参数。
+     * 返回：文本结果。
      */
     public String getContentsDiff(String content1, String content2) throws IOException {
         RawText rawContent1 = new RawText(content1.getBytes());
@@ -550,14 +449,12 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDiffList` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Diff List`。
+     * 参数：
+     * - `commit1`：`commit1` 参数。
+     * - `commit2`：`commit2` 参数。
+     * - `path`：文件或资源路径。
+     * 返回：匹配的数据集合。
      */
     public List<Diff> getDiffList(String commit1, String commit2, String path) throws IOException {
         ObjectReader reader = git.getRepository().newObjectReader();
@@ -603,14 +500,10 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toBranchInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toBranchInfo` 对应的处理。
+     * 参数：
+     * - `ref`：`ref` 参数。
+     * 返回：处理结果。
      */
     private BranchInfo toBranchInfo(Ref ref) {
         String name = org.eclipse.jgit.lib.Repository.shortenRefName(ref.getName());
@@ -620,14 +513,10 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toCommit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toCommit` 对应的处理。
+     * 参数：
+     * - `revCommit`：`revCommit` 参数。
+     * 返回：处理结果。
      */
     private Commit toCommit(RevCommit revCommit) {
         return new Commit(revCommit.getCommitTime() * 1000l, revCommit.getName(),
@@ -635,28 +524,20 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolveCommit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resolveCommit` 对应的处理。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：处理结果。
      */
     private RevCommit resolveCommit(String id) throws IOException {
         return git.getRepository().parseCommit(resolve(id));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolve` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resolve` 对应的处理。
+     * 参数：
+     * - `rev`：`rev` 参数。
+     * 返回：处理结果。
      */
     private ObjectId resolve(String rev) throws IOException {
         ObjectId result = git.getRepository().resolve(rev);
@@ -667,14 +548,10 @@ public class GitRepository {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `execute` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `execute` 对应的处理。
+     * 参数：
+     * - `command`：`command` 参数。
+     * 返回：处理结果。
      */
     private <C extends GitCommand<T>, T> T execute(C command) throws GitAPIException {
         if (command instanceof TransportCommand) {
@@ -694,14 +571,13 @@ public class GitRepository {
     };
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `iterableToPageData` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `iterableToPageData` 对应的处理。
+     * 参数：
+     * - `iterable`：`iterable` 参数。
+     * - `mapper`：`mapper` 参数。
+     * - `pageLink`：`pageLink` 参数。
+     * - `comparatorFunction`：`comparatorFunction` 参数。
+     * 返回：匹配的数据集合。
      */
     private static <T, R> PageData<R> iterableToPageData(Iterable<T> iterable,
                                                          Function<? super T, ? extends R> mapper,
@@ -730,7 +606,6 @@ public class GitRepository {
         return new PageData<>(data, totalPages, totalElements, hasNext);
     }
 
-    @RequiredArgsConstructor
     /**
      * 中文说明：
      * 1. 类目的：`AuthHandler` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -741,27 +616,20 @@ public class GitRepository {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @RequiredArgsConstructor
     private static class AuthHandler {
         /**
-         * 字段说明：
-         * 1. 保存 `credentialsProvider` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 凭据，用于按场景创建或提供目标对象。
          */
         private final CredentialsProvider credentialsProvider;
         private final SshdSessionFactory sshSessionFactory;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `createFor` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：保存或创建`For`。
+         * 参数：
+         * - `settings`：配置对象。
+         * - `directory`：`directory` 参数。
+         * 返回：处理结果。
          */
         protected static AuthHandler createFor(RepositorySettings settings, File directory) {
             CredentialsProvider credentialsProvider = null;
@@ -775,14 +643,10 @@ public class GitRepository {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `configureCommand` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `configureCommand` 对应的处理。
+         * 参数：
+         * - `command`：`command` 参数。
+         * 返回：无。
          */
         protected void configureCommand(TransportCommand command) {
             if (credentialsProvider != null) {
@@ -799,28 +663,23 @@ public class GitRepository {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `newCredentialsProvider` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `newCredentialsProvider` 对应的处理。
+         * 参数：
+         * - `username`：名称。
+         * - `password`：`password` 参数。
+         * 返回：处理结果。
          */
         private static CredentialsProvider newCredentialsProvider(String username, String password) {
             return new UsernamePasswordCredentialsProvider(username, password == null ? "" : password);
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `newSshdSessionFactory` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `newSshdSessionFactory` 对应的处理。
+         * 参数：
+         * - `privateKey`：键。
+         * - `password`：`password` 参数。
+         * - `directory`：`directory` 参数。
+         * 返回：处理结果。
          */
         private static SshdSessionFactory newSshdSessionFactory(String privateKey, String password, File directory) {
             SshdSessionFactory sshSessionFactory = null;
@@ -848,14 +707,11 @@ public class GitRepository {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `loadKeyPairs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取键。
+         * 参数：
+         * - `privateKeyContent`：键。
+         * - `password`：`password` 参数。
+         * 返回：匹配的数据集合。
          */
         private static Iterable<KeyPair> loadKeyPairs(String privateKeyContent, String password) {
             Iterable<KeyPair> keyPairs = null;
@@ -883,12 +739,7 @@ public class GitRepository {
     private static class CommitFilter extends RevFilter {
 
         /**
-         * 字段说明：
-         * 1. 保存 `textSearch` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 搜索文本，表示当前对象的对应属性。
          */
         private final String textSearch;
         private final boolean showMergeCommits;
@@ -898,55 +749,41 @@ public class GitRepository {
             this.showMergeCommits = showMergeCommits;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `include` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `include` 对应的处理。
+         * 参数：
+         * - `walker`：`walker` 参数。
+         * - `c`：`c` 参数。
+         * 返回：判断结果。
          */
+        @Override
         public boolean include(RevWalk walker, RevCommit c) {
             return (showMergeCommits || c.getParentCount() < 2) && (StringUtils.isEmpty(textSearch)
                     || c.getFullMessage().toLowerCase().contains(textSearch));
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `clone` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `clone` 对应的处理。
+         * 参数：无。
+         * 返回：处理结果。
          */
+        @Override
         public RevFilter clone() {
             return this;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `requiresCommitBody` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `requiresCommitBody` 对应的处理。
+         * 参数：无。
+         * 返回：判断结果。
          */
+        @Override
         public boolean requiresCommitBody() {
             return false;
         }
 
     }
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`Commit` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -957,39 +794,24 @@ public class GitRepository {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @Data
     public static class Commit {
         /**
-         * 字段说明：
-         * 1. 保存 `timestamp` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 时间戳，用于标识当前数据或事件发生的时间。
          */
         private final long timestamp;
         private final String id;
         /**
-         * 字段说明：
-         * 1. 保存 `message` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 消息，承载当前步骤需要处理的内容。
          */
         private final String message;
         private final String authorName;
         /**
-         * 字段说明：
-         * 1. 保存 `authorEmail` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 作者邮箱，用于展示或标识当前对象。
          */
         private final String authorEmail;
     }
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`Status` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -1000,29 +822,19 @@ public class GitRepository {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @Data
     public static class Status {
         /**
-         * 字段说明：
-         * 1. 保存 `added` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `added`集合，用于去重保存或快速判断对象是否存在。
          */
         private final Set<String> added;
         private final Set<String> modified;
         /**
-         * 字段说明：
-         * 1. 保存 `removed` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `removed`集合，用于去重保存或快速判断对象是否存在。
          */
         private final Set<String> removed;
     }
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`Diff` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -1033,34 +845,20 @@ public class GitRepository {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @Data
     public static class Diff {
         /**
-         * 字段说明：
-         * 1. 保存 `filePath` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 文件路径，用于定位本地文件或目录。
          */
         private String filePath;
         private DiffEntry.ChangeType changeType;
         /**
-         * 字段说明：
-         * 1. 保存 `fileContentAtCommit1` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 文件，用于定位本地文件或目录。
          */
         private String fileContentAtCommit1;
         private String fileContentAtCommit2;
         /**
-         * 字段说明：
-         * 1. 保存 `diffStringValue` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 值，保存当前处理得到的具体内容。
          */
         private String diffStringValue;
     }

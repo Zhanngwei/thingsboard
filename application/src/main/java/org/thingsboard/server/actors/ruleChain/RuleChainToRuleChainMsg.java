@@ -25,8 +25,6 @@ import org.thingsboard.server.common.msg.TbMsg;
 /**
  * Created by ashvayka on 19.03.18.
  */
-@EqualsAndHashCode(callSuper = true)
-@ToString
 /**
  * 中文说明：
  * 1. 类目的：`RuleChainToRuleChainMsg` 是ThingsBoard Application 模块中的Actor 通信与消息处理类型，用于管理租户、设备、规则链或规则节点的异步消息路由。
@@ -37,38 +35,29 @@ import org.thingsboard.server.common.msg.TbMsg;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Actor / Command。
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString
 public final class RuleChainToRuleChainMsg extends TbToRuleChainActorMsg  {
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `source` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `source` 字段，保存当前对象的对应属性。
      */
+    @Getter
     private final RuleChainId source;
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `fromRelationType` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 关系，用于区分不同处理分支。
      */
+    @Getter
     private final String fromRelationType;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `RuleChainToRuleChainMsg` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `RuleChainToRuleChainMsg` 实例，并初始化必要字段。
+     * 参数：
+     * - `target`：`target` 参数。
+     * - `source`：`source` 参数。
+     * - `tbMsg`：待处理消息。
+     * - `fromRelationType`：类型。
+     * 返回：新创建的对象实例。
      */
     public RuleChainToRuleChainMsg(RuleChainId target, RuleChainId source, TbMsg tbMsg, String fromRelationType) {
         super(tbMsg, target);
@@ -76,17 +65,12 @@ public final class RuleChainToRuleChainMsg extends TbToRuleChainActorMsg  {
         this.fromRelationType = fromRelationType;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getMsgType` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public MsgType getMsgType() {
         return MsgType.RULE_CHAIN_TO_RULE_CHAIN_MSG;
     }

@@ -34,7 +34,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbMsgPackProcessingContext` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
@@ -45,48 +44,29 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
  */
+@Slf4j
 public class TbMsgPackProcessingContext {
 
     /**
-     * 字段说明：
-     * 1. 保存 `queueName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列名称，用于标识或展示当前对象。
      */
     private final String queueName;
     private final TbRuleEngineSubmitStrategy submitStrategy;
     /**
-     * 字段说明：
-     * 1. 保存 `skipTimeoutMsgsPossible` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足超时时间条件。
      */
     private final boolean skipTimeoutMsgsPossible;
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `profilerEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否启用`profiler`。
      */
+    @Getter
     private final boolean profilerEnabled;
     private final AtomicInteger pendingCount;
     private final CountDownLatch processingTimeoutLatch = new CountDownLatch(1);
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `pendingMap` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `pendingMap`映射关系，用于按键查找对应值。
      */
+    @Getter
     private final ConcurrentMap<UUID, TbProtoQueueMsg<TransportProtos.ToRuleEngineMsg>> pendingMap;
     @Getter
     private final ConcurrentMap<UUID, TbProtoQueueMsg<TransportProtos.ToRuleEngineMsg>> successMap = new ConcurrentHashMap<>();
@@ -98,24 +78,17 @@ public class TbMsgPackProcessingContext {
     private final ConcurrentMap<UUID, RuleNodeInfo> lastRuleNodeMap = new ConcurrentHashMap<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `canceled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足`canceled`条件。
      */
     private volatile boolean canceled = false;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbMsgPackProcessingContext` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbMsgPackProcessingContext` 实例，并初始化必要字段。
+     * 参数：
+     * - `queueName`：队列名称或队列对象。
+     * - `submitStrategy`：`submitStrategy` 参数。
+     * - `skipTimeoutMsgsPossible`：待处理消息。
+     * 返回：新创建的对象实例。
      */
     public TbMsgPackProcessingContext(String queueName, TbRuleEngineSubmitStrategy submitStrategy, boolean skipTimeoutMsgsPossible) {
         this.queueName = queueName;
@@ -127,18 +100,14 @@ public class TbMsgPackProcessingContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `await` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `await` 对应的处理。
+     * 参数：
+     * - `packProcessingTimeout`：`packProcessingTimeout` 参数。
+     * - `milliseconds`：`milliseconds` 参数。
+     * 返回：判断结果。
      */
     public boolean await(long packProcessingTimeout, TimeUnit milliseconds) throws InterruptedException {
         boolean success = processingTimeoutLatch.await(packProcessingTimeout, milliseconds);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!success && profilerEnabled) {
             msgProfilerMap.values().forEach(this::onTimeout);
         }
@@ -146,54 +115,42 @@ public class TbMsgPackProcessingContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onSuccess` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Success`。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：无。
      */
     public void onSuccess(UUID id) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TbProtoQueueMsg<TransportProtos.ToRuleEngineMsg> msg;
         boolean empty = false;
         msg = pendingMap.remove(id);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (msg != null) {
             empty = pendingCount.decrementAndGet() == 0;
             successMap.put(id, msg);
             submitStrategy.onSuccess(id);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (empty) {
             processingTimeoutLatch.countDown();
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onFailure` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理失败信息。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `id`：`id`ID。
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
     public void onFailure(TenantId tenantId, UUID id, RuleEngineException e) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TbProtoQueueMsg<TransportProtos.ToRuleEngineMsg> msg;
         boolean empty = false;
         msg = pendingMap.remove(id);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (msg != null) {
             empty = pendingCount.decrementAndGet() == 0;
             failedMap.put(id, msg);
             exceptionsMap.putIfAbsent(tenantId, e);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (empty) {
             processingTimeoutLatch.countDown();
         }
@@ -203,18 +160,14 @@ public class TbMsgPackProcessingContext {
     private final ConcurrentHashMap<UUID, TbRuleNodeProfilerInfo> ruleNodeProfilerMap = new ConcurrentHashMap<>();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onProcessingStart` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Processing Start`。
+     * 参数：
+     * - `id`：`id`ID。
+     * - `ruleNodeInfo`：`ruleNodeInfo` 参数。
+     * 返回：无。
      */
     public void onProcessingStart(UUID id, RuleNodeInfo ruleNodeInfo) {
         lastRuleNodeMap.put(id, ruleNodeInfo);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (profilerEnabled) {
             msgProfilerMap.computeIfAbsent(id, TbMsgProfilerInfo::new).onStart(ruleNodeInfo.getRuleNodeId());
             ruleNodeProfilerMap.putIfAbsent(ruleNodeInfo.getRuleNodeId().getId(), new TbRuleNodeProfilerInfo(ruleNodeInfo));
@@ -222,20 +175,15 @@ public class TbMsgPackProcessingContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onProcessingEnd` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Processing End`。
+     * 参数：
+     * - `id`：`id`ID。
+     * - `ruleNodeId`：规则节点ID。
+     * 返回：无。
      */
     public void onProcessingEnd(UUID id, RuleNodeId ruleNodeId) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (profilerEnabled) {
             long processingTime = msgProfilerMap.computeIfAbsent(id, TbMsgProfilerInfo::new).onEnd(ruleNodeId);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (processingTime > 0) {
                 ruleNodeProfilerMap.computeIfAbsent(ruleNodeId.getId(), TbRuleNodeProfilerInfo::new).record(processingTime);
             }
@@ -243,49 +191,34 @@ public class TbMsgPackProcessingContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onTimeout` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理超时时间。
+     * 参数：
+     * - `profilerInfo`：`profilerInfo` 参数。
+     * 返回：无。
      */
     public void onTimeout(TbMsgProfilerInfo profilerInfo) {
         Map.Entry<UUID, Long> ruleNodeInfo = profilerInfo.onTimeout();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (ruleNodeInfo != null) {
             ruleNodeProfilerMap.computeIfAbsent(ruleNodeInfo.getKey(), TbRuleNodeProfilerInfo::new).record(ruleNodeInfo.getValue());
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLastVisitedRuleNode` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取规则节点。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：处理结果。
      */
     public RuleNodeInfo getLastVisitedRuleNode(UUID id) {
         return lastRuleNodeMap.get(id);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `printProfilerStats` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `printProfilerStats` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void printProfilerStats() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (profilerEnabled) {
             log.debug("Top Rule Nodes by max execution time:");
             ruleNodeProfilerMap.values().stream()
@@ -305,14 +238,9 @@ public class TbMsgPackProcessingContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanup` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cleanup` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void cleanup() {
         canceled = true;
@@ -322,14 +250,9 @@ public class TbMsgPackProcessingContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isCanceled` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Canceled`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean isCanceled() {
         return skipTimeoutMsgsPossible && canceled;

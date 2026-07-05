@@ -24,54 +24,55 @@ import org.thingsboard.server.common.data.validation.NoXss;
 import java.util.Collections;
 import java.util.List;
 
-@Data
 /**
  * 中文说明：`TbCreateAlarmNodeConfiguration` 是创建告警节点配置对象，用于承载规则节点 JSON 中的配置项和默认值。
  * 配置来源：实例字段通常由前端规则节点配置 JSON 反序列化得到，`defaultConfiguration` 提供缺省配置。
  * 调用边界：本类本身不直接涉及数据库、缓存、MQTT、Actor 或事务；具体实现和调用链可能在使用这些配置的节点中涉及。
  */
+@Data
 public class TbCreateAlarmNodeConfiguration extends TbAbstractAlarmNodeConfiguration implements NodeConfiguration<TbCreateAlarmNodeConfiguration> {
 
-    @NoXss
     /**
-     * 配置字段：来自规则节点 JSON 的 `severity` 配置项，控制告警严重级别。
+     * `severity` 字段，保存当前对象的对应属性。
      */
+    @NoXss
     private String severity;
     /**
-     * 配置字段：来自规则节点 JSON 的 `propagate` 配置项，控制与本类处理流程相关的运行时值。
+     * 是否向关联对象传播当前状态。
      */
     private boolean propagate;
     /**
-     * 配置字段：来自规则节点 JSON 的 `propagateToOwner` 配置项，控制与本类处理流程相关的运行时值。
+     * 是否向关联对象传播当前状态。
      */
     private boolean propagateToOwner;
     /**
-     * 配置字段：来自规则节点 JSON 的 `propagateToTenant` 配置项，控制租户上下文。
+     * 是否向关联对象传播当前状态。
      */
     private boolean propagateToTenant;
     /**
-     * 配置字段：来自规则节点 JSON 的 `useMessageAlarmData` 配置项，控制告警类型、严重级别或详情。
+     * 是否使用告警。
      */
     private boolean useMessageAlarmData;
     /**
-     * 配置字段：来自规则节点 JSON 的 `overwriteAlarmDetails` 配置项，控制告警类型、严重级别或详情。
+     * 是否满足告警条件。
      */
     private boolean overwriteAlarmDetails = true;
     /**
-     * 配置字段：来自规则节点 JSON 的 `dynamicSeverity` 配置项，控制告警严重级别。
+     * 是否满足`dynamicSeverity`条件。
      */
     private boolean dynamicSeverity;
 
     /**
-     * 配置字段：来自规则节点 JSON 的 `relationTypes` 配置项，控制关系方向、类型或关系查询条件。
+     * 关系列表，用于保存一组待处理对象。
      */
     private List<String> relationTypes;
 
-    @Override
     /**
-     * 方法说明：构建规则节点 JSON 未显式提供字段时使用的默认配置。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public TbCreateAlarmNodeConfiguration defaultConfiguration() {
         TbCreateAlarmNodeConfiguration configuration = new TbCreateAlarmNodeConfiguration();
         configuration.setScriptLang(ScriptLanguage.TBEL);

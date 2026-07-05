@@ -29,7 +29,6 @@ import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.Iterator;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AzureIotHubUtil` 是ThingsBoard Common 模块中的公共工具类型，用于提供跨模块复用的纯函数、解析、转换或辅助逻辑。
@@ -40,63 +39,37 @@ import java.util.Iterator;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Utility / Helper。
  */
+@Slf4j
 public final class AzureIotHubUtil {
     private static final String BASE_DIR_PATH = System.getProperty("user.dir");
     /**
-     * 字段说明：
-     * 1. 保存 `APP_DIR` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `APP_DIR`常量，用于统一引用固定值。
      */
     private static final String APP_DIR = "application";
     private static final String SRC_DIR = "src";
     /**
-     * 字段说明：
-     * 1. 保存 `MAIN_DIR` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `MAIN_DIR`常量，用于统一引用固定值。
      */
     private static final String MAIN_DIR = "main";
     private static final String DATA_DIR = "data";
     /**
-     * 字段说明：
-     * 1. 保存 `CERTS_DIR` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `CERTS_DIR`常量，用于统一引用固定值。
      */
     private static final String CERTS_DIR = "certs";
     private static final String AZURE_DIR = "azure";
     /**
-     * 字段说明：
-     * 1. 保存 `FILE_NAME` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 名称常量，用于统一引用固定值。
      */
     private static final String FILE_NAME = "DigiCertGlobalRootG2.crt.pem";
 
     /**
-     * 字段说明：
-     * 1. 保存 `FULL_FILE_PATH` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 文件路径常量，用于统一引用固定值。
      */
     private static final Path FULL_FILE_PATH;
 
     static {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (BASE_DIR_PATH.endsWith("bin")) {
             FULL_FILE_PATH = Paths.get(BASE_DIR_PATH.replaceAll("bin$", ""), DATA_DIR, CERTS_DIR, AZURE_DIR, FILE_NAME);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (BASE_DIR_PATH.endsWith("conf")) {
             FULL_FILE_PATH = Paths.get(BASE_DIR_PATH.replaceAll("conf$", ""), DATA_DIR, CERTS_DIR, AZURE_DIR, FILE_NAME);
         } else {
@@ -105,72 +78,46 @@ public final class AzureIotHubUtil {
     }
 
     /**
-     * 字段说明：
-     * 1. 保存 `SAS_TOKEN_VALID_SECS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 令牌常量，用于统一引用固定值。
      */
     private static final long SAS_TOKEN_VALID_SECS = 365 * 24 * 60 * 60;
     private static final long ONE_SECOND_IN_MILLISECONDS = 1000;
 
     /**
-     * 字段说明：
-     * 1. 保存 `SAS_TOKEN_FORMAT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 令牌常量，用于统一引用固定值。
      */
     private static final String SAS_TOKEN_FORMAT = "SharedAccessSignature sr=%s&sig=%s&se=%s";
 
     /**
-     * 字段说明：
-     * 1. 保存 `USERNAME_FORMAT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户名常量，用于统一引用固定值。
      */
     private static final String USERNAME_FORMAT = "%s/%s/?api-version=2018-06-30";
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `AzureIotHubUtil` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `AzureIotHubUtil` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     private AzureIotHubUtil() {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildUsername` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建用户名。
+     * 参数：
+     * - `host`：`host` 参数。
+     * - `deviceId`：设备IDID。
+     * 返回：文本结果。
      */
     public static String buildUsername(String host, String deviceId) {
         return String.format(USERNAME_FORMAT, host, deviceId);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildSasToken` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建令牌。
+     * 参数：
+     * - `host`：`host` 参数。
+     * - `sasKey`：键。
+     * 返回：文本结果。
      */
     public static String buildSasToken(String host, String sasKey) {
         try {
@@ -184,21 +131,15 @@ public final class AzureIotHubUtil {
             byte[] rawHmac = mac.doFinal(toSign.getBytes(StandardCharsets.UTF_8));
             String signature = URLEncoder.encode(Base64.getEncoder().encodeToString(rawHmac), "UTF-8");
             return String.format(SAS_TOKEN_FORMAT, targetUri, signature, expiryTime);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             throw new RuntimeException("Failed to build SAS token!!!", e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildExpiresOn` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建`Expires On`。
+     * 参数：无。
+     * 返回：数值结果。
      */
     private static long buildExpiresOn() {
         long expiresOnDate = System.currentTimeMillis();
@@ -207,22 +148,15 @@ public final class AzureIotHubUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDefaultCaCert` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Default Ca Cert`。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public static String getDefaultCaCert() {
         byte[] fileBytes;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (Files.exists(FULL_FILE_PATH)) {
             try {
                 fileBytes = Files.readAllBytes(FULL_FILE_PATH);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (IOException e) {
                 log.error("Failed to load Default CaCert file!!! [{}]", FULL_FILE_PATH, e);
                 throw new RuntimeException("Failed to load Default CaCert file!!!");
@@ -231,7 +165,6 @@ public final class AzureIotHubUtil {
             Path azureDirectory = FULL_FILE_PATH.getParent();
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(azureDirectory)) {
                 Iterator<Path> iterator = stream.iterator();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (iterator.hasNext()) {
                     Path firstFile = iterator.next();
                     fileBytes = Files.readAllBytes(firstFile);
@@ -239,7 +172,6 @@ public final class AzureIotHubUtil {
                     log.error("Default CaCert file not found in the directory [{}]!!!", azureDirectory);
                     throw new RuntimeException("Default CaCert file not found in the directory!!!");
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (IOException e) {
                 log.error("Failed to load Default CaCert file from the directory [{}]!!!", azureDirectory, e);
                 throw new RuntimeException("Failed to load Default CaCert file from the directory!!!");

@@ -56,11 +56,6 @@ import static org.eclipse.californium.scandium.dtls.cipher.CipherSuite.TLS_PSK_W
 import static org.thingsboard.server.transport.lwm2m.server.LwM2MNetworkConfig.getCoapConfig;
 import static org.thingsboard.server.transport.lwm2m.server.ota.DefaultLwM2MOtaUpdateService.FIRMWARE_UPDATE_COAP_RESOURCE;
 
-@Slf4j
-@Component
-@DependsOn({"lwM2mDownlinkMsgHandler", "lwM2mUplinkMsgHandler"})
-@TbLwM2mTransportComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`DefaultLwM2mTransportService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -71,90 +66,55 @@ import static org.thingsboard.server.transport.lwm2m.server.ota.DefaultLwM2MOtaU
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Component
+@DependsOn({"lwM2mDownlinkMsgHandler", "lwM2mUplinkMsgHandler"})
+@TbLwM2mTransportComponent
+@RequiredArgsConstructor
 public class DefaultLwM2mTransportService implements LwM2MTransportService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `RPK_OR_X509_CIPHER_SUITES` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `RPK_OR_X509_CIPHER_SUITES`常量，用于统一引用固定值。
      */
     public static final CipherSuite[] RPK_OR_X509_CIPHER_SUITES = {TLS_PSK_WITH_AES_128_CCM_8, TLS_PSK_WITH_AES_128_CBC_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256};
     public static final CipherSuite[] PSK_CIPHER_SUITES = {TLS_PSK_WITH_AES_128_CCM_8, TLS_PSK_WITH_AES_128_CBC_SHA256};
 
     /**
-     * 字段说明：
-     * 1. 保存 `context` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private final LwM2mTransportContext context;
     private final LwM2MTransportServerConfig config;
     /**
-     * 字段说明：
-     * 1. 保存 `otaPackageDataCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数据，保存当前步骤读取或计算得到的内容。
      */
     private final OtaPackageDataCache otaPackageDataCache;
     private final LwM2mUplinkMsgHandler handler;
     /**
-     * 字段说明：
-     * 1. 保存 `registrationStore` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 存储组件，表示当前对象的对应属性。
      */
     private final CaliforniumRegistrationStore registrationStore;
     private final TbSecurityStore securityStore;
     /**
-     * 字段说明：
-     * 1. 保存 `certificateVerifier` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 证书，用于认证或安全校验。
      */
     private final TbLwM2MDtlsCertificateVerifier certificateVerifier;
     private final TbLwM2MAuthorizer authorizer;
     /**
-     * 字段说明：
-     * 1. 保存 `modelProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 提供者，用于按场景创建或提供目标对象。
      */
     private final LwM2mVersionedModelProvider modelProvider;
 
     /**
-     * 字段说明：
-     * 1. 保存 `server` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务端，用于支撑当前网络或外部服务交互。
      */
     private LeshanServer server;
 
-    @AfterStartUp(order = AfterStartUp.AFTER_TRANSPORT_SERVICE)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @AfterStartUp(order = AfterStartUp.AFTER_TRANSPORT_SERVICE)
     public void init() {
         this.server = getLhServer();
         /*
@@ -164,7 +124,6 @@ public class DefaultLwM2mTransportService implements LwM2MTransportService {
          * nameFile = "BC68JAR01A09_TO_BC68JAR01A10.bin"
          * "coap://host:port/{path}/{token}/{nameFile}"
          */
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         LwM2mTransportCoapResource otaCoapResource = new LwM2mTransportCoapResource(otaPackageDataCache, FIRMWARE_UPDATE_COAP_RESOURCE);
         this.server.coap().getServer().add(otaCoapResource);
         this.context.setServer(server);
@@ -172,14 +131,9 @@ public class DefaultLwM2mTransportService implements LwM2MTransportService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startLhServer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动服务端。
+     * 参数：无。
+     * 返回：无。
      */
     private void startLhServer() {
         log.info("Starting LwM2M transport server...");
@@ -192,37 +146,26 @@ public class DefaultLwM2mTransportService implements LwM2MTransportService {
         log.info("Started LwM2M transport server.");
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdown` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `shutdown` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void shutdown() {
         try {
             log.info("Stopping LwM2M transport server!");
             server.destroy();
             log.info("LwM2M transport server stopped!");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("Failed to gracefully stop the LwM2M transport server!", e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLhServer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取服务端。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private LeshanServer getLhServer() {
         LeshanServerBuilder builder = new LeshanServerBuilder();
@@ -262,17 +205,13 @@ public class DefaultLwM2mTransportService implements LwM2MTransportService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setServerWithCredentials` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新凭据。
+     * 参数：
+     * - `builder`：`builder` 参数。
+     * - `dtlsConfig`：配置对象。
+     * 返回：无。
      */
     private void setServerWithCredentials(LeshanServerBuilder builder, DtlsConnectorConfig.Builder dtlsConfig) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (this.config.getSslCredentials() != null) {
             SslCredentials sslCredentials = this.config.getSslCredentials();
             builder.setPublicKey(sslCredentials.getPublicKey());
@@ -289,19 +228,13 @@ public class DefaultLwM2mTransportService implements LwM2MTransportService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String getName() {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return DataConstants.LWM2M_TRANSPORT_NAME;
     }
 

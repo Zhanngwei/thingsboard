@@ -32,7 +32,6 @@ import java.util.Date;
 
 import static org.eclipse.leshan.core.model.ResourceModel.Type.OPAQUE;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`LwM2mValueConverterImpl` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -43,66 +42,54 @@ import static org.eclipse.leshan.core.model.ResourceModel.Type.OPAQUE;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class LwM2mValueConverterImpl implements LwM2mValueConverter {
 
     private static final LwM2mValueConverterImpl INSTANCE = new LwM2mValueConverterImpl();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getInstance` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Instance`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public static LwM2mValueConverterImpl getInstance() {
         return INSTANCE;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertValue` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换值。
+     * 参数：
+     * - `value`：值。
+     * - `currentType`：类型。
+     * - `expectedType`：类型。
+     * - `resourcePath`：文件或资源路径。
+     * 返回：处理结果。
      */
+    @Override
     public Object convertValue(Object value, Type currentType, Type expectedType, LwM2mPath resourcePath)
             throws CodecException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (value == null) {
            return null;
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (expectedType == null) {
             /** unknown resource, trusted value */
             return value;
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (currentType == expectedType) {
             /** expected type */
             return value;
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (currentType == null) {
             currentType = OPAQUE;
         }
 
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (expectedType) {
             case INTEGER:
-                // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
                 switch (currentType) {
                     case FLOAT:
                         log.debug("Trying to convert float value [{}] to Integer", value);
                         Long longValue = ((Double) value).longValue();
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if ((double) value == longValue.doubleValue()) {
                             return longValue;
                         }
@@ -114,12 +101,10 @@ public class LwM2mValueConverterImpl implements LwM2mValueConverter {
                 }
                 break;
             case FLOAT:
-                // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
                 switch (currentType) {
                     case INTEGER:
                         log.debug("Trying to convert integer value [{}] to float", value);
                         Double floatValue = ((Long) value).doubleValue();
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if ((long) value == floatValue.longValue()) {
                             return floatValue;
                         }
@@ -131,14 +116,11 @@ public class LwM2mValueConverterImpl implements LwM2mValueConverter {
                 }
                 break;
             case BOOLEAN:
-                // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
                 switch (currentType) {
                     case STRING:
                         log.debug("Trying to convert string value {} to boolean", value);
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (StringUtils.equalsIgnoreCase((String) value, "true")) {
                             return true;
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         } else if (StringUtils.equalsIgnoreCase((String) value, "false")) {
                             return false;
                         }

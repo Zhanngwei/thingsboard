@@ -73,10 +73,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-@Service
-@Slf4j
-@ConditionalOnProperty(prefix = "edges", value = "enabled", havingValue = "true")
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`EdgeGrpcService` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
@@ -87,6 +83,10 @@ import java.util.function.Consumer;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
  */
+@Service
+@Slf4j
+@ConditionalOnProperty(prefix = "edges", value = "enabled", havingValue = "true")
+@TbCoreComponent
 public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase implements EdgeRpcService {
 
     private final ConcurrentMap<EdgeId, EdgeGrpcSession> sessions = new ConcurrentHashMap<>();
@@ -96,202 +96,107 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
 
     private final ConcurrentMap<UUID, Consumer<FromEdgeSyncResponse>> localSyncEdgeRequests = new ConcurrentHashMap<>();
 
+    /**
+     * 端口号，用于描述服务监听或访问地址。
+     */
     @Value("${edges.rpc.port}")
-    /**
-     * 字段说明：
-     * 1. 保存 `rpcPort` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int rpcPort;
+    /**
+     * 是否启用 SSL。
+     */
     @Value("${edges.rpc.ssl.enabled}")
-    /**
-     * 字段说明：
-     * 1. 保存 `sslEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean sslEnabled;
+    /**
+     * 文件，用于定位本地文件或目录。
+     */
     @Value("${edges.rpc.ssl.cert}")
-    /**
-     * 字段说明：
-     * 1. 保存 `certFileResource` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String certFileResource;
+    /**
+     * 私钥，用于定位映射、配置或数据项。
+     */
     @Value("${edges.rpc.ssl.private_key}")
-    /**
-     * 字段说明：
-     * 1. 保存 `privateKeyResource` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String privateKeyResource;
+    /**
+     * 是否满足遥测条件。
+     */
     @Value("${edges.state.persistToTelemetry:false}")
-    /**
-     * 字段说明：
-     * 1. 保存 `persistToTelemetry` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean persistToTelemetry;
+    /**
+     * 时间，用于发起外部调用或协议交互。
+     */
     @Value("${edges.rpc.client_max_keep_alive_time_sec:1}")
-    /**
-     * 字段说明：
-     * 1. 保存 `clientMaxKeepAliveTimeSec` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int clientMaxKeepAliveTimeSec;
+    /**
+     * 消息，承载当前步骤需要处理的内容。
+     */
     @Value("${edges.rpc.max_inbound_message_size:4194304}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxInboundMessageSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxInboundMessageSize;
+    /**
+     * 时间，用于控制时间范围或等待时长。
+     */
     @Value("${edges.rpc.keep_alive_time_sec:10}")
-    /**
-     * 字段说明：
-     * 1. 保存 `keepAliveTimeSec` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int keepAliveTimeSec;
+    /**
+     * 超时时间，用于控制时间范围或等待时长。
+     */
     @Value("${edges.rpc.keep_alive_timeout_sec:5}")
-    /**
-     * 字段说明：
-     * 1. 保存 `keepAliveTimeoutSec` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int keepAliveTimeoutSec;
-    @Value("${edges.scheduler_pool_size}")
     /**
-     * 字段说明：
-     * 1. 保存 `schedulerPoolSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 线程池大小，用于安排延迟任务或周期任务。
      */
+    @Value("${edges.scheduler_pool_size}")
     private int schedulerPoolSize;
 
-    @Value("${edges.send_scheduler_pool_size}")
     /**
-     * 字段说明：
-     * 1. 保存 `sendSchedulerPoolSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 线程池大小，用于安排延迟任务或周期任务。
      */
+    @Value("${edges.send_scheduler_pool_size}")
     private int sendSchedulerPoolSize;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `ctx` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @Autowired
     private EdgeContextComponent ctx;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tsSubService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，提供当前类调用的业务操作。
      */
+    @Autowired
     private TelemetrySubscriptionService tsSubService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `clusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private TbClusterService clusterService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `server` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务端，用于支撑当前网络或外部服务交互。
      */
     private Server server;
 
     /**
-     * 字段说明：
-     * 1. 保存 `edgeEventProcessingExecutorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 边缘节点，提供当前类调用的业务操作。
      */
     private ScheduledExecutorService edgeEventProcessingExecutorService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `sendDownlinkExecutorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private ScheduledExecutorService sendDownlinkExecutorService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `executorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private ScheduledExecutorService executorService;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() {
         log.info("Initializing Edge RPC service!");
         NettyServerBuilder builder = NettyServerBuilder.forPort(rpcPort)
@@ -301,14 +206,11 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
                 .permitKeepAliveWithoutCalls(true)
                 .maxInboundMessageSize(maxInboundMessageSize)
                 .addService(this);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sslEnabled) {
             try {
                 InputStream certFileIs = ResourceUtils.getInputStream(this, certFileResource);
                 InputStream privateKeyFileIs = ResourceUtils.getInputStream(this, privateKeyResource);
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 builder.useTransportSecurity(certFileIs, privateKeyFileIs);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.error("Unable to set up SSL context. Reason: " + e.getMessage(), e);
                 throw new RuntimeException("Unable to set up SSL context!", e);
@@ -318,7 +220,6 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
         log.info("Going to start Edge RPC server using port: {}", rpcPort);
         try {
             server.start();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.error("Failed to start Edge RPC server!", e);
             throw new RuntimeException("Failed to start Edge RPC server!");
@@ -329,76 +230,56 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
         log.info("Edge RPC service initialized!");
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void destroy() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (server != null) {
             server.shutdownNow();
         }
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         for (Map.Entry<EdgeId, ScheduledFuture<?>> entry : sessionEdgeEventChecks.entrySet()) {
             EdgeId edgeId = entry.getKey();
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             ScheduledFuture<?> sessionEdgeEventCheck = entry.getValue();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sessionEdgeEventCheck != null && !sessionEdgeEventCheck.isCancelled() && !sessionEdgeEventCheck.isDone()) {
                 sessionEdgeEventCheck.cancel(true);
                 sessionEdgeEventChecks.remove(edgeId);
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (edgeEventProcessingExecutorService != null) {
             edgeEventProcessingExecutorService.shutdownNow();
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sendDownlinkExecutorService != null) {
             sendDownlinkExecutorService.shutdownNow();
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (executorService != null) {
             executorService.shutdownNow();
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleMsgs` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Msgs`。
+     * 参数：
+     * - `outputStream`：`outputStream` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public StreamObserver<RequestMsg> handleMsgs(StreamObserver<ResponseMsg> outputStream) {
         return new EdgeGrpcSession(ctx, outputStream, this::onEdgeConnect, this::onEdgeDisconnect, sendDownlinkExecutorService, this.maxInboundMessageSize).getInputStream();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onToEdgeSessionMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onToEdgeSessionMsg(TenantId tenantId, EdgeSessionMsg msg) {
         executorService.execute(() -> {
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (msg.getMsgType()) {
                 case EDGE_EVENT_UPDATE_TO_EDGE_SESSION_MSG:
                     EdgeEventUpdateMsg edgeEventUpdateMsg = (EdgeEventUpdateMsg) msg;
@@ -419,17 +300,14 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateEdge` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新边缘节点。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edge`：`edge` 参数。
+     * 返回：无。
      */
+    @Override
     public void updateEdge(TenantId tenantId, Edge edge) {
         executorService.execute(() -> {
             EdgeGrpcSession session = sessions.get(edge.getId());
@@ -442,17 +320,14 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteEdge` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理边缘节点。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * 返回：无。
      */
+    @Override
     public void deleteEdge(TenantId tenantId, EdgeId edgeId) {
         executorService.execute(() -> {
             EdgeGrpcSession session = sessions.get(edgeId);
@@ -473,14 +348,11 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onEdgeEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * 返回：无。
      */
     private void onEdgeEvent(TenantId tenantId, EdgeId edgeId) {
         EdgeGrpcSession session = sessions.get(edgeId);
@@ -500,14 +372,11 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onEdgeConnect` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：
+     * - `edgeId`：边缘节点ID。
+     * - `edgeGrpcSession`：会话对象。
+     * 返回：无。
      */
     private void onEdgeConnect(EdgeId edgeId, EdgeGrpcSession edgeGrpcSession) {
         Edge edge = edgeGrpcSession.getEdge();
@@ -530,14 +399,12 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startSyncProcess` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Sync Process`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * - `requestId`：请求ID。
+     * 返回：无。
      */
     private void startSyncProcess(TenantId tenantId, EdgeId edgeId, UUID requestId) {
         EdgeGrpcSession session = sessions.get(edgeId);
@@ -551,17 +418,14 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processSyncRequest` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `request`：请求对象。
+     * - `responseConsumer`：响应对象。
+     * 返回：无。
      */
+    @Override
     public void processSyncRequest(ToEdgeSyncRequest request, Consumer<FromEdgeSyncResponse> responseConsumer) {
         log.trace("[{}][{}] Processing sync edge request [{}]", request.getTenantId(), request.getId(), request.getEdgeId());
         UUID requestId = request.getId();
@@ -571,14 +435,11 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `scheduleSyncRequestTimeout` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `scheduleSyncRequestTimeout` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * - `requestId`：请求ID。
+     * 返回：无。
      */
     private void scheduleSyncRequestTimeout(ToEdgeSyncRequest request, UUID requestId) {
         log.trace("[{}] scheduling sync edge request", requestId);
@@ -593,14 +454,10 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processSyncResponse` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：无。
      */
     private void processSyncResponse(FromEdgeSyncResponse response) {
         log.trace("[{}] Received response from sync service: [{}]", response.getId(), response);
@@ -614,14 +471,10 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `scheduleEdgeEventsCheck` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `scheduleEdgeEventsCheck` 对应的处理。
+     * 参数：
+     * - `session`：会话对象。
+     * 返回：无。
      */
     private void scheduleEdgeEventsCheck(EdgeGrpcSession session) {
         EdgeId edgeId = session.getEdge().getId();
@@ -669,14 +522,10 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cancelScheduleEdgeEventsCheck` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cancelScheduleEdgeEventsCheck` 对应的处理。
+     * 参数：
+     * - `edgeId`：边缘节点ID。
+     * 返回：无。
      */
     private void cancelScheduleEdgeEventsCheck(EdgeId edgeId) {
         log.trace("[{}] cancelling edge event check for edge", edgeId);
@@ -690,14 +539,11 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onEdgeDisconnect` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：
+     * - `edge`：`edge` 参数。
+     * - `sessionId`：会话ID。
+     * 返回：无。
      */
     private void onEdgeDisconnect(Edge edge, UUID sessionId) {
         EdgeId edgeId = edge.getId();
@@ -724,14 +570,13 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
     private void save(TenantId tenantId, EdgeId edgeId, String key, long value) {
         log.debug("[{}][{}] Updating long edge telemetry [{}] [{}]", tenantId, edgeId, key, value);
@@ -746,14 +591,13 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
     private void save(TenantId tenantId, EdgeId edgeId, String key, boolean value) {
         log.debug("[{}][{}] Updating boolean edge telemetry [{}] [{}]", tenantId, edgeId, key, value);
@@ -779,22 +623,12 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
      */
     private static class AttributeSaveCallback implements FutureCallback<Void> {
         /**
-         * 字段说明：
-         * 1. 保存 `tenantId` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 租户ID，用于定位对应业务对象。
          */
         private final TenantId tenantId;
         private final EdgeId edgeId;
         /**
-         * 字段说明：
-         * 1. 保存 `key` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 键，用于定位映射、配置或数据项。
          */
         private final String key;
         private final Object value;
@@ -806,46 +640,37 @@ public class EdgeGrpcService extends EdgeRpcServiceGrpc.EdgeRpcServiceImplBase i
             this.value = value;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `result`：`result` 参数。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(@Nullable Void result) {
             log.trace("[{}][{}] Successfully updated attribute [{}] with value [{}]", tenantId, edgeId, key, value);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onFailure` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理失败信息。
+         * 参数：
+         * - `t`：`t` 参数。
+         * 返回：无。
          */
+        @Override
         public void onFailure(Throwable t) {
             log.warn("[{}][{}] Failed to update attribute [{}] with value [{}]", tenantId, edgeId, key, value, t);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `pushRuleEngineMessage` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交规则引擎。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edge`：`edge` 参数。
+     * - `ts`：时间戳。
+     * - `msgType`：待处理消息。
+     * 返回：无。
      */
     private void pushRuleEngineMessage(TenantId tenantId, Edge edge, long ts, TbMsgType msgType) {
         try {

@@ -38,28 +38,20 @@ import java.util.Set;
 public class CoapAdaptorUtils {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toGetAttributeRequestMsg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toGetAttributeRequestMsg` 对应的处理。
+     * 参数：
+     * - `inbound`：`inbound` 参数。
+     * 返回：处理结果。
      */
     public static TransportProtos.GetAttributeRequestMsg toGetAttributeRequestMsg(Request inbound) throws AdaptorException {
         List<String> queryElements = inbound.getOptions().getUriQuery();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.GetAttributeRequestMsg.Builder result = TransportProtos.GetAttributeRequestMsg.newBuilder();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (queryElements != null && queryElements.size() > 0) {
             Set<String> clientKeys = toKeys(queryElements, "clientKeys");
             Set<String> sharedKeys = toKeys(queryElements, "sharedKeys");
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (clientKeys != null) {
                 result.addAllClientAttributeNames(clientKeys);
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sharedKeys != null) {
                 result.addAllSharedAttributeNames(sharedKeys);
             }
@@ -69,26 +61,20 @@ public class CoapAdaptorUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toKeys` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toKeys` 对应的处理。
+     * 参数：
+     * - `queryElements`：数据列表。
+     * - `attributeName`：名称。
+     * 返回：匹配的数据集合。
      */
     private static Set<String> toKeys(List<String> queryElements, String attributeName) throws AdaptorException {
         String keys = null;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (String queryElement : queryElements) {
             String[] queryItem = queryElement.split("=");
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (queryItem.length == 2 && queryItem[0].equals(attributeName)) {
                 keys = queryItem[1];
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (keys != null && !StringUtils.isEmpty(keys)) {
             return new HashSet<>(Arrays.asList(keys.split(",")));
         } else {

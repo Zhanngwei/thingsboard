@@ -51,8 +51,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`TbCoapDtlsCertificateVerifier` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -63,90 +61,69 @@ import java.util.concurrent.TimeUnit;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Data
 public class TbCoapDtlsCertificateVerifier implements NewAdvancedCertificateVerifier {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbCoapDtlsSessionInMemoryStorage` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 会话，保存当前连接或交互过程的会话信息。
      */
     private final TbCoapDtlsSessionInMemoryStorage tbCoapDtlsSessionInMemoryStorage;
 
     /**
-     * 字段说明：
-     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private TransportService transportService;
     private TbServiceInfoProvider serviceInfoProvider;
     /**
-     * 字段说明：
-     * 1. 保存 `skipValidityCheckForClientCert` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足客户端条件。
      */
     private boolean skipValidityCheckForClientCert;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbCoapDtlsCertificateVerifier` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbCoapDtlsCertificateVerifier` 实例，并初始化必要字段。
+     * 参数：
+     * - `transportService`：服务对象。
+     * - `serviceInfoProvider`：服务对象。
+     * - `dtlsSessionInactivityTimeout`：会话对象。
+     * - `dtlsSessionReportTimeout`：会话对象。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public TbCoapDtlsCertificateVerifier(TransportService transportService, TbServiceInfoProvider serviceInfoProvider, long dtlsSessionInactivityTimeout, long dtlsSessionReportTimeout, boolean skipValidityCheckForClientCert) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.transportService = transportService;
         this.serviceInfoProvider = serviceInfoProvider;
         this.skipValidityCheckForClientCert = skipValidityCheckForClientCert;
         this.tbCoapDtlsSessionInMemoryStorage = new TbCoapDtlsSessionInMemoryStorage(dtlsSessionInactivityTimeout, dtlsSessionReportTimeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSupportedCertificateTypes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取证书。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<CertificateType> getSupportedCertificateTypes() {
         return Collections.singletonList(CertificateType.X_509);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyCertificate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验证书。
+     * 参数：
+     * - `cid`：`cid`ID。
+     * - `serverName`：名称。
+     * - `remotePeer`：`remotePeer` 参数。
+     * - `clientUsage`：客户端对象。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
+    @Override
     public CertificateVerificationResult verifyCertificate(ConnectionId cid, ServerNames serverName, InetSocketAddress remotePeer, boolean clientUsage, boolean verifySubject, boolean truncateCertificatePath, CertificateMessage message) {
         try {
             CertPath certpath = message.getCertificateChain();
             X509Certificate[] chain = certpath.getCertificates().toArray(new X509Certificate[0]);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (X509Certificate cert : chain) {
                 try {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!skipValidityCheckForClientCert) {
                         cert.checkValidity();
                     }
@@ -155,13 +132,10 @@ public class TbCoapDtlsCertificateVerifier implements NewAdvancedCertificateVeri
                     String sha3Hash = EncryptionUtil.getSha3Hash(strCert);
                     final ValidateDeviceCredentialsResponse[] deviceCredentialsResponse = new ValidateDeviceCredentialsResponse[1];
                     CountDownLatch latch = new CountDownLatch(1);
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     transportService.process(DeviceTransportType.COAP, TransportProtos.ValidateDeviceX509CertRequestMsg.newBuilder().setHash(sha3Hash).build(),
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             new TransportServiceCallback<>() {
                                 @Override
                                 public void onSuccess(ValidateDeviceCredentialsResponse msg) {
-                                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                                     if (!StringUtils.isEmpty(msg.getCredentials())) {
                                         deviceCredentialsResponse[0] = msg;
                                     }
@@ -176,16 +150,13 @@ public class TbCoapDtlsCertificateVerifier implements NewAdvancedCertificateVeri
                             });
                     latch.await(10, TimeUnit.SECONDS);
                     ValidateDeviceCredentialsResponse msg = deviceCredentialsResponse[0];
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (msg != null && strCert.equals(msg.getCredentials())) {
                         DeviceProfile deviceProfile = msg.getDeviceProfile();
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (msg.hasDeviceInfo() && deviceProfile != null) {
                             tbCoapDtlsSessionInMemoryStorage.put(remotePeer, new TbCoapDtlsSessionInfo(msg, deviceProfile));
                         }
                         break;
                     }
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (InterruptedException |
                         CertificateEncodingException |
                         CertificateExpiredException |
@@ -196,79 +167,54 @@ public class TbCoapDtlsCertificateVerifier implements NewAdvancedCertificateVeri
                 }
             }
             return new CertificateVerificationResult(cid, certpath, null);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (HandshakeException e) {
             log.trace("Certificate validation failed!", e);
             return new CertificateVerificationResult(cid, e, null);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAcceptedIssuers` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Accepted Issuers`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<X500Principal> getAcceptedIssuers() {
         return CertPathUtil.toSubjects(null);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setResultHandler` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新处理器。
+     * 参数：
+     * - `resultHandler`：处理器对象。
+     * 返回：无。
      */
+    @Override
     public void setResultHandler(HandshakeResultHandler resultHandler) {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTbCoapDtlsSessionsMap` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Tb Coap Dtls Sessions Map`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public ConcurrentMap<InetSocketAddress, TbCoapDtlsSessionInfo> getTbCoapDtlsSessionsMap() {
         return tbCoapDtlsSessionInMemoryStorage.getDtlsSessionsMap();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evictTimeoutSessions` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理超时时间。
+     * 参数：无。
+     * 返回：无。
      */
     public void evictTimeoutSessions() {
         tbCoapDtlsSessionInMemoryStorage.evictTimeoutSessions();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDtlsSessionReportTimeout` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取会话。
+     * 参数：无。
+     * 返回：数值结果。
      */
     public long getDtlsSessionReportTimeout() {
         return tbCoapDtlsSessionInMemoryStorage.getDtlsSessionReportTimeout();

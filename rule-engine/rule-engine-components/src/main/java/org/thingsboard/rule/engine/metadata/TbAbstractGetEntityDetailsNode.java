@@ -33,7 +33,6 @@ import java.util.List;
 
 import static org.thingsboard.common.util.DonAsynchron.withCallback;
 
-@Slf4j
 /**
  * 中文说明：`TbAbstractGetEntityDetailsNode` 是抽象获取实体详情节点规则节点，用于读取、补充或映射消息元数据、实体字段、属性和遥测上下文信息。
  * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
@@ -42,37 +41,45 @@ import static org.thingsboard.common.util.DonAsynchron.withCallback;
  * 配置对象：`TbAbstractGetEntityDetailsNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
  * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
  */
+@Slf4j
 public abstract class TbAbstractGetEntityDetailsNode<C extends TbAbstractGetEntityDetailsNodeConfiguration, I extends UUIDBased> extends TbAbstractNodeWithFetchTo<C> {
 
-    @Override
     /**
-     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
-     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
-     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         var msgDataAsObjectNode = TbMsgSource.DATA.equals(fetchTo) ? getMsgDataAsObjectNode(msg) : null;
-        // 异步回调用于把服务或转换结果映射为规则链成功/失败关系。
         withCallback(getDetails(ctx, msg, msgDataAsObjectNode),
                 ctx::tellSuccess,
                 t -> ctx.tellFailure(msg, t), ctx.getDbCallbackExecutor());
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetEntityDetailsNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Prefix`。
+     * 参数：无。
+     * 返回：文本结果。
      */
     protected abstract String getPrefix();
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetEntityDetailsNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取异步结果。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     protected abstract ListenableFuture<? extends ContactBased<I>> getContactBasedFuture(TbContext ctx, TbMsg msg);
 
     /**
-     * 方法说明：检查状态、关系、配置或数据合法性，供 `TbAbstractGetEntityDetailsNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：校验`If Details List Is Not Empty Or Else Throw`。
+     * 参数：
+     * - `detailsList`：数据列表。
+     * 返回：无。
      */
     protected void checkIfDetailsListIsNotEmptyOrElseThrow(List<ContactBasedEntityDetails> detailsList) throws TbNodeException {
         if (detailsList == null || detailsList.isEmpty()) {
@@ -81,12 +88,15 @@ public abstract class TbAbstractGetEntityDetailsNode<C extends TbAbstractGetEnti
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetEntityDetailsNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Details`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `messageData`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbMsg> getDetails(TbContext ctx, TbMsg msg, ObjectNode messageData) {
         ListenableFuture<? extends ContactBased<I>> contactBasedFuture = getContactBasedFuture(ctx, msg);
-        // 异步串联后续服务调用，避免阻塞当前规则节点处理线程。
         return Futures.transformAsync(contactBasedFuture, contactBased -> {
             if (contactBased == null) {
                 return Futures.immediateFuture(msg);
@@ -98,8 +108,12 @@ public abstract class TbAbstractGetEntityDetailsNode<C extends TbAbstractGetEnti
     }
 
     /**
-     * 方法说明：从消息或服务层获取需要补充的数据，供 `TbAbstractGetEntityDetailsNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取实体。
+     * 参数：
+     * - `contactBased`：`contactBased` 参数。
+     * - `messageData`：待处理消息。
+     * - `msgMetaData`：待处理消息。
+     * 返回：无。
      */
     private void fetchEntityDetailsToMsg(ContactBased<I> contactBased, ObjectNode messageData, TbMsgMetaData msgMetaData) {
         String value = null;
@@ -149,8 +163,13 @@ public abstract class TbAbstractGetEntityDetailsNode<C extends TbAbstractGetEnti
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `TbAbstractGetEntityDetailsNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新`Detail`。
+     * 参数：
+     * - `property`：`property` 参数。
+     * - `value`：值。
+     * - `messageData`：待处理消息。
+     * - `msgMetaData`：待处理消息。
+     * 返回：无。
      */
     private void setDetail(String property, String value, ObjectNode messageData, TbMsgMetaData msgMetaData) {
         String fieldName = getPrefix() + property;

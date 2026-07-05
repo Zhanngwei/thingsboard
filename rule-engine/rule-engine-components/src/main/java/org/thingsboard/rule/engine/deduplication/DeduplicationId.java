@@ -22,7 +22,7 @@ package org.thingsboard.rule.engine.deduplication;
 public enum DeduplicationId {
 
     /**
-     * 枚举项说明：本行枚举常量定义 `DeduplicationId` 支持的取值，用于配置或处理流程中的分支判断。
+     * 客户常量，用于统一引用固定值。
      */
     ORIGINATOR, TENANT, CUSTOMER
 

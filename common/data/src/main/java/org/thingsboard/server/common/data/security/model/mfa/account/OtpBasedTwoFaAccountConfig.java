@@ -18,8 +18,6 @@ package org.thingsboard.server.common.data.security.model.mfa.account;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
 /**
  * 中文说明：
  * 1. 类目的：`OtpBasedTwoFaAccountConfig` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -30,6 +28,8 @@ import lombok.EqualsAndHashCode;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
 public abstract class OtpBasedTwoFaAccountConfig extends TwoFaAccountConfig {
 }
 

@@ -26,8 +26,7 @@ import org.thingsboard.server.common.data.plugin.ComponentType;
 import org.thingsboard.server.common.msg.TbMsg;
 
 /**
- * 已废弃的同步开始节点，保留用于兼容旧规则链配置。
- * 本节点不会直接开启、提交或回滚数据库事务，只是在规则链中表达历史上的按 originator 同步处理边界；当前实现直接放行消息。
+ * `TbSynchronizationBeginNode` 类，封装当前模块中的一组相关职责。
  */
 @Slf4j
 @RuleNode(
@@ -44,23 +43,22 @@ import org.thingsboard.server.common.msg.TbMsg;
 public class TbSynchronizationBeginNode implements TbNode {
 
     /**
-     * 初始化同步开始节点。
-     * 当前节点无配置和运行态资源，不读取数据库或缓存，也不建立事务上下文。
-     *
-     * @param ctx 规则节点上下文
-     * @param configuration 空配置
-     * @throws TbNodeException 初始化异常，当前实现不会主动抛出
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
     }
 
     /**
-     * 处理进入同步开始节点的消息。
-     * 当前实现只记录废弃告警并将消息发送到成功链路；本方法不直接开启数据库事务，具体顺序保证应由队列提交策略等调用链能力提供。
-     *
-     * @param ctx 规则节点上下文
-     * @param msg 待处理消息
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {

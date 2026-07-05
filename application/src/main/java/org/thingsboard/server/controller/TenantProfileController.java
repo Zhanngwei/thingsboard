@@ -60,11 +60,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TENANT_PROFI
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_PROFILE_TEXT_SEARCH_DESCRIPTION;
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
-@Slf4j
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`TenantProfileController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -75,43 +70,34 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
+@Slf4j
+@RequiredArgsConstructor
 public class TenantProfileController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `TENANT_PROFILE_INFO_DESCRIPTION` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户常量，用于统一引用固定值。
      */
     private static final String TENANT_PROFILE_INFO_DESCRIPTION = "Tenant Profile Info is a lightweight object that contains only id and name of the profile. ";
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbTenantProfileService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户，提供当前类调用的业务操作。
      */
     private final TbTenantProfileService tbTenantProfileService;
 
+    /**
+     * 功能：获取租户ID。
+     * 参数：
+     * - `strTenantProfileId`：租户IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Tenant Profile (getTenantProfileById)",
             notes = "Fetch the Tenant Profile object based on the provided Tenant Profile Id. " + SYSTEM_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfile/{tenantProfileId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantProfileById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public TenantProfile getTenantProfileById(
             @ApiParam(value = TENANT_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable("tenantProfileId") String strTenantProfileId) throws ThingsboardException {
@@ -120,21 +106,17 @@ public class TenantProfileController extends BaseController {
         return checkTenantProfileId(tenantProfileId, Operation.READ);
     }
 
+    /**
+     * 功能：获取租户ID。
+     * 参数：
+     * - `strTenantProfileId`：租户IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Tenant Profile Info (getTenantProfileInfoById)",
             notes = "Fetch the Tenant Profile Info object based on the provided Tenant Profile Id. " + TENANT_PROFILE_INFO_DESCRIPTION + SYSTEM_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfileInfo/{tenantProfileId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantProfileInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public EntityInfo getTenantProfileInfoById(
             @ApiParam(value = TENANT_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable("tenantProfileId") String strTenantProfileId) throws ThingsboardException {
@@ -143,21 +125,16 @@ public class TenantProfileController extends BaseController {
         return checkNotNull(tenantProfileService.findTenantProfileInfoById(getTenantId(), tenantProfileId));
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get default Tenant Profile Info (getDefaultTenantProfileInfo)",
             notes = "Fetch the default Tenant Profile Info object based. " + TENANT_PROFILE_INFO_DESCRIPTION + SYSTEM_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfileInfo/default", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDefaultTenantProfileInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public EntityInfo getDefaultTenantProfileInfo() throws ThingsboardException {
         return checkNotNull(tenantProfileService.findDefaultTenantProfileInfo(getTenantId()));
     }
@@ -218,23 +195,18 @@ public class TenantProfileController extends BaseController {
                     MARKDOWN_CODE_BLOCK_END +
                     "Remove 'id', from the request body example (below) to create new Tenant Profile entity." +
                     SYSTEM_AUTHORITY_PARAGRAPH)
+    /**
+     * 功能：保存或创建租户。
+     * 参数：
+     * - `tenantProfile`：租户信息或租户标识。
+     * 返回：处理结果。
+     */
     @PreAuthorize("hasAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfile", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveTenantProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public TenantProfile saveTenantProfile(@ApiParam(value = "A JSON value representing the tenant profile.")
                                            @RequestBody TenantProfile tenantProfile) throws ThingsboardException {
         TenantProfile oldProfile;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tenantProfile.getId() == null) {
             accessControlService.checkPermission(getCurrentUser(), Resource.TENANT_PROFILE, Operation.CREATE);
             oldProfile = null;
@@ -245,21 +217,17 @@ public class TenantProfileController extends BaseController {
         return tbTenantProfileService.save(getTenantId(), tenantProfile, oldProfile);
     }
 
+    /**
+     * 功能：删除或清理租户。
+     * 参数：
+     * - `strTenantProfileId`：租户IDID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete Tenant Profile (deleteTenantProfile)",
             notes = "Deletes the tenant profile. Referencing non-existing tenant profile Id will cause an error. Referencing profile that is used by the tenants will cause an error. " + SYSTEM_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfile/{tenantProfileId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTenantProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteTenantProfile(@ApiParam(value = TENANT_PROFILE_ID_PARAM_DESCRIPTION)
                                     @PathVariable("tenantProfileId") String strTenantProfileId) throws ThingsboardException {
         checkParameter("tenantProfileId", strTenantProfileId);
@@ -268,21 +236,17 @@ public class TenantProfileController extends BaseController {
         tbTenantProfileService.delete(getTenantId(), profile);
     }
 
+    /**
+     * 功能：更新租户。
+     * 参数：
+     * - `strTenantProfileId`：租户IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Make tenant profile default (setDefaultTenantProfile)",
             notes = "Makes specified tenant profile to be default. Referencing non-existing tenant profile Id will cause an error. " + SYSTEM_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfile/{tenantProfileId}/default", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `setDefaultTenantProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public TenantProfile setDefaultTenantProfile(
             @ApiParam(value = TENANT_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable("tenantProfileId") String strTenantProfileId) throws ThingsboardException {
@@ -293,20 +257,20 @@ public class TenantProfileController extends BaseController {
         return tenantProfile;
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Tenant Profiles (getTenantProfiles)", notes = "Returns a page of tenant profiles registered in the platform. " + PAGE_DATA_PARAMETERS + SYSTEM_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfiles", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantProfiles` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<TenantProfile> getTenantProfiles(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -322,21 +286,21 @@ public class TenantProfileController extends BaseController {
         return checkNotNull(tenantProfileService.findTenantProfiles(getTenantId(), pageLink));
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Tenant Profiles Info (getTenantProfileInfos)", notes = "Returns a page of tenant profile info objects registered in the platform. "
             + TENANT_PROFILE_INFO_DESCRIPTION + PAGE_DATA_PARAMETERS + SYSTEM_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenantProfileInfos", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantProfileInfos` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<EntityInfo> getTenantProfileInfos(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -352,18 +316,14 @@ public class TenantProfileController extends BaseController {
         return checkNotNull(tenantProfileService.findTenantProfileInfos(getTenantId(), pageLink));
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `ids`：`ids` 参数。
+     * 返回：匹配的数据集合。
+     */
     @GetMapping(value = "/tenantProfiles", params = {"ids"})
     @PreAuthorize("hasAuthority('SYS_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantProfilesByIds` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<TenantProfile> getTenantProfilesByIds(@RequestParam("ids") UUID[] ids) {
         return tenantProfileService.findTenantProfilesByIds(TenantId.SYS_TENANT_ID, ids);
     }

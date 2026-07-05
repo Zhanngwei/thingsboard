@@ -34,63 +34,65 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Data
-@Slf4j
-@JsonIgnoreProperties(ignoreUnknown = true)
 /**
  * 中文说明：`CertPemCredentials` 是证书PEM凭据辅助类，用于描述客户端认证方式以及证书、Basic、匿名等凭据初始化资料。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Data
+@Slf4j
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CertPemCredentials implements ClientCredentials {
 
     /**
-     * 常量字段：定义 `PRIVATE_KEY_ALIAS`，用于消息体、元数据、属性或遥测中的键名，本身不触发外部系统调用。
+     * 私钥常量，用于统一引用固定值。
      */
     public static final String PRIVATE_KEY_ALIAS = "private-key";
     /**
-     * 常量字段：定义 `X_509`，用于与本类处理流程相关的运行时值，本身不触发外部系统调用。
+     * `X_509`常量，用于统一引用固定值。
      */
     public static final String X_509 = "X.509";
     /**
-     * 常量字段：定义 `CERT_ALIAS_PREFIX`，用于证书内容，本身不触发外部系统调用。
+     * `CERT_ALIAS_PREFIX`常量，用于统一引用固定值。
      */
     public static final String CERT_ALIAS_PREFIX = "cert-";
     /**
-     * 常量字段：定义 `CA_CERT_CERT_ALIAS_PREFIX`，用于证书内容，本身不触发外部系统调用。
+     * `CA_CERT_CERT_ALIAS_PREFIX`常量，用于统一引用固定值。
      */
     public static final String CA_CERT_CERT_ALIAS_PREFIX = "caCert-cert-";
 
     /**
-     * 字段说明：保存 `caCert`，表示证书内容，供本类方法在规则节点处理流程中使用。
+     * `caCert` 字段，保存当前对象的对应属性。
      */
     protected String caCert;
     /**
-     * 字段说明：保存 `cert`，表示证书内容，供本类方法在规则节点处理流程中使用。
+     * `cert` 字段，保存当前对象的对应属性。
      */
     private String cert;
     /**
-     * 字段说明：保存 `privateKey`，表示消息体、元数据、属性或遥测中的键名，供本类方法在规则节点处理流程中使用。
+     * 私钥，用于定位映射、配置或数据项。
      */
     private String privateKey;
     /**
-     * 字段说明：保存 `password`，表示凭据密码，供本类方法在规则节点处理流程中使用。
+     * 密码，用于认证或安全校验。
      */
     private String password = "";
 
-    @Override
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `CertPemCredentials` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取类型。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public CredentialsType getType() {
         return CredentialsType.CERT_PEM;
     }
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态，供 `CertPemCredentials` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：初始化或启动上下文。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public SslContext initSslContext() {
         try {
             SslContextBuilder builder = SslContextBuilder.forClient();
@@ -108,8 +110,9 @@ public class CertPemCredentials implements ClientCredentials {
     }
 
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态，供 `CertPemCredentials` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建工厂。
+     * 参数：无。
+     * 返回：处理结果。
      */
     protected TrustManagerFactory createAndInitTrustManagerFactory() throws Exception {
         List<X509Certificate> caCerts = SslUtil.readCertFile(caCert);
@@ -126,8 +129,9 @@ public class CertPemCredentials implements ClientCredentials {
     }
 
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态，供 `CertPemCredentials` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建键。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private KeyManagerFactory createAndInitKeyManagerFactory() throws Exception {
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -136,8 +140,9 @@ public class CertPemCredentials implements ClientCredentials {
     }
 
     /**
-     * 方法说明：加载或解析本类处理所需的配置、实体或辅助数据，供 `CertPemCredentials` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取键。
+     * 参数：无。
+     * 返回：处理结果。
      */
     protected KeyStore loadKeyStore() throws Exception {
         List<X509Certificate> certificates = SslUtil.readCertFile(this.cert);

@@ -21,49 +21,54 @@ import org.thingsboard.server.common.msg.TbMsg;
 import java.util.LinkedList;
 import java.util.List;
 
-@Data
 /**
  * 中文说明：`DeduplicationData` 是去重数据辅助类，用于按配置聚合、去重、延迟和输出消息。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Data
 public class DeduplicationData {
 
     /**
-     * 字段说明：保存 `msgList`，表示当前规则链消息，供本类方法在规则节点处理流程中使用。
+     * 消息列表，用于保存一组待处理对象。
      */
     private final List<TbMsg> msgList;
     /**
-     * 字段说明：保存 `tickScheduled`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 是否满足`tickScheduled`条件。
      */
     private boolean tickScheduled;
 
     /**
-     * 方法说明：构造 `DeduplicationData` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `DeduplicationData` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public DeduplicationData() {
         msgList = new LinkedList<>();
     }
 
     /**
-     * 方法说明：执行 `size` 对应的辅助逻辑，供 `DeduplicationData` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `size` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     public int size() {
         return msgList.size();
     }
 
     /**
-     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `DeduplicationData` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `add` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     public void add(TbMsg msg) {
         msgList.add(msg);
     }
 
     /**
-     * 方法说明：执行 `isEmpty` 对应的辅助逻辑，供 `DeduplicationData` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：判断`Empty`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean isEmpty() {
         return msgList.isEmpty();

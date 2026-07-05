@@ -26,9 +26,6 @@ import org.thingsboard.server.dao.asset.AssetService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.sync.vc.data.EntitiesImportCtx;
 
-@Service
-@TbCoreComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`AssetImportService` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
@@ -39,110 +36,91 @@ import org.thingsboard.server.service.sync.vc.data.EntitiesImportCtx;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Observer。
  */
+@Service
+@TbCoreComponent
+@RequiredArgsConstructor
 public class AssetImportService extends BaseEntityImportService<AssetId, Asset, EntityExportData<Asset>> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `assetService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 资产集合，用于去重保存或快速判断对象是否存在。
      */
     private final AssetService assetService;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setOwner` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Owner`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `asset`：`asset` 参数。
+     * - `idProvider`：`idProvider` 参数。
+     * 返回：无。
      */
+    @Override
     protected void setOwner(TenantId tenantId, Asset asset, IdProvider idProvider) {
         asset.setTenantId(tenantId);
         asset.setCustomerId(idProvider.getInternalId(asset.getCustomerId()));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `prepare` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `prepare` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `asset`：`asset` 参数。
+     * - `old`：`old` 参数。
+     * - `exportData`：待处理数据。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected Asset prepare(EntitiesImportCtx ctx, Asset asset, Asset old, EntityExportData<Asset> exportData, IdProvider idProvider) {
         asset.setAssetProfileId(idProvider.getInternalId(asset.getAssetProfileId()));
         return asset;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveOrUpdate` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Or Update`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `asset`：`asset` 参数。
+     * - `exportData`：待处理数据。
+     * - `idProvider`：`idProvider` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected Asset saveOrUpdate(EntitiesImportCtx ctx, Asset asset, EntityExportData<Asset> exportData, IdProvider idProvider) {
         return assetService.saveAsset(asset);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deepCopy` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `deepCopy` 对应的处理。
+     * 参数：
+     * - `asset`：`asset` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected Asset deepCopy(Asset asset) {
         return new Asset(asset);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanupForComparison` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`For Comparison`。
+     * 参数：
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
+    @Override
     protected void cleanupForComparison(Asset e) {
         super.cleanupForComparison(e);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (e.getCustomerId() != null && e.getCustomerId().isNullUid()) {
             e.setCustomerId(null);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityType` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public EntityType getEntityType() {
         return EntityType.ASSET;
     }

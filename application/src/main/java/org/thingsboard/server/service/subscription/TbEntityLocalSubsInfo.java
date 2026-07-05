@@ -33,8 +33,6 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Information about the local websocket subscriptions.
  */
-@Slf4j
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`TbEntityLocalSubsInfo` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -45,27 +43,19 @@ import java.util.concurrent.locks.ReentrantLock;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Slf4j
+@RequiredArgsConstructor
 public class TbEntityLocalSubsInfo {
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `tenantId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户ID，用于定位对应业务对象。
      */
+    @Getter
     private final TenantId tenantId;
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `entityId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 实体ID，用于定位对应业务对象。
      */
+    @Getter
     private final EntityId entityId;
     @Getter
     private final Lock lock = new ReentrantLock();
@@ -74,70 +64,41 @@ public class TbEntityLocalSubsInfo {
     private volatile TbSubscriptionsInfo state = new TbSubscriptionsInfo();
 
     private final Map<Integer, Set<TbSubscription<?>>> pendingSubs = new ConcurrentHashMap<>();
+    /**
+     * 时序数据，承载当前流程需要传递的内容。
+     */
     @Getter
     @Setter
-    /**
-     * 字段说明：
-     * 1. 保存 `pendingTimeSeriesEvent` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int pendingTimeSeriesEvent;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @Getter
     @Setter
-    /**
-     * 字段说明：
-     * 1. 保存 `pendingTimeSeriesEventTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long pendingTimeSeriesEventTs;
+    /**
+     * 事件，表示当前对象的对应属性。
+     */
     @Getter
     @Setter
-    /**
-     * 字段说明：
-     * 1. 保存 `pendingAttributesEvent` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int pendingAttributesEvent;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @Getter
     @Setter
-    /**
-     * 字段说明：
-     * 1. 保存 `pendingAttributesEventTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long pendingAttributesEventTs;
 
     /**
-     * 字段说明：
-     * 1. 保存 `seqNumber` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 序号，用于控制处理规模或位置。
      */
     private int seqNumber = 0;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `add` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `add` 对应的处理。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * 返回：处理结果。
      */
     public TbEntitySubEvent add(TbSubscription<?> subscription) {
         log.trace("[{}][{}][{}] Adding: {}", tenantId, entityId, subscription.getSubscriptionId(), subscription);
@@ -145,18 +106,15 @@ public class TbEntityLocalSubsInfo {
         subs.add(subscription);
         TbSubscriptionsInfo newState = created ? state : state.copy();
         boolean stateChanged = false;
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (subscription.getType()) {
             case NOTIFICATIONS:
             case NOTIFICATIONS_COUNT:
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!newState.notifications) {
                     newState.notifications = true;
                     stateChanged = true;
                 }
                 break;
             case ALARMS:
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!newState.alarms) {
                     newState.alarms = true;
                     stateChanged = true;
@@ -164,18 +122,14 @@ public class TbEntityLocalSubsInfo {
                 break;
             case ATTRIBUTES:
                 var attrSub = (TbAttributeSubscription) subscription;
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!newState.attrAllKeys) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (attrSub.isAllKeys()) {
                         newState.attrAllKeys = true;
                         stateChanged = true;
                     } else {
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (newState.attrKeys == null) {
                             newState.attrKeys = new HashSet<>(attrSub.getKeyStates().keySet());
                             stateChanged = true;
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         } else if (newState.attrKeys.addAll(attrSub.getKeyStates().keySet())) {
                             stateChanged = true;
                         }
@@ -184,18 +138,14 @@ public class TbEntityLocalSubsInfo {
                 break;
             case TIMESERIES:
                 var tsSub = (TbTimeSeriesSubscription) subscription;
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!newState.tsAllKeys) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (tsSub.isAllKeys()) {
                         newState.tsAllKeys = true;
                         stateChanged = true;
                     } else {
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (newState.tsKeys == null) {
                             newState.tsKeys = new HashSet<>(tsSub.getKeyStates().keySet());
                             stateChanged = true;
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         } else if (newState.tsKeys.addAll(tsSub.getKeyStates().keySet())) {
                             stateChanged = true;
                         }
@@ -203,7 +153,6 @@ public class TbEntityLocalSubsInfo {
                 }
                 break;
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (stateChanged) {
             state = newState;
         }
@@ -217,14 +166,10 @@ public class TbEntityLocalSubsInfo {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `remove` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `remove` 对应的处理。
+     * 参数：
+     * - `sub`：`sub` 参数。
+     * 返回：处理结果。
      */
     public TbEntitySubEvent remove(TbSubscription<?> sub) {
         log.trace("[{}][{}][{}] Removing: {}", tenantId, entityId, sub.getSubscriptionId(), sub);
@@ -284,14 +229,10 @@ public class TbEntityLocalSubsInfo {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toEvent` 对应的处理。
+     * 参数：
+     * - `type`：类型。
+     * 返回：处理结果。
      */
     public TbEntitySubEvent toEvent(ComponentLifecycleEvent type) {
         seqNumber++;
@@ -303,14 +244,9 @@ public class TbEntityLocalSubsInfo {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isNf` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Nf`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean isNf() {
         return state.notifications;
@@ -318,28 +254,20 @@ public class TbEntityLocalSubsInfo {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isEmpty` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Empty`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean isEmpty() {
         return state.isEmpty();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerPendingSubscription` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建订阅。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * - `event`：`event` 参数。
+     * 返回：处理结果。
      */
     public TbSubscription<?> registerPendingSubscription(TbSubscription<?> subscription, TbEntitySubEvent event) {
         if (TbSubscriptionType.ATTRIBUTES.equals(subscription.getType())) {
@@ -371,14 +299,10 @@ public class TbEntityLocalSubsInfo {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clearPendingSubscriptions` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Pending Subscriptions`。
+     * 参数：
+     * - `seqNumber`：`seqNumber` 参数。
+     * 返回：匹配的数据集合。
      */
     public Set<TbSubscription<?>> clearPendingSubscriptions(int seqNumber) {
         if (pendingTimeSeriesEvent == seqNumber) {

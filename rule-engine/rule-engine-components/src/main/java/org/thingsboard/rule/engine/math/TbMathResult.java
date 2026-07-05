@@ -19,38 +19,38 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 /**
  * 中文说明：`TbMathResult` 是数学结果辅助类，用于解析数学参数、计算结果并可写回消息、属性或时间序列。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class TbMathResult {
 
     /**
-     * 字段说明：保存 `type`，表示类型匹配条件，供本类方法在规则节点处理流程中使用。
+     * 类型，用于区分不同处理分支。
      */
     private TbMathArgumentType type;
     /**
-     * 字段说明：保存 `key`，表示消息体、元数据、属性或遥测中的键名，供本类方法在规则节点处理流程中使用。
+     * 键，用于定位映射、配置或数据项。
      */
     private String key;
     // 0 means integer, x > 0 means x decimal points after ".";
     /**
-     * 字段说明：保存 `resultValuePrecision`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
     private int resultValuePrecision;
     /**
-     * 字段说明：保存 `addToBody`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 是否满足`addToBody`条件。
      */
     private boolean addToBody;
     /**
-     * 字段说明：保存 `addToMetadata`，表示消息元数据，供本类方法在规则节点处理流程中使用。
+     * 是否满足`addToMetadata`条件。
      */
     private boolean addToMetadata;
     /**
-     * 字段说明：保存 `attributeScope`，表示属性作用域，供本类方法在规则节点处理流程中使用。
+     * 属性，表示当前对象的对应属性。
      */
     private String attributeScope;
 

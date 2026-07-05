@@ -19,9 +19,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：保存单条设备画像告警规则的可持久化运行状态，用于在规则节点重启或状态恢复时继续计算持续时间和重复次数。
@@ -33,30 +30,21 @@ import lombok.NoArgsConstructor;
  * 7. 显式方法：本类没有手写方法，构造器与访问器由 Lombok 生成，线程安全取决于外层状态管理是否串行化访问。
  * 8. 设计模式：可视为 Memento/DTO，用于保存告警规则运行状态快照。
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class PersistedAlarmRuleState {
 
     /**
-     * 字段说明：
-     * 1. 保存最近一次满足或评估该告警规则条件的事件时间戳。
-     * 2. 数据来源是 `AlarmRuleState` 在处理遥测、属性或事件消息时计算出的当前事件时间。
-     * 3. 生命周期与对应设备和告警规则的持久化状态一致，会在状态恢复后继续参与下一次评估。
-     * 4. 使用 long 避免装箱开销，并与 ThingsBoard 内部毫秒时间戳表示保持一致。
+     * 时间戳，用于标识当前数据或事件发生的时间。
      */
     private long lastEventTs;
     /**
-     * 字段说明：
-     * 1. 保存当前告警规则已经累计满足条件的持续时间。
-     * 2. 数据来源是设备画像告警评估流程对连续事件时间窗口的计算结果。
-     * 3. 生命周期跨单次消息处理存在，用于持续型告警条件在后续消息中继续累加。
-     * 4. 独立保存该值可以避免每次恢复后从历史遥测重新扫描，降低数据库读取和规则评估成本。
+     * 持续时间，用于控制时间范围或等待时长。
      */
     private long duration;
     /**
-     * 字段说明：
-     * 1. 保存重复型或次数型告警条件已经累计命中的事件数量。
-     * 2. 数据来源是 `AlarmRuleState` 对当前设备消息流的规则匹配结果。
-     * 3. 生命周期与告警规则状态一致，清除、重置或规则配置变化时由外层状态流程更新。
-     * 4. 使用单独字段表达计数语义，避免把计数隐含在消息元数据或临时缓存中导致恢复语义不清。
+     * 事件，用于控制数量、位置或分页范围。
      */
     private long eventCount;
 

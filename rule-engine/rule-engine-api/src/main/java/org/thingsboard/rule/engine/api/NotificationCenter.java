@@ -40,93 +40,69 @@ import java.util.Set;
 public interface NotificationCenter {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：处理一条通知请求并异步返回统计结果。
-     * 2. 输入参数：tenantId 是租户边界，notificationRequest 是通知请求，callback 接收发送统计。
-     * 3. 返回值：保存或处理后的 NotificationRequest。
-     * 4. 调用时机：通知规则节点或系统服务需要发起通知时调用。
-     * 5. 调用方：通知规则节点、系统通知流程。
-     * 6. 使用流程：属于 Rule Engine 通知请求处理流程。
-     * 7. 线程安全：接口无状态，具体实现需保证请求持久化和异步回调并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT/Actor；实现可能涉及数据库、缓存和外部通知渠道，服务 Rule Engine。
+     * 功能：处理请求。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `notificationRequest`：请求对象。
+     * - `callback`：处理完成后的回调。
+     * 返回：处理结果。
      */
     NotificationRequest processNotificationRequest(TenantId tenantId, NotificationRequest notificationRequest, FutureCallback<NotificationRequestStats> callback);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：发送通用 Web 平台通知。
-     * 2. 输入参数：tenantId 是租户，recipients 是用户过滤条件，template 是通知模板。
-     * 3. 返回值：无。
-     * 4. 调用时机：系统流程需要给一组用户发送平台内通知时调用。
-     * 5. 调用方：通知中心、系统通知服务或规则节点间接调用。
-     * 6. 使用流程：属于 Web 通知投递流程。
-     * 7. 线程安全：实现需保证模板渲染、收件人解析和通知持久化并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库和模板缓存，可由 Rule Engine 触发。
+     * 功能：发送或提交通知。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `recipients`：`recipients` 参数。
+     * - `template`：`template` 参数。
+     * 返回：无。
      */
     void sendGeneralWebNotification(TenantId tenantId, UsersFilter recipients, NotificationTemplate template);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：删除指定通知请求。
-     * 2. 输入参数：tenantId 是租户边界，notificationRequestId 是通知请求标识。
-     * 3. 返回值：无。
-     * 4. 调用时机：清理通知请求或管理员删除通知记录时调用。
-     * 5. 调用方：通知管理流程。
-     * 6. 使用流程：属于通知请求生命周期管理流程。
-     * 7. 线程安全：实现需保证并发删除和状态读取一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库，可能清理缓存。
+     * 功能：删除或清理请求。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `notificationRequestId`：请求ID。
+     * 返回：无。
      */
     void deleteNotificationRequest(TenantId tenantId, NotificationRequestId notificationRequestId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：标记单条通知为已读。
-     * 2. 输入参数：tenantId 是租户，recipientId 是接收用户，notificationId 是通知标识。
-     * 3. 返回值：无。
-     * 4. 调用时机：用户阅读通知后调用。
-     * 5. 调用方：Web 通知 API 或 UI 操作流程。
-     * 6. 使用流程：属于平台通知状态更新流程。
-     * 7. 线程安全：实现需保证并发状态更新一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT/Actor/Rule Engine 消息；实现通常访问数据库。
+     * 功能：执行 `markNotificationAsRead` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `recipientId`：`recipientId`ID。
+     * - `notificationId`：通知ID。
+     * 返回：无。
      */
     void markNotificationAsRead(TenantId tenantId, UserId recipientId, NotificationId notificationId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按投递方式将接收人的所有通知标记为已读。
-     * 2. 输入参数：tenantId 是租户，deliveryMethod 是投递方式，recipientId 是接收用户。
-     * 3. 返回值：无。
-     * 4. 调用时机：用户执行全部已读操作时调用。
-     * 5. 调用方：Web 通知 API 或 UI 操作流程。
-     * 6. 使用流程：属于平台通知状态批量更新流程。
-     * 7. 线程安全：实现需保证批量更新与并发新增通知的一致性。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT/Actor；实现通常访问数据库并可能使用事务。
+     * 功能：执行 `markAllNotificationsAsRead` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deliveryMethod`：`deliveryMethod` 参数。
+     * - `recipientId`：`recipientId`ID。
+     * 返回：无。
      */
     void markAllNotificationsAsRead(TenantId tenantId, NotificationDeliveryMethod deliveryMethod, UserId recipientId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：删除接收人的单条通知。
-     * 2. 输入参数：tenantId 是租户，recipientId 是接收用户，notificationId 是通知标识。
-     * 3. 返回值：无。
-     * 4. 调用时机：用户或管理流程删除通知时调用。
-     * 5. 调用方：Web 通知 API 或通知管理流程。
-     * 6. 使用流程：属于平台通知生命周期管理流程。
-     * 7. 线程安全：实现需保证并发删除和读取一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库，可能清理缓存。
+     * 功能：删除或清理通知。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `recipientId`：`recipientId`ID。
+     * - `notificationId`：通知ID。
+     * 返回：无。
      */
     void deleteNotification(TenantId tenantId, UserId recipientId, NotificationId notificationId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：获取租户当前可用的通知投递方式。
-     * 2. 输入参数：tenantId 是租户边界。
-     * 3. 返回值：可用 NotificationDeliveryMethod 集合。
-     * 4. 调用时机：创建通知请求、渲染配置或校验目标渠道时调用。
-     * 5. 调用方：通知规则节点、通知管理 API。
-     * 6. 使用流程：属于通知发送前置能力发现流程。
-     * 7. 线程安全：实现需保证配置读取并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现可能读取配置缓存或数据库，直接服务 Rule Engine。
+     * 功能：获取`Available Delivery Methods`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
     Set<NotificationDeliveryMethod> getAvailableDeliveryMethods(TenantId tenantId);
 

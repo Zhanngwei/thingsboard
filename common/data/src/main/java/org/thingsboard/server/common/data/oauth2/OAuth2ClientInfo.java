@@ -22,11 +22,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-@EqualsAndHashCode
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@ApiModel
 /**
  * 中文说明：
  * 1. 类目的：`OAuth2ClientInfo` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -37,49 +32,35 @@ import lombok.NoArgsConstructor;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@EqualsAndHashCode
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@ApiModel
 public class OAuth2ClientInfo {
 
+    /**
+     * 名称，用于标识或展示当前对象。
+     */
     @ApiModelProperty(value = "OAuth2 client name", example = "GitHub")
-    /**
-     * 字段说明：
-     * 1. 保存 `name` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String name;
-    @ApiModelProperty(value = "Name of the icon, displayed on OAuth2 log in button", example = "github-logo")
     /**
-     * 字段说明：
-     * 1. 保存 `icon` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `icon` 字段，保存当前对象的对应属性。
      */
+    @ApiModelProperty(value = "Name of the icon, displayed on OAuth2 log in button", example = "github-logo")
     private String icon;
+    /**
+     * URL 地址，用于定位外部资源或本地资源。
+     */
     @ApiModelProperty(value = "URI for OAuth2 log in. On HTTP GET request to this URI, it redirects to the OAuth2 provider page",
             example = "/oauth2/authorization/8352f191-2b4d-11ec-9ed1-cbf57c026ecc")
-    /**
-     * 字段说明：
-     * 1. 保存 `url` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String url;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `OAuth2ClientInfo` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `OAuth2ClientInfo` 实例，并初始化必要字段。
+     * 参数：
+     * - `oauth2ClientInfo`：客户端对象。
+     * 返回：新创建的对象实例。
      */
     public OAuth2ClientInfo(OAuth2ClientInfo oauth2ClientInfo) {
         this.name = oauth2ClientInfo.getName();

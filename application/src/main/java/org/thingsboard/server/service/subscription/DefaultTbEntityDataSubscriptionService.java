@@ -86,10 +86,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-@SuppressWarnings("UnstableApiUsage")
-@Slf4j
-@TbCoreComponent
-@Service
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbEntityDataSubscriptionService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -100,228 +96,131 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@SuppressWarnings("UnstableApiUsage")
+@Slf4j
+@TbCoreComponent
+@Service
 public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubscriptionService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEFAULT_LIMIT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数量限制常量，用于统一引用固定值。
      */
     private static final int DEFAULT_LIMIT = 100;
     private final Map<String, Map<Integer, TbAbstractSubCtx>> subscriptionsBySessionId = new ConcurrentHashMap<>();
 
-    @Autowired @Lazy
     /**
-     * 字段说明：
-     * 1. 保存 `wsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired @Lazy
     private WebSocketService wsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `entityService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 实体，提供当前类调用的业务操作。
      */
+    @Autowired
     private EntityService entityService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `alarmService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 告警，提供当前类调用的业务操作。
      */
+    @Autowired
     private AlarmService alarmService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `attributesService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private AttributesService attributesService;
 
+    /**
+     * 订阅，提供当前类调用的业务操作。
+     */
     @Autowired
     @Lazy
-    /**
-     * 字段说明：
-     * 1. 保存 `localSubscriptionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private TbLocalSubscriptionService localSubscriptionService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，提供当前类调用的业务操作。
      */
+    @Autowired
     private TimeseriesService tsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `serviceInfoProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private TbServiceInfoProvider serviceInfoProvider;
 
+    /**
+     * 回调，负责处理对应任务或消息。
+     */
     @Autowired
     @Getter
-    /**
-     * 字段说明：
-     * 1. 保存 `dbCallbackExecutor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private DbCallbackExecutorService dbCallbackExecutor;
 
     /**
-     * 字段说明：
-     * 1. 保存 `scheduler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 调度器，用于安排延迟任务或周期任务。
      */
     private ScheduledExecutorService scheduler;
 
+    /**
+     * 时间戳，用于区分不同处理分支。
+     */
     @Value("${database.ts.type}")
-    /**
-     * 字段说明：
-     * 1. 保存 `databaseTsType` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String databaseTsType;
+    /**
+     * 分页查询条件，表示当前对象的对应属性。
+     */
     @Value("${server.ws.dynamic_page_link.refresh_interval:6}")
-    /**
-     * 字段说明：
-     * 1. 保存 `dynamicPageLinkRefreshInterval` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long dynamicPageLinkRefreshInterval;
+    /**
+     * 线程池大小，用于控制处理规模或位置。
+     */
     @Value("${server.ws.dynamic_page_link.refresh_pool_size:1}")
-    /**
-     * 字段说明：
-     * 1. 保存 `dynamicPageLinkRefreshPoolSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int dynamicPageLinkRefreshPoolSize;
+    /**
+     * 订阅，保存当前步骤读取或计算得到的内容。
+     */
     @Value("${server.ws.max_entities_per_data_subscription:1000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxEntitiesPerDataSubscription` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxEntitiesPerDataSubscription;
+    /**
+     * 告警对象，用于描述当前业务场景。
+     */
     @Value("${server.ws.max_entities_per_alarm_subscription:1000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxEntitiesPerAlarmSubscription` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxEntitiesPerAlarmSubscription;
+    /**
+     * 告警对象，用于描述当前业务场景。
+     */
     @Value("${server.ws.dynamic_page_link.max_alarm_queries_per_refresh_interval:10}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxAlarmQueriesPerRefreshInterval` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxAlarmQueriesPerRefreshInterval;
-    @Value("${ui.dashboard.max_datapoints_limit:50000}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxDatapointLimit` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数量限制，用于控制数量、位置或分页范围。
      */
+    @Value("${ui.dashboard.max_datapoints_limit:50000}")
     private int maxDatapointLimit;
 
     /**
-     * 字段说明：
-     * 1. 保存 `wsCallBackExecutor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     private ExecutorService wsCallBackExecutor;
     private boolean tsInSqlDB;
     /**
-     * 字段说明：
-     * 1. 保存 `serviceId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务ID，用于定位对应业务对象。
      */
     private String serviceId;
     private SubscriptionServiceStatistics stats = new SubscriptionServiceStatistics();
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initExecutor` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void initExecutor() {
         serviceId = serviceInfoProvider.getServiceId();
         wsCallBackExecutor = Executors.newSingleThreadExecutor(ThingsBoardThreadFactory.forName("ws-entity-sub-callback"));
         tsInSqlDB = databaseTsType.equalsIgnoreCase("sql") || databaseTsType.equalsIgnoreCase("timescale");
         ThreadFactory tbThreadFactory = ThingsBoardThreadFactory.forName("ws-entity-sub-scheduler");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (dynamicPageLinkRefreshPoolSize == 1) {
             scheduler = Executors.newSingleThreadScheduledExecutor(tbThreadFactory);
         } else {
@@ -329,45 +228,33 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
         }
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdownExecutor` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void shutdownExecutor() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (wsCallBackExecutor != null) {
             wsCallBackExecutor.shutdownNow();
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (scheduler != null) {
             scheduler.shutdownNow();
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Cmd`。
+     * 参数：
+     * - `session`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleCmd(WebSocketSessionRef session, EntityDataCmd cmd) {
         TbEntityDataSubCtx ctx = getSubCtx(session.getSessionId(), cmd.getCmdId());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (ctx != null) {
             log.debug("[{}][{}] Updating existing subscriptions using: {}", session.getSessionId(), cmd.getCmdId(), cmd);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (cmd.hasAnyCmd()) {
                 ctx.clearEntitySubscriptions();
             }
@@ -379,7 +266,6 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
 
         // Fetch entity list using entity data query
         if (cmd.getQuery() != null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ctx.getQuery() == null) {
                 log.debug("[{}][{}] Initializing data using query: {}", session.getSessionId(), cmd.getCmdId(), cmd.getQuery());
             } else {
@@ -390,7 +276,6 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
             //Step 1. Update existing query with the contents of LatestValueCmd
             if (cmd.getLatestCmd() != null) {
                 cmd.getLatestCmd().getKeys().forEach(key -> {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!query.getLatestValues().contains(key)) {
                         query.getLatestValues().add(key);
                     }
@@ -402,11 +287,9 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
             stats.getRegularQueryInvocationCnt().incrementAndGet();
             stats.getRegularQueryTimeSpent().addAndGet(end - start);
             ctx.cancelTasks();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ctx.getQuery().getPageLink().isDynamic()) {
                 //TODO: validate number of dynamic page links against rate limits. Ignore dynamic flag if limit is reached.
                 TbEntityDataSubCtx finalCtx = ctx;
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 ScheduledFuture<?> task = scheduler.scheduleWithFixedDelay(
                         () -> refreshDynamicQuery(finalCtx),
                         dynamicPageLinkRefreshInterval, dynamicPageLinkRefreshInterval, TimeUnit.SECONDS);
@@ -415,11 +298,8 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
         }
 
         try {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             List<ListenableFuture<?>> cmdFutures = new ArrayList<>();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (cmd.getAggHistoryCmd() != null) {
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 cmdFutures.add(handleAggHistoryCmd(ctx, cmd.getAggHistoryCmd()));
             }
             if (cmd.getAggTsCmd() != null) {
@@ -450,14 +330,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleRegularCommands` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Regular Commands`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
     private void handleRegularCommands(TbEntityDataSubCtx ctx, EntityDataCmd cmd) {
         try {
@@ -477,14 +354,10 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkAndSendInitialData` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验数据。
+     * 参数：
+     * - `theCtx`：处理上下文。
+     * 返回：无。
      */
     private void checkAndSendInitialData(@Nullable TbEntityDataSubCtx theCtx) {
         if (!theCtx.isInitialDataSent()) {
@@ -495,14 +368,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleAggHistoryCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理历史数据订阅命令。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `cmd`：`cmd` 参数。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbEntityDataSubCtx> handleAggHistoryCmd(TbEntityDataSubCtx ctx, AggHistoryCmd cmd) {
         ConcurrentMap<Integer, ReadTsKvQueryInfo> queries = new ConcurrentHashMap<>();
@@ -520,14 +390,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleAggTsCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理时间戳。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `cmd`：`cmd` 参数。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbEntityDataSubCtx> handleAggTsCmd(TbEntityDataSubCtx ctx, AggTimeSeriesCmd cmd) {
         ConcurrentMap<Integer, ReadTsKvQueryInfo> queries = new ConcurrentHashMap<>();
@@ -539,14 +406,14 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleAggCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Agg Cmd`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `keys`：键。
+     * - `queries`：键值映射。
+     * - `startTs`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbEntityDataSubCtx> handleAggCmd(TbEntityDataSubCtx ctx, List<AggKey> keys, ConcurrentMap<Integer, ReadTsKvQueryInfo> queries,
                                                               long startTs, long endTs, boolean subscribe) {
@@ -607,31 +474,26 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleWsCmdRuntimeException` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Ws Cmd Runtime Exception`。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * - `e`：`e` 参数。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
     private void handleWsCmdRuntimeException(String sessionId, RuntimeException e, EntityDataCmd cmd) {
         log.debug("[{}] Failed to process ws cmd: {}", sessionId, cmd, e);
         wsService.close(sessionId, CloseStatus.SERVICE_RESTARTED);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Cmd`。
+     * 参数：
+     * - `session`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleCmd(WebSocketSessionRef session, EntityCountCmd cmd) {
         TbEntityCountSubCtx ctx = getSubCtx(session.getSessionId(), cmd.getCmdId());
         if (ctx == null) {
@@ -651,17 +513,14 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Cmd`。
+     * 参数：
+     * - `session`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleCmd(WebSocketSessionRef session, AlarmDataCmd cmd) {
         TbAlarmDataSubCtx ctx = getSubCtx(session.getSessionId(), cmd.getCmdId());
         if (ctx == null) {
@@ -693,17 +552,14 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Cmd`。
+     * 参数：
+     * - `session`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleCmd(WebSocketSessionRef session, AlarmCountCmd cmd) {
         TbAlarmCountSubCtx ctx = getSubCtx(session.getSessionId(), cmd.getCmdId());
         if (ctx == null) {
@@ -724,14 +580,10 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `validate` 对应的处理。
+     * 参数：
+     * - `finalCtx`：处理上下文。
+     * 返回：判断结果。
      */
     private boolean validate(TbAbstractSubCtx<?> finalCtx) {
         if (finalCtx.isStopped()) {
@@ -750,14 +602,10 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `refreshDynamicQuery` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新查询条件。
+     * 参数：
+     * - `finalCtx`：处理上下文。
+     * 返回：无。
      */
     private void refreshDynamicQuery(TbAbstractSubCtx<?> finalCtx) {
         try {
@@ -777,14 +625,10 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `refreshAlarmQuery` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新告警。
+     * 参数：
+     * - `finalCtx`：处理上下文。
+     * 返回：无。
      */
     private void refreshAlarmQuery(TbAlarmDataSubCtx finalCtx) {
         if (validate(finalCtx)) {
@@ -794,17 +638,12 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
         }
     }
 
-    @Scheduled(fixedDelayString = "${server.ws.dynamic_page_link.stats:10000}")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `printStats` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `printStats` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Scheduled(fixedDelayString = "${server.ws.dynamic_page_link.stats:10000}")
     public void printStats() {
         int alarmQueryInvocationCntValue = stats.getAlarmQueryInvocationCnt().getAndSet(0);
         long alarmQueryInvocationTimeValue = stats.getAlarmQueryTimeSpent().getAndSet(0);
@@ -824,14 +663,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSubCtx` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建上下文。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：处理结果。
      */
     private TbEntityDataSubCtx createSubCtx(WebSocketSessionRef sessionRef, EntityDataCmd cmd) {
         Map<Integer, TbAbstractSubCtx> sessionSubs = subscriptionsBySessionId.computeIfAbsent(sessionRef.getSessionId(), k -> new HashMap<>());
@@ -845,14 +681,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSubCtx` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建上下文。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：处理结果。
      */
     private TbEntityCountSubCtx createSubCtx(WebSocketSessionRef sessionRef, EntityCountCmd cmd) {
         Map<Integer, TbAbstractSubCtx> sessionSubs = subscriptionsBySessionId.computeIfAbsent(sessionRef.getSessionId(), k -> new HashMap<>());
@@ -867,14 +700,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSubCtx` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建上下文。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：处理结果。
      */
     private TbAlarmDataSubCtx createSubCtx(WebSocketSessionRef sessionRef, AlarmDataCmd cmd) {
         Map<Integer, TbAbstractSubCtx> sessionSubs = subscriptionsBySessionId.computeIfAbsent(sessionRef.getSessionId(), k -> new HashMap<>());
@@ -887,14 +717,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSubCtx` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建上下文。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：处理结果。
      */
     private TbAlarmCountSubCtx createSubCtx(WebSocketSessionRef sessionRef, AlarmCountCmd cmd) {
         Map<Integer, TbAbstractSubCtx> sessionSubs = subscriptionsBySessionId.computeIfAbsent(sessionRef.getSessionId(), k -> new HashMap<>());
@@ -907,17 +734,14 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
         return ctx;
     }
 
-    @SuppressWarnings("unchecked")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSubCtx` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取上下文。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * - `cmdId`：`cmdId`ID。
+     * 返回：处理结果。
      */
+    @SuppressWarnings("unchecked")
     private <T extends TbAbstractSubCtx> T getSubCtx(String sessionId, int cmdId) {
         Map<Integer, TbAbstractSubCtx> sessionSubs = subscriptionsBySessionId.get(sessionId);
         if (sessionSubs != null) {
@@ -928,14 +752,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleTimeSeriesCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理时序数据。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `cmd`：`cmd` 参数。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbEntityDataSubCtx> handleTimeSeriesCmd(TbEntityDataSubCtx ctx, TimeSeriesCmd cmd) {
         log.debug("[{}][{}] Fetching time-series data for last {} ms for keys: ({})", ctx.getSessionId(), ctx.getCmdId(), cmd.getTimeWindow(), cmd.getKeys());
@@ -944,14 +765,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleHistoryCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理历史数据订阅命令。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `cmd`：`cmd` 参数。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbEntityDataSubCtx> handleHistoryCmd(TbEntityDataSubCtx ctx, EntityHistoryCmd cmd) {
         log.debug("[{}][{}] Fetching history data for start {} and end {} ms for keys: ({})", ctx.getSessionId(), ctx.getCmdId(), cmd.getStartTs(), cmd.getEndTs(), cmd.getKeys());
@@ -959,14 +777,12 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleGetTsCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理时间戳。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `cmd`：`cmd` 参数。
+     * - `subscribe`：`subscribe` 参数。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbEntityDataSubCtx> handleGetTsCmd(TbEntityDataSubCtx ctx, GetTsCmd cmd, boolean subscribe) {
         Map<Integer, String> queriesKeys = new ConcurrentHashMap<>();
@@ -1051,14 +867,11 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleLatestCmd` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理最新数据订阅命令。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `latestCmd`：`latestCmd` 参数。
+     * 返回：无。
      */
     private void handleLatestCmd(TbEntityDataSubCtx ctx, LatestValueCmd latestCmd) {
         log.trace("[{}][{}] Going to process latest command: {}", ctx.getSessionId(), ctx.getCmdId(), latestCmd);
@@ -1128,43 +941,32 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toTsValue` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toTsValue` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：处理结果。
      */
     private Map<String, TsValue> toTsValue(List<TsKvEntry> data) {
         return data.stream().collect(Collectors.toMap(TsKvEntry::getKey, value -> new TsValue(value.getTs(), value.getValueAsString())));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cancelSubscription` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cancelSubscription` 对应的处理。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void cancelSubscription(String sessionId, UnsubscribeCmd cmd) {
         cleanupAndCancel(getSubCtx(sessionId, cmd.getCmdId()));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanupAndCancel` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`And Cancel`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
     private void cleanupAndCancel(TbAbstractSubCtx ctx) {
         if (ctx != null) {
@@ -1178,17 +980,13 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cancelAllSessionSubscriptions` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cancelAllSessionSubscriptions` 对应的处理。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * 返回：无。
      */
+    @Override
     public void cancelAllSessionSubscriptions(String sessionId) {
         Map<Integer, TbAbstractSubCtx> sessionSubs = subscriptionsBySessionId.remove(sessionId);
         if (sessionSubs != null) {
@@ -1197,14 +995,10 @@ public class DefaultTbEntityDataSubscriptionService implements TbEntityDataSubsc
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLimit` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取数量限制。
+     * 参数：
+     * - `limit`：数量限制。
+     * 返回：数值结果。
      */
     private int getLimit(int limit) {
         return limit == 0 ? DEFAULT_LIMIT : limit;

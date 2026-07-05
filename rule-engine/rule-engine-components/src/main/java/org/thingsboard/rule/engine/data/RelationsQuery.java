@@ -22,26 +22,25 @@ import org.thingsboard.server.common.data.relation.RelationEntityTypeFilter;
 import java.util.List;
 
 /**
- * 通用实体关系查询条件，供规则节点按关系方向、层级和实体类型过滤器查找关联实体。
- * 本类只表达查询参数，本身不直接访问数据库或缓存，也不直接发送或确认 Rule Engine 消息。
+ * `RelationsQuery` 类，封装当前模块中的一组相关职责。
  */
 @Data
 public class RelationsQuery {
 
     /**
-     * 关系搜索方向，决定查询结果从起点实体的来源侧还是目标侧取实体。
+     * `direction` 字段，保存当前对象的对应属性。
      */
     private EntitySearchDirection direction;
     /**
-     * 关系遍历最大层级，默认查询一层。
+     * `maxLevel` 字段，保存当前对象的对应属性。
      */
     private int maxLevel = 1;
     /**
-     * 关系实体类型过滤器列表，用于限制返回的关联实体范围。
+     * `filters`列表，用于保存一组待处理对象。
      */
     private List<RelationEntityTypeFilter> filters;
     /**
-     * 是否只返回最后一层关系上的实体，默认返回所有匹配层级。
+     * 是否满足`fetchLastLevelOnly`条件。
      */
     private boolean fetchLastLevelOnly = false;
 }

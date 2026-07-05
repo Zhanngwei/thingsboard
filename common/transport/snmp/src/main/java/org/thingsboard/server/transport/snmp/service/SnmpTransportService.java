@@ -80,11 +80,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-@TbSnmpTransportComponent
-@Service
-@Slf4j
-@RequiredArgsConstructor
-@SuppressWarnings("UnstableApiUsage")
 /**
  * 中文说明：
  * 1. 类目的：`SnmpTransportService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -95,114 +90,69 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@TbSnmpTransportComponent
+@Service
+@Slf4j
+@RequiredArgsConstructor
+@SuppressWarnings("UnstableApiUsage")
 public class SnmpTransportService implements TbTransportService, CommandResponder {
     /**
-     * 字段说明：
-     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TransportService transportService;
     private final PduService pduService;
-    @Autowired @Lazy
     /**
-     * 字段说明：
-     * 1. 保存 `transportContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @Autowired @Lazy
     private SnmpTransportContext transportContext;
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `snmp` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `snmp` 字段，保存当前对象的对应属性。
      */
+    @Getter
     private Snmp snmp;
     private ListeningScheduledExecutorService scheduler;
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     private ExecutorService executor;
 
     private final Map<SnmpCommunicationSpec, ResponseDataMapper> responseDataMappers = new EnumMap<>(SnmpCommunicationSpec.class);
     private final Map<SnmpCommunicationSpec, ResponseProcessor> responseProcessors = new EnumMap<>(SnmpCommunicationSpec.class);
 
+    /**
+     * 端口号，用于描述服务监听或访问地址。
+     */
     @Value("${transport.snmp.bind_port:1620}")
-    /**
-     * 字段说明：
-     * 1. 保存 `snmpBindPort` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer snmpBindPort;
+    /**
+     * 当前响应对象，封装处理完成后的返回信息。
+     */
     @Value("${transport.snmp.response_processing.parallelism_level:4}")
-    /**
-     * 字段说明：
-     * 1. 保存 `responseProcessingThreadPoolSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int responseProcessingThreadPoolSize;
+    /**
+     * 线程池大小，用于安排延迟任务或周期任务。
+     */
     @Value("${transport.snmp.scheduler_thread_pool_size:4}")
-    /**
-     * 字段说明：
-     * 1. 保存 `schedulerThreadPoolSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int schedulerThreadPoolSize;
+    /**
+     * `snmpUnderlyingProtocol` 字段，保存当前对象的对应属性。
+     */
     @Value("${transport.snmp.underlying_protocol}")
-    /**
-     * 字段说明：
-     * 1. 保存 `snmpUnderlyingProtocol` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String snmpUnderlyingProtocol;
-    @Value("${transport.snmp.request_chunk_delay_ms:100}")
     /**
-     * 字段说明：
-     * 1. 保存 `requestChunkDelayMs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
+    @Value("${transport.snmp.request_chunk_delay_ms:100}")
     private int requestChunkDelayMs;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     private void init() throws IOException {
         scheduler = MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(schedulerThreadPoolSize, ThingsBoardThreadFactory.forName("snmp-querying")));
         executor = ThingsBoardExecutors.newWorkStealingPool(responseProcessingThreadPoolSize, "snmp-response-processing");
@@ -214,57 +164,39 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
         log.info("SNMP transport service initialized");
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stop` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `stop` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void stop() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (scheduler != null) {
             scheduler.shutdownNow();
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (executor != null) {
             executor.shutdownNow();
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initializeSnmp` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `initializeSnmp` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void initializeSnmp() throws IOException {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportMapping<?> transportMapping;
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (snmpUnderlyingProtocol) {
             case "udp":
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 transportMapping = new DefaultUdpTransportMapping(new UdpAddress(snmpBindPort));
                 break;
             case "tcp":
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 transportMapping = new DefaultTcpTransportMapping(new TcpAddress(snmpBindPort));
                 break;
             default:
                 throw new IllegalArgumentException("Underlying protocol " + snmpUnderlyingProtocol + " for SNMP is not supported");
         }
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         snmp = new Snmp(transportMapping);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         snmp.addNotificationListener(transportMapping, transportMapping.getListenAddress(), this);
         snmp.listen();
 
@@ -273,17 +205,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createQueryingTasks` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Querying Tasks`。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * 返回：无。
      */
     public void createQueryingTasks(DeviceSessionContext sessionContext) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         sessionContext.getProfileTransportConfiguration().getCommunicationConfigs().stream()
                 .filter(communicationConfig -> communicationConfig instanceof RepeatingQueryingSnmpCommunicationConfig)
                 .forEach(config -> {
@@ -293,14 +220,11 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
                     ScheduledTask scheduledTask = new ScheduledTask();
                     scheduledTask.init(() -> {
                         try {
-                            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                             if (sessionContext.isActive()) {
                                 return sendRequest(sessionContext, repeatingCommunicationConfig);
                             }
-                        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                         } catch (Exception e) {
                             log.error("Failed to send SNMP request for device {}: {}", sessionContext.getDeviceId(), e.toString());
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             transportService.errorEvent(sessionContext.getTenantId(), sessionContext.getDeviceId(), config.getSpec().getLabel(), e);
                         }
                         return Futures.immediateVoidFuture();
@@ -310,14 +234,10 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cancelQueryingTasks` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cancelQueryingTasks` 对应的处理。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * 返回：无。
      */
     public void cancelQueryingTasks(DeviceSessionContext sessionContext) {
         sessionContext.getQueryingTasks().forEach(ScheduledTask::cancel);
@@ -326,28 +246,23 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交请求。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `communicationConfig`：配置对象。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Void> sendRequest(DeviceSessionContext sessionContext, SnmpCommunicationConfig communicationConfig) {
         return sendRequest(sessionContext, communicationConfig, Collections.emptyMap());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交请求。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `communicationConfig`：配置对象。
+     * - `values`：值。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Void> sendRequest(DeviceSessionContext sessionContext, SnmpCommunicationConfig communicationConfig, Map<String, String> values) {
         List<PDU> request = pduService.createPdus(sessionContext, communicationConfig, values);
@@ -361,14 +276,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交请求。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `request`：请求对象。
+     * - `requestContext`：处理上下文。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Void> sendRequest(DeviceSessionContext sessionContext, List<PDU> request, RequestContext requestContext) {
         if (request.size() <= 1 || requestChunkDelayMs == 0) {
@@ -394,14 +307,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendPdu` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Pdu`。
+     * 参数：
+     * - `pdu`：`pdu` 参数。
+     * - `requestContext`：处理上下文。
+     * - `sessionContext`：处理上下文。
+     * 返回：无。
      */
     private void sendPdu(PDU pdu, RequestContext requestContext, DeviceSessionContext sessionContext) {
         log.debug("[{}] Sending SNMP request with {} variable bindings to {}", sessionContext.getDeviceId(), pdu.size(), sessionContext.getTarget().getAddress());
@@ -414,14 +325,11 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onAttributeUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理属性。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `attributeUpdateNotification`：`attributeUpdateNotification` 参数。
+     * 返回：无。
      */
     public void onAttributeUpdate(DeviceSessionContext sessionContext, TransportProtos.AttributeUpdateNotificationMsg attributeUpdateNotification) {
         sessionContext.getProfileTransportConfiguration().getCommunicationConfigs().stream()
@@ -438,14 +346,11 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onToDeviceRpcRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理设备。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `toDeviceRpcRequestMsg`：设备信息或设备标识。
+     * 返回：无。
      */
     public void onToDeviceRpcRequest(DeviceSessionContext sessionContext, TransportProtos.ToDeviceRpcRequestMsg toDeviceRpcRequestMsg) {
         SnmpMethod snmpMethod = SnmpMethod.valueOf(toDeviceRpcRequestMsg.getMethodName());
@@ -483,14 +388,11 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processResponseEvent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
     public void processResponseEvent(DeviceSessionContext sessionContext, ResponseEvent event) {
         ((Snmp) event.getSource()).cancel(event.getRequest(), sessionContext);
@@ -548,17 +450,13 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
      * NOTE: SNMP TRAPs support won't work properly when there is more than one SNMP transport,
      *  due to load-balancing of requests from devices: session might not be on this instance
      * */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processPdu` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Pdu`。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @Override
     public void processPdu(CommandResponderEvent event) {
         IpAddress sourceAddress = (IpAddress) event.getPeerAddress();
         List<DeviceSessionContext> sessions = transportContext.getSessions().stream()
@@ -585,14 +483,11 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processIncomingTrap` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Incoming Trap`。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
     private void processIncomingTrap(DeviceSessionContext sessionContext, CommandResponderEvent event) {
         PDU pdu = event.getPDU();
@@ -617,14 +512,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `sessionContext`：处理上下文。
+     * - `response`：响应对象。
+     * - `requestContext`：处理上下文。
+     * 返回：无。
      */
     private void processResponse(DeviceSessionContext sessionContext, List<PDU> response, RequestContext requestContext) {
         ResponseProcessor responseProcessor = responseProcessors.get(requestContext.getCommunicationSpec());
@@ -641,14 +534,9 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `configureResponseDataMappers` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `configureResponseDataMappers` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void configureResponseDataMappers() {
         responseDataMappers.put(SnmpCommunicationSpec.TO_DEVICE_RPC_REQUEST, (pdus, requestContext) -> {
@@ -674,14 +562,9 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `configureResponseProcessors` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `configureResponseProcessors` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void configureResponseProcessors() {
         responseProcessors.put(SnmpCommunicationSpec.TELEMETRY_QUERYING, (responseData, requestContext, sessionContext) -> {
@@ -716,46 +599,32 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportActivity` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：上报`Activity`。
+     * 参数：
+     * - `sessionInfo`：会话对象。
+     * 返回：无。
      */
     private void reportActivity(TransportProtos.SessionInfoProto sessionInfo) {
         transportService.recordActivity(sessionInfo);
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String getName() {
         return DataConstants.SNMP_TRANSPORT_NAME;
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdown` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `shutdown` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void shutdown() {
         log.info("Stopping SNMP transport!");
         if (scheduler != null) {
@@ -774,7 +643,6 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
         log.info("SNMP transport stopped!");
     }
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`RequestContext` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -785,50 +653,36 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @Data
     private static class RequestContext {
         /**
-         * 字段说明：
-         * 1. 保存 `requestId` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 请求ID，用于定位对应业务对象。
          */
         private final Integer requestId;
         private final SnmpCommunicationSpec communicationSpec;
         /**
-         * 字段说明：
-         * 1. 保存 `method` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `method` 字段，保存当前对象的对应属性。
          */
         private final SnmpMethod method;
         private final List<SnmpMapping> responseMappings;
 
         /**
-         * 字段说明：
-         * 1. 保存 `requestSize` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 当前请求对象，封装本次处理需要的输入信息。
          */
         private final int requestSize;
         private List<PDU> responseParts;
 
-        @Builder
         /**
-         * 方法说明：
-         * 1. 职责：执行 `RequestContext` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `SnmpTransportService` 实例，并初始化必要字段。
+         * 参数：
+         * - `requestId`：请求ID。
+         * - `communicationSpec`：`communicationSpec` 参数。
+         * - `method`：`method` 参数。
+         * - `responseMappings`：响应对象。
+         * - 其余参数：补充处理条件。
+         * 返回：新创建的对象实例。
          */
+        @Builder
         public RequestContext(Integer requestId, SnmpCommunicationSpec communicationSpec, SnmpMethod method, List<SnmpMapping> responseMappings, int requestSize) {
             this.requestId = requestId;
             this.communicationSpec = communicationSpec;
@@ -853,14 +707,11 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
      */
     private interface ResponseDataMapper {
         /**
-         * 方法说明：
-         * 1. 职责：执行 `map` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `map` 对应的处理。
+         * 参数：
+         * - `pdus`：数据列表。
+         * - `requestContext`：处理上下文。
+         * 返回：处理结果。
          */
         JsonObject map(List<PDU> pdus, RequestContext requestContext);
     }
@@ -877,14 +728,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
      */
     private interface ResponseProcessor {
         /**
-         * 方法说明：
-         * 1. 职责：执行 `process` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `process` 对应的处理。
+         * 参数：
+         * - `responseData`：响应对象。
+         * - `requestContext`：处理上下文。
+         * - `sessionContext`：处理上下文。
+         * 返回：无。
          */
         void process(JsonObject responseData, RequestContext requestContext, DeviceSessionContext sessionContext);
     }

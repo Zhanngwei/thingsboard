@@ -38,11 +38,6 @@ import java.util.concurrent.TimeUnit;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.thingsboard.server.common.data.query.EntityKeyType.TIME_SERIES;
 
-@DaoSqlTest
-@TestPropertySource(properties = {
-        "sql.attributes.value_no_xss_validation=true",
-        "sql.ts.value_no_xss_validation=true"
-})
 /**
  * 中文说明：
  * 1. 类目的：`TelemetryControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -53,19 +48,19 @@ import static org.thingsboard.server.common.data.query.EntityKeyType.TIME_SERIES
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@DaoSqlTest
+@TestPropertySource(properties = {
+        "sql.attributes.value_no_xss_validation=true",
+        "sql.ts.value_no_xss_validation=true"
+})
 public class TelemetryControllerTest extends AbstractControllerTest {
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testConstraintValidator` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证校验器相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testConstraintValidator() throws Exception {
         loginTenantAdmin();
         Device device = createDevice();
@@ -77,17 +72,12 @@ public class TelemetryControllerTest extends AbstractControllerTest {
         doPostAsync("/api/plugins/telemetry/DEVICE/" + device.getId() + "/timeseries/smth", invalidRequestBody, String.class, status().isBadRequest());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTelemetryRequests` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证遥测相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testTelemetryRequests() throws Exception {
         loginTenantAdmin();
         Device device = createDevice();
@@ -142,17 +132,12 @@ public class TelemetryControllerTest extends AbstractControllerTest {
         Assert.assertEquals(middleOfTheInterval, monthResult.get("ts").asLong());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteAllTelemetryWithLatest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证遥测相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteAllTelemetryWithLatest() throws Exception {
         loginTenantAdmin();
         Device device = createDevice();
@@ -196,17 +181,12 @@ public class TelemetryControllerTest extends AbstractControllerTest {
         Assert.assertTrue(timeseries.isEmpty());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteAllTelemetryWithoutLatest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证遥测相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteAllTelemetryWithoutLatest() throws Exception {
         loginTenantAdmin();
         Device device = createDevice();
@@ -248,17 +228,12 @@ public class TelemetryControllerTest extends AbstractControllerTest {
         Assert.assertTrue(timeseries.isEmpty());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testValueConstraintValidator` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证值相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testValueConstraintValidator() throws Exception {
         loginTenantAdmin();
         Device device = createDevice();
@@ -270,17 +245,12 @@ public class TelemetryControllerTest extends AbstractControllerTest {
         doPostAsync("/api/plugins/telemetry/DEVICE/" + device.getId() + "/timeseries/smth", invalidRequestBody, String.class, status().isBadRequest());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testEmptyKeyIsProhibited` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证键相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testEmptyKeyIsProhibited() throws Exception {
         loginTenantAdmin();
         Device device = createDevice();
@@ -294,14 +264,9 @@ public class TelemetryControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private Device createDevice() throws Exception {
         String testToken = "TEST_TOKEN";

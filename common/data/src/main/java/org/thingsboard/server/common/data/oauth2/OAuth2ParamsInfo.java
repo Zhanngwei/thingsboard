@@ -26,13 +26,6 @@ import lombok.ToString;
 
 import java.util.List;
 
-@EqualsAndHashCode
-@Data
-@ToString
-@Builder(toBuilder = true)
-@NoArgsConstructor
-@AllArgsConstructor
-@ApiModel
 /**
  * 中文说明：
  * 1. 类目的：`OAuth2ParamsInfo` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -43,39 +36,31 @@ import java.util.List;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@EqualsAndHashCode
+@Data
+@ToString
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
+@ApiModel
 public class OAuth2ParamsInfo {
 
+    /**
+     * `domainInfos`列表，用于保存一组待处理对象。
+     */
     @ApiModelProperty(value = "List of configured domains where OAuth2 platform will redirect a user after successful " +
             "authentication. Cannot be empty. There have to be only one domain with specific name with scheme type 'MIXED'. " +
             "Configured domains with the same name must have different scheme types", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `domainInfos` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private List<OAuth2DomainInfo> domainInfos;
+    /**
+     * `mobileInfos`列表，用于保存一组待处理对象。
+     */
     @ApiModelProperty(value = "Mobile applications settings. Application package name must be unique within the list", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `mobileInfos` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private List<OAuth2MobileInfo> mobileInfos;
-    @ApiModelProperty(value = "List of OAuth2 provider settings. Cannot be empty", required = true)
     /**
-     * 字段说明：
-     * 1. 保存 `clientRegistrations` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户端列表，用于保存一组待处理对象。
      */
+    @ApiModelProperty(value = "List of OAuth2 provider settings. Cannot be empty", required = true)
     private List<OAuth2RegistrationInfo> clientRegistrations;
 
 }

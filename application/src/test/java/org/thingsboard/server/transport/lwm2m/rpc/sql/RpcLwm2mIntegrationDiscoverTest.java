@@ -52,17 +52,12 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
      *
      * @throws Exception
      */
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDiscoverAll_Return_CONTENT_LinksAllObjectsAllInstancesOfClient` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户端相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDiscoverAll_Return_CONTENT_LinksAllObjectsAllInstancesOfClient() throws Exception {
         String setRpcRequest = "{\"method\":\"DiscoverAll\"}";
         String actualResult = doPostAsync("/api/plugins/rpc/twoway/" + deviceId, setRpcRequest, String.class, status().isOk());
@@ -72,11 +67,9 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
         Set actualObjects = ConcurrentHashMap.newKeySet();
         Set actualInstances = ConcurrentHashMap.newKeySet();
         rpcActualValue.forEach(node -> {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!node.get("uriReference").asText().equals("/")) {
                 LwM2mPath path = new LwM2mPath(node.get("uriReference").asText());
                 actualObjects.add("/" + path.getObjectId());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (path.isObjectInstance()) {
                     actualInstances.add("/" + path.getObjectId() + "/" + path.getObjectInstanceId());
                 }
@@ -91,17 +84,12 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
      *
      * @throws Exception
      */
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDiscoverObject_Return_CONTENT_LinksInstancesAndResourcesOnLyExpectedObject` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Discover Object Return CONTENT Links Instances And Resources On Ly Expected Object`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDiscoverObject_Return_CONTENT_LinksInstancesAndResourcesOnLyExpectedObject() {
         expectedObjectIdVers.forEach(expected -> {
             try {
@@ -112,7 +100,6 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
                 String[] actualValues = rpcActualResult.get("value").asText().split(",");
                 assertTrue(actualValues.length > 0);
                 assertEquals(0, Arrays.stream(actualValues).filter(path -> !path.contains(expectedObjectId)).collect(Collectors.toList()).size());
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -128,17 +115,12 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
      * Discover {"id":"19/0"}
      * {"result":"CONTENT","value":"[</19/0>;dim=2;pmin=10;pmax=60;gt=50;lt=42.2,</19/0/0>;pmax=120, </19/0/1>, </19/0/2>, </19/0/3>, </19/0/4>, </19/0/5>;lt=45]"}
      */
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDiscoverInstance_Return_CONTENT_LinksResourcesOnLyExpectedInstance` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Discover Instance Return CONTENT Links Resources On Ly Expected Instance`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDiscoverInstance_Return_CONTENT_LinksResourcesOnLyExpectedInstance() throws Exception {
         String expected = (String) expectedObjectIdVerInstances.stream().findAny().get();
         String actualResult = sendDiscover(expected);
@@ -162,17 +144,12 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
      * If WriteAttributes not implemented:
      * {"result":"CONTENT","value":"</19/0/0>"}
      */
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDiscoverResource_Return_CONTENT_LinksResourceOnLyExpectedResource` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Discover Resource Return CONTENT Links Resource On Ly Expected Resource`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDiscoverResource_Return_CONTENT_LinksResourceOnLyExpectedResource() throws Exception {
         String expectedInstance = (String) expectedInstances.stream().findFirst().get();
         String expectedObjectInstanceId = pathIdVerToObjectId(expectedInstance);
@@ -192,17 +169,12 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
      * Discover {"id":"2/0"}
      *{"result":"NOT_FOUND"}
      */
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDiscoverObjectInstanceAbsentInObject_Return_NOT_FOUND` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Discover Object Instance Absent In Object Return NOT FOUND`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDiscoverObjectInstanceAbsentInObject_Return_NOT_FOUND() throws Exception {
         String expected = objectIdVer_2 + "/" + OBJECT_INSTANCE_ID_0;
         String actualResult = sendDiscover(expected);
@@ -213,17 +185,12 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
      * Discover {"id":"2/0/2"}
      * {"result":"NOT_FOUND"}
      */
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDiscoverResourceAbsentInObject_Return_NOT_FOUND` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Discover Resource Absent In Object Return NOT FOUND`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDiscoverResourceAbsentInObject_Return_NOT_FOUND() throws Exception {
          String expected = objectIdVer_2 + "/" + OBJECT_INSTANCE_ID_0 + "/" + RESOURCE_ID_2;
         String actualResult = sendDiscover(expected);
@@ -232,14 +199,10 @@ public class RpcLwm2mIntegrationDiscoverTest extends AbstractRpcLwM2MIntegration
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendDiscover` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Discover`。
+     * 参数：
+     * - `path`：文件或资源路径。
+     * 返回：文本结果。
      */
     private String sendDiscover(String path) throws Exception {
         String setRpcRequest = "{\"method\": \"Discover\", \"params\": {\"id\": \"" + path + "\"}}";

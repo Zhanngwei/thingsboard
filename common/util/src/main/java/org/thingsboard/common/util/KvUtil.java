@@ -30,17 +30,12 @@ import org.thingsboard.server.common.data.kv.KvEntry;
 public class KvUtil {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStringValue` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `entry`：`entry` 参数。
+     * 返回：文本结果。
      */
     public static String getStringValue(KvEntry entry) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (entry.getDataType()) {
             case LONG:
                 return entry.getLongValue().map(String::valueOf).orElse(null);
@@ -58,17 +53,12 @@ public class KvUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDoubleValue` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `entry`：`entry` 参数。
+     * 返回：数值结果。
      */
     public static Double getDoubleValue(KvEntry entry) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (entry.getDataType()) {
             case LONG:
                 return entry.getLongValue().map(Long::doubleValue).orElse(null);
@@ -79,14 +69,12 @@ public class KvUtil {
             case STRING:
                 try {
                     return Double.parseDouble(entry.getStrValue().orElse(""));
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (RuntimeException e) {
                     return null;
                 }
             case JSON:
                 try {
                     return Double.parseDouble(entry.getJsonValue().orElse(""));
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (RuntimeException e) {
                     return null;
                 }
@@ -96,17 +84,12 @@ public class KvUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getBoolValue` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `entry`：`entry` 参数。
+     * 返回：判断结果。
      */
     public static Boolean getBoolValue(KvEntry entry) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (entry.getDataType()) {
             case LONG:
                 return entry.getLongValue().map(e -> e != 0).orElse(null);
@@ -117,14 +100,12 @@ public class KvUtil {
             case STRING:
                 try {
                     return Boolean.parseBoolean(entry.getStrValue().orElse(""));
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (RuntimeException e) {
                     return null;
                 }
             case JSON:
                 try {
                     return Boolean.parseBoolean(entry.getJsonValue().orElse(""));
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (RuntimeException e) {
                     return null;
                 }

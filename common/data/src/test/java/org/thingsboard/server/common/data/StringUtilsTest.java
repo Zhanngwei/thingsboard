@@ -33,52 +33,39 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class StringUtilsTest {
 
+    /**
+     * 功能：验证`Contains0x00 then True`相关场景。
+     * 参数：
+     * - `sample`：`sample` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @ValueSource(strings = {
             "\000", "\u0000", " \000", " \000 ", "\000 ", "\000\000", "\000 \000",
             "世\000界", "F0929906\000\000\000\000\000\000\000\000\000",
     })
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testContains0x00_thenTrue` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     void testContains0x00_thenTrue(String sample) {
         assertThat(StringUtils.contains0x00(sample)).isTrue();
     }
 
+    /**
+     * 功能：验证`Contains0x00 then False`相关场景。
+     * 参数：
+     * - `sample`：`sample` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @ValueSource(strings = {"", "  ", "abc", "世界", "\001", "\uD83D\uDC0C"})
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testContains0x00_thenFalse` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     void testContains0x00_thenFalse(String sample) {
         assertThat(StringUtils.contains0x00(sample)).isFalse();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTruncate` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Truncate`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void testTruncate() {
         int maxLength = 5;
         assertThat(StringUtils.truncate(null, maxLength)).isNull();

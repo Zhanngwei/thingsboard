@@ -22,31 +22,30 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 import java.util.Collections;
 import java.util.Map;
 
-@Data
 /**
- * RabbitMQ 节点配置模型，保存连接参数、目标 exchange/routingKey 模板和消息属性。
- * 配置类本身不直接建立 RabbitMQ 连接、不执行发布，也不涉及异步回调、数据库或缓存。
+ * `TbRabbitMqNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbRabbitMqNodeConfiguration implements NodeConfiguration<TbRabbitMqNodeConfiguration> {
 
     /**
-     * RabbitMQ exchange 名称模板，空值表示默认 exchange。
+     * 名称，用于展示或标识当前对象。
      */
     private String exchangeNamePattern;
     /**
-     * RabbitMQ routing key 模板，空值表示空 routing key。
+     * 键，用于定位映射、配置或数据项。
      */
     private String routingKeyPattern;
     /**
-     * RabbitMQ MessageProperties 常量名称。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private String messageProperties;
     /**
-     * RabbitMQ Broker 主机。
+     * 主机地址，用于描述服务监听或访问地址。
      */
     private String host;
     /**
-     * RabbitMQ Broker 端口。
+     * 端口号，用于描述服务监听或访问地址。
      */
     private int port;
     /**
@@ -54,33 +53,34 @@ public class TbRabbitMqNodeConfiguration implements NodeConfiguration<TbRabbitMq
      */
     private String virtualHost;
     /**
-     * RabbitMQ 用户名。
+     * 用户名，用于认证或安全校验。
      */
     private String username;
     /**
-     * RabbitMQ 密码。
+     * 密码，用于认证或安全校验。
      */
     private String password;
     /**
-     * 是否启用 RabbitMQ 客户端自动恢复。
+     * 是否启用`automatic recovery`。
      */
     private boolean automaticRecoveryEnabled;
     /**
-     * RabbitMQ 连接超时时间。
+     * 超时时间，用于控制时间范围或等待时长。
      */
     private int connectionTimeout;
     /**
-     * RabbitMQ 握手超时时间。
+     * 超时时间，用于控制时间范围或等待时长。
      */
     private int handshakeTimeout;
     /**
-     * 透传到 RabbitMQ ConnectionFactory 的客户端属性。
+     * 客户端映射关系，用于按键查找对应值。
      */
     private Map<String, String> clientProperties;
 
     /**
-     * 构造 RabbitMQ 节点默认配置。
-     * 本方法只设置默认值，不直接连接 Broker，也不处理 Rule Engine 消息确认。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbRabbitMqNodeConfiguration defaultConfiguration() {

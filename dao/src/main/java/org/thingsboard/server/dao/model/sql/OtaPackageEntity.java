@@ -55,11 +55,6 @@ import static org.thingsboard.server.dao.model.ModelConstants.OTA_PACKAGE_URL_CO
 import static org.thingsboard.server.dao.model.ModelConstants.OTA_PACKAGE_VERSION_COLUMN;
 import static org.thingsboard.server.dao.model.ModelConstants.SEARCH_TEXT_PROPERTY;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
-@Entity
-@TypeDef(name = "json", typeClass = JsonStringType.class)
-@Table(name = OTA_PACKAGE_TABLE_NAME)
 /**
  * 中文说明：
  * 1. 类目的：`OtaPackageEntity` 是 ThingsBoard DAO 模块 中的持久化实体映射类型，用于描述 ThingsBoard 领域对象与 SQL/Cassandra 存储结构之间的字段映射、索引关系和序列化边界。
@@ -71,199 +66,120 @@ import static org.thingsboard.server.dao.model.ModelConstants.SEARCH_TEXT_PROPER
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Entity / Mapper / Value Object。
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@Entity
+@TypeDef(name = "json", typeClass = JsonStringType.class)
+@Table(name = OTA_PACKAGE_TABLE_NAME)
 public class OtaPackageEntity extends BaseSqlEntity<OtaPackage> {
 
-    @Column(name = OTA_PACKAGE_TENANT_ID_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `tenantId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户ID，用于定位对应业务对象。
      */
+    @Column(name = OTA_PACKAGE_TENANT_ID_COLUMN)
     private UUID tenantId;
 
-    @Column(name = OTA_PACKAGE_DEVICE_PROFILE_ID_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `deviceProfileId` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备配置ID，用于定位对应业务对象。
      */
+    @Column(name = OTA_PACKAGE_DEVICE_PROFILE_ID_COLUMN)
     private UUID deviceProfileId;
 
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = OTA_PACKAGE_TYPE_COLUMN)
-    /**
-     * 字段说明：
-     * 1. 保存 `type` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private OtaPackageType type;
 
-    @Column(name = OTA_PACKAGE_TILE_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `title` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * `title` 字段，保存当前对象的对应属性。
      */
+    @Column(name = OTA_PACKAGE_TILE_COLUMN)
     private String title;
 
-    @Column(name = OTA_PACKAGE_VERSION_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `version` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 版本号，表示当前对象的对应属性。
      */
+    @Column(name = OTA_PACKAGE_VERSION_COLUMN)
     private String version;
 
-    @Column(name = OTA_PACKAGE_TAG_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `tag` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * `tag` 字段，保存当前对象的对应属性。
      */
+    @Column(name = OTA_PACKAGE_TAG_COLUMN)
     private String tag;
 
-    @Column(name = OTA_PACKAGE_URL_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `url` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * URL 地址，用于定位外部资源或本地资源。
      */
+    @Column(name = OTA_PACKAGE_URL_COLUMN)
     private String url;
 
-    @Column(name = OTA_PACKAGE_FILE_NAME_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `fileName` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 名称，用于标识或展示当前对象。
      */
+    @Column(name = OTA_PACKAGE_FILE_NAME_COLUMN)
     private String fileName;
 
-    @Column(name = OTA_PACKAGE_CONTENT_TYPE_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `contentType` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 类型，用于区分不同处理分支。
      */
+    @Column(name = OTA_PACKAGE_CONTENT_TYPE_COLUMN)
     private String contentType;
 
+    /**
+     * `checksumAlgorithm` 字段，保存当前对象的对应属性。
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = OTA_PACKAGE_CHECKSUM_ALGORITHM_COLUMN)
-    /**
-     * 字段说明：
-     * 1. 保存 `checksumAlgorithm` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private ChecksumAlgorithm checksumAlgorithm;
 
-    @Column(name = OTA_PACKAGE_CHECKSUM_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `checksum` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * `checksum` 字段，保存当前对象的对应属性。
      */
+    @Column(name = OTA_PACKAGE_CHECKSUM_COLUMN)
     private String checksum;
 
+    /**
+     * 数据列表，用于保存一组待处理对象。
+     */
     @Lob
     @Column(name = OTA_PACKAGE_DATA_COLUMN, columnDefinition = "BINARY")
-    /**
-     * 字段说明：
-     * 1. 保存 `data` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private byte[] data;
 
-    @Column(name = OTA_PACKAGE_DATA_SIZE_COLUMN)
     /**
-     * 字段说明：
-     * 1. 保存 `dataSize` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 数据，保存当前步骤读取或计算得到的内容。
      */
+    @Column(name = OTA_PACKAGE_DATA_SIZE_COLUMN)
     private Long dataSize;
 
+    /**
+     * 扩展信息，表示当前对象的对应属性。
+     */
     @Type(type = "json")
     @Column(name = ModelConstants.OTA_PACKAGE_ADDITIONAL_INFO_COLUMN)
-    /**
-     * 字段说明：
-     * 1. 保存 `additionalInfo` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private JsonNode additionalInfo;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `OtaPackageEntity` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `OtaPackageEntity` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public OtaPackageEntity() {
         super();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `OtaPackageEntity` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `OtaPackageEntity` 实例，并初始化必要字段。
+     * 参数：
+     * - `otaPackage`：`otaPackage` 参数。
+     * 返回：新创建的对象实例。
      */
     public OtaPackageEntity(OtaPackage otaPackage) {
         this.createdTime = otaPackage.getCreatedTime();
         this.setUuid(otaPackage.getUuidId());
         this.tenantId = otaPackage.getTenantId().getId();
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (otaPackage.getDeviceProfileId() != null) {
             this.deviceProfileId = otaPackage.getDeviceProfileId().getId();
         }
@@ -281,24 +197,16 @@ public class OtaPackageEntity extends BaseSqlEntity<OtaPackage> {
         this.additionalInfo = otaPackage.getAdditionalInfo();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toData` 对应的持久化实体映射类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 ORM、Repository 或 DAO 在读写数据库时创建，并随单次查询或持久化会话存在时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：从数据库行或 Common DTO 构造实体对象，经过 ORM 管理后再转换回上层数据契约。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toData` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public OtaPackage toData() {
         OtaPackage otaPackage = new OtaPackage(new OtaPackageId(id));
         otaPackage.setCreatedTime(createdTime);
         otaPackage.setTenantId(TenantId.fromUUID(tenantId));
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (deviceProfileId != null) {
             otaPackage.setDeviceProfileId(new DeviceProfileId(deviceProfileId));
         }
@@ -312,7 +220,6 @@ public class OtaPackageEntity extends BaseSqlEntity<OtaPackage> {
         otaPackage.setChecksumAlgorithm(checksumAlgorithm);
         otaPackage.setChecksum(checksum);
         otaPackage.setDataSize(dataSize);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (data != null) {
             otaPackage.setData(ByteBuffer.wrap(data));
             otaPackage.setHasData(true);

@@ -71,12 +71,7 @@ import java.util.stream.Collectors;
 public class ProtoUtils {
 
     /**
-     * 字段说明：
-     * 1. 保存 `entityTypeByProtoNumber` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 实体常量，用于统一引用固定值。
      */
     private static final EntityType[] entityTypeByProtoNumber;
 
@@ -87,52 +82,37 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     public static TransportProtos.ComponentLifecycleMsgProto toProto(ComponentLifecycleMsg msg) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return TransportProtos.ComponentLifecycleMsgProto.newBuilder()
                 .setTenantIdMSB(msg.getTenantId().getId().getMostSignificantBits())
                 .setTenantIdLSB(msg.getTenantId().getId().getLeastSignificantBits())
                 .setEntityType(toProto(msg.getEntityId().getEntityType()))
                 .setEntityIdMSB(msg.getEntityId().getId().getMostSignificantBits())
                 .setEntityIdLSB(msg.getEntityId().getId().getLeastSignificantBits())
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 .setEvent(TransportProtos.ComponentLifecycleEvent.forNumber(msg.getEvent().ordinal()))
                 .build();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `entityType`：实体对象。
+     * 返回：处理结果。
      */
     public static TransportProtos.EntityTypeProto toProto(EntityType entityType) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return TransportProtos.EntityTypeProto.forNumber(entityType.getProtoNumber());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     public static ComponentLifecycleMsg fromProto(TransportProtos.ComponentLifecycleMsgProto proto) {
         return new ComponentLifecycleMsg(
@@ -143,14 +123,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `entityType`：实体对象。
+     * 返回：处理结果。
      */
     public static EntityType fromProto(TransportProtos.EntityTypeProto entityType) {
         return entityTypeByProtoNumber[entityType.getNumber()];
@@ -158,17 +134,12 @@ public class ProtoUtils {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：处理结果。
      */
     public static TransportProtos.ToEdgeSyncRequestMsgProto toProto(ToEdgeSyncRequest request) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return TransportProtos.ToEdgeSyncRequestMsgProto.newBuilder()
                 .setTenantIdMSB(request.getTenantId().getId().getMostSignificantBits())
                 .setTenantIdLSB(request.getTenantId().getId().getLeastSignificantBits())
@@ -180,14 +151,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     public static ToEdgeSyncRequest fromProto(TransportProtos.ToEdgeSyncRequestMsgProto proto) {
         return new ToEdgeSyncRequest(
@@ -198,17 +165,12 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：处理结果。
      */
     public static TransportProtos.FromEdgeSyncResponseMsgProto toProto(FromEdgeSyncResponse response) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return TransportProtos.FromEdgeSyncResponseMsgProto.newBuilder()
                 .setTenantIdMSB(response.getTenantId().getId().getMostSignificantBits())
                 .setTenantIdLSB(response.getTenantId().getId().getLeastSignificantBits())
@@ -221,14 +183,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     public static FromEdgeSyncResponse fromProto(TransportProtos.FromEdgeSyncResponseMsgProto proto) {
         return new FromEdgeSyncResponse(
@@ -240,17 +198,12 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     public static TransportProtos.EdgeEventUpdateMsgProto toProto(EdgeEventUpdateMsg msg) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return TransportProtos.EdgeEventUpdateMsgProto.newBuilder()
                 .setTenantIdMSB(msg.getTenantId().getId().getMostSignificantBits())
                 .setTenantIdLSB(msg.getTenantId().getId().getLeastSignificantBits())
@@ -260,14 +213,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     public static EdgeEventUpdateMsg fromProto(TransportProtos.EdgeEventUpdateMsgProto proto) {
         return new EdgeEventUpdateMsg(
@@ -277,24 +226,18 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.DeviceEdgeUpdateMsgProto toProto(DeviceEdgeUpdateMsg msg) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.DeviceEdgeUpdateMsgProto.Builder builder = TransportProtos.DeviceEdgeUpdateMsgProto.newBuilder()
                 .setTenantIdMSB(msg.getTenantId().getId().getMostSignificantBits())
                 .setTenantIdLSB(msg.getTenantId().getId().getLeastSignificantBits())
                 .setDeviceIdMSB(msg.getDeviceId().getId().getMostSignificantBits())
                 .setDeviceIdLSB(msg.getDeviceId().getId().getLeastSignificantBits());
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (msg.getEdgeId() != null) {
             builder.setEdgeIdMSB(msg.getEdgeId().getId().getMostSignificantBits())
                     .setEdgeIdLSB(msg.getEdgeId().getId().getLeastSignificantBits());
@@ -304,18 +247,13 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static DeviceEdgeUpdateMsg fromProto(TransportProtos.DeviceEdgeUpdateMsgProto proto) {
         EdgeId edgeId = null;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (proto.hasEdgeIdMSB() && proto.hasEdgeIdLSB()) {
             edgeId = new EdgeId(new UUID(proto.getEdgeIdMSB(), proto.getEdgeIdLSB()));
         }
@@ -326,17 +264,12 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.DeviceNameOrTypeUpdateMsgProto toProto(DeviceNameOrTypeUpdateMsg msg) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return TransportProtos.DeviceNameOrTypeUpdateMsgProto.newBuilder()
                 .setTenantIdMSB(msg.getTenantId().getId().getMostSignificantBits())
                 .setTenantIdLSB(msg.getTenantId().getId().getLeastSignificantBits())
@@ -348,14 +281,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static DeviceNameOrTypeUpdateMsg fromProto(TransportProtos.DeviceNameOrTypeUpdateMsgProto proto) {
         return new DeviceNameOrTypeUpdateMsg(
@@ -367,17 +296,12 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.DeviceAttributesEventMsgProto toProto(DeviceAttributesEventNotificationMsg msg) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.DeviceAttributesEventMsgProto.Builder builder = TransportProtos.DeviceAttributesEventMsgProto.newBuilder();
         builder.setTenantIdMSB(msg.getTenantId().getId().getMostSignificantBits())
                 .setTenantIdLSB(msg.getTenantId().getId().getLeastSignificantBits())
@@ -385,7 +309,6 @@ public class ProtoUtils {
                 .setDeviceIdLSB(msg.getDeviceId().getId().getLeastSignificantBits())
                 .setDeleted(msg.isDeleted());
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (msg.getScope() != null) {
             builder.setScope(TransportProtos.AttributeScopeProto.valueOf(msg.getScope()));
         }
@@ -438,14 +361,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static ToDeviceActorNotificationMsg fromProto(TransportProtos.DeviceAttributesEventMsgProto proto) {
         return new DeviceAttributesEventNotificationMsg(
@@ -459,14 +378,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.DeviceCredentialsUpdateMsgProto toProto(DeviceCredentialsUpdateNotificationMsg msg) {
         TransportProtos.DeviceCredentialsProto.Builder protoBuilder = TransportProtos.DeviceCredentialsProto.newBuilder()
@@ -489,14 +404,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static ToDeviceActorNotificationMsg fromProto(TransportProtos.DeviceCredentialsUpdateMsgProto proto) {
         DeviceCredentials deviceCredentials = new DeviceCredentials();
@@ -512,14 +423,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.ToDeviceRpcRequestActorMsgProto toProto(ToDeviceRpcRequestActorMsg msg) {
         TransportProtos.ToDeviceRpcRequestMsg proto = TransportProtos.ToDeviceRpcRequestMsg.newBuilder()
@@ -542,14 +449,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static ToDeviceActorNotificationMsg fromProto(TransportProtos.ToDeviceRpcRequestActorMsgProto proto) {
         TransportProtos.ToDeviceRpcRequestMsg toDeviceRpcRequestMsg = proto.getToDeviceRpcRequestMsg();
@@ -565,14 +468,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.FromDeviceRpcResponseActorMsgProto toProto(FromDeviceRpcResponseActorMsg msg) {
         TransportProtos.FromDeviceRPCResponseProto.Builder builder = TransportProtos.FromDeviceRPCResponseProto.newBuilder()
@@ -594,14 +493,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static ToDeviceActorNotificationMsg fromProto(TransportProtos.FromDeviceRpcResponseActorMsgProto proto) {
         FromDeviceRpcResponse fromDeviceRpcResponse = new FromDeviceRpcResponse(
@@ -617,14 +512,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.RemoveRpcActorMsgProto toProto(RemoveRpcActorMsg msg) {
         return TransportProtos.RemoveRpcActorMsgProto.newBuilder()
@@ -638,14 +529,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static ToDeviceActorNotificationMsg fromProto(TransportProtos.RemoveRpcActorMsgProto proto) {
         return new RemoveRpcActorMsg(
@@ -656,14 +543,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TransportProtos.DeviceDeleteMsgProto toProto(DeviceDeleteMsg msg) {
         return TransportProtos.DeviceDeleteMsgProto.newBuilder()
@@ -675,14 +558,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     private static DeviceDeleteMsg fromProto(TransportProtos.DeviceDeleteMsgProto proto) {
         return new DeviceDeleteMsg(
@@ -691,14 +570,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProto` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     public static TransportProtos.ToDeviceActorNotificationMsgProto toProto(ToDeviceActorNotificationMsg msg) {
         if (msg instanceof DeviceEdgeUpdateMsg) {
@@ -738,14 +613,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromProto` 对应的处理。
+     * 参数：
+     * - `proto`：`proto` 参数。
+     * 返回：处理结果。
      */
     public static ToDeviceActorNotificationMsg fromProto(TransportProtos.ToDeviceActorNotificationMsgProto proto) {
         if (proto.hasDeviceEdgeUpdateMsg()) {
@@ -769,14 +640,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeKeySetFromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `deletedKeysList`：键。
+     * 返回：匹配的数据集合。
      */
     private static Set<AttributeKey> getAttributeKeySetFromProto(List<TransportProtos.AttributeKey> deletedKeysList) {
         if (deletedKeysList.isEmpty()) {
@@ -788,14 +655,10 @@ public class ProtoUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributesKvEntryFromProto` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取Protobuf。
+     * 参数：
+     * - `valuesList`：值。
+     * 返回：匹配的数据集合。
      */
     private static List<AttributeKvEntry> getAttributesKvEntryFromProto(List<TransportProtos.AttributeValueProto> valuesList) {
         if (valuesList.isEmpty()) {

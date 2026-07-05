@@ -24,16 +24,16 @@ import java.util.stream.Stream;
 import static org.mockito.Mockito.spy;
 
 /**
- * 测试目标：验证 {@code TbMsgGeneratorNodeTest} 覆盖的 调试节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbMsgGeneratorNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbMsgGeneratorNodeTest` 测试类，用于验证 `TbMsgGeneratorNode` 相关行为。
  */
 public class TbMsgGeneratorNodeTest extends AbstractRuleNodeUpgradeTest {
 
     // Rule nodes upgrade
-    /** 参数源方法：{@code givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
+    /**
+     * 功能：验证 `givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     private static Stream<Arguments> givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig() {
         return Stream.of(
                 // default config for version 0
@@ -54,7 +54,11 @@ public class TbMsgGeneratorNodeTest extends AbstractRuleNodeUpgradeTest {
         );
     }
 
-    /** 实现方法：{@code getTestNode} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+    /**
+     * 功能：获取节点实例。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @Override
     protected TbNode getTestNode() {
         return spy(TbMsgGeneratorNode.class);

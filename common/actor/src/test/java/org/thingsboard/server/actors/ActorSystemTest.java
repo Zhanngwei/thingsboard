@@ -37,8 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Slf4j
-@RunWith(MockitoJUnitRunner.class)
 /**
  * 中文说明：
  * 1. 类目的：`ActorSystemTest` 是ThingsBoard Common 测试模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -49,60 +47,37 @@ import java.util.concurrent.atomic.AtomicLong;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@RunWith(MockitoJUnitRunner.class)
 public class ActorSystemTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `ROOT_DISPATCHER` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `ROOT_DISPATCHER`常量，用于统一引用固定值。
      */
     public static final String ROOT_DISPATCHER = "root-dispatcher";
     private static final int _100K = 100 * 1024;
     /**
-     * 字段说明：
-     * 1. 保存 `TIMEOUT_AWAIT_MAX_SEC` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间常量，用于统一引用固定值。
      */
     public static final int TIMEOUT_AWAIT_MAX_SEC = 100;
 
     /**
-     * 字段说明：
-     * 1. 保存 `actorSystem` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * Actor 系统，表示当前对象的对应属性。
      */
     private volatile TbActorSystem actorSystem;
     private volatile ExecutorService submitPool;
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     private ExecutorService executor;
     private int parallelism;
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initActorSystem` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动Actor 系统。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void initActorSystem() {
         int cores = Runtime.getRuntime().availableProcessors();
         parallelism = Math.max(2, cores / 2);
@@ -111,145 +86,98 @@ public class ActorSystemTest {
         submitPool = Executors.newFixedThreadPool(parallelism, ThingsBoardThreadFactory.forName(getClass().getSimpleName() + "-submit-test-scope")); //order guaranteed
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdownActorSystem` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭Actor 系统。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void shutdownActorSystem() {
         actorSystem.stop();
         submitPool.shutdownNow();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (executor != null) {
             executor.shutdownNow();
         }
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test1actorsAnd100KMessages` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test1actorsAnd100KMessages` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void test1actorsAnd100KMessages() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         testActorsAndMessages(1, _100K, 1);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test10actorsAnd100KMessages` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test10actorsAnd100KMessages` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void test10actorsAnd100KMessages() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         testActorsAndMessages(10, _100K, 1);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test100KActorsAnd1Messages5timesSingleThread` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test100KActorsAnd1Messages5timesSingleThread` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void test100KActorsAnd1Messages5timesSingleThread() throws InterruptedException {
         executor = Executors.newSingleThreadExecutor(ThingsBoardThreadFactory.forName(getClass().getSimpleName()));
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         testActorsAndMessages(_100K, 1, 5);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test100KActorsAnd1Messages5times` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test100KActorsAnd1Messages5times` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void test100KActorsAnd1Messages5times() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         testActorsAndMessages(_100K, 1, 5);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test100KActorsAnd10Messages` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test100KActorsAnd10Messages` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void test100KActorsAnd10Messages() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         testActorsAndMessages(_100K, 10, 1);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test1KActorsAnd1KMessages` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test1KActorsAnd1KMessages` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void test1KActorsAnd1KMessages() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         testActorsAndMessages(1000, 1000, 10);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNoMessagesAfterDestroy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`No Messages After Destroy`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNoMessagesAfterDestroy() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
@@ -261,9 +189,7 @@ public class ActorSystemTest {
         TbActorRef actorId2 = actorSystem.createRootActor(ROOT_DISPATCHER, new SlowInitActor.SlowInitActorCreator(
                 new TbEntityActorId(new DeviceId(UUID.randomUUID())), testCtx2));
 
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         actorId1.tell(new IntTbActorMsg(42));
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         actorId2.tell(new IntTbActorMsg(42));
         actorSystem.stop(actorId1);
 
@@ -271,17 +197,12 @@ public class ActorSystemTest {
         Assert.assertFalse(testCtx1.getLatch().await(1, TimeUnit.SECONDS));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testOneActorCreated` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证Actor 实例相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testOneActorCreated() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
@@ -302,24 +223,18 @@ public class ActorSystemTest {
         initLatch.countDown(); //replacement for Thread.wait(500) in the SlowCreateActorCreator
         Assert.assertTrue(actorsReadyLatch.await(TIMEOUT_AWAIT_MAX_SEC, TimeUnit.SECONDS));
 
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         actorSystem.tell(actorId, new IntTbActorMsg(42));
 
         Assert.assertTrue(testCtx1.getLatch().await(TIMEOUT_AWAIT_MAX_SEC, TimeUnit.SECONDS));
         Assert.assertFalse(testCtx2.getLatch().await(1, TimeUnit.SECONDS));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testActorCreatorCalledOnce` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证Actor 实例相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testActorCreatorCalledOnce() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
@@ -328,7 +243,6 @@ public class ActorSystemTest {
         final int actorsCount = 1000;
         final CountDownLatch initLatch = new CountDownLatch(1);
         final CountDownLatch actorsReadyLatch = new CountDownLatch(actorsCount);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < actorsCount; i++) {
             submitPool.submit(() -> {
                 actorSystem.createRootActor(ROOT_DISPATCHER, new SlowCreateActor.SlowCreateActorCreator(actorId, testCtx, initLatch));
@@ -338,7 +252,6 @@ public class ActorSystemTest {
         initLatch.countDown();
         Assert.assertTrue(actorsReadyLatch.await(TIMEOUT_AWAIT_MAX_SEC, TimeUnit.SECONDS));
 
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         actorSystem.tell(actorId, new IntTbActorMsg(42));
 
         Assert.assertTrue(testCtx.getLatch().await(TIMEOUT_AWAIT_MAX_SEC, TimeUnit.SECONDS));
@@ -346,17 +259,12 @@ public class ActorSystemTest {
         Assert.assertEquals(2, testCtx.getInvocationCount().get());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFailedInit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Failed Init`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFailedInit() throws InterruptedException {
         executor = ThingsBoardExecutors.newWorkStealingPool(parallelism, getClass());
         actorSystem.createDispatcher(ROOT_DISPATCHER, executor);
@@ -378,14 +286,12 @@ public class ActorSystemTest {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testActorsAndMessages` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Actors And Messages`相关场景。
+     * 参数：
+     * - `actorsCount`：`actorsCount` 参数。
+     * - `msgNumber`：待处理消息。
+     * - `times`：`times` 参数。
+     * 返回：无。
      */
     public void testActorsAndMessages(int actorsCount, int msgNumber, int times) throws InterruptedException {
         Random random = new Random();
@@ -435,14 +341,10 @@ public class ActorSystemTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getActorTestCtx` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取上下文。
+     * 参数：
+     * - `i`：`i` 参数。
+     * 返回：处理结果。
      */
     private ActorTestCtx getActorTestCtx(int i) {
         CountDownLatch countDownLatch = new CountDownLatch(1);

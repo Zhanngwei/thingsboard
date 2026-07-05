@@ -31,15 +31,14 @@ import java.util.Map;
 public interface FirebaseService {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：向指定 FCM token 发送 Firebase 推送消息。
-     * 2. 输入参数：tenantId 是租户边界，credentials 是 Firebase 凭据，fcmToken 是目标设备 token，title/body 是通知标题和正文，data 是扩展载荷，badge 是角标。
-     * 3. 返回值：无；失败通过 Exception 抛出。
-     * 4. 调用时机：通知中心或 Firebase 通知节点需要发送移动推送时调用。
-     * 5. 调用方：Firebase 通知节点、通知中心实现。
-     * 6. 使用流程：属于 Rule Engine 外部通知发送流程。
-     * 7. 线程安全：接口无状态，具体实现需保证外部客户端和凭据使用并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、MQTT、Actor、数据库；实现可能读取配置缓存并调用外部 FCM API。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `credentials`：`credentials` 参数。
+     * - `fcmToken`：`fcmToken` 参数。
+     * - `title`：`title` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     void sendMessage(TenantId tenantId, String credentials, String fcmToken, String title, String body, Map<String, String> data, Integer badge) throws Exception;
 

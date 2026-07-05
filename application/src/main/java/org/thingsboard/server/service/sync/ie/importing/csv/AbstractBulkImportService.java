@@ -87,80 +87,44 @@ import java.util.stream.Stream;
  * 7. 设计模式：主要体现 Service / Observer。
  */
 public abstract class AbstractBulkImportService<E extends HasId<? extends EntityId> & HasTenantId> {
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tsSubscriptionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 订阅，提供当前类调用的业务操作。
      */
+    @Autowired
     private TelemetrySubscriptionService tsSubscriptionService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
+    @Autowired
     private TbTenantProfileCache tenantProfileCache;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `accessControlService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private AccessControlService accessControlService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `accessValidator` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 校验器，封装可复用的处理规则。
      */
+    @Autowired
     private AccessValidator accessValidator;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `entityActionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 实体，提供当前类调用的业务操作。
      */
+    @Autowired
     private EntityActionService entityActionService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     private ThreadPoolExecutor executor;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initExecutor` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     private void initExecutor() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (executor == null) {
             executor = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors(), Runtime.getRuntime().availableProcessors(),
                     60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(150_000),
@@ -170,14 +134,11 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processBulkImport` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Bulk Import`。
+     * 参数：
+     * - `request`：请求对象。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
     public final BulkImportResult<E> processBulkImport(BulkImportRequest request, SecurityUser user) throws Exception {
         List<EntityData> entitiesData = parseData(request);
@@ -193,14 +154,12 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
                     ImportedEntityInfo<E> importedEntityInfo = saveEntity(entityData.getFields(), user);
                     E entity = importedEntityInfo.getEntity();
 
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (request.getMapping().getUpdate() || !importedEntityInfo.isUpdated()) {
                         saveKvs(user, entity, entityData.getKvs());
                     }
                     return importedEntityInfo;
                 },
                 importedEntityInfo -> {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (importedEntityInfo.isUpdated()) {
                         result.getUpdated().incrementAndGet();
                     } else {
@@ -219,22 +178,18 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
         return result;
     }
 
-    @SneakyThrows
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntity` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `fields`：键值映射。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @SneakyThrows
     private ImportedEntityInfo<E> saveEntity(Map<BulkImportColumnType, String> fields, SecurityUser user) {
         ImportedEntityInfo<E> importedEntityInfo = new ImportedEntityInfo<>();
 
         E entity = findOrCreateEntity(user.getTenantId(), fields.get(BulkImportColumnType.NAME));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (entity.getId() != null) {
             importedEntityInfo.setOldEntity((E) entity.getClass().getConstructor(entity.getClass()).newInstance(entity));
             importedEntityInfo.setUpdated(true);
@@ -253,74 +208,54 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findOrCreateEntity` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `name`：名称。
+     * 返回：处理结果。
      */
     protected abstract E findOrCreateEntity(TenantId tenantId, String name);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setOwners` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Owners`。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `user`：`user` 参数。
+     * 返回：无。
      */
     protected abstract void setOwners(E entity, SecurityUser user);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setEntityFields` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新实体。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `fields`：键值映射。
+     * 返回：无。
      */
     protected abstract void setEntityFields(E entity, Map<BulkImportColumnType, String> fields);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntity` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entity`：实体对象。
+     * - `fields`：键值映射。
+     * 返回：处理结果。
      */
     protected abstract E saveEntity(SecurityUser user, E entity, Map<BulkImportColumnType, String> fields);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityType` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：无。
+     * 返回：处理结果。
      */
     protected abstract EntityType getEntityType();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrCreateAdditionalInfoObj` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取扩展信息。
+     * 参数：
+     * - `entity`：实体对象。
+     * 返回：处理结果。
      */
     protected ObjectNode getOrCreateAdditionalInfoObj(HasAdditionalInfo entity) {
         return entity.getAdditionalInfo() == null || entity.getAdditionalInfo().isNull() ?
@@ -328,14 +263,12 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveKvs` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Kvs`。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entity`：实体对象。
+     * - `data`：待处理数据。
+     * 返回：无。
      */
     private void saveKvs(SecurityUser user, E entity, Map<BulkImportRequest.ColumnMapping, ParsedValue> data) {
         Arrays.stream(BulkImportColumnType.values())
@@ -351,7 +284,6 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
                 .filter(kvsEntry -> kvsEntry.getValue().entrySet().size() > 0)
                 .forEach(kvsEntry -> {
                     BulkImportColumnType kvType = kvsEntry.getKey();
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (kvType == BulkImportColumnType.SHARED_ATTRIBUTE || kvType == BulkImportColumnType.SERVER_ATTRIBUTE) {
                         saveAttributes(user, entity, kvsEntry, kvType);
                     } else {
@@ -360,17 +292,15 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
                 });
     }
 
-    @SneakyThrows
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveTelemetry` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建遥测。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entity`：实体对象。
+     * - `kvsEntry`：键值映射。
+     * 返回：无。
      */
+    @SneakyThrows
     private void saveTelemetry(SecurityUser user, E entity, Map.Entry<BulkImportColumnType, JsonObject> kvsEntry) {
         List<TsKvEntry> timeseries = JsonConverter.convertToTelemetry(kvsEntry.getValue(), System.currentTimeMillis())
                 .entrySet().stream()
@@ -378,10 +308,8 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
                 .collect(Collectors.toList());
 
         accessValidator.validateEntityAndCallback(user, Operation.WRITE_TELEMETRY, entity.getId(), (result, tenantId, entityId) -> {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             TenantProfile tenantProfile = tenantProfileCache.get(tenantId);
             long tenantTtl = TimeUnit.DAYS.toSeconds(((DefaultTenantProfileConfiguration) tenantProfile.getProfileData().getConfiguration()).getDefaultStorageTtlDays());
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             tsSubscriptionService.saveAndNotify(tenantId, user.getCustomerId(), entityId, timeseries, tenantTtl, new FutureCallback<Void>() {
                 @Override
                 public void onSuccess(@Nullable Void tmp) {
@@ -399,23 +327,21 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
         });
     }
 
-    @SneakyThrows
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttributes` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attributes`。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entity`：实体对象。
+     * - `kvsEntry`：键值映射。
+     * - `kvType`：类型。
+     * 返回：无。
      */
+    @SneakyThrows
     private void saveAttributes(SecurityUser user, E entity, Map.Entry<BulkImportColumnType, JsonObject> kvsEntry, BulkImportColumnType kvType) {
         String scope = kvType.getKey();
         List<AttributeKvEntry> attributes = new ArrayList<>(JsonConverter.convertToAttributes(kvsEntry.getValue()));
 
         accessValidator.validateEntityAndCallback(user, Operation.WRITE_ATTRIBUTES, entity.getId(), (result, tenantId, entityId) -> {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             tsSubscriptionService.saveAndNotify(tenantId, entityId, scope, attributes, new FutureCallback<>() {
 
                 @Override
@@ -437,20 +363,15 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseData` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析数据。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：匹配的数据集合。
      */
     private List<EntityData> parseData(BulkImportRequest request) throws Exception {
         List<List<String>> records = CsvUtils.parseCsv(request.getFile(), request.getMapping().getDelimiter());
         AtomicInteger linesCounter = new AtomicInteger(0);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (request.getMapping().getHeader()) {
             records.remove(0);
             linesCounter.incrementAndGet();
@@ -464,7 +385,6 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
                             .map(i -> Map.entry(columnsMappings.get(i), record.get(i)))
                             .filter(entry -> StringUtils.isNotEmpty(entry.getValue()))
                             .forEach(entry -> {
-                                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                                 if (!entry.getKey().getType().isKv()) {
                                     entityData.getFields().put(entry.getKey().getType(), entry.getValue());
                                 } else {
@@ -478,25 +398,18 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
                 .collect(Collectors.toList());
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdownExecutor` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     private void shutdownExecutor() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!executor.isTerminating()) {
             executor.shutdown();
         }
     }
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`EntityData` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
@@ -507,21 +420,16 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 Service / Observer。
      */
+    @Data
     protected static class EntityData {
         private final Map<BulkImportColumnType, String> fields = new LinkedHashMap<>();
         private final Map<BulkImportRequest.ColumnMapping, ParsedValue> kvs = new LinkedHashMap<>();
         /**
-         * 字段说明：
-         * 1. 保存 `lineNumber` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `lineNumber` 字段，保存当前对象的对应属性。
          */
         private int lineNumber;
     }
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`ParsedValue` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
@@ -532,30 +440,20 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 Service / Observer。
      */
+    @Data
     protected static class ParsedValue {
         /**
-         * 字段说明：
-         * 1. 保存 `value` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 值，保存当前处理得到的具体内容。
          */
         private final Object value;
         private final DataType dataType;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `toJsonPrimitive` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `toJsonPrimitive` 对应的处理。
+         * 参数：无。
+         * 返回：处理结果。
          */
         public JsonPrimitive toJsonPrimitive() {
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (dataType) {
                 case STRING:
                     return new JsonPrimitive((String) value);
@@ -571,14 +469,9 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `stringValue` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `stringValue` 对应的处理。
+         * 参数：无。
+         * 返回：文本结果。
          */
         public String stringValue() {
             return value.toString();

@@ -36,8 +36,6 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Random;
 
-@Slf4j
-
 /**
  * 中文说明：
  * 1. 类目的：`TbUtilsTest` 是ThingsBoard Common 测试模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -48,102 +46,58 @@ import java.util.Random;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class TbUtilsTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `ctx` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private ExecutionContext ctx;
 
     /**
-     * 字段说明：
-     * 1. 保存 `intValHex` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `intValHex` 字段，保存当前对象的对应属性。
      */
     private final String intValHex = "41EA62CC";
     private final float floatVal = 29.29824f;
     /**
-     * 字段说明：
-     * 1. 保存 `floatValStr` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `floatValStr` 字段，保存当前对象的对应属性。
      */
     private final String floatValStr = "29.29824";
 
 
     /**
-     * 字段说明：
-     * 1. 保存 `floatValHexRev` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `floatValHexRev` 字段，保存当前对象的对应属性。
      */
     private final String floatValHexRev = "CC62EA41";
     private final float floatValRev = -5.948442E7f;
 
     /**
-     * 字段说明：
-     * 1. 保存 `longVal` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `longVal` 字段，保存当前对象的对应属性。
      */
     private final long longVal = 0x409B04B10CB295EAL;
     private final String longValHex = "409B04B10CB295EA";
     /**
-     * 字段说明：
-     * 1. 保存 `longValRev` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `longValRev` 字段，保存当前对象的对应属性。
      */
     private final long longValRev = 0xEA95B20CB1049B40L;
     private final String longValHexRev = "EA95B20CB1049B40";
     /**
-     * 字段说明：
-     * 1. 保存 `doubleValStr` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `doubleValStr` 字段，保存当前对象的对应属性。
      */
     private final String doubleValStr = "1729.1729";
     private final double doubleVal = 1729.1729;
     /**
-     * 字段说明：
-     * 1. 保存 `doubleValRev` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `doubleValRev` 字段，保存当前对象的对应属性。
      */
     private final double doubleValRev = -2.7208640774822924E205;
 
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `before` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `before` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void before() {
         SandboxedParserConfiguration parserConfig = ParserContext.enableSandboxedMode();
         parserConfig.addImport("JSON", TbJson.class);
@@ -152,7 +106,6 @@ public class TbUtilsTest {
         parserConfig.registerDataType("Calendar", Calendar.class, date -> 8L);
         try {
             TbUtils.register(parserConfig);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("Cannot register functions", e);
         }
@@ -160,32 +113,22 @@ public class TbUtilsTest {
         Assert.assertNotNull(ctx);
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `after` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `after` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void after() {
         ctx.stop();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseHexToInt` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Hex To Int`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseHexToInt() {
         Assert.assertEquals(0xAB, TbUtils.parseHexToInt("AB"));
 
@@ -199,17 +142,12 @@ public class TbUtilsTest {
         Assert.assertEquals(0xDDCCBBAA, TbUtils.parseHexToInt("AABBCCDD", false));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseBytesToInt_checkPrimitives` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Bytes To Int check Primitives`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseBytesToInt_checkPrimitives() {
         int expected = 257;
         byte[] data = ByteBuffer.allocate(4).putInt(expected).array();
@@ -234,17 +172,12 @@ public class TbUtilsTest {
         Assert.assertEquals(expected, TbUtils.parseBytesToInt(data, 0, 3, false));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseBytesToInt_checkLists` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Bytes To Int check Lists`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseBytesToInt_checkLists() {
         int expected = 257;
         List<Byte> data = toList(ByteBuffer.allocate(4).putInt(expected).array());
@@ -269,17 +202,12 @@ public class TbUtilsTest {
         Assert.assertEquals(expected, TbUtils.parseBytesToInt(data, 0, 3, false));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toFlatMap` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toFlatMap` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void toFlatMap() {
         ExecutionHashMap<String, Object> inputMap = new ExecutionHashMap<>(16, ctx);
         inputMap.put("name", "Alice");
@@ -339,17 +267,12 @@ public class TbUtilsTest {
         Assert.assertEquals(expectedMapWithoutPaths, actualMapWithoutPaths);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseInt` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Int`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseInt() {
         Assert.assertNull(TbUtils.parseInt(null));
         Assert.assertNull(TbUtils.parseInt(""));
@@ -381,49 +304,34 @@ public class TbUtilsTest {
         Assert.assertThrows(NumberFormatException.class, () -> TbUtils.parseInt("KonaIn", 10));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseFloat` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Float`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseFloat() {
         Assert.assertEquals(java.util.Optional.of(floatVal).get(), TbUtils.parseFloat(floatValStr));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toFixedFloat` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toFixedFloat` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void toFixedFloat() {
         float actualF = TbUtils.toFixed(floatVal, 3);
         Assert.assertEquals(1, Float.compare(floatVal, actualF));
         Assert.assertEquals(0, Float.compare(29.298f, actualF));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseHexToFloat` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Hex To Float`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseHexToFloat() {
         Assert.assertEquals(0, Float.compare(floatVal, TbUtils.parseHexToFloat(intValHex)));
         Assert.assertEquals(0, Float.compare(floatValRev, TbUtils.parseHexToFloat(intValHex, false)));
@@ -431,17 +339,12 @@ public class TbUtilsTest {
         Assert.assertEquals(0, Float.compare(floatVal, TbUtils.parseLittleEndianHexToFloat(floatValHexRev)));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `arseBytesToFloat` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `arseBytesToFloat` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void arseBytesToFloat() {
         byte[] floatValByte = {65, -22, 98, -52};
         Assert.assertEquals(0, Float.compare(floatVal, TbUtils.parseBytesToFloat(floatValByte, 0)));
@@ -452,17 +355,12 @@ public class TbUtilsTest {
         Assert.assertEquals(0, Float.compare(floatValRev, TbUtils.parseBytesToFloat(floatVaList, 0, false)));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseLong` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Long`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseLong() {
         Assert.assertNull(TbUtils.parseLong(null));
         Assert.assertNull(TbUtils.parseLong(""));
@@ -494,17 +392,12 @@ public class TbUtilsTest {
         Assert.assertThrows(NumberFormatException.class, () -> TbUtils.parseLong("KonaLong", 10));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseHexToLong` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Hex To Long`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseHexToLong() {
         Assert.assertEquals(longVal, TbUtils.parseHexToLong(longValHex));
         Assert.assertEquals(longVal, TbUtils.parseHexToLong(longValHexRev, false));
@@ -512,17 +405,12 @@ public class TbUtilsTest {
         Assert.assertEquals(longVal, TbUtils.parseLittleEndianHexToLong(longValHexRev));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseBytesToLong` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Bytes To Long`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseBytesToLong() {
         byte[] longValByte = {64, -101, 4, -79, 12, -78, -107, -22};
         Assert.assertEquals(longVal, TbUtils.parseBytesToLong(longValByte, 0, 8));
@@ -534,49 +422,34 @@ public class TbUtilsTest {
         Assert.assertEquals(longValRev, TbUtils.parseBytesToLong(longVaList, 0, 8));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parsDouble` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `parsDouble` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parsDouble() {
         Assert.assertEquals(java.util.Optional.of(doubleVal).get(), TbUtils.parseDouble(doubleValStr));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toFixedDouble` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toFixedDouble` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void toFixedDouble() {
         double actualD = TbUtils.toFixed(doubleVal, 3);
         Assert.assertEquals(-1, Double.compare(doubleVal, actualD));
         Assert.assertEquals(0, Double.compare(1729.173, actualD));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseHexToDouble` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Hex To Double`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseHexToDouble() {
         Assert.assertEquals(0, Double.compare(doubleVal, TbUtils.parseHexToDouble(longValHex)));
         Assert.assertEquals(0, Double.compare(doubleValRev, TbUtils.parseHexToDouble(longValHex, false)));
@@ -584,17 +457,12 @@ public class TbUtilsTest {
         Assert.assertEquals(0, Double.compare(doubleVal, TbUtils.parseLittleEndianHexToDouble(longValHexRev)));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseBytesToDouble` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Bytes To Double`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseBytesToDouble() {
         byte[] doubleValByte = {64, -101, 4, -79, 12, -78, -107, -22};
         Assert.assertEquals(0, Double.compare(doubleVal, TbUtils.parseBytesToDouble(doubleValByte, 0)));
@@ -605,17 +473,12 @@ public class TbUtilsTest {
         Assert.assertEquals(0, Double.compare(doubleValRev, TbUtils.parseBytesToDouble(doubleVaList, 0, false)));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseBytesDecodeToJson` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析JSON。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseBytesDecodeToJson() throws IOException, IllegalAccessException {
         String expectedStr = "{\"hello\": \"world\"}";
         ExecutionHashMap<String, Object> expectedJson = new ExecutionHashMap<>(1, ctx);
@@ -624,17 +487,12 @@ public class TbUtilsTest {
         Object actualJson =  TbUtils.decodeToJson(ctx, expectedBytes);
         Assert.assertEquals(expectedJson,actualJson);
     }
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseStringDecodeToJson` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析JSON。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void parseStringDecodeToJson() throws IOException {
         String expectedStr = "{\"hello\": \"world\"}";
         ExecutionHashMap<String, Object> expectedJson = new ExecutionHashMap<>(1, ctx);
@@ -643,17 +501,12 @@ public class TbUtilsTest {
         Assert.assertEquals(expectedJson,actualJson);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stringToBytesInputObjectTest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `stringToBytesInputObjectTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void stringToBytesInputObjectTest() throws IOException, IllegalAccessException {
         String expectedStr = "{\"hello\": \"world\"}";
         Object inputJson = TbUtils.decodeToJson(ctx, expectedStr);
@@ -671,55 +524,42 @@ public class TbUtilsTest {
         Assert.assertThrows(IllegalAccessException.class, () -> TbUtils.stringToBytes(ctx, ((ExecutionHashMap) finalInputJson).get("hello"), "UTF-8"));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `bytesFromList` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `bytesFromList` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void bytesFromList() {
         byte[] arrayBytes =      {(byte)0x00, (byte)0x08, (byte)0x10, (byte)0x1C, (byte)0xFF, (byte)0xFC, (byte)0xAD, (byte)0x88, (byte)0x75, (byte)0x74, (byte)0x8A, (byte)0x82};
         Object[] arrayMix      = {    "0x00",         8,        "16",     "0x1C",        255, (byte)0xFC,        173,        136,        117,        116,       -118,     "-126"};
 
         String expected = new String(arrayBytes);
         ArrayList<Byte> listBytes = new ArrayList<>(arrayBytes.length);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Byte element : arrayBytes) {
             listBytes.add(element);
         }
         Assert.assertEquals(expected, TbUtils.bytesToString(listBytes));
 
         ArrayList<Object> listMix = new ArrayList<>(arrayMix.length);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Object element : arrayMix) {
             listMix.add(element);
         }
         Assert.assertEquals(expected, TbUtils.bytesToString(listMix));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `bytesFromList_Error` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `bytesFromList_Error` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void bytesFromList_Error() {
         List<String> listHex = new ArrayList<>();
         listHex.add("0xFG");
         try {
             TbUtils.bytesToString(listHex);
             Assert.fail("Should throw NumberFormatException");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NumberFormatException e) {
             Assert.assertTrue(e.getMessage().contains("Failed radix: [16] for value: \"FG\"!"));
         }
@@ -727,7 +567,6 @@ public class TbUtilsTest {
         try {
             TbUtils.bytesToString(listHex);
             Assert.fail("Should throw NumberFormatException");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NumberFormatException e) {
             Assert.assertTrue(e.getMessage().contains("Failed radix: [10] for value: \"1F\"!"));
         }
@@ -737,7 +576,6 @@ public class TbUtilsTest {
         try {
             TbUtils.bytesToString(listIntString);
             Assert.fail("Should throw NumberFormatException");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NumberFormatException e) {
             Assert.assertTrue(e.getMessage().contains("The value '-129' could not be correctly converted to a byte. " +
                     "Integer to byte conversion requires the use of only 8 bits (with a range of min/max = -128/255)!"));
@@ -747,7 +585,6 @@ public class TbUtilsTest {
         try {
             TbUtils.bytesToString(listIntString);
             Assert.fail("Should throw NumberFormatException");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NumberFormatException e) {
             Assert.assertTrue(e.getMessage().contains("The value '256' could not be correctly converted to a byte. " +
                     "Integer to byte conversion requires the use of only 8 bits (with a range of min/max = -128/255)!"));
@@ -758,7 +595,6 @@ public class TbUtilsTest {
         try {
             TbUtils.bytesToString(listIntBytes);
             Assert.fail("Should throw NumberFormatException");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NumberFormatException e) {
             Assert.assertTrue(e.getMessage().contains("The value '-129' could not be correctly converted to a byte. " +
                     "Integer to byte conversion requires the use of only 8 bits (with a range of min/max = -128/255)!"));
@@ -768,7 +604,6 @@ public class TbUtilsTest {
         try {
             TbUtils.bytesToString(listIntBytes);
             Assert.fail("Should throw NumberFormatException");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NumberFormatException e) {
             Assert.assertTrue(e.getMessage().contains("The value '256' could not be correctly converted to a byte. " +
                     "Integer to byte conversion requires the use of only 8 bits (with a range of min/max = -128/255)!"));
@@ -781,7 +616,6 @@ public class TbUtilsTest {
         try {
             TbUtils.bytesToString(listObjects);
             Assert.fail("Should throw NumberFormatException");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NumberFormatException e) {
             Assert.assertTrue(e.getMessage().contains("The value '[0xFD]' could not be correctly converted to a byte. " +
                     "Must be a HexDecimal/String/Integer/Byte format !"));
@@ -790,18 +624,13 @@ public class TbUtilsTest {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toList` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toList` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：匹配的数据集合。
      */
     private static List<Byte> toList(byte[] data) {
         List<Byte> result = new ArrayList<>(data.length);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Byte b : data) {
             result.add(b);
         }

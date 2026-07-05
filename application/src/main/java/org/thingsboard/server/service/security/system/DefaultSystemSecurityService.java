@@ -71,8 +71,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.thingsboard.server.common.data.CacheConstants.SECURITY_SETTINGS_CACHE;
 
-@Service
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultSystemSecurityService` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
@@ -83,94 +81,59 @@ import static org.thingsboard.server.common.data.CacheConstants.SECURITY_SETTING
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Strategy。
  */
+@Service
+@Slf4j
 public class DefaultSystemSecurityService implements SystemSecurityService {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `adminSettingsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private AdminSettingsService adminSettingsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `encoder` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 编码器，表示当前对象的对应属性。
      */
+    @Autowired
     private BCryptPasswordEncoder encoder;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `userService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，提供当前类调用的业务操作。
      */
+    @Autowired
     private UserService userService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `mailService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private MailService mailService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `auditLogService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private AuditLogService auditLogService;
 
-    @Resource
     /**
-     * 字段说明：
-     * 1. 保存 `self` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `self` 字段，保存当前对象的对应属性。
      */
+    @Resource
     private SystemSecurityService self;
 
+    /**
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @Cacheable(cacheNames = SECURITY_SETTINGS_CACHE, key = "'securitySettings'")
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getSecuritySettings` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public SecuritySettings getSecuritySettings() {
         SecuritySettings securitySettings = null;
         AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(TenantId.SYS_TENANT_ID, "securitySettings");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (adminSettings != null) {
             try {
                 securitySettings = JacksonUtil.convertValue(adminSettings.getJsonValue(), SecuritySettings.class);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 throw new RuntimeException("Failed to load security settings!", e);
             }
@@ -183,21 +146,16 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         return securitySettings;
     }
 
+    /**
+     * 功能：保存或创建配置。
+     * 参数：
+     * - `securitySettings`：配置对象。
+     * 返回：匹配的数据集合。
+     */
     @CacheEvict(cacheNames = SECURITY_SETTINGS_CACHE, key = "'securitySettings'")
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveSecuritySettings` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public SecuritySettings saveSecuritySettings(SecuritySettings securitySettings) {
         AdminSettings adminSettings = adminSettingsService.findAdminSettingsByKey(TenantId.SYS_TENANT_ID, "securitySettings");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (adminSettings == null) {
             adminSettings = new AdminSettings();
             adminSettings.setTenantId(TenantId.SYS_TENANT_ID);
@@ -207,31 +165,26 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         AdminSettings savedAdminSettings = adminSettingsService.saveAdminSettings(TenantId.SYS_TENANT_ID, adminSettings);
         try {
             return JacksonUtil.convertValue(savedAdminSettings.getJsonValue(), SecuritySettings.class);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             throw new RuntimeException("Failed to load security settings!", e);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateUserCredentials` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验用户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `userCredentials`：`userCredentials` 参数。
+     * - `username`：名称。
+     * - `password`：`password` 参数。
+     * 返回：无。
      */
+    @Override
     public void validateUserCredentials(TenantId tenantId, UserCredentials userCredentials, String username, String password) throws AuthenticationException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!encoder.matches(password, userCredentials.getPassword())) {
             int failedLoginAttempts = userService.increaseFailedLoginAttempts(tenantId, userCredentials.getUserId());
             SecuritySettings securitySettings = self.getSecuritySettings();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (securitySettings.getMaxFailedLoginAttempts() != null && securitySettings.getMaxFailedLoginAttempts() > 0) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (failedLoginAttempts > securitySettings.getMaxFailedLoginAttempts() && userCredentials.isEnabled()) {
                     lockAccount(userCredentials.getUserId(), username, securitySettings.getUserLockoutNotificationEmail(), securitySettings.getMaxFailedLoginAttempts());
                     throw new LockedException("Authentication Failed. Username was locked due to security policy.");
@@ -240,7 +193,6 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
             throw new BadCredentialsException("Authentication Failed. Username or Password not valid.");
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!userCredentials.isEnabled()) {
             throw new DisabledException("User is not active");
         }
@@ -248,9 +200,7 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         userService.resetFailedLoginAttempts(tenantId, userCredentials.getUserId());
 
         SecuritySettings securitySettings = self.getSecuritySettings();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (isPositiveInteger(securitySettings.getPasswordPolicy().getPasswordExpirationPeriodDays())) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if ((userCredentials.getCreatedTime()
                     + TimeUnit.DAYS.toMillis(securitySettings.getPasswordPolicy().getPasswordExpirationPeriodDays()))
                     < System.currentTimeMillis()) {
@@ -260,23 +210,20 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateTwoFaVerification` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Two Fa Verification`。
+     * 参数：
+     * - `securityUser`：`securityUser` 参数。
+     * - `verificationSuccess`：`verificationSuccess` 参数。
+     * - `twoFaSettings`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void validateTwoFaVerification(SecurityUser securityUser, boolean verificationSuccess, PlatformTwoFaSettings twoFaSettings) {
         TenantId tenantId = securityUser.getTenantId();
         UserId userId = securityUser.getId();
 
         int failedVerificationAttempts;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!verificationSuccess) {
             failedVerificationAttempts = userService.increaseFailedLoginAttempts(tenantId, userId);
         } else {
@@ -285,7 +232,6 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         }
 
         Integer maxVerificationFailures = twoFaSettings.getMaxVerificationFailuresBeforeUserLockout();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (maxVerificationFailures != null && maxVerificationFailures > 0
                 && failedVerificationAttempts >= maxVerificationFailures) {
             userService.setUserCredentialsEnabled(TenantId.SYS_TENANT_ID, userId, false);
@@ -296,14 +242,13 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `lockAccount` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `lockAccount` 对应的处理。
+     * 参数：
+     * - `userId`：用户ID。
+     * - `username`：名称。
+     * - `userLockoutNotificationEmail`：`userLockoutNotificationEmail` 参数。
+     * - `maxFailedLoginAttempts`：`maxFailedLoginAttempts` 参数。
+     * 返回：无。
      */
     private void lockAccount(UserId userId, String username, String userLockoutNotificationEmail, Integer maxFailedLoginAttempts) {
         userService.setUserCredentialsEnabled(TenantId.SYS_TENANT_ID, userId, false);
@@ -316,17 +261,14 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validatePassword` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验密码。
+     * 参数：
+     * - `password`：`password` 参数。
+     * - `userCredentials`：`userCredentials` 参数。
+     * 返回：无。
      */
+    @Override
     public void validatePassword(String password, UserCredentials userCredentials) throws DataValidationException {
         SecuritySettings securitySettings = self.getSecuritySettings();
         UserPasswordPolicy passwordPolicy = securitySettings.getPasswordPolicy();
@@ -348,17 +290,14 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validatePasswordByPolicy` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验密码。
+     * 参数：
+     * - `password`：`password` 参数。
+     * - `passwordPolicy`：`passwordPolicy` 参数。
+     * 返回：无。
      */
+    @Override
     public void validatePasswordByPolicy(String password, UserPasswordPolicy passwordPolicy) {
         List<Rule> passwordRules = new ArrayList<>();
 
@@ -391,17 +330,15 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getBaseUrl` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取基础访问地址。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `httpServletRequest`：请求对象。
+     * 返回：文本结果。
      */
+    @Override
     public String getBaseUrl(TenantId tenantId, CustomerId customerId, HttpServletRequest httpServletRequest) {
         String baseUrl = null;
         AdminSettings generalSettings = adminSettingsService.findAdminSettingsByKey(TenantId.SYS_TENANT_ID, "general");
@@ -419,32 +356,31 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
         return baseUrl;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logLoginAction` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logLoginAction` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `authenticationDetails`：`authenticationDetails` 参数。
+     * - `actionType`：类型。
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
+    @Override
     public void logLoginAction(User user, Object authenticationDetails, ActionType actionType, Exception e) {
         logLoginAction(user, authenticationDetails, actionType, null, e);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logLoginAction` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logLoginAction` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `authenticationDetails`：`authenticationDetails` 参数。
+     * - `actionType`：类型。
+     * - `provider`：`provider` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void logLoginAction(User user, Object authenticationDetails, ActionType actionType, String provider, Exception e) {
         String clientAddress = "Unknown";
         String browser = "Unknown";
@@ -496,14 +432,10 @@ public class DefaultSystemSecurityService implements SystemSecurityService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isPositiveInteger` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Positive Integer`。
+     * 参数：
+     * - `val`：`val` 参数。
+     * 返回：判断结果。
      */
     private static boolean isPositiveInteger(Integer val) {
         return val != null && val.intValue() > 0;

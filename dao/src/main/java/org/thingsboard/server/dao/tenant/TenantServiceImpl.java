@@ -66,8 +66,6 @@ import java.util.Optional;
 
 import static org.thingsboard.server.dao.service.Validator.validateId;
 
-@Service("TenantDaoService")
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TenantServiceImpl` 是 ThingsBoard DAO 模块 中的租户、客户或用户持久化服务类型，用于管理多租户边界内的组织、客户、用户、权限和配置数据访问。
@@ -79,423 +77,253 @@ import static org.thingsboard.server.dao.service.Validator.validateId;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Service / Repository。
  */
+@Service("TenantDaoService")
+@Slf4j
 public class TenantServiceImpl extends AbstractCachedEntityService<TenantId, Tenant, TenantEvictEvent> implements TenantService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEFAULT_TENANT_REGION` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户常量，用于统一引用固定值。
      */
     private static final String DEFAULT_TENANT_REGION = "Global";
     public static final String INCORRECT_TENANT_ID = "Incorrect tenantId ";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户，用于读取或保存对应领域对象。
      */
+    @Autowired
     private TenantDao tenantDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户，提供当前类调用的业务操作。
      */
+    @Autowired
     private TenantProfileService tenantProfileService;
 
+    /**
+     * 用户，提供当前类调用的业务操作。
+     */
     @Autowired
     @Lazy
-    /**
-     * 字段说明：
-     * 1. 保存 `userService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private UserService userService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `customerService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 客户，提供当前类调用的业务操作。
      */
+    @Autowired
     private CustomerService customerService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `assetService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 资产集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private AssetService assetService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `assetProfileService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 资产配置集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private AssetProfileService assetProfileService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceService deviceService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceProfileService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备配置，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceProfileService deviceProfileService;
 
+    /**
+     * 状态，提供当前类调用的业务操作。
+     */
     @Lazy
     @Autowired
-    /**
-     * 字段说明：
-     * 1. 保存 `apiUsageStateService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private ApiUsageStateService apiUsageStateService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `widgetsBundleService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 部件包，提供当前类调用的业务操作。
      */
+    @Autowired
     private WidgetsBundleService widgetsBundleService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `widgetTypeService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 部件类型，提供当前类调用的业务操作。
      */
+    @Autowired
     private WidgetTypeService widgetTypeService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `dashboardService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 仪表盘，提供当前类调用的业务操作。
      */
+    @Autowired
     private DashboardService dashboardService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `ruleChainService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 规则链，提供当前类调用的业务操作。
      */
+    @Autowired
     private RuleChainService ruleChainService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `resourceService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private ResourceService resourceService;
 
+    /**
+     * 服务，提供当前类调用的业务操作。
+     */
     @Autowired
     @Lazy
-    /**
-     * 字段说明：
-     * 1. 保存 `otaPackageService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private OtaPackageService otaPackageService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `rpcService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * RPC，提供当前类调用的业务操作。
      */
+    @Autowired
     private RpcService rpcService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantValidator` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户对象，用于描述当前业务场景。
      */
+    @Autowired
     private DataValidator<Tenant> tenantValidator;
 
+    /**
+     * 队列，提供当前类调用的业务操作。
+     */
     @Lazy
     @Autowired
-    /**
-     * 字段说明：
-     * 1. 保存 `queueService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private QueueService queueService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `adminSettingsService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private AdminSettingsService adminSettingsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationSettingsService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 通知服务集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private NotificationSettingsService notificationSettingsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRequestService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 通知服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private NotificationRequestService notificationRequestService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRuleService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 通知服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private NotificationRuleService notificationRuleService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationTemplateService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 通知服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private NotificationTemplateService notificationTemplateService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationTargetService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 通知服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private NotificationTargetService notificationTargetService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `existsTenantCache` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 是否满足租户条件。
      */
+    @Autowired
     protected TbTransactionalCache<TenantId, Boolean> existsTenantCache;
 
+    /**
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
+     */
     @TransactionalEventListener(classes = TenantEvictEvent.class)
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `handleEvictEvent` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void handleEvictEvent(TenantEvictEvent event) {
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         TenantId tenantId = event.getTenantId();
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         cache.evict(tenantId);
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         if (event.isInvalidateExists()) {
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             existsTenantCache.evict(tenantId);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenantById` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：处理结果。
      */
+    @Override
     public Tenant findTenantById(TenantId tenantId) {
         log.trace("Executing findTenantById [{}]", tenantId);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
 
-        // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
         return cache.getAndPutInTransaction(tenantId, () -> tenantDao.findById(tenantId, tenantId.getId()), true);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenantInfoById` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：处理结果。
      */
+    @Override
     public TenantInfo findTenantInfoById(TenantId tenantId) {
         log.trace("Executing findTenantInfoById [{}]", tenantId);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return tenantDao.findTenantInfoById(tenantId, tenantId.getId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenantByIdAsync` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `callerId`：`callerId`ID。
+     * - `tenantId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Tenant> findTenantByIdAsync(TenantId callerId, TenantId tenantId) {
         log.trace("Executing findTenantByIdAsync [{}]", tenantId);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return tenantDao.findByIdAsync(callerId, tenantId.getId());
     }
 
+    /**
+     * 功能：保存或创建租户。
+     * 参数：
+     * - `tenant`：租户信息或租户标识。
+     * 返回：处理结果。
+     */
     @Override
     @Transactional
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveTenant` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Tenant saveTenant(Tenant tenant) {
         log.trace("Executing saveTenant [{}]", tenant);
         tenant.setRegion(DEFAULT_TENANT_REGION);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenant.getTenantProfileId() == null) {
             TenantProfile tenantProfile = this.tenantProfileService.findOrCreateDefaultTenantProfile(TenantId.SYS_TENANT_ID);
             tenant.setTenantProfileId(tenantProfile.getId());
         }
         tenantValidator.validate(tenant, Tenant::getId);
         boolean create = tenant.getId() == null;
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         Tenant savedTenant = tenantDao.save(tenant.getId(), tenant);
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         publishEvictEvent(new TenantEvictEvent(savedTenant.getId(), create));
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         eventPublisher.publishEvent(SaveEntityEvent.builder().tenantId(savedTenant.getId()).entityId(savedTenant.getId()).created(create).build());
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenant.getId() == null) {
             deviceProfileService.createDefaultDeviceProfile(savedTenant.getId());
             assetProfileService.createDefaultAssetProfile(savedTenant.getId());
             apiUsageStateService.createDefaultApiUsageState(savedTenant.getId(), null);
             try {
                 notificationSettingsService.createDefaultNotificationConfigs(savedTenant.getId());
-            // 异常在这里被转换为 DAO 层统一失败路径，避免数据库或底层驱动异常直接泄漏给上层调用方。
             } catch (Throwable e) {
                 log.error("Failed to create default notification configs for tenant {}", savedTenant.getId(), e);
             }
@@ -508,19 +336,13 @@ public class TenantServiceImpl extends AbstractCachedEntityService<TenantId, Ten
      * Ideally we should delete related entites without "paginatedRemover" logic. But in such a case we can't clear cache and send events.
      * We will create separate task to make "deleteTenant" transactional.
      */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTenant` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：删除或清理租户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
+    @Override
     public void deleteTenant(TenantId tenantId) {
         log.trace("Executing deleteTenant [{}]", tenantId);
         Validator.validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -547,7 +369,6 @@ public class TenantServiceImpl extends AbstractCachedEntityService<TenantId, Ten
         notificationTargetService.deleteNotificationTargetsByTenantId(tenantId);
         notificationSettingsService.deleteNotificationSettings(tenantId);
         adminSettingsService.deleteAdminSettingsByTenantId(tenantId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         tenantDao.removeById(tenantId, tenantId.getId());
         publishEvictEvent(new TenantEvictEvent(tenantId, true));
         eventPublisher.publishEvent(DeleteEntityEvent.builder().tenantId(tenantId).entityId(tenantId).build());
@@ -555,112 +376,75 @@ public class TenantServiceImpl extends AbstractCachedEntityService<TenantId, Ten
         alarmService.deleteEntityAlarmRecordsByTenantId(tenantId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenants` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`Tenants`。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Tenant> findTenants(PageLink pageLink) {
         log.trace("Executing findTenants pageLink [{}]", pageLink);
         Validator.validatePageLink(pageLink);
         return tenantDao.findTenants(TenantId.SYS_TENANT_ID, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenantInfos` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<TenantInfo> findTenantInfos(PageLink pageLink) {
         log.trace("Executing findTenantInfos pageLink [{}]", pageLink);
         Validator.validatePageLink(pageLink);
         return tenantDao.findTenantInfos(TenantId.SYS_TENANT_ID, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenantIdsByTenantProfileId` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantProfileId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<TenantId> findTenantIdsByTenantProfileId(TenantProfileId tenantProfileId) {
         log.trace("Executing findTenantsByTenantProfileId [{}]", tenantProfileId);
         return tenantDao.findTenantIdsByTenantProfileId(tenantProfileId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTenants` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：删除或清理`Tenants`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void deleteTenants() {
         log.trace("Executing deleteTenants");
         tenantsRemover.removeEntities(TenantId.SYS_TENANT_ID, TenantId.SYS_TENANT_ID);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findTenantsIds` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`Tenants Ids`。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<TenantId> findTenantsIds(PageLink pageLink) {
         log.trace("Executing findTenantsIds");
         Validator.validatePageLink(pageLink);
         return tenantDao.findTenantsIds(pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `tenantExists` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `tenantExists` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：判断结果。
      */
+    @Override
     public boolean tenantExists(TenantId tenantId) {
         return existsTenantCache.getAndPutInTransaction(tenantId, () -> tenantDao.existsById(tenantId, tenantId.getId()), false);
     }
@@ -678,36 +462,24 @@ public class TenantServiceImpl extends AbstractCachedEntityService<TenantId, Ten
         }
     };
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findEntity` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * 返回：可能存在的结果。
      */
+    @Override
     public Optional<HasId<?>> findEntity(TenantId tenantId, EntityId entityId) {
         return Optional.ofNullable(findTenantById(new TenantId(entityId.getId())));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityType` 对应的租户、客户或用户持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由管理 API、安全流程或后台任务调用，随请求事务完成并触发必要的缓存失效时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验租户/客户/用户作用域后执行数据库读写，并把结果返回给 Web 或后台服务。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public EntityType getEntityType() {
         return EntityType.TENANT;
     }

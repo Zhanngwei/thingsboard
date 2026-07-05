@@ -37,62 +37,38 @@ import java.util.function.Consumer;
 final class MqttPendingSubscription {
 
     /**
-     * 字段说明：
-     * 1. 保存 `future` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 异步结果，表示当前对象的对应属性。
      */
     private final Promise<Void> future;
     private final String topic;
     private final Set<MqttPendingHandler> handlers = new HashSet<>();
     /**
-     * 字段说明：
-     * 1. 保存 `subscribeMessage` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private final MqttSubscribeMessage subscribeMessage;
 
     /**
-     * 字段说明：
-     * 1. 保存 `retransmissionHandler` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 处理器，负责处理对应任务或消息。
      */
     private final RetransmissionHandler<MqttSubscribeMessage> retransmissionHandler;
 
     /**
-     * 字段说明：
-     * 1. 保存 `sent` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 是否满足`sent`条件。
      */
     private boolean sent = false;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `MqttPendingSubscription` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：创建 `MqttPendingSubscription` 实例，并初始化必要字段。
+     * 参数：
+     * - `future`：`future` 参数。
+     * - `topic`：主题名称或主题对象。
+     * - `message`：待处理消息。
+     * - `operation`：`operation` 参数。
+     * 返回：新创建的对象实例。
      */
     MqttPendingSubscription(Promise<Void> future, String topic, MqttSubscribeMessage message, PendingOperation operation) {
-        // 异步结果通过回调继续处理，调用线程不能假设这里已经完成完整链路。
         this.future = future;
         this.topic = topic;
-        // MQTT 状态会影响连接、订阅、发布确认或重传流程，需要与协议时序保持一致。
         this.subscribeMessage = message;
 
         this.retransmissionHandler = new RetransmissionHandler<>(operation);
@@ -100,144 +76,90 @@ final class MqttPendingSubscription {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getFuture` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取异步结果。
+     * 参数：无。
+     * 返回：处理结果。
      */
     Promise<Void> getFuture() {
-        // 异步结果通过回调继续处理，调用线程不能假设这里已经完成完整链路。
         return future;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTopic` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取主题。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String getTopic() {
         return topic;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isSent` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：判断`Sent`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean isSent() {
         return sent;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setSent` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：更新`Sent`。
+     * 参数：
+     * - `sent`：`sent` 参数。
+     * 返回：无。
      */
     void setSent(boolean sent) {
         this.sent = sent;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSubscribeMessage` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：处理结果。
      */
     MqttSubscribeMessage getSubscribeMessage() {
-        // MQTT 状态会影响连接、订阅、发布确认或重传流程，需要与协议时序保持一致。
         return subscribeMessage;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addHandler` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：保存或创建处理器。
+     * 参数：
+     * - `handler`：处理器对象。
+     * - `once`：`once` 参数。
+     * 返回：无。
      */
     void addHandler(MqttHandler handler, boolean once) {
-        // MQTT 状态会影响连接、订阅、发布确认或重传流程，需要与协议时序保持一致。
         this.handlers.add(new MqttPendingHandler(handler, once));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getHandlers` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Handlers`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     Set<MqttPendingHandler> getHandlers() {
         return handlers;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startRetransmitTimer` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：初始化或启动定时器。
+     * 参数：
+     * - `eventLoop`：`eventLoop` 参数。
+     * - `sendPacket`：`sendPacket` 参数。
+     * 返回：无。
      */
     void startRetransmitTimer(EventLoop eventLoop, Consumer<Object> sendPacket) {
-        // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
         if (this.sent) { //If the packet is sent, we can start the retransmit timer
             this.retransmissionHandler.setHandle((fixedHeader, originalMessage) ->
-                    // MQTT 状态会影响连接、订阅、发布确认或重传流程，需要与协议时序保持一致。
                     sendPacket.accept(new MqttSubscribeMessage(fixedHeader, originalMessage.variableHeader(), originalMessage.payload())));
             this.retransmissionHandler.start(eventLoop);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onSubackReceived` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：处理`on Suback Received`。
+     * 参数：无。
+     * 返回：无。
      */
     void onSubackReceived() {
         this.retransmissionHandler.stop();
@@ -256,26 +178,17 @@ final class MqttPendingSubscription {
      */
     final class MqttPendingHandler {
         /**
-         * 字段说明：
-         * 1. 保存 `handler` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-         * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-         * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-         * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+         * 处理器，负责处理对应任务或消息。
          */
         private final MqttHandler handler;
         private final boolean once;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `MqttPendingHandler` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-         * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-         * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-         * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-         * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-         * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-         * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-         * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+         * 功能：创建 `MqttPendingSubscription` 实例，并初始化必要字段。
+         * 参数：
+         * - `handler`：处理器对象。
+         * - `once`：`once` 参数。
+         * 返回：新创建的对象实例。
          */
         MqttPendingHandler(MqttHandler handler, boolean once) {
             this.handler = handler;
@@ -283,30 +196,18 @@ final class MqttPendingSubscription {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getHandler` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-         * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-         * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-         * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-         * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-         * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-         * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-         * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+         * 功能：获取处理器。
+         * 参数：无。
+         * 返回：处理结果。
          */
         MqttHandler getHandler() {
             return handler;
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `isOnce` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-         * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-         * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-         * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-         * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-         * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-         * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-         * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+         * 功能：判断`Once`。
+         * 参数：无。
+         * 返回：判断结果。
          */
         boolean isOnce() {
             return once;
@@ -314,15 +215,9 @@ final class MqttPendingSubscription {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onChannelClosed` 对应的Netty MQTT 客户端协议类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：处理网络通道。
+     * 参数：无。
+     * 返回：无。
      */
     void onChannelClosed() {
         this.retransmissionHandler.stop();

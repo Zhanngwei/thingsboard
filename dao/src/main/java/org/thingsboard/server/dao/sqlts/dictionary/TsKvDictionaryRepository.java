@@ -22,7 +22,6 @@ import org.thingsboard.server.dao.util.SqlTsOrTsLatestAnyDao;
 
 import java.util.Optional;
 
-@SqlTsOrTsLatestAnyDao
 /**
  * 中文说明：
  * 1. 类目的：`TsKvDictionaryRepository` 是 ThingsBoard DAO 模块 中的时序数据持久化类型，用于处理遥测键值、最新值、历史分区、聚合查询和 Timescale/PostgreSQL 时序读写。
@@ -34,19 +33,14 @@ import java.util.Optional;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Strategy / Template。
  */
+@SqlTsOrTsLatestAnyDao
 public interface TsKvDictionaryRepository extends JpaRepository<TsKvDictionary, TsKvDictionaryCompositeKey> {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findByKeyId` 对应的时序数据持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由遥测写入、历史查询、聚合查询或测试流程按请求调用，并受数据库连接池和事务管理约束时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据实体、键、时间窗口和聚合参数选择存储路径，执行批量写入或查询后返回时序数据。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取键。
+     * 参数：
+     * - `keyId`：键ID。
+     * 返回：可能存在的结果。
      */
     Optional<TsKvDictionary> findByKeyId(int keyId);
 

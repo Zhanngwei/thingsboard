@@ -49,7 +49,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Illia Barkov
  */
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`BaseRestApiLimitsTest` 是ThingsBoard Application 测试模块中的测试支撑类型，用于验证 Application 模块的控制器、服务、Actor 或集成流程。
@@ -60,59 +59,40 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Test Fixture。
  */
+@Slf4j
 public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `MESSAGES_LIMIT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数量限制常量，用于统一引用固定值。
      */
     private static int MESSAGES_LIMIT = 10;
     private static int TIME_FOR_LIMIT = 5;
 
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfile` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
     TenantProfile tenantProfile;
 
     ListeningExecutorService service = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `before` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `before` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void before() throws Exception {
         loginSysAdmin();
         tenantProfile = getDefaultTenantProfile();
         resetTokens();
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `after` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `after` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void after() throws Exception {
         resetTokens();
         loginSysAdmin();
@@ -121,17 +101,12 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
         service.shutdown();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCustomerRestApiLimits` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testCustomerRestApiLimits() throws Exception {
         loginSysAdmin();
 
@@ -145,24 +120,18 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
 
         loginCustomerUser();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < MESSAGES_LIMIT; i++) {
             doGet("/api/device/types").andExpect(status().isOk());
         }
         doGet("/api/device/types").andExpect(status().is4xxClientError());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTenantRestApiLimits` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testTenantRestApiLimits() throws Exception {
         loginSysAdmin();
 
@@ -176,24 +145,18 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
 
         loginCustomerUser();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < MESSAGES_LIMIT; i++) {
             doGet("/api/device/types").andExpect(status().isOk());
         }
         doGet("/api/device/types").andExpect(status().is4xxClientError());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCustomerRestApiLimitsWithAsyncMethod` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testCustomerRestApiLimitsWithAsyncMethod() throws Exception {
         loginSysAdmin();
 
@@ -207,20 +170,17 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
 
         loginTenantAdmin();
 
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<ListenableFuture<ResultActions>> attributesRequests = new ArrayList<>();
 
         doGet("/api/plugins/telemetry/" + tenantId.getEntityType() + "/" + tenantId.getId().toString() + "/values/attributes").andExpect(status().isOk());
         Thread.sleep(TimeUnit.SECONDS.toMillis(TIME_FOR_LIMIT)); // Wait to initialization for bucket4j
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < MESSAGES_LIMIT; i++) {
             attributesRequests.add(service.submit(() -> doGet("/api/plugins/telemetry/" + tenantId.getEntityType() + "/" + tenantId.getId().toString() + "/values/attributes")));
         }
 
         List<ResultActions> lists = blockForResponses(attributesRequests);
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (ResultActions resultActions : lists) {
             resultActions.andExpect(status().isOk());
         }
@@ -229,14 +189,9 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDefaultTenantProfile` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private TenantProfile getDefaultTenantProfile() throws Exception {
 
@@ -254,30 +209,20 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `blockForResponses` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `blockForResponses` 对应的处理。
+     * 参数：
+     * - `futures`：数据列表。
+     * 返回：匹配的数据集合。
      */
     List<ResultActions> blockForResponses(List<ListenableFuture<ResultActions>> futures) throws ExecutionException {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         ListenableFuture<List<ResultActions>> futureOfList = Futures.allAsList(futures);
         List<ResultActions> responses;
         try {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             responses = futureOfList.get(20, TimeUnit.SECONDS);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (TimeoutException | InterruptedException | ExecutionException e) {
             responses = new ArrayList<>();
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             for (ListenableFuture<ResultActions> future : futures) {
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 if (future.isDone()) {
-                    // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                     responses.add(Uninterruptibles.getUninterruptibly(future));
                 }
             }
@@ -286,14 +231,11 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createTenantProfileConfigurationWithRestLimits` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建租户。
+     * 参数：
+     * - `tenantLimits`：租户信息或租户标识。
+     * - `customerLimits`：数量限制。
+     * 返回：处理结果。
      */
     private DefaultTenantProfileConfiguration createTenantProfileConfigurationWithRestLimits(String tenantLimits, String customerLimits) {
         DefaultTenantProfileConfiguration.DefaultTenantProfileConfigurationBuilder builder = DefaultTenantProfileConfiguration.builder();
@@ -304,14 +246,11 @@ public abstract class BaseRestApiLimitsTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveTenantProfileWitConfiguration` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建租户。
+     * 参数：
+     * - `tenantProfile`：租户信息或租户标识。
+     * - `tenantProfileConfiguration`：租户信息或租户标识。
+     * 返回：无。
      */
     private void saveTenantProfileWitConfiguration(TenantProfile tenantProfile, TenantProfileConfiguration tenantProfileConfiguration) {
         TenantProfileData tenantProfileData = tenantProfile.getProfileData();

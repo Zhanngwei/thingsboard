@@ -41,67 +41,49 @@ import org.thingsboard.server.transport.mqtt.limits.ProxyIpFilter;
 public class MqttTransportServerInitializer extends ChannelInitializer<SocketChannel> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `context` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private final MqttTransportContext context;
     private final boolean sslEnabled;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `MqttTransportServerInitializer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `MqttTransportServerInitializer` 实例，并初始化必要字段。
+     * 参数：
+     * - `context`：处理上下文。
+     * - `sslEnabled`：`sslEnabled` 参数。
+     * 返回：新创建的对象实例。
      */
     public MqttTransportServerInitializer(MqttTransportContext context, boolean sslEnabled) {
         this.context = context;
         this.sslEnabled = sslEnabled;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initChannel` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动网络通道。
+     * 参数：
+     * - `ch`：`ch` 参数。
+     * 返回：无。
      */
+    @Override
     public void initChannel(SocketChannel ch) {
         ChannelPipeline pipeline = ch.pipeline();
         SslHandler sslHandler = null;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (context.isProxyEnabled()) {
             pipeline.addLast("proxy", new HAProxyMessageDecoder());
             pipeline.addLast("ipFilter", new ProxyIpFilter(context));
         } else {
             pipeline.addLast("ipFilter", new IpFilter(context));
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sslEnabled && context.getSslHandlerProvider() != null) {
             sslHandler = context.getSslHandlerProvider().getSslHandler();
             pipeline.addLast(sslHandler);
         }
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         pipeline.addLast("decoder", new MqttDecoder(context.getMaxPayloadSize()));
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         pipeline.addLast("encoder", MqttEncoder.INSTANCE);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTransportHandler handler = new MqttTransportHandler(context, sslHandler);
 
         pipeline.addLast(handler);
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         ch.closeFuture().addListener(handler);
     }
 

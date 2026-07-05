@@ -21,30 +21,32 @@ package org.thingsboard.rule.engine.credentials;
  */
 public enum CredentialsType {
     /**
-     * 枚举项说明：本行枚举常量定义 `CredentialsType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `ANONYMOUS`常量，用于统一引用固定值。
      */
     ANONYMOUS("anonymous"),
     /**
-     * 枚举项说明：本行枚举常量定义 `CredentialsType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `BASIC`常量，用于统一引用固定值。
      */
     BASIC("basic"),
     /**
-     * 枚举项说明：本行枚举常量定义 `CredentialsType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `SAS`常量，用于统一引用固定值。
      */
     SAS("sas"),
     /**
-     * 枚举项说明：本行枚举常量定义 `CredentialsType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `CERT_PEM`常量，用于统一引用固定值。
      */
     CERT_PEM("cert.PEM");
 
     /**
-     * 字段说明：保存 `label`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 显示标签，用于展示或标识当前对象。
      */
     private final String label;
 
     /**
-     * 方法说明：构造 `CredentialsType` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `CredentialsType` 实例，并初始化必要字段。
+     * 参数：
+     * - `label`：`label` 参数。
+     * 返回：新创建的对象实例。
      */
     CredentialsType(String label) {
         this.label = label;

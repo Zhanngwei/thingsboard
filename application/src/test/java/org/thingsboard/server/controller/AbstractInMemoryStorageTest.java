@@ -17,7 +17,6 @@ package org.thingsboard.server.controller;
 
 import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractInMemoryStorageTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -28,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@Slf4j
 public abstract class AbstractInMemoryStorageTest {
 
 }

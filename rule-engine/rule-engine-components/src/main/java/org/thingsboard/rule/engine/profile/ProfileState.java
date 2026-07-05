@@ -52,34 +52,38 @@ import java.util.concurrent.CopyOnWriteArrayList;
 class ProfileState {
 
     /**
-     * 字段说明：保存 `deviceProfile`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 设备配置，保存当前对象的配置选项。
      */
     private DeviceProfile deviceProfile;
-    @Getter(AccessLevel.PACKAGE)
     /**
-     * 字段说明：保存 `alarmSettings`，表示告警类型、严重级别或详情，供本类方法在规则节点处理流程中使用。
+     * 告警列表，用于保存一组待处理对象。
      */
+    @Getter(AccessLevel.PACKAGE)
     private final List<DeviceProfileAlarm> alarmSettings = new CopyOnWriteArrayList<>();
-    @Getter(AccessLevel.PACKAGE)
     /**
-     * 字段说明：保存 `entityKeys`，表示消息体、元数据、属性或遥测中的键名，供本类方法在规则节点处理流程中使用。
+     * 实体集合，用于去重保存或快速判断对象是否存在。
      */
+    @Getter(AccessLevel.PACKAGE)
     private final Set<AlarmConditionFilterKey> entityKeys = ConcurrentHashMap.newKeySet();
 
     private final Map<String, Map<AlarmSeverity, Set<AlarmConditionFilterKey>>> alarmCreateKeys = new HashMap<>();
     private final Map<String, Set<AlarmConditionFilterKey>> alarmClearKeys = new HashMap<>();
 
     /**
-     * 方法说明：构造 `ProfileState` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `ProfileState` 实例，并初始化必要字段。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：新创建的对象实例。
      */
     ProfileState(DeviceProfile deviceProfile) {
         updateDeviceProfile(deviceProfile);
     }
 
     /**
-     * 方法说明：执行 `updateDeviceProfile` 对应的辅助逻辑，供 `ProfileState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新设备配置。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：无。
      */
     void updateDeviceProfile(DeviceProfile deviceProfile) {
         this.deviceProfile = deviceProfile;
@@ -118,8 +122,10 @@ class ProfileState {
     }
 
     /**
-     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `ProfileState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建`Schedule Dynamic Values`。
+     * 参数：
+     * - `schedule`：`schedule` 参数。
+     * 返回：无。
      */
     private void addScheduleDynamicValues(AlarmSchedule schedule) {
         DynamicValue<String> dynamicValue = schedule.getDynamicValue();
@@ -132,8 +138,10 @@ class ProfileState {
     }
 
     /**
-     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `ProfileState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `alarmRule`：`alarmRule` 参数。
+     * 返回：无。
      */
     private void addEntityKeysFromAlarmConditionSpec(AlarmRule alarmRule) {
         AlarmConditionSpec spec = alarmRule.getCondition().getSpec();
@@ -167,8 +175,12 @@ class ProfileState {
     }
 
     /**
-     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `ProfileState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建`Dynamic Values Recursively`。
+     * 参数：
+     * - `predicate`：`predicate` 参数。
+     * - `entityKeys`：实体对象。
+     * - `ruleKeys`：键。
+     * 返回：无。
      */
     private void addDynamicValuesRecursively(KeyFilterPredicate predicate, Set<AlarmConditionFilterKey> entityKeys, Set<AlarmConditionFilterKey> ruleKeys) {
         switch (predicate.getType()) {
@@ -193,16 +205,20 @@ class ProfileState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `ProfileState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     DeviceProfileId getProfileId() {
         return deviceProfile.getId();
     }
 
     /**
-     * 方法说明：创建实体、告警、关系或辅助对象，供 `ProfileState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取告警。
+     * 参数：
+     * - `id`：`id`ID。
+     * - `severity`：`severity` 参数。
+     * 返回：匹配的数据集合。
      */
     Set<AlarmConditionFilterKey> getCreateAlarmKeys(String id, AlarmSeverity severity) {
         Map<AlarmSeverity, Set<AlarmConditionFilterKey>> sKeys = alarmCreateKeys.get(id);
@@ -219,8 +235,10 @@ class ProfileState {
     }
 
     /**
-     * 方法说明：清除告警或本地状态，供 `ProfileState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取告警。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：匹配的数据集合。
      */
     Set<AlarmConditionFilterKey> getClearAlarmKeys(String id) {
         Set<AlarmConditionFilterKey> keys = alarmClearKeys.get(id);

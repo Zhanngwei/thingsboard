@@ -49,26 +49,28 @@ import static org.thingsboard.server.common.data.msg.TbMsgType.POST_TELEMETRY_RE
 import static org.thingsboard.server.common.data.msg.TbMsgType.TIMESERIES_UPDATED;
 import static org.thingsboard.server.common.data.msg.TbMsgType.TO_SERVER_RPC_REQUEST;
 
-@Slf4j
 /**
- * Edge/Cloud 推送节点的抽象基类，负责把支持的 Rule Engine 消息转换为事件语义。
- * 本类本身不直接访问数据库、缓存或外部网络；具体保存、通知和远端同步由子类及其调用链实现。
+ * `AbstractTbMsgPushNode` 类，封装当前模块中的一组相关职责。
  */
+@Slf4j
 public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfiguration, S, U> implements TbNode {
 
     /**
-     * 推送节点配置，主要提供属性 scope 默认值。
+     * 配置，保存当前对象的配置选项。
      */
     protected T config;
 
     /**
-     * 属性 scope 元数据键名。
+     * `SCOPE`常量，用于统一引用固定值。
      */
     private static final String SCOPE = "scope";
 
     /**
-     * 初始化推送节点配置。
-     * 本方法不直接访问数据库或缓存，也不执行 Edge/Cloud 事件持久化。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
@@ -76,8 +78,11 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
     }
 
     /**
-     * 过滤来自反向同步源的消息，并校验消息类型后交给子类处理。
-     * 本方法本身不直接保存事件；不支持的消息会走 Failure，忽略来源的消息会直接 ack。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
@@ -96,8 +101,11 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
     }
 
     /**
-     * 根据消息类型构建子类事件对象。
-     * 本方法只做本地数据转换，不直接写数据库或发送到 Edge/Cloud；实际持久化由 processMsg 子类实现。
+     * 功能：构建事件。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `ctx`：处理上下文。
+     * 返回：处理结果。
      */
     protected S buildEvent(TbMsg msg, TbContext ctx) {
         if (msg.isTypeOf(ALARM)) {
@@ -111,7 +119,6 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
             switch (actionType) {
                 case ATTRIBUTES_UPDATED:
                 case POST_ATTRIBUTES:
-                    // 属性更新事件保留 kv 和 scope，POST_ATTRIBUTES 额外标记来源语义。
                     entityBody.put("kv", dataJson);
                     entityBody.put(SCOPE, getScope(metadata));
                     if (EdgeEventActionType.POST_ATTRIBUTES.equals(actionType)) {
@@ -119,14 +126,12 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
                     }
                     break;
                 case ATTRIBUTES_DELETED:
-                    // 删除属性事件只需要属性键集合和 scope。
                     List<String> keys = JacksonUtil.convertValue(dataJson.get("attributes"), new TypeReference<>() {
                     });
                     entityBody.put("keys", keys);
                     entityBody.put(SCOPE, getScope(metadata));
                     break;
                 case TIMESERIES_UPDATED:
-                    // 时序事件保留数据体和消息元数据时间戳。
                     entityBody.put("data", dataJson);
                     entityBody.put("ts", msg.getMetaDataTs());
                     break;
@@ -140,8 +145,10 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
     }
 
     /**
-     * 根据告警元数据判断 EdgeEventActionType。
-     * 本方法只读取消息元数据，不直接访问数据库、缓存或外部系统。
+     * 功能：获取告警。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static EdgeEventActionType getAlarmActionType(TbMsg msg) {
         boolean isNewAlarm = Boolean.parseBoolean(msg.getMetaData().getValue(DataConstants.IS_NEW_ALARM));
@@ -158,39 +165,60 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
     }
 
     /**
-     * 由子类构造具体事件对象。
-     * 本方法声明本身不直接涉及数据库或缓存；子类实现可能只是对象构造或进一步交给服务保存。
+     * 功能：构建事件。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `eventAction`：`eventAction` 参数。
+     * - `entityId`：实体IDID。
+     * - `eventType`：类型。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     abstract S buildEvent(TenantId tenantId, EdgeEventActionType eventAction, UUID entityId, U eventType, JsonNode entityBody);
 
     /**
-     * 由子类把实体类型映射为目标事件类型。
+     * 功能：获取实体。
+     * 参数：
+     * - `entityType`：实体对象。
+     * 返回：处理结果。
      */
     abstract U getEventTypeByEntityType(EntityType entityType);
 
     /**
-     * 返回告警消息对应的事件类型。
+     * 功能：获取告警。
+     * 参数：无。
+     * 返回：处理结果。
      */
     abstract U getAlarmEventType();
 
     /**
-     * 返回应忽略的消息来源标识，防止 Edge/Cloud 双向同步形成回环。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：文本结果。
      */
     abstract String getIgnoredMessageSource();
 
     /**
-     * 返回当前节点配置类，用于通用 init 转换。
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     abstract protected Class<T> getConfigClazz();
 
     /**
-     * 子类处理已校验消息，通常负责保存事件并安排成功/失败路由。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     abstract void processMsg(TbContext ctx, TbMsg msg);
 
     /**
-     * 从告警消息体中解析告警 UUID。
-     * 本方法只解析本地 JSON，不直接访问数据库或缓存。
+     * 功能：获取消息。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     protected UUID getUUIDFromMsgData(TbMsg msg) {
         Alarm alarm = JacksonUtil.fromString(msg.getData(), Alarm.class);
@@ -198,8 +226,10 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
     }
 
     /**
-     * 获取属性 scope，优先使用消息元数据，缺省时使用节点配置。
-     * 本方法不直接访问数据库、缓存或外部系统。
+     * 功能：获取`Scope`。
+     * 参数：
+     * - `metadata`：待处理数据。
+     * 返回：文本结果。
      */
     protected String getScope(Map<String, String> metadata) {
         String scope = metadata.get(SCOPE);
@@ -210,8 +240,10 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
     }
 
     /**
-     * 将 Rule Engine 消息类型映射为 EdgeEventActionType。
-     * 连接/活动事件根据 scope 判断写入时序还是属性；不支持类型会抛出异常。
+     * 功能：获取边缘节点。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     protected EdgeEventActionType getEdgeEventActionTypeByMsgType(TbMsg msg) {
         EdgeEventActionType actionType;
@@ -236,8 +268,10 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
     }
 
     /**
-     * 判断消息类型是否可被推送节点处理。
-     * 本方法只做本地类型判断，不直接涉及数据库、缓存或外部调用。
+     * 功能：判断消息。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     protected boolean isSupportedMsgType(TbMsg msg) {
         return msg.isTypeOneOf(POST_TELEMETRY_REQUEST, POST_ATTRIBUTES_REQUEST, ATTRIBUTES_UPDATED, ATTRIBUTES_DELETED, TIMESERIES_UPDATED,

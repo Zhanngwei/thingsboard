@@ -29,12 +29,6 @@ import org.thingsboard.server.dao.service.DaoSqlTest;
 /**
  * Created by Valerii Sosliuk on 4/22/2017.
  */
-@RunWith(SpringRunner.class)
-@ContextConfiguration(classes = {JpaDaoConfig.class, SqlTsDaoConfig.class, SqlTsLatestDaoConfig.class, SqlTimeseriesDaoConfig.class})
-@DaoSqlTest
-@TestExecutionListeners({
-        DependencyInjectionTestExecutionListener.class,
-        DirtiesContextTestExecutionListener.class})
 /**
  * 中文说明：
  * 1. 类目的：`AbstractJpaDaoTest` 是 ThingsBoard DAO 测试模块 中的持久化实现层类型，用于承载服务端实体、关系、属性、遥测、事件和配置数据的持久化访问实现。
@@ -46,17 +40,18 @@ import org.thingsboard.server.dao.service.DaoSqlTest;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Service / Template。
  */
+@RunWith(SpringRunner.class)
+@ContextConfiguration(classes = {JpaDaoConfig.class, SqlTsDaoConfig.class, SqlTsLatestDaoConfig.class, SqlTimeseriesDaoConfig.class})
+@DaoSqlTest
+@TestExecutionListeners({
+        DependencyInjectionTestExecutionListener.class,
+        DirtiesContextTestExecutionListener.class})
 public abstract class AbstractJpaDaoTest {
 
-    @MockBean(answer = Answers.RETURNS_MOCKS)
     /**
-     * 字段说明：
-     * 1. 保存 `statsFactory` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 工厂，用于按场景创建或提供目标对象。
      */
+    @MockBean(answer = Answers.RETURNS_MOCKS)
     StatsFactory statsFactory;
 
 }

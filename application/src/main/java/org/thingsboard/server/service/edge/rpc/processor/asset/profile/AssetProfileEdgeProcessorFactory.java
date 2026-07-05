@@ -19,8 +19,6 @@ import org.springframework.stereotype.Component;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessorFactory;
 
-@Component
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`AssetProfileEdgeProcessorFactory` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
@@ -31,6 +29,8 @@ import org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessorFactor
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
  */
+@Component
+@TbCoreComponent
 public class AssetProfileEdgeProcessorFactory extends BaseEdgeProcessorFactory<AssetProfileEdgeProcessorV1, AssetProfileEdgeProcessorV2> {
 
 }

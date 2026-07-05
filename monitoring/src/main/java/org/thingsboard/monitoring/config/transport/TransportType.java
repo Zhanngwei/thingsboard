@@ -23,8 +23,6 @@ import org.thingsboard.monitoring.service.transport.impl.HttpTransportHealthChec
 import org.thingsboard.monitoring.service.transport.impl.Lwm2mTransportHealthChecker;
 import org.thingsboard.monitoring.service.transport.impl.MqttTransportHealthChecker;
 
-@AllArgsConstructor
-@Getter
 /**
  * 中文说明：
  * 1. 类目的：`TransportType` 是 ThingsBoard Monitoring 模块 中的监控配置模型类型，用于承载目标服务、协议探测、设备凭据、阈值和通知配置的数据契约。
@@ -36,6 +34,8 @@ import org.thingsboard.monitoring.service.transport.impl.MqttTransportHealthChec
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 DTO / Configuration。
  */
+@AllArgsConstructor
+@Getter
 public enum TransportType {
 
     MQTT("MQTT", MqttTransportHealthChecker.class),
@@ -44,12 +44,7 @@ public enum TransportType {
     LWM2M("LwM2M", Lwm2mTransportHealthChecker.class);
 
     /**
-     * 字段说明：
-     * 1. 保存 `name` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 名称，用于标识或展示当前对象。
      */
     private final String name;
     private final Class<? extends TransportHealthChecker<?>> serviceClass;

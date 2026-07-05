@@ -49,7 +49,6 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 
-@ExtendWith(MockitoExtension.class)
 /**
  * 中文说明：
  * 1. 类目的：`DefaultRuleEngineDeviceStateManagerTest` 是ThingsBoard Application 测试模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -60,88 +59,49 @@ import static org.mockito.Mockito.never;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@ExtendWith(MockitoExtension.class)
 public class DefaultRuleEngineDeviceStateManagerTest {
 
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `deviceStateServiceMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
+    @Mock
     private static DeviceStateService deviceStateServiceMock;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `tbCallbackMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 回调，用于接收异步处理完成后的结果。
      */
+    @Mock
     private static TbCallback tbCallbackMock;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `clusterServiceMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Mock
     private static TbClusterService clusterServiceMock;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `metadataMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `metadataMock` 字段，保存当前对象的对应属性。
      */
+    @Mock
     private static TbQueueMsgMetadata metadataMock;
 
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `serviceInfoProviderMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Mock
     private TbServiceInfoProvider serviceInfoProviderMock;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `partitionServiceMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
+    @Mock
     private PartitionService partitionServiceMock;
 
-    @Captor
     /**
-     * 字段说明：
-     * 1. 保存 `queueCallbackCaptor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，用于接收异步处理完成后的结果。
      */
+    @Captor
     private static ArgumentCaptor<TbQueueCallback> queueCallbackCaptor;
 
     /**
-     * 字段说明：
-     * 1. 保存 `deviceStateManager` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备状态管理器，负责处理对应任务或消息。
      */
     private static DefaultRuleEngineDeviceStateManager deviceStateManager;
 
@@ -152,35 +112,27 @@ public class DefaultRuleEngineDeviceStateManagerTest {
     private static final TopicPartitionInfo MY_TPI = TopicPartitionInfo.builder().myPartition(true).build();
     private static final TopicPartitionInfo EXTERNAL_TPI = TopicPartitionInfo.builder().myPartition(false).build();
 
-    @BeforeEach
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setup` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
+    @BeforeEach
     public void setup() {
         deviceStateManager = new DefaultRuleEngineDeviceStateManager(serviceInfoProviderMock, partitionServiceMock, Optional.of(deviceStateServiceMock), clusterServiceMock);
     }
 
+    /**
+     * 功能：验证 `givenRoutedToLocalAndProcessingSuccess_whenOnDeviceAction_thenShouldCallLocalServiceAndSuccessCallback` 描述的测试场景。
+     * 参数：
+     * - `onDeviceAction`：设备信息或设备标识。
+     * - `actionVerification`：`actionVerification` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @DisplayName("Given event should be routed to local service and event processed has succeeded, " +
             "when onDeviceX() is called, then should route event to local service and call onSuccess() callback.")
     @MethodSource
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenRoutedToLocalAndProcessingSuccess_whenOnDeviceAction_thenShouldCallLocalServiceAndSuccessCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenRoutedToLocalAndProcessingSuccess_whenOnDeviceAction_thenShouldCallLocalServiceAndSuccessCallback(Runnable onDeviceAction, Runnable actionVerification) {
         // GIVEN
         given(serviceInfoProviderMock.isService(ServiceType.TB_CORE)).willReturn(true);
@@ -197,14 +149,9 @@ public class DefaultRuleEngineDeviceStateManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenRoutedToLocalAndProcessingSuccess_whenOnDeviceAction_thenShouldCallLocalServiceAndSuccessCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenRoutedToLocalAndProcessingSuccess_whenOnDeviceAction_thenShouldCallLocalServiceAndSuccessCallback` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> givenRoutedToLocalAndProcessingSuccess_whenOnDeviceAction_thenShouldCallLocalServiceAndSuccessCallback() {
         return Stream.of(
@@ -227,20 +174,18 @@ public class DefaultRuleEngineDeviceStateManagerTest {
         );
     }
 
+    /**
+     * 功能：验证 `givenRoutedToLocalAndProcessingFailure_whenOnDeviceAction_thenShouldCallLocalServiceAndFailureCallback` 描述的测试场景。
+     * 参数：
+     * - `exceptionThrowSetup`：`exceptionThrowSetup` 参数。
+     * - `onDeviceAction`：设备信息或设备标识。
+     * - `actionVerification`：`actionVerification` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @DisplayName("Given event should be routed to local service and event processed has failed, " +
             "when onDeviceX() is called, then should route event to local service and call onFailure() callback.")
     @MethodSource
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenRoutedToLocalAndProcessingFailure_whenOnDeviceAction_thenShouldCallLocalServiceAndFailureCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenRoutedToLocalAndProcessingFailure_whenOnDeviceAction_thenShouldCallLocalServiceAndFailureCallback(
             Runnable exceptionThrowSetup, Runnable onDeviceAction, Runnable actionVerification
     ) {
@@ -262,14 +207,9 @@ public class DefaultRuleEngineDeviceStateManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenRoutedToLocalAndProcessingFailure_whenOnDeviceAction_thenShouldCallLocalServiceAndFailureCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenRoutedToLocalAndProcessingFailure_whenOnDeviceAction_thenShouldCallLocalServiceAndFailureCallback` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> givenRoutedToLocalAndProcessingFailure_whenOnDeviceAction_thenShouldCallLocalServiceAndFailureCallback() {
         return Stream.of(
@@ -296,20 +236,17 @@ public class DefaultRuleEngineDeviceStateManagerTest {
         );
     }
 
+    /**
+     * 功能：验证 `givenRoutedToExternal_whenOnDeviceAction_thenShouldSendQueueMsgToExternalServiceWithCorrectCallback` 描述的测试场景。
+     * 参数：
+     * - `onDeviceAction`：设备信息或设备标识。
+     * - `actionVerification`：`actionVerification` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @DisplayName("Given event should be routed to external service, " +
             "when onDeviceX() is called, then should send correct queue message to external service with correct callback object.")
     @MethodSource
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenRoutedToExternal_whenOnDeviceAction_thenShouldSendQueueMsgToExternalServiceWithCorrectCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenRoutedToExternal_whenOnDeviceAction_thenShouldSendQueueMsgToExternalServiceWithCorrectCallback(Runnable onDeviceAction, Runnable actionVerification) {
         // WHEN
         ReflectionTestUtils.setField(deviceStateManager, "deviceStateService", Optional.empty());
@@ -329,21 +266,15 @@ public class DefaultRuleEngineDeviceStateManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenRoutedToExternal_whenOnDeviceAction_thenShouldSendQueueMsgToExternalServiceWithCorrectCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenRoutedToExternal_whenOnDeviceAction_thenShouldSendQueueMsgToExternalServiceWithCorrectCallback` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> givenRoutedToExternal_whenOnDeviceAction_thenShouldSendQueueMsgToExternalServiceWithCorrectCallback() {
         return Stream.of(
                 Arguments.of(
                         (Runnable) () -> deviceStateManager.onDeviceConnect(TENANT_ID, DEVICE_ID, EVENT_TS, tbCallbackMock),
                         (Runnable) () -> {
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var deviceConnectMsg = TransportProtos.DeviceConnectProto.newBuilder()
                                     .setTenantIdMSB(TENANT_ID.getId().getMostSignificantBits())
                                     .setTenantIdLSB(TENANT_ID.getId().getLeastSignificantBits())
@@ -351,7 +282,6 @@ public class DefaultRuleEngineDeviceStateManagerTest {
                                     .setDeviceIdLSB(DEVICE_ID.getId().getLeastSignificantBits())
                                     .setLastConnectTime(EVENT_TS)
                                     .build();
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var toCoreMsg = TransportProtos.ToCoreMsg.newBuilder()
                                     .setDeviceConnectMsg(deviceConnectMsg)
                                     .build();
@@ -361,7 +291,6 @@ public class DefaultRuleEngineDeviceStateManagerTest {
                 Arguments.of(
                         (Runnable) () -> deviceStateManager.onDeviceActivity(TENANT_ID, DEVICE_ID, EVENT_TS, tbCallbackMock),
                         (Runnable) () -> {
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var deviceActivityMsg = TransportProtos.DeviceActivityProto.newBuilder()
                                     .setTenantIdMSB(TENANT_ID.getId().getMostSignificantBits())
                                     .setTenantIdLSB(TENANT_ID.getId().getLeastSignificantBits())
@@ -369,7 +298,6 @@ public class DefaultRuleEngineDeviceStateManagerTest {
                                     .setDeviceIdLSB(DEVICE_ID.getId().getLeastSignificantBits())
                                     .setLastActivityTime(EVENT_TS)
                                     .build();
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var toCoreMsg = TransportProtos.ToCoreMsg.newBuilder()
                                     .setDeviceActivityMsg(deviceActivityMsg)
                                     .build();
@@ -379,7 +307,6 @@ public class DefaultRuleEngineDeviceStateManagerTest {
                 Arguments.of(
                         (Runnable) () -> deviceStateManager.onDeviceDisconnect(TENANT_ID, DEVICE_ID, EVENT_TS, tbCallbackMock),
                         (Runnable) () -> {
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var deviceDisconnectMsg = TransportProtos.DeviceDisconnectProto.newBuilder()
                                     .setTenantIdMSB(TENANT_ID.getId().getMostSignificantBits())
                                     .setTenantIdLSB(TENANT_ID.getId().getLeastSignificantBits())
@@ -387,7 +314,6 @@ public class DefaultRuleEngineDeviceStateManagerTest {
                                     .setDeviceIdLSB(DEVICE_ID.getId().getLeastSignificantBits())
                                     .setLastDisconnectTime(EVENT_TS)
                                     .build();
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var toCoreMsg = TransportProtos.ToCoreMsg.newBuilder()
                                     .setDeviceDisconnectMsg(deviceDisconnectMsg)
                                     .build();
@@ -397,7 +323,6 @@ public class DefaultRuleEngineDeviceStateManagerTest {
                 Arguments.of(
                         (Runnable) () -> deviceStateManager.onDeviceInactivity(TENANT_ID, DEVICE_ID, EVENT_TS, tbCallbackMock),
                         (Runnable) () -> {
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var deviceInactivityMsg = TransportProtos.DeviceInactivityProto.newBuilder()
                                     .setTenantIdMSB(TENANT_ID.getId().getMostSignificantBits())
                                     .setTenantIdLSB(TENANT_ID.getId().getLeastSignificantBits())
@@ -405,7 +330,6 @@ public class DefaultRuleEngineDeviceStateManagerTest {
                                     .setDeviceIdLSB(DEVICE_ID.getId().getLeastSignificantBits())
                                     .setLastInactivityTime(EVENT_TS)
                                     .build();
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             var toCoreMsg = TransportProtos.ToCoreMsg.newBuilder()
                                     .setDeviceInactivityMsg(deviceInactivityMsg)
                                     .build();

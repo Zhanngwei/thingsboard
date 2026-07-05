@@ -30,7 +30,6 @@ import org.thingsboard.server.transport.lwm2m.server.downlink.DownlinkRequestCal
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`RpcDownlinkRequestCallbackProxy` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -41,72 +40,51 @@ import java.util.concurrent.TimeoutException;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public abstract class RpcDownlinkRequestCallbackProxy<R, T> implements DownlinkRequestCallback<R, T> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TransportService transportService;
     private final TransportProtos.ToDeviceRpcRequestMsg request;
     /**
-     * 字段说明：
-     * 1. 保存 `callback` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 回调，用于接收异步处理完成后的结果。
      */
     private final DownlinkRequestCallback<R, T> callback;
 
     /**
-     * 字段说明：
-     * 1. 保存 `client` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户端，用于发起外部调用或协议交互。
      */
     protected final LwM2mClient client;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `RpcDownlinkRequestCallbackProxy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `RpcDownlinkRequestCallbackProxy` 实例，并初始化必要字段。
+     * 参数：
+     * - `transportService`：服务对象。
+     * - `client`：客户端对象。
+     * - `requestMsg`：请求对象。
+     * - `callback`：处理完成后的回调。
+     * 返回：新创建的对象实例。
      */
     public RpcDownlinkRequestCallbackProxy(TransportService transportService, LwM2mClient client, TransportProtos.ToDeviceRpcRequestMsg requestMsg, DownlinkRequestCallback<R, T> callback) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.transportService = transportService;
         this.client = client;
         this.request = requestMsg;
         this.callback = callback;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onSent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Sent`。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：判断结果。
      */
+    @Override
     public boolean onSent(R request) {
         client.lock();
         try {
             UUID rpcId = new UUID(this.request.getRequestIdMSB(), this.request.getRequestIdLSB());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (rpcId.equals(client.getLastSentRpcId())) {
                 log.debug("[{}]][{}] Rpc has already sent!", client.getEndpoint(), rpcId);
                 return false;
@@ -115,93 +93,70 @@ public abstract class RpcDownlinkRequestCallbackProxy<R, T> implements DownlinkR
         } finally {
             client.unlock();
         }
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportService.process(client.getSession(), this.request, RpcStatus.SENT, TransportServiceCallback.EMPTY);
         return true;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Success`。
+     * 参数：
+     * - `request`：请求对象。
+     * - `response`：响应对象。
+     * 返回：无。
      */
+    @Override
     public void onSuccess(R request, T response) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportService.process(client.getSession(), this.request, RpcStatus.DELIVERED, true, TransportServiceCallback.EMPTY);
         sendRpcReplyOnSuccess(response);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (callback != null) {
             callback.onSuccess(request, response);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onValidationError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理错误信息。
+     * 参数：
+     * - `params`：`params` 参数。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onValidationError(String params, String msg) {
         sendRpcReplyOnValidationError(msg);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (callback != null) {
             callback.onValidationError(params, msg);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理错误信息。
+     * 参数：
+     * - `params`：`params` 参数。
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
+    @Override
     public void onError(String params, Exception e) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (e instanceof TimeoutException || e instanceof org.eclipse.leshan.core.request.exception.TimeoutException) {
             client.setLastSentRpcId(null);
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             transportService.process(client.getSession(), this.request, RpcStatus.TIMEOUT, TransportServiceCallback.EMPTY);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (!(e instanceof ClientSleepingException)) {
             sendRpcReplyOnError(e);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (callback != null) {
             callback.onError(params, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reply` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `reply` 对应的处理。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：无。
      */
     protected void reply(LwM2MRpcResponseBody response) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.ToDeviceRpcResponseMsg.Builder msg = TransportProtos.ToDeviceRpcResponseMsg.newBuilder().setRequestId(request.getRequestId());
         String responseAsString = JacksonUtil.toString(response);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isEmpty(response.getError())) {
             msg.setPayload(responseAsString);
         } else {
@@ -211,40 +166,28 @@ public abstract class RpcDownlinkRequestCallbackProxy<R, T> implements DownlinkR
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRpcReplyOnSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交RPC。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：无。
      */
     abstract protected void sendRpcReplyOnSuccess(T response);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRpcReplyOnValidationError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交RPC。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     protected void sendRpcReplyOnValidationError(String msg) {
         reply(LwM2MRpcResponseBody.builder().result(ResponseCode.BAD_REQUEST.getName()).error(msg).build());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRpcReplyOnError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交RPC。
+     * 参数：
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
     protected void sendRpcReplyOnError(Exception e) {
         String error = e.getMessage();

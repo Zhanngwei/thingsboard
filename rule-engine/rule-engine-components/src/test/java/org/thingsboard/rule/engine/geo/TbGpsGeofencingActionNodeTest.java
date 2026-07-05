@@ -55,28 +55,30 @@ import static org.thingsboard.rule.engine.util.GpsGeofencingEvents.OUTSIDE;
 import static org.thingsboard.server.common.data.msg.TbNodeConnectionType.SUCCESS;
 
 /**
- * 测试目标：验证 {@code TbGpsGeofencingActionNodeTest} 覆盖的 地理围栏组件 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbGpsGeofencingActionNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbGpsGeofencingActionNodeTest` 测试类，用于验证 `TbGpsGeofencingActionNode` 相关行为。
  */
 @ExtendWith(MockitoExtension.class)
 class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
 
-    /** Mock 依赖字段：{@code ctx} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctx;
-    /** Mock 依赖字段：{@code attributesService} 保存 {@code AttributesService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 服务，提供当前类调用的业务操作。
+     */
     @Mock
     private AttributesService attributesService;
-    /** 可变 fixture 字段：{@code node} 保存 {@code TbGpsGeofencingActionNode} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，表示当前对象的对应属性。
+     */
     private TbGpsGeofencingActionNode node;
 
     /**
-     * 生命周期方法：{@code setUp} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
     @BeforeEach
     void setUp() {
@@ -84,16 +86,20 @@ class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 生命周期方法：{@code tearDown} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `tearDown` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @AfterEach
     void tearDown() {
         node.destroy();
     }
 
-    /** 参数源方法：{@code givenReportPresenceStatusOnEachMessage_whenOnMsg_thenVerifyOutputMsgType} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
+    /**
+     * 功能：验证 `givenReportPresenceStatusOnEachMessage_whenOnMsg_thenVerifyOutputMsgType` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     private static Stream<Arguments> givenReportPresenceStatusOnEachMessage_whenOnMsg_thenVerifyOutputMsgType() {
         DeviceId deviceId = new DeviceId(UUID.randomUUID());
         long tsNow = System.currentTimeMillis();
@@ -171,9 +177,10 @@ class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 辅助方法：{@code getOutsideRectangleTbMsg} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取消息。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
     private TbMsg getOutsideRectangleTbMsg(EntityId entityId) {
         return getTbMsg(entityId, getMetadataForNewVersionPolygonPerimeter(),
@@ -182,9 +189,10 @@ class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 辅助方法：{@code getInsideRectangleTbMsg} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取消息。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
     private TbMsg getInsideRectangleTbMsg(EntityId entityId) {
         return getTbMsg(entityId, getMetadataForNewVersionPolygonPerimeter(),
@@ -193,9 +201,13 @@ class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 辅助方法：{@code getTbMsg} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取消息。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `metadata`：待处理数据。
+     * - `latitude`：`latitude` 参数。
+     * - `longitude`：`longitude` 参数。
+     * 返回：处理结果。
      */
     private TbMsg getTbMsg(EntityId entityId, TbMsgMetaData metadata, double latitude, double longitude) {
         String data = "{\"latitude\": " + latitude + ", \"longitude\": " + longitude + "}";
@@ -203,9 +215,9 @@ class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 辅助方法：{@code getMetadataForNewVersionPolygonPerimeter} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取版本号。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private TbMsgMetaData getMetadataForNewVersionPolygonPerimeter() {
         var metadata = new TbMsgMetaData();
@@ -214,7 +226,11 @@ class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     // Rule nodes upgrade
-    /** 参数源方法：{@code givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
+    /**
+     * 功能：验证 `givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     private static Stream<Arguments> givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig() {
         return Stream.of(
                 // default config for version 0
@@ -293,7 +309,11 @@ class TbGpsGeofencingActionNodeTest extends AbstractRuleNodeUpgradeTest {
         );
     }
 
-    /** 实现方法：{@code getTestNode} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+    /**
+     * 功能：获取节点实例。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @Override
     protected TbNode getTestNode() {
         return node;

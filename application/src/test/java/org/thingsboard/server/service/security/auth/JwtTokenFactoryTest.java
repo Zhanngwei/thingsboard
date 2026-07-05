@@ -66,47 +66,27 @@ import static org.mockito.Mockito.when;
 public class JwtTokenFactoryTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tokenFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
     private JwtTokenFactory tokenFactory;
     private AdminSettingsService adminSettingsService;
     /**
-     * 字段说明：
-     * 1. 保存 `notificationCenter` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知，表示当前对象的对应属性。
      */
     private NotificationCenter notificationCenter;
     private JwtSettingsService jwtSettingsService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `jwtSettings` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
     private JwtSettings jwtSettings;
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeEach` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeEach` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeEach() {
         jwtSettings = new JwtSettings();
         jwtSettings.setTokenIssuer("tb");
@@ -122,17 +102,12 @@ public class JwtTokenFactoryTest {
         tokenFactory = new JwtTokenFactory(jwtSettingsService);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCreateAndParseAccessJwtToken` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证令牌相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testCreateAndParseAccessJwtToken() {
         SecurityUser securityUser = new SecurityUser();
         securityUser.setId(new UserId(UUID.randomUUID()));
@@ -156,14 +131,10 @@ public class JwtTokenFactoryTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCreateAndParseAccessJwtToken` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证令牌相关场景。
+     * 参数：
+     * - `securityUser`：`securityUser` 参数。
+     * 返回：无。
      */
     public void testCreateAndParseAccessJwtToken(SecurityUser securityUser) {
         AccessJwtToken accessToken = tokenFactory.createAccessJwtToken(securityUser);
@@ -184,17 +155,12 @@ public class JwtTokenFactoryTest {
         assertThat(parsedSecurityUser.getLastName()).isEqualTo(securityUser.getLastName());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCreateAndParseRefreshJwtToken` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证令牌相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testCreateAndParseRefreshJwtToken() {
         SecurityUser securityUser = new SecurityUser();
         securityUser.setId(new UserId(UUID.randomUUID()));
@@ -217,17 +183,12 @@ public class JwtTokenFactoryTest {
         assertThat(parsedSecurityUser.getAuthority()).isNull();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testCreateAndParsePreVerificationJwtToken` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证令牌相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testCreateAndParsePreVerificationJwtToken() {
         SecurityUser securityUser = new SecurityUser();
         securityUser.setId(new UserId(UUID.randomUUID()));
@@ -253,24 +214,18 @@ public class JwtTokenFactoryTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testJwtSigningKeyIssueNotification` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证键相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testJwtSigningKeyIssueNotification() {
         JwtSettings badJwtSettings = jwtSettings;
         badJwtSettings.setTokenSigningKey(JwtSettingsService.TOKEN_SIGNING_KEY_DEFAULT);
         mockJwtSettings(badJwtSettings);
         jwtSettingsService = mockJwtSettingsService();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 5; i++) { // to check if notification is not sent twice
             jwtSettingsService.getJwtSettings();
         }
@@ -280,14 +235,10 @@ public class JwtTokenFactoryTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `mockJwtSettings` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `mockJwtSettings` 对应的处理。
+     * 参数：
+     * - `settings`：配置对象。
+     * 返回：无。
      */
     private void mockJwtSettings(JwtSettings settings) {
         AdminSettings adminJwtSettings = new AdminSettings();
@@ -297,14 +248,9 @@ public class JwtTokenFactoryTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `mockJwtSettingsService` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `mockJwtSettingsService` 对应的处理。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     private DefaultJwtSettingsService mockJwtSettingsService() {
         return new DefaultJwtSettingsService(adminSettingsService, Optional.empty(),
@@ -312,14 +258,11 @@ public class JwtTokenFactoryTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkExpirationTime` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验过期时间。
+     * 参数：
+     * - `jwtToken`：`jwtToken` 参数。
+     * - `tokenLifetime`：`tokenLifetime` 参数。
+     * 返回：无。
      */
     private void checkExpirationTime(JwtToken jwtToken, int tokenLifetime) {
         Claims claims = tokenFactory.parseTokenClaims(jwtToken.getToken()).getBody();
@@ -327,10 +270,8 @@ public class JwtTokenFactoryTest {
             Calendar expirationTime = Calendar.getInstance();
             expirationTime.setTime(new Date());
             expirationTime.add(Calendar.SECOND, tokenLifetime);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (actualExpirationTime.equals(expirationTime.getTime())) {
                 return true;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (actualExpirationTime.before(expirationTime.getTime())) {
                 int gap = 2;
                 expirationTime.add(Calendar.SECOND, -gap);

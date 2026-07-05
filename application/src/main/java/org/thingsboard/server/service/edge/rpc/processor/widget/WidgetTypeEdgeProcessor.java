@@ -29,9 +29,6 @@ import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.edge.rpc.constructor.widget.WidgetMsgConstructor;
 import org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessor;
 
-@Slf4j
-@Component
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`WidgetTypeEdgeProcessor` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
@@ -42,31 +39,28 @@ import org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessor;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
  */
+@Slf4j
+@Component
+@TbCoreComponent
 public class WidgetTypeEdgeProcessor extends BaseEdgeProcessor {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertWidgetTypeEventToDownlink` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换部件类型。
+     * 参数：
+     * - `edgeEvent`：`edgeEvent` 参数。
+     * - `edgeVersion`：`edgeVersion` 参数。
+     * 返回：处理结果。
      */
     public DownlinkMsg convertWidgetTypeEventToDownlink(EdgeEvent edgeEvent, EdgeVersion edgeVersion) {
         WidgetTypeId widgetTypeId = new WidgetTypeId(edgeEvent.getEntityId());
         DownlinkMsg downlinkMsg = null;
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (edgeEvent.getAction()) {
             case ADDED:
             case UPDATED:
                 WidgetTypeDetails widgetTypeDetails = widgetTypeService.findWidgetTypeDetailsById(edgeEvent.getTenantId(), widgetTypeId);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (widgetTypeDetails != null) {
                     UpdateMsgType msgType = getUpdateMsgType(edgeEvent.getAction());
                     WidgetTypeUpdateMsg widgetTypeUpdateMsg =
-                            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
                             ((WidgetMsgConstructor) widgetMsgConstructorFactory.getMsgConstructorByEdgeVersion(edgeVersion)).constructWidgetTypeUpdateMsg(msgType, widgetTypeDetails, edgeVersion);
                     downlinkMsg = DownlinkMsg.newBuilder()
                             .setDownlinkMsgId(EdgeUtils.nextPositiveInt())
@@ -76,7 +70,6 @@ public class WidgetTypeEdgeProcessor extends BaseEdgeProcessor {
                 break;
             case DELETED:
                 WidgetTypeUpdateMsg widgetTypeUpdateMsg =
-                        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
                         ((WidgetMsgConstructor) widgetMsgConstructorFactory.getMsgConstructorByEdgeVersion(edgeVersion)).constructWidgetTypeDeleteMsg(widgetTypeId);
                 downlinkMsg = DownlinkMsg.newBuilder()
                         .setDownlinkMsgId(EdgeUtils.nextPositiveInt())

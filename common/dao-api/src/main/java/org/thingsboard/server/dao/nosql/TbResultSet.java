@@ -49,34 +49,22 @@ import java.util.function.Function;
 public class TbResultSet implements AsyncResultSet {
 
     /**
-     * 字段说明：
-     * 1. 保存 `originalStatement` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 语句，表示当前对象所处状态。
      */
     private final Statement originalStatement;
     private final AsyncResultSet delegate;
     /**
-     * 字段说明：
-     * 1. 保存 `executeAsyncFunction` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `executeAsyncFunction`集合，用于去重保存或快速判断对象是否存在。
      */
     private final Function<Statement, TbResultSetFuture> executeAsyncFunction;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbResultSet` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbResultSet` 实例，并初始化必要字段。
+     * 参数：
+     * - `originalStatement`：`originalStatement` 参数。
+     * - `delegate`：`delegate` 参数。
+     * - `executeAsyncFunction`：`executeAsyncFunction` 参数。
+     * 返回：新创建的对象实例。
      */
     public TbResultSet(Statement originalStatement, AsyncResultSet delegate,
                        Function<Statement, TbResultSetFuture> executeAsyncFunction) {
@@ -85,144 +73,102 @@ public class TbResultSet implements AsyncResultSet {
         this.executeAsyncFunction = executeAsyncFunction;
     }
 
+    /**
+     * 功能：获取`Column Definitions`。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @NonNull
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getColumnDefinitions` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ColumnDefinitions getColumnDefinitions() {
         return delegate.getColumnDefinitions();
     }
 
+    /**
+     * 功能：获取信息对象。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @NonNull
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getExecutionInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ExecutionInfo getExecutionInfo() {
         return delegate.getExecutionInfo();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `remaining` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `remaining` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
+    @Override
     public int remaining() {
         return delegate.remaining();
     }
 
+    /**
+     * 功能：执行 `currentPage` 对应的处理。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @NonNull
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `currentPage` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Iterable<Row> currentPage() {
         return delegate.currentPage();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hasMorePages` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`More Pages`。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public boolean hasMorePages() {
         return delegate.hasMorePages();
     }
 
+    /**
+     * 功能：获取`Next Page`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @NonNull
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `fetchNextPage` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public CompletionStage<AsyncResultSet> fetchNextPage() throws IllegalStateException {
         return delegate.fetchNextPage();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `wasApplied` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `wasApplied` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public boolean wasApplied() {
         return delegate.wasApplied();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `allRows` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `allRows` 对应的处理。
+     * 参数：
+     * - `executor`：`executor` 参数。
+     * 返回：匹配的数据集合。
      */
     public ListenableFuture<List<Row>> allRows(Executor executor) {
         List<Row> allRows = new ArrayList<>();
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         SettableFuture<List<Row>> resultFuture = SettableFuture.create();
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         this.processRows(originalStatement, delegate, allRows, resultFuture, executor);
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return resultFuture;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processRows` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Rows`。
+     * 参数：
+     * - `statement`：`statement` 参数。
+     * - `resultSet`：`resultSet` 参数。
+     * - `allRows`：数据列表。
+     * - `resultFuture`：数据列表。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void processRows(Statement statement,
                              AsyncResultSet resultSet,
@@ -230,45 +176,34 @@ public class TbResultSet implements AsyncResultSet {
                              SettableFuture<List<Row>> resultFuture,
                              Executor executor) {
         allRows.addAll(loadRows(resultSet));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (resultSet.hasMorePages()) {
             ByteBuffer nextPagingState = resultSet.getExecutionInfo().getPagingState();
             Statement<?> nextStatement = statement.setPagingState(nextPagingState);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             TbResultSetFuture resultSetFuture = executeAsyncFunction.apply(nextStatement);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             Futures.addCallback(resultSetFuture,
-                    // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                     new FutureCallback<TbResultSet>() {
                         @Override
                         public void onSuccess(@Nullable TbResultSet result) {
                             processRows(nextStatement, result,
-                                    // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                                     allRows, resultFuture, executor);
                         }
 
                         @Override
                         public void onFailure(Throwable t) {
-                            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                             resultFuture.setException(t);
                         }
                     }, executor != null ? executor : MoreExecutors.directExecutor()
             );
         } else {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             resultFuture.set(allRows);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadRows` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Rows`。
+     * 参数：
+     * - `resultSet`：`resultSet` 参数。
+     * 返回：匹配的数据集合。
      */
     List<Row> loadRows(AsyncResultSet resultSet) {
         return Lists.newArrayList(resultSet.currentPage());

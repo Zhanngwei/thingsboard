@@ -28,7 +28,6 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractSqlTsDatabaseUpgradeService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -39,104 +38,65 @@ import java.sql.Statement;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Slf4j
 public abstract class AbstractSqlTsDatabaseUpgradeService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `CALL_REGEX` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `CALL_REGEX`常量，用于统一引用固定值。
      */
     protected static final String CALL_REGEX = "call ";
     protected static final String DROP_TABLE = "DROP TABLE ";
     /**
-     * 字段说明：
-     * 1. 保存 `DROP_PROCEDURE_IF_EXISTS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `DROP_PROCEDURE_IF_EXISTS`常量，用于统一引用固定值。
      */
     protected static final String DROP_PROCEDURE_IF_EXISTS = "DROP PROCEDURE IF EXISTS ";
     protected static final String TS_KV_SQL = "ts_kv.sql";
     /**
-     * 字段说明：
-     * 1. 保存 `PATH_TO_USERS_PUBLIC_FOLDER` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 目录常量，用于统一引用固定值。
      */
     protected static final String PATH_TO_USERS_PUBLIC_FOLDER = "C:\\Users\\Public";
     protected static final String THINGSBOARD_WINDOWS_UPGRADE_DIR = "THINGSBOARD_WINDOWS_UPGRADE_DIR";
 
-    @Value("${spring.datasource.url}")
     /**
-     * 字段说明：
-     * 1. 保存 `dbUrl` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * URL 地址，用于定位外部资源或本地资源。
      */
+    @Value("${spring.datasource.url}")
     protected String dbUrl;
 
-    @Value("${spring.datasource.username}")
     /**
-     * 字段说明：
-     * 1. 保存 `dbUserName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，用于标识或展示当前对象。
      */
+    @Value("${spring.datasource.username}")
     protected String dbUserName;
 
-    @Value("${spring.datasource.password}")
     /**
-     * 字段说明：
-     * 1. 保存 `dbPassword` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @Value("${spring.datasource.password}")
     protected String dbPassword;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `installScripts` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `installScripts` 字段，保存当前对象的对应属性。
      */
+    @Autowired
     protected InstallScripts installScripts;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadSql` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取SQL。
+     * 参数：
+     * - `conn`：`conn` 参数。
+     * - `fileName`：名称。
+     * - `version`：`version` 参数。
+     * 返回：无。
      */
     protected abstract void loadSql(Connection conn, String fileName, String version);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadFunctions` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Functions`。
+     * 参数：
+     * - `sqlFile`：`sqlFile` 参数。
+     * - `conn`：`conn` 参数。
+     * 返回：无。
      */
     protected void loadFunctions(Path sqlFile, Connection conn) throws Exception {
         String sql = new String(Files.readAllBytes(sqlFile), StandardCharsets.UTF_8);
@@ -144,14 +104,10 @@ public abstract class AbstractSqlTsDatabaseUpgradeService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkVersion` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验版本号。
+     * 参数：
+     * - `conn`：`conn` 参数。
+     * 返回：判断结果。
      */
     protected boolean checkVersion(Connection conn) {
         boolean versionValid = false;
@@ -159,12 +115,10 @@ public abstract class AbstractSqlTsDatabaseUpgradeService {
             Statement statement = conn.createStatement();
             ResultSet resultSet = statement.executeQuery("SELECT current_setting('server_version_num')");
             resultSet.next();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if(resultSet.getLong(1) > 110000) {
                 versionValid = true;
             }
             statement.close();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.info("Failed to check current PostgreSQL version due to: {}", e.getMessage());
         }
@@ -172,14 +126,11 @@ public abstract class AbstractSqlTsDatabaseUpgradeService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isOldSchema` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Old Schema`。
+     * 参数：
+     * - `conn`：`conn` 参数。
+     * - `fromVersion`：`fromVersion` 参数。
+     * 返回：判断结果。
      */
     protected boolean isOldSchema(Connection conn, long fromVersion) {
         boolean isOldSchema = true;
@@ -188,7 +139,6 @@ public abstract class AbstractSqlTsDatabaseUpgradeService {
             statement.execute("CREATE TABLE IF NOT EXISTS tb_schema_settings ( schema_version bigint NOT NULL, CONSTRAINT tb_schema_settings_pkey PRIMARY KEY (schema_version));");
             Thread.sleep(1000);
             ResultSet resultSet = statement.executeQuery("SELECT schema_version FROM tb_schema_settings;");
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (resultSet.next()) {
                 isOldSchema = resultSet.getLong(1) <= fromVersion;
             } else {
@@ -196,7 +146,6 @@ public abstract class AbstractSqlTsDatabaseUpgradeService {
                 statement.execute("INSERT INTO tb_schema_settings (schema_version) VALUES (" + fromVersion + ")");
             }
             statement.close();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (InterruptedException | SQLException e) {
             log.info("Failed to check current PostgreSQL schema due to: {}", e.getMessage());
         }
@@ -204,25 +153,20 @@ public abstract class AbstractSqlTsDatabaseUpgradeService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeQuery` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行查询条件。
+     * 参数：
+     * - `conn`：`conn` 参数。
+     * - `query`：`query` 参数。
+     * 返回：无。
      */
     protected void executeQuery(Connection conn, String query) {
         try {
             Statement statement = conn.createStatement();
             statement.execute(query); //NOSONAR, ignoring because method used to execute thingsboard database upgrade script
             SQLWarning warnings = statement.getWarnings();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (warnings != null) {
                 log.info("{}", warnings.getMessage());
                 SQLWarning nextWarning = warnings.getNextWarning();
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 while (nextWarning != null) {
                     log.info("{}", nextWarning.getMessage());
                     nextWarning = nextWarning.getNextWarning();
@@ -230,7 +174,6 @@ public abstract class AbstractSqlTsDatabaseUpgradeService {
             }
             Thread.sleep(2000);
             log.info("Successfully executed query: {}", query);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (InterruptedException | SQLException e) {
             log.error("Failed to execute query: {} due to: {}", query, e.getMessage());
             throw new RuntimeException("Failed to execute query:" + query + " due to: ", e);

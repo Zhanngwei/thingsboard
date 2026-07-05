@@ -31,7 +31,6 @@ import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`CaffeineTbTransactionalCache` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -42,81 +41,60 @@ import java.util.concurrent.locks.ReentrantLock;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@RequiredArgsConstructor
 public abstract class CaffeineTbTransactionalCache<K extends Serializable, V extends Serializable> implements TbTransactionalCache<K, V> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `cacheManager` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 管理器，负责处理对应任务或消息。
      */
     private final CacheManager cacheManager;
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `cacheName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 名称，用于标识或展示当前对象。
      */
+    @Getter
     private final String cacheName;
 
     private final Lock lock = new ReentrantLock();
     private final Map<K, Set<UUID>> objectTransactions = new HashMap<>();
     private final Map<UUID, CaffeineTbCacheTransaction<K, V>> transactions = new HashMap<>();
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `get` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
+    @Override
     public TbCacheValueWrapper<V> get(K key) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         return SimpleTbCacheValueWrapper.wrap(cacheManager.getCache(cacheName).get(key));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `put` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `put` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
+    @Override
     public void put(K key, V value) {
         lock.lock();
         try {
             failAllTransactionsByKey(key);
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             cacheManager.getCache(cacheName).put(key, value);
         } finally {
             lock.unlock();
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `putIfAbsent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `putIfAbsent` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
+    @Override
     public void putIfAbsent(K key, V value) {
         lock.lock();
         try {
@@ -127,17 +105,13 @@ public abstract class CaffeineTbTransactionalCache<K extends Serializable, V ext
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：无。
      */
+    @Override
     public void evict(K key) {
         lock.lock();
         try {
@@ -148,17 +122,13 @@ public abstract class CaffeineTbTransactionalCache<K extends Serializable, V ext
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `keys`：键。
+     * 返回：无。
      */
+    @Override
     public void evict(Collection<K> keys) {
         lock.lock();
         try {
@@ -171,99 +141,73 @@ public abstract class CaffeineTbTransactionalCache<K extends Serializable, V ext
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evictOrPut` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Or Put`。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
+    @Override
     public void evictOrPut(K key, V value) {
         //No need to put the value in case of Caffeine, because evict will cancel concurrent transaction used to "get" the missing value from cache.
         evict(key);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newTransactionForKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newTransactionForKey` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
+    @Override
     public TbCacheTransaction<K, V> newTransactionForKey(K key) {
         return newTransaction(Collections.singletonList(key));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newTransactionForKeys` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newTransactionForKeys` 对应的处理。
+     * 参数：
+     * - `keys`：键。
+     * 返回：处理结果。
      */
+    @Override
     public TbCacheTransaction<K, V> newTransactionForKeys(List<K> keys) {
         return newTransaction(keys);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doPutIfAbsent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doPutIfAbsent` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
     void doPutIfAbsent(Object key, Object value) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         cacheManager.getCache(cacheName).putIfAbsent(key, value);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doEvict` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doEvict` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：无。
      */
     void doEvict(K key) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         cacheManager.getCache(cacheName).evict(key);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newTransaction` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newTransaction` 对应的处理。
+     * 参数：
+     * - `keys`：键。
+     * 返回：处理结果。
      */
     TbCacheTransaction<K, V> newTransaction(List<K> keys) {
         lock.lock();
         try {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             var transaction = new CaffeineTbCacheTransaction<>(this, keys);
             var transactionId = transaction.getId();
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (K key : keys) {
                 objectTransactions.computeIfAbsent(key, k -> new HashSet<>()).add(transactionId);
             }
@@ -275,30 +219,22 @@ public abstract class CaffeineTbTransactionalCache<K extends Serializable, V ext
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `commit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `commit` 对应的处理。
+     * 参数：
+     * - `trId`：`trId`ID。
+     * - `pendingPuts`：键值映射。
+     * 返回：判断结果。
      */
     public boolean commit(UUID trId, Map<Object, Object> pendingPuts) {
         lock.lock();
         try {
             var tr = transactions.get(trId);
             var success = !tr.isFailed();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (success) {
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 for (K key : tr.getKeys()) {
                     Set<UUID> otherTransactions = objectTransactions.get(key);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (otherTransactions != null) {
-                        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                         for (UUID otherTrId : otherTransactions) {
-                            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                             if (trId == null || !trId.equals(otherTrId)) {
                                 transactions.get(otherTrId).setFailed(true);
                             }
@@ -315,14 +251,10 @@ public abstract class CaffeineTbTransactionalCache<K extends Serializable, V ext
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `rollback` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `rollback` 对应的处理。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：无。
      */
     void rollback(UUID id) {
         lock.lock();
@@ -334,17 +266,12 @@ public abstract class CaffeineTbTransactionalCache<K extends Serializable, V ext
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeTransaction` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Transaction`。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：无。
      */
     private void removeTransaction(UUID id) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         CaffeineTbCacheTransaction<K, V> transaction = transactions.remove(id);
         if (transaction != null) {
             for (var key : transaction.getKeys()) {
@@ -360,14 +287,10 @@ public abstract class CaffeineTbTransactionalCache<K extends Serializable, V ext
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `failAllTransactionsByKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `failAllTransactionsByKey` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：无。
      */
     private void failAllTransactionsByKey(K key) {
         Set<UUID> transactionsIds = objectTransactions.get(key);

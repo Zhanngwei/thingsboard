@@ -21,18 +21,17 @@ import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.script.ScriptLanguage;
 
 /**
- * 消息生成器节点的配置对象，定义生成次数、周期、来源实体和脚本内容。
- * 本类仅保存配置，不直接执行脚本、不访问数据库或缓存，也不直接处理 Rule Engine 消息流。
+ * `TbMsgGeneratorNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
 @Data
 public class TbMsgGeneratorNodeConfiguration implements NodeConfiguration<TbMsgGeneratorNodeConfiguration> {
 
     /**
-     * 表示不限制生成消息数量的配置值。
+     * 消息常量，用于统一引用固定值。
      */
     public static final int UNLIMITED_MSG_COUNT = 0;
     /**
-     * 默认脚本，返回一条示例遥测消息、元数据和消息类型。
+     * `DEFAULT_SCRIPT`常量，用于统一引用固定值。
      */
     public static final String DEFAULT_SCRIPT = "var msg = { temp: 42, humidity: 77 };\n" +
             "var metadata = { data: 40 };\n" +
@@ -40,39 +39,38 @@ public class TbMsgGeneratorNodeConfiguration implements NodeConfiguration<TbMsgG
             "return { msg: msg, metadata: metadata, msgType: msgType };";
 
     /**
-     * 允许生成的消息总数，0 表示无限生成。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private int msgCount;
     /**
-     * 两次生成之间的周期，单位为秒。
+     * `periodInSeconds` 字段，保存当前对象的对应属性。
      */
     private int periodInSeconds;
     /**
-     * 可选的来源实体 UUID 字符串；为空时使用节点自身作为来源实体。
+     * `originatorId`ID，用于定位对应业务对象。
      */
     private String originatorId;
     /**
-     * 来源实体类型，只有配置了来源实体 UUID 时才会被使用。
+     * 类型，用于区分不同处理分支。
      */
     private EntityType originatorType;
     /**
-     * 脚本语言，决定运行 TBEL 脚本还是 JavaScript 脚本。
+     * `scriptLang` 字段，保存当前对象的对应属性。
      */
     private ScriptLanguage scriptLang;
     /**
-     * JavaScript 版本的生成脚本。
+     * `jsScript` 字段，保存当前对象的对应属性。
      */
     private String jsScript;
     /**
-     * TBEL 版本的生成脚本。
+     * `tbelScript` 字段，保存当前对象的对应属性。
      */
     private String tbelScript;
 
     /**
-     * 创建消息生成器节点的默认配置。
-     * 本方法只构造内存对象，不触发脚本执行、数据库读取、缓存读取或 Rule Engine 消息投递。
-     *
-     * @return 带默认生成周期、无限次数和默认脚本的配置实例
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbMsgGeneratorNodeConfiguration defaultConfiguration() {

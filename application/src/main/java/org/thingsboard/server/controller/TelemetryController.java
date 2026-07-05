@@ -142,10 +142,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TS_STRICT_DA
 /**
  * Created by ashvayka on 22.03.18.
  */
-@RestController
-@TbCoreComponent
-@RequestMapping(TbUrlConstants.TELEMETRY_URL_PREFIX)
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TelemetryController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -156,84 +152,67 @@ import static org.thingsboard.server.controller.ControllerConstants.TS_STRICT_DA
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping(TbUrlConstants.TELEMETRY_URL_PREFIX)
+@Slf4j
 public class TelemetryController extends BaseController {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，提供当前类调用的业务操作。
      */
+    @Autowired
     private TimeseriesService tsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `accessValidator` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 校验器，封装可复用的处理规则。
      */
+    @Autowired
     private AccessValidator accessValidator;
 
-    @Value("${transport.json.max_string_value_length:0}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxStringValueLength` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 值，保存当前处理得到的具体内容。
      */
+    @Value("${transport.json.max_string_value_length:0}")
     private int maxStringValueLength;
 
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     private ExecutorService executor;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initExecutor` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void initExecutor() {
         executor = Executors.newSingleThreadExecutor(ThingsBoardThreadFactory.forName("telemetry-controller"));
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdownExecutor` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void shutdownExecutor() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (executor != null) {
             executor.shutdownNow();
         }
     }
 
+    /**
+     * 功能：获取属性。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get all attribute keys (getAttributeKeys)",
             notes = "Returns a set of unique attribute key names for the selected entity. " +
                     "The response will include merged key names set for all attribute scopes:" +
@@ -245,22 +224,22 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/keys/attributes", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeKeys` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getAttributeKeys(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr) throws ThingsboardException {
         return accessValidator.validateEntityAndCallback(getCurrentUser(), Operation.READ_ATTRIBUTES, entityType, entityIdStr, this::getAttributeKeysCallback);
     }
 
+    /**
+     * 功能：获取属性。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get all attribute keys by scope (getAttributeKeysByScope)",
             notes = "Returns a set of unique attribute key names for the selected entity and attributes scope: " +
                     "\n\n * SERVER_SCOPE - supported for all entity types;" +
@@ -271,16 +250,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/keys/attributes/{scope}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeKeysByScope` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getAttributeKeysByScope(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -289,6 +258,16 @@ public class TelemetryController extends BaseController {
                 (result, tenantId, entityId) -> getAttributeKeysCallback(result, tenantId, entityId, scope));
     }
 
+    /**
+     * 功能：获取`Attributes`。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get attributes (getAttributes)",
             notes = "Returns all attributes that belong to specified entity. Use optional 'keys' parameter to return specific attributes."
                     + "\n Example of the result: \n\n"
@@ -300,16 +279,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/values/attributes", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getAttributes(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -320,6 +289,16 @@ public class TelemetryController extends BaseController {
     }
 
 
+    /**
+     * 功能：获取`Attributes By Scope`。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get attributes by scope (getAttributesByScope)",
             notes = "Returns all attributes of a specified scope that belong to specified entity." +
                     ENTITY_GET_ATTRIBUTE_SCOPES +
@@ -333,16 +312,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/values/attributes/{scope}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributesByScope` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getAttributesByScope(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -353,6 +322,16 @@ public class TelemetryController extends BaseController {
                 (result, tenantId, entityId) -> getAttributeValuesCallback(result, user, entityId, scope, keysStr));
     }
 
+    /**
+     * 功能：获取时序数据。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get time-series keys (getTimeseriesKeys)",
             notes = "Returns a set of unique time-series key names for the selected entity. " +
                     "\n\n" + INVALID_ENTITY_ID_OR_ENTITY_TYPE_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -360,24 +339,23 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/keys/timeseries", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimeseriesKeys` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getTimeseriesKeys(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr) throws ThingsboardException {
         return accessValidator.validateEntityAndCallback(getCurrentUser(), Operation.READ_TELEMETRY, entityType, entityIdStr,
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 (result, tenantId, entityId) -> Futures.addCallback(tsService.findAllLatest(tenantId, entityId), getTsKeysToResponseCallback(result), MoreExecutors.directExecutor()));
     }
 
+    /**
+     * 功能：获取时序数据。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get latest time-series value (getLatestTimeseries)",
             notes = "Returns all time-series that belong to specified entity. Use optional 'keys' parameter to return specific time-series." +
                     " The result is a JSON object. The format of the values depends on the 'useStrictDataTypes' parameter." +
@@ -394,16 +372,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/values/timeseries", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getLatestTimeseries` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getLatestTimeseries(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -415,6 +383,16 @@ public class TelemetryController extends BaseController {
                 (result, tenantId, entityId) -> getLatestTimeseriesValuesCallback(result, user, entityId, keysStr, useStrictDataTypes));
     }
 
+    /**
+     * 功能：获取时序数据。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get time-series data (getTimeseries)",
             notes = "Returns a range of time-series values for specified entity. " +
                     "Returns not aggregated data by default. " +
@@ -428,16 +406,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/values/timeseries", method = RequestMethod.GET, params = {"keys", "startTs", "endTs"})
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimeseries` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getTimeseries(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -467,21 +435,28 @@ public class TelemetryController extends BaseController {
                 (result, tenantId, entityId) -> {
                     AggregationParams params;
                     Aggregation agg = Aggregation.valueOf(aggStr);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (Aggregation.NONE.equals(agg)) {
                         params = AggregationParams.none();
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     } else if (intervalType == null || IntervalType.MILLISECONDS.equals(intervalType)) {
                         params = interval == 0L ? AggregationParams.none() : AggregationParams.milliseconds(agg, interval);
                     } else {
                         params = AggregationParams.calendar(agg, intervalType, timeZone);
                     }
                     List<ReadTsKvQuery> queries = toKeysList(keys).stream().map(key -> new BaseReadTsKvQuery(key, startTs, endTs, params, limit, orderBy)).collect(Collectors.toList());
-                    // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                     Futures.addCallback(tsService.findAll(tenantId, entityId, queries), getTsKvListCallback(result, useStrictDataTypes), MoreExecutors.directExecutor());
                 });
     }
 
+    /**
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `DEVICE_ID_PARAM_DESCRIPTION`：设备信息或设备标识。
+     * - `deviceIdStr`：设备信息或设备标识。
+     * - `ATTRIBUTES_SCOPE_DESCRIPTION`：`ATTRIBUTES_SCOPE_DESCRIPTION` 参数。
+     * - `ATTRIBUTES_SAVE_SCOPE_ALLOWED_VALUES`：值。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Save device attributes (saveDeviceAttributes)",
             notes = "Creates or updates the device attributes based on device id and specified attribute scope. " +
                     SAVE_ATTRIBUTES_REQUEST_PAYLOAD
@@ -499,16 +474,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{deviceId}/{scope}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDeviceAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> saveDeviceAttributes(
             @ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION, required = true) @PathVariable("deviceId") String deviceIdStr,
             @ApiParam(value = ATTRIBUTES_SCOPE_DESCRIPTION, allowableValues = ATTRIBUTES_SAVE_SCOPE_ALLOWED_VALUES, required = true) @PathVariable("scope") String scope,
@@ -517,6 +482,16 @@ public class TelemetryController extends BaseController {
         return saveAttributes(getTenantId(), entityId, scope, request);
     }
 
+    /**
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Save entity attributes (saveEntityAttributesV1)",
             notes = "Creates or updates the entity attributes based on Entity Id and the specified attribute scope. " +
                     ENTITY_SAVE_ATTRIBUTE_SCOPES +
@@ -532,16 +507,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/{scope}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntityAttributesV1` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> saveEntityAttributesV1(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -551,6 +516,16 @@ public class TelemetryController extends BaseController {
         return saveAttributes(getTenantId(), entityId, scope, request);
     }
 
+    /**
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Save entity attributes (saveEntityAttributesV2)",
             notes = "Creates or updates the entity attributes based on Entity Id and the specified attribute scope. " +
                     ENTITY_SAVE_ATTRIBUTE_SCOPES +
@@ -566,16 +541,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/attributes/{scope}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntityAttributesV2` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> saveEntityAttributesV2(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -586,6 +551,16 @@ public class TelemetryController extends BaseController {
     }
 
 
+    /**
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Save or update time-series data (saveEntityTelemetry)",
             notes = "Creates or updates the entity time-series data based on the Entity Id and request payload." +
                     SAVE_TIMESERIES_REQUEST_PAYLOAD +
@@ -601,16 +576,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/timeseries/{scope}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntityTelemetry` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> saveEntityTelemetry(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -620,6 +585,16 @@ public class TelemetryController extends BaseController {
         return saveTelemetry(getTenantId(), entityId, requestBody, 0L);
     }
 
+    /**
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Save or update time-series data with TTL (saveEntityTelemetryWithTTL)",
             notes = "Creates or updates the entity time-series data based on the Entity Id and request payload." +
                     SAVE_TIMESERIES_REQUEST_PAYLOAD +
@@ -636,16 +611,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/timeseries/{scope}/{ttl}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntityTelemetryWithTTL` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> saveEntityTelemetryWithTTL(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -656,6 +621,16 @@ public class TelemetryController extends BaseController {
         return saveTelemetry(getTenantId(), entityId, requestBody, ttl);
     }
 
+    /**
+     * 功能：删除或清理实体。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Delete entity time-series data (deleteEntityTimeseries)",
             notes = "Delete time-series for selected entity based on entity id, entity type and keys." +
                     " Use 'deleteAllDataForKeys' to delete all time-series data." +
@@ -676,16 +651,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/timeseries/delete", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteEntityTimeseries` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> deleteEntityTimeseries(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -705,19 +670,18 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTimeseries` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理时序数据。
+     * 参数：
+     * - `entityIdStr`：实体对象。
+     * - `keysStr`：键。
+     * - `deleteAllDataForKeys`：待处理数据。
+     * - `startTs`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
      */
     private DeferredResult<ResponseEntity> deleteTimeseries(EntityId entityIdStr, String keysStr, boolean deleteAllDataForKeys,
                                                             Long startTs, Long endTs, boolean rewriteLatestIfDeleted, boolean deleteLatest) throws ThingsboardException {
         List<String> keys = toKeysList(keysStr);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (keys.isEmpty()) {
             return getImmediateDeferredResult("Empty keys: " + keysStr, HttpStatus.BAD_REQUEST);
         }
@@ -725,12 +689,10 @@ public class TelemetryController extends BaseController {
 
         long deleteFromTs;
         long deleteToTs;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (deleteAllDataForKeys) {
             deleteFromTs = 0L;
             deleteToTs = System.currentTimeMillis();
         } else {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (startTs == null || endTs == null) {
                 return getImmediateDeferredResult("When deleteAllDataForKeys is false, start and end timestamp values shouldn't be empty", HttpStatus.BAD_REQUEST);
             } else {
@@ -741,11 +703,9 @@ public class TelemetryController extends BaseController {
 
         return accessValidator.validateEntityAndCallback(user, Operation.WRITE_TELEMETRY, entityIdStr, (result, tenantId, entityId) -> {
             List<DeleteTsKvQuery> deleteTsKvQueries = new ArrayList<>();
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (String key : keys) {
                 deleteTsKvQueries.add(new BaseDeleteTsKvQuery(key, deleteFromTs, deleteToTs, rewriteLatestIfDeleted, deleteLatest));
             }
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             tsSubService.deleteTimeseriesAndNotify(tenantId, entityId, keys, deleteTsKvQueries, new FutureCallback<>() {
                 @Override
                 public void onSuccess(@Nullable Void tmp) {
@@ -762,6 +722,16 @@ public class TelemetryController extends BaseController {
         });
     }
 
+    /**
+     * 功能：删除或清理设备。
+     * 参数：
+     * - `DEVICE_ID_PARAM_DESCRIPTION`：设备信息或设备标识。
+     * - `deviceIdStr`：设备信息或设备标识。
+     * - `ATTRIBUTES_SCOPE_DESCRIPTION`：`ATTRIBUTES_SCOPE_DESCRIPTION` 参数。
+     * - `ATTRIBUTES_SCOPE_ALLOWED_VALUES`：值。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Delete device attributes (deleteDeviceAttributes)",
             notes = "Delete device attributes using provided Device Id, scope and a list of keys. " +
                     "Referencing a non-existing Device Id will cause an error" + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -777,16 +747,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{deviceId}/{scope}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDeviceAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> deleteDeviceAttributes(
             @ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION, required = true) @PathVariable(DEVICE_ID) String deviceIdStr,
             @ApiParam(value = ATTRIBUTES_SCOPE_DESCRIPTION, allowableValues = ATTRIBUTES_SCOPE_ALLOWED_VALUES, required = true) @PathVariable("scope") String scope,
@@ -795,6 +755,16 @@ public class TelemetryController extends BaseController {
         return deleteAttributes(entityId, scope, keysStr);
     }
 
+    /**
+     * 功能：删除或清理实体。
+     * 参数：
+     * - `ENTITY_TYPE_PARAM_DESCRIPTION`：实体对象。
+     * - `true`：`true` 参数。
+     * - `entityType`：实体对象。
+     * - `ENTITY_ID_PARAM_DESCRIPTION`：实体对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Delete entity attributes (deleteEntityAttributes)",
             notes = "Delete entity attributes using provided Entity Id, scope and a list of keys. " +
                     INVALID_ENTITY_ID_OR_ENTITY_TYPE_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -810,16 +780,6 @@ public class TelemetryController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/{entityType}/{entityId}/{scope}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteEntityAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> deleteEntityAttributes(
             @ApiParam(value = ENTITY_TYPE_PARAM_DESCRIPTION, required = true, defaultValue = "DEVICE") @PathVariable("entityType") String entityType,
             @ApiParam(value = ENTITY_ID_PARAM_DESCRIPTION, required = true) @PathVariable("entityId") String entityIdStr,
@@ -830,24 +790,20 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Attributes`。
+     * 参数：
+     * - `entityIdSrc`：实体对象。
+     * - `scope`：`scope` 参数。
+     * - `keysStr`：键。
+     * 返回：响应结果。
      */
     private DeferredResult<ResponseEntity> deleteAttributes(EntityId entityIdSrc, String scope, String keysStr) throws ThingsboardException {
         List<String> keys = toKeysList(keysStr);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (keys.isEmpty()) {
             return getImmediateDeferredResult("Empty keys: " + keysStr, HttpStatus.BAD_REQUEST);
         }
         SecurityUser user = getCurrentUser();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (DataConstants.SERVER_SCOPE.equals(scope) ||
                 DataConstants.SHARED_SCOPE.equals(scope) ||
                 DataConstants.CLIENT_SCOPE.equals(scope)) {
@@ -877,14 +833,13 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Attributes`。
+     * 参数：
+     * - `srcTenantId`：租户IDID。
+     * - `entityIdSrc`：实体对象。
+     * - `scope`：`scope` 参数。
+     * - `json`：`json` 参数。
+     * 返回：响应结果。
      */
     private DeferredResult<ResponseEntity> saveAttributes(TenantId srcTenantId, EntityId entityIdSrc, String scope, JsonNode json) throws ThingsboardException {
         if (!DataConstants.SERVER_SCOPE.equals(scope) && !DataConstants.SHARED_SCOPE.equals(scope)) {
@@ -922,14 +877,13 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveTelemetry` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建遥测。
+     * 参数：
+     * - `curTenantId`：租户IDID。
+     * - `entityIdSrc`：实体对象。
+     * - `requestBody`：请求对象。
+     * - `ttl`：`ttl` 参数。
+     * 返回：响应结果。
      */
     private DeferredResult<ResponseEntity> saveTelemetry(TenantId curTenantId, EntityId entityIdSrc, String requestBody, long ttl) throws ThingsboardException {
         Map<Long, List<KvEntry>> telemetryRequest;
@@ -977,14 +931,14 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLatestTimeseriesValuesCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时序数据。
+     * 参数：
+     * - `result`：`result` 参数。
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void getLatestTimeseriesValuesCallback(@Nullable DeferredResult<ResponseEntity> result, SecurityUser user, EntityId entityId, String keys, Boolean useStrictDataTypes) {
         ListenableFuture<List<TsKvEntry>> future;
@@ -997,14 +951,14 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeValuesCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `result`：`result` 参数。
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void getAttributeValuesCallback(@Nullable DeferredResult<ResponseEntity> result, SecurityUser user, EntityId entityId, String scope, String keys) {
         List<String> keyList = toKeysList(keys);
@@ -1032,28 +986,25 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeKeysCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `result`：`result` 参数。
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * 返回：无。
      */
     private void getAttributeKeysCallback(@Nullable DeferredResult<ResponseEntity> result, TenantId tenantId, EntityId entityId, String scope) {
         Futures.addCallback(attributesService.findAll(tenantId, entityId, scope), getAttributeKeysToResponseCallback(result), MoreExecutors.directExecutor());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeKeysCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `result`：`result` 参数。
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * 返回：无。
      */
     private void getAttributeKeysCallback(@Nullable DeferredResult<ResponseEntity> result, TenantId tenantId, EntityId entityId) {
         List<ListenableFuture<List<AttributeKvEntry>>> futures = new ArrayList<>();
@@ -1067,14 +1018,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTsKeysToResponseCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：匹配的数据集合。
      */
     private FutureCallback<List<TsKvEntry>> getTsKeysToResponseCallback(final DeferredResult<ResponseEntity> response) {
         return new FutureCallback<>() {
@@ -1093,14 +1040,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeKeysToResponseCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：匹配的数据集合。
      */
     private FutureCallback<List<AttributeKvEntry>> getAttributeKeysToResponseCallback(final DeferredResult<ResponseEntity> response) {
         return new FutureCallback<List<AttributeKvEntry>>() {
@@ -1120,14 +1063,14 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeValuesToResponseCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `response`：响应对象。
+     * - `user`：`user` 参数。
+     * - `scope`：`scope` 参数。
+     * - `entityId`：实体IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
     private FutureCallback<List<AttributeKvEntry>> getAttributeValuesToResponseCallback(final DeferredResult<ResponseEntity> response,
                                                                                         final SecurityUser user, final String scope,
@@ -1152,14 +1095,11 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTsKvListCallback` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `response`：响应对象。
+     * - `useStrictDataTypes`：待处理数据。
+     * 返回：匹配的数据集合。
      */
     private FutureCallback<List<TsKvEntry>> getTsKvListCallback(final DeferredResult<ResponseEntity> response, Boolean useStrictDataTypes) {
         return new FutureCallback<>() {
@@ -1182,14 +1122,14 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logTimeseriesDeleted` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logTimeseriesDeleted` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `keys`：键。
+     * - `startTs`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void logTimeseriesDeleted(SecurityUser user, EntityId entityId, List<String> keys, long startTs, long endTs, Throwable e) {
         notificationEntityService.logEntityAction(user.getTenantId(), entityId, ActionType.TIMESERIES_DELETED, user,
@@ -1197,14 +1137,13 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logTelemetryUpdated` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logTelemetryUpdated` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `telemetry`：数据列表。
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
     private void logTelemetryUpdated(SecurityUser user, EntityId entityId, List<TsKvEntry> telemetry, Throwable e) {
         notificationEntityService.logEntityAction(user.getTenantId(), entityId, ActionType.TIMESERIES_UPDATED, user,
@@ -1212,14 +1151,14 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logAttributesDeleted` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logAttributesDeleted` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void logAttributesDeleted(SecurityUser user, EntityId entityId, String scope, List<String> keys, Throwable e) {
         notificationEntityService.logEntityAction(user.getTenantId(), (UUIDBased & EntityId) entityId,
@@ -1227,14 +1166,14 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logAttributesUpdated` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logAttributesUpdated` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributes`：数据列表。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void logAttributesUpdated(SecurityUser user, EntityId entityId, String scope, List<AttributeKvEntry> attributes, Throwable e) {
         notificationEntityService.logEntityAction(user.getTenantId(), entityId, ActionType.ATTRIBUTES_UPDATED, user,
@@ -1243,14 +1182,14 @@ public class TelemetryController extends BaseController {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logAttributesRead` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logAttributesRead` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void logAttributesRead(SecurityUser user, EntityId entityId, String scope, List<String> keys, Throwable e) {
         notificationEntityService.logEntityAction(user.getTenantId(), entityId, ActionType.ATTRIBUTES_READ, user,
@@ -1258,14 +1197,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `mergeAllAttributesFutures` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `mergeAllAttributesFutures` 对应的处理。
+     * 参数：
+     * - `futures`：数据列表。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<List<AttributeKvEntry>> mergeAllAttributesFutures(List<ListenableFuture<List<AttributeKvEntry>>> futures) {
         return Futures.transform(Futures.successfulAsList(futures),
@@ -1279,14 +1214,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toKeysList` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toKeysList` 对应的处理。
+     * 参数：
+     * - `keys`：键。
+     * 返回：匹配的数据集合。
      */
     private List<String> toKeysList(String keys) {
         List<String> keyList = null;
@@ -1297,14 +1228,11 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getImmediateDeferredResult` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Immediate Deferred Result`。
+     * 参数：
+     * - `message`：待处理消息。
+     * - `status`：`status` 参数。
+     * 返回：响应结果。
      */
     private DeferredResult<ResponseEntity> getImmediateDeferredResult(String message, HttpStatus status) {
         DeferredResult<ResponseEntity> result = new DeferredResult<>();
@@ -1313,14 +1241,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractRequestAttributes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractRequestAttributes` 对应的处理。
+     * 参数：
+     * - `jsonNode`：`jsonNode` 参数。
+     * 返回：匹配的数据集合。
      */
     private List<AttributeKvEntry> extractRequestAttributes(JsonNode jsonNode) {
         long ts = System.currentTimeMillis();
@@ -1352,14 +1276,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toJsonStr` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toJsonStr` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：文本结果。
      */
     private String toJsonStr(JsonNode value) {
         try {
@@ -1370,14 +1290,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toJsonNode` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toJsonNode` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     private JsonNode toJsonNode(String value) {
         try {
@@ -1388,14 +1304,10 @@ public class TelemetryController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getKvValue` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `entry`：`entry` 参数。
+     * 返回：处理结果。
      */
     private Object getKvValue(KvEntry entry) {
         if (entry.getDataType() == DataType.JSON) {

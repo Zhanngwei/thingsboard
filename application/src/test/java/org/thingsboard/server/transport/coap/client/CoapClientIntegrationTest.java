@@ -59,8 +59,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.thingsboard.server.common.data.query.EntityKeyType.CLIENT_ATTRIBUTE;
 import static org.thingsboard.server.common.data.query.EntityKeyType.SHARED_ATTRIBUTE;
 
-@Slf4j
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`CoapClientIntegrationTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -71,33 +69,25 @@ import static org.thingsboard.server.common.data.query.EntityKeyType.SHARED_ATTR
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@Slf4j
+@DaoSqlTest
 public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
 
     private static final String PAYLOAD_VALUES_STR = "{\"key1\":\"value1\", \"key2\":true, \"key3\": 3.0, \"key4\": 4," +
             " \"key5\": {\"someNumber\": 42, \"someArray\": [1,2,3], \"someNestedObject\": {\"key\": \"value\"}}}";
     private static final List<String> EXPECTED_KEYS = Arrays.asList("key1", "key2", "key3", "key4", "key5");
     /**
-     * 字段说明：
-     * 1. 保存 `DEVICE_RESPONSE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备常量，用于统一引用固定值。
      */
     private static final String DEVICE_RESPONSE = "{\"value1\":\"A\",\"value2\":\"B\"}";
 
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeTest() throws Exception {
         CoapTestConfigProperties configProperties = CoapTestConfigProperties.builder()
                 .deviceName("Test Post Attributes device")
@@ -105,32 +95,22 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
         processBeforeTest(configProperties);
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void afterTest() throws Exception {
         processAfterTest();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testConfirmableRequests` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Confirmable Requests`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testConfirmableRequests() throws Exception {
         boolean confirmable = true;
         processAttributesTest(confirmable);
@@ -138,17 +118,12 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
         processTestRequestAttributesValuesFromTheServer(confirmable);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNonConfirmableRequests` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Non Confirmable Requests`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNonConfirmableRequests() throws Exception {
         boolean confirmable = false;
         processAttributesTest(confirmable);
@@ -157,14 +132,10 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processAttributesTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Attributes Test`。
+     * 参数：
+     * - `confirmable`：`confirmable` 参数。
+     * 返回：无。
      */
     protected void processAttributesTest(boolean confirmable) throws Exception {
         client = createClientForFeatureWithConfirmableParameter(FeatureType.ATTRIBUTES, confirmable);
@@ -190,14 +161,10 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processTwoWayRpcTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理RPC。
+     * 参数：
+     * - `confirmable`：`confirmable` 参数。
+     * 返回：无。
      */
     protected void processTwoWayRpcTest(boolean confirmable) throws Exception {
         client = createClientForFeatureWithConfirmableParameter(FeatureType.RPC, confirmable);
@@ -240,14 +207,10 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processTestRequestAttributesValuesFromTheServer` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `confirmable`：`confirmable` 参数。
+     * 返回：无。
      */
     protected void processTestRequestAttributesValuesFromTheServer(boolean confirmable) throws Exception {
         client = createClientForFeatureWithConfirmableParameter(FeatureType.ATTRIBUTES, confirmable);
@@ -277,24 +240,19 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
         assertEquals("CoAP response type is wrong!", client.getType(), response.advanced().getType());
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assertAttributesValues` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `assertAttributesValues` 对应的处理。
+     * 参数：
+     * - `deviceValues`：设备信息或设备标识。
+     * - `keySet`：键。
+     * 返回：无。
      */
+    @SuppressWarnings({"unchecked", "rawtypes"})
     protected void assertAttributesValues(List<Map<String, Object>> deviceValues, Set<String> keySet) {
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Map<String, Object> map : deviceValues) {
             String key = (String) map.get("key");
             Object value = map.get("value");
             assertTrue(keySet.contains(key));
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (key) {
                 case "key1":
                     assertEquals("value1", value);
@@ -321,25 +279,19 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getActualKeysList` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Actual Keys List`。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：匹配的数据集合。
      */
     private List<String> getActualKeysList(DeviceId deviceId) throws Exception {
         long start = System.currentTimeMillis();
         long end = System.currentTimeMillis() + 5000;
 
         List<String> actualKeys = null;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while (start <= end) {
             actualKeys = doGetAsyncTyped("/api/plugins/telemetry/DEVICE/" + deviceId + "/keys/attributes/CLIENT_SCOPE", new TypeReference<>() {
             });
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (actualKeys.size() == EXPECTED_KEYS.size()) {
                 break;
             }
@@ -350,28 +302,21 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateCurrentStateNotification` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验状态。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     private void validateCurrentStateNotification(CoapTestCallback callback) {
         assertArrayEquals(EMPTY_PAYLOAD, callback.getPayloadBytes());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateTwoWayStateChangedNotification` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验状态。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `actualResult`：`actualResult` 参数。
+     * 返回：无。
      */
     private void validateTwoWayStateChangedNotification(CoapTestCallback callback, String actualResult) {
         assertEquals(DEVICE_RESPONSE, actualResult);
@@ -391,80 +336,56 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     protected class TestCoapCallbackForRPC extends CoapTestCallback {
 
         /**
-         * 字段说明：
-         * 1. 保存 `client` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 客户端，用于发起外部调用或协议交互。
          */
         private final CoapTestClient client;
 
-        @Getter
         /**
-         * 字段说明：
-         * 1. 保存 `wasSuccessful` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 当前操作是否成功。
          */
+        @Getter
         private boolean wasSuccessful = false;
 
         TestCoapCallbackForRPC(CoapTestClient client) {
             this.client = client;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onLoad` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Load`。
+         * 参数：
+         * - `response`：响应对象。
+         * 返回：无。
          */
+        @Override
         public void onLoad(CoapResponse response) {
             payloadBytes = response.getPayload();
             responseCode = response.getCode();
             observe = response.getOptions().getObserve();
             wasSuccessful = client.getType().equals(response.advanced().getType());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (observe != null) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (observe > 0) {
                     processOnLoadResponse(response, client);
                 }
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onError` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理错误信息。
+         * 参数：无。
+         * 返回：无。
          */
+        @Override
         public void onError() {
             log.warn("Command Response Ack Error, No connect");
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processOnLoadResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `response`：响应对象。
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     protected void processOnLoadResponse(CoapResponse response, CoapTestClient client) {
         JsonNode responseJson = JacksonUtil.fromBytes(response.getPayload());
@@ -484,18 +405,14 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createClientForFeatureWithConfirmableParameter` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建客户端。
+     * 参数：
+     * - `featureType`：类型。
+     * - `confirmable`：`confirmable` 参数。
+     * 返回：处理结果。
      */
     private CoapTestClient createClientForFeatureWithConfirmableParameter(FeatureType featureType, boolean confirmable) {
         CoapTestClient coapTestClient = new CoapTestClient(accessToken, featureType);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (confirmable) {
             coapTestClient.useCONs();
         } else {
@@ -505,14 +422,10 @@ public class CoapClientIntegrationTest extends AbstractCoapIntegrationTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityKeys` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `scope`：`scope` 参数。
+     * 返回：匹配的数据集合。
      */
     private List<EntityKey> getEntityKeys(EntityKeyType scope) {
         return CoapClientIntegrationTest.EXPECTED_KEYS.stream().map(key -> new EntityKey(scope, key)).collect(Collectors.toList());

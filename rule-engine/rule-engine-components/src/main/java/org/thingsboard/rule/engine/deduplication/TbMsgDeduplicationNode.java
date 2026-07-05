@@ -46,6 +46,14 @@ import java.util.concurrent.TimeUnit;
 
 import static org.thingsboard.server.common.data.DataConstants.QUEUE_NAME;
 
+/**
+ * 中文说明：`TbMsgDeduplicationNode` 是消息去重节点规则节点，用于按配置聚合、去重、延迟和输出消息。
+ * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
+ * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
+ * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
+ * 配置对象：`TbMsgDeduplicationNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
+ * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ */
 @RuleNode(
         type = ComponentType.TRANSFORMATION,
         name = "deduplication",
@@ -63,61 +71,59 @@ import static org.thingsboard.server.common.data.DataConstants.QUEUE_NAME;
         configDirective = "tbActionNodeMsgDeduplicationConfig"
 )
 @Slf4j
-/**
- * 中文说明：`TbMsgDeduplicationNode` 是消息去重节点规则节点，用于按配置聚合、去重、延迟和输出消息。
- * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
- * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
- * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
- * 配置对象：`TbMsgDeduplicationNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
- * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
- */
 public class TbMsgDeduplicationNode implements TbNode {
 
     /**
-     * 常量字段：定义 `TB_MSG_DEDUPLICATION_RETRY_DELAY`，用于重试次数或重试间隔，本身不触发外部系统调用。
+     * 消息常量，用于统一引用固定值。
      */
     public static final int TB_MSG_DEDUPLICATION_RETRY_DELAY = 10;
 
     /**
-     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     * 配置，保存当前对象的配置选项。
      */
     private TbMsgDeduplicationNodeConfiguration config;
 
     private final Map<EntityId, DeduplicationData> deduplicationMap;
     /**
-     * 字段说明：保存 `deduplicationInterval`，表示时间间隔，供本类方法在规则节点处理流程中使用。
+     * 时间间隔，用于控制时间范围或等待时长。
      */
     private long deduplicationInterval;
     /**
-     * 字段说明：保存 `queueName` 本地缓存、队列或并发状态，用于协调本类处理流程。
+     * 队列名称，用于标识或展示当前对象。
      */
     private String queueName;
 
     /**
-     * 方法说明：构造 `TbMsgDeduplicationNode` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `TbMsgDeduplicationNode` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public TbMsgDeduplicationNode() {
         this.deduplicationMap = new HashMap<>();
     }
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = TbNodeUtils.convert(configuration, TbMsgDeduplicationNodeConfiguration.class);
         this.deduplicationInterval = TimeUnit.SECONDS.toMillis(config.getInterval());
         this.queueName = ctx.getQueueName();
     }
 
-    @Override
     /**
-     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
-     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
-     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onMsg(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException, TbNodeException {
         if (msg.isTypeOf(TbMsgType.DEDUPLICATION_TIMEOUT_SELF_MSG)) {
             processDeduplication(ctx, msg.getOriginator());
@@ -126,20 +132,24 @@ public class TbMsgDeduplicationNode implements TbNode {
         }
     }
 
-    @Override
     /**
-     * 方法说明：在节点生命周期销毁阶段释放缓存、脚本引擎、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void destroy() {
         deduplicationMap.clear();
     }
 
-    @Override
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `upgrade` 对应的处理。
+     * 参数：
+     * - `fromVersion`：`fromVersion` 参数。
+     * - `oldConfiguration`：配置对象。
+     * 返回：处理结果。
      */
+    @Override
     public TbPair<Boolean, JsonNode> upgrade(int fromVersion, JsonNode oldConfiguration) throws TbNodeException {
         boolean hasChanges = false;
         switch (fromVersion) {
@@ -156,8 +166,11 @@ public class TbMsgDeduplicationNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     private void processOnRegularMsg(TbContext ctx, TbMsg msg) {
         EntityId id = msg.getOriginator();
@@ -174,8 +187,11 @@ public class TbMsgDeduplicationNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理`Deduplication`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `deduplicationId`：`deduplicationId`ID。
+     * 返回：无。
      */
     private void processDeduplication(TbContext ctx, EntityId deduplicationId) {
         DeduplicationData data = deduplicationMap.get(deduplicationId);
@@ -245,8 +261,12 @@ public class TbMsgDeduplicationNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `scheduleTickMsg` 对应的辅助逻辑，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `scheduleTickMsg` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `deduplicationId`：`deduplicationId`ID。
+     * - `data`：待处理数据。
+     * 返回：无。
      */
     private void scheduleTickMsg(TbContext ctx, EntityId deduplicationId, DeduplicationData data) {
         if (!data.isTickScheduled()) {
@@ -256,8 +276,11 @@ public class TbMsgDeduplicationNode implements TbNode {
     }
 
     /**
-     * 方法说明：按租户、实体或关系条件查询数据，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Valid Pack`。
+     * 参数：
+     * - `msgs`：待处理消息。
+     * - `deduplicationTimeoutMs`：`deduplicationTimeoutMs` 参数。
+     * 返回：处理结果。
      */
     private Optional<TbPair<Long, Long>> findValidPack(List<TbMsg> msgs, long deduplicationTimeoutMs) {
         Optional<TbMsg> min = msgs.stream().min(Comparator.comparing(TbMsg::getMetaDataTs));
@@ -272,19 +295,21 @@ public class TbMsgDeduplicationNode implements TbNode {
     }
 
     /**
-     * 方法说明：把处理结果发送到规则链后续关系，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `enqueueForTellNextWithRetry` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `retryAttempt`：`retryAttempt` 参数。
+     * 返回：无。
      */
     private void enqueueForTellNextWithRetry(TbContext ctx, TbMsg msg, int retryAttempt) {
         if (config.getMaxRetries() > retryAttempt) {
-            // 通过规则引擎上下文安排后续消息投递或自身定时消息。
             ctx.enqueueForTellNext(msg, TbNodeConnectionType.SUCCESS,
                     () -> {
                         log.trace("[{}][{}][{}] Successfully enqueue deduplication result message!", ctx.getSelfId(), msg.getOriginator(), retryAttempt);
                     },
                     throwable -> {
                         log.trace("[{}][{}][{}] Failed to enqueue deduplication output message due to: ", ctx.getSelfId(), msg.getOriginator(), retryAttempt, throwable);
-                        // 通过规则引擎上下文安排后续消息投递或自身定时消息。
                         ctx.schedule(() -> {
                             enqueueForTellNextWithRetry(ctx, msg, retryAttempt + 1);
                         }, TB_MSG_DEDUPLICATION_RETRY_DELAY, TimeUnit.SECONDS);
@@ -293,17 +318,21 @@ public class TbMsgDeduplicationNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `scheduleTickMsg` 对应的辅助逻辑，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `scheduleTickMsg` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `deduplicationId`：`deduplicationId`ID。
+     * 返回：无。
      */
     private void scheduleTickMsg(TbContext ctx, EntityId deduplicationId) {
-        // 通过规则引擎上下文安排后续消息投递或自身定时消息。
         ctx.tellSelf(ctx.newMsg(null, TbMsgType.DEDUPLICATION_TIMEOUT_SELF_MSG, deduplicationId, TbMsgMetaData.EMPTY, TbMsg.EMPTY_STRING), deduplicationInterval + 1);
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取数据。
+     * 参数：
+     * - `msgs`：待处理消息。
+     * 返回：文本结果。
      */
     private String getMergedData(List<TbMsg> msgs) {
         ArrayNode mergedData = JacksonUtil.newArrayNode();
@@ -317,8 +346,9 @@ public class TbMsgDeduplicationNode implements TbNode {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbMsgDeduplicationNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Metadata`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private TbMsgMetaData getMetadata() {
         TbMsgMetaData metaData = new TbMsgMetaData();

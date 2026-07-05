@@ -82,74 +82,46 @@ import static org.thingsboard.server.common.data.StringUtils.isEmpty;
  */
 public class TestRestClient {
     /**
-     * 字段说明：
-     * 1. 保存 `JWT_TOKEN_HEADER_PARAM` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 令牌常量，用于统一引用固定值。
      */
     private static final String JWT_TOKEN_HEADER_PARAM = "X-Authorization";
     private static final String CONTENT_TYPE_HEADER = "Content-Type";
     /**
-     * 字段说明：
-     * 1. 保存 `requestSpec` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
     private final RequestSpecification requestSpec;
     private String token;
     /**
-     * 字段说明：
-     * 1. 保存 `refreshToken` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 令牌，用于认证或安全校验。
      */
     private String refreshToken;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TestRestClient` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：创建 `TestRestClient` 实例，并初始化必要字段。
+     * 参数：
+     * - `url`：`url` 参数。
+     * 返回：新创建的对象实例。
      */
     public TestRestClient(String url) {
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         RestAssured.filters(new RequestLoggingFilter(), new ResponseLoggingFilter());
 
         requestSpec = given().baseUri(url)
                 .contentType(ContentType.JSON)
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .config(RestAssuredConfig.config()
                         .headerConfig(HeaderConfig.headerConfig()
                                 .overwriteHeadersWithName(JWT_TOKEN_HEADER_PARAM, CONTENT_TYPE_HEADER)));
 
-        // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
         if (url.matches("^(https)://.*$")) {
-            // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
             requestSpec.relaxedHTTPSValidation();
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `login` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `login` 对应的处理。
+     * 参数：
+     * - `username`：名称。
+     * - `password`：`password` 参数。
+     * 返回：无。
      */
     public void login(String username, String password) {
         Map<String, String> loginRequest = new HashMap<>();
@@ -165,58 +137,43 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postDevice` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postDevice` 对应的处理。
+     * 参数：
+     * - `accessToken`：`accessToken` 参数。
+     * - `device`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     public Device postDevice(String accessToken, Device device) {
         return given().spec(requestSpec).body(device)
                 .pathParams("accessToken", accessToken)
                 .post("/api/device?accessToken={accessToken}")
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK)
                 .extract()
                 .as(Device.class);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceByName` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取设备。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     public Device getDeviceByName(String deviceName) {
         return given().spec(requestSpec).pathParam("deviceName", deviceName)
                 .get("/api/tenant/devices?deviceName={deviceName}")
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK)
                 .extract()
                 .as(Device.class);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceById` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取设备ID。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * - `statusCode`：`statusCode` 参数。
+     * 返回：处理结果。
      */
     public ValidatableResponse getDeviceById(DeviceId deviceId, int statusCode) {
         return given().spec(requestSpec)
@@ -227,33 +184,22 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceById` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取设备ID。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
     public Device getDeviceById(DeviceId deviceId) {
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         return getDeviceById(deviceId, HTTP_OK)
                 .extract()
                 .as(Device.class);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDevices` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Devices`。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<Device> getDevices(PageLink pageLink) {
         Map<String, String> params = new HashMap<>();
@@ -261,7 +207,6 @@ public class TestRestClient {
         return given().spec(requestSpec).queryParams(params)
                 .get("/api/tenant/devices")
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK)
                 .extract()
                 .as(new TypeRef<PageData<Device>>() {
@@ -269,131 +214,97 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceCredentialsByDeviceId` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取设备凭据。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
     public DeviceCredentials getDeviceCredentialsByDeviceId(DeviceId deviceId) {
         return given().spec(requestSpec).get("/api/device/{deviceId}/credentials", deviceId.getId())
                 .then()
                 .assertThat()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK)
                 .extract()
                 .as(DeviceCredentials.class);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postTelemetry` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postTelemetry` 对应的处理。
+     * 参数：
+     * - `credentialsId`：凭据ID。
+     * - `telemetry`：`telemetry` 参数。
+     * 返回：处理结果。
      */
     public ValidatableResponse postTelemetry(String credentialsId, JsonNode telemetry) {
         return given().spec(requestSpec).body(telemetry)
                 .post("/api/v1/{credentialsId}/telemetry", credentialsId)
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDevice` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理设备。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
     public ValidatableResponse deleteDevice(DeviceId deviceId) {
         return given().spec(requestSpec)
                 .delete("/api/device/{deviceId}", deviceId.getId())
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDeviceIfExists` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理设备。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
     public ValidatableResponse deleteDeviceIfExists(DeviceId deviceId) {
         return given().spec(requestSpec)
                 .delete("/api/device/{deviceId}", deviceId.getId())
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(anyOf(is(HTTP_OK), is(HTTP_NOT_FOUND)));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postTelemetryAttribute` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postTelemetryAttribute` 对应的处理。
+     * 参数：
+     * - `entityType`：实体对象。
+     * - `deviceId`：设备IDID。
+     * - `scope`：`scope` 参数。
+     * - `attribute`：`attribute` 参数。
+     * 返回：处理结果。
      */
     public ValidatableResponse postTelemetryAttribute(String entityType, DeviceId deviceId, String scope, JsonNode attribute) {
         return given().spec(requestSpec).body(attribute)
                 .post("/api/plugins/telemetry/{entityType}/{entityId}/attributes/{scope}", entityType, deviceId.getId(), scope)
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postAttribute` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postAttribute` 对应的处理。
+     * 参数：
+     * - `accessToken`：`accessToken` 参数。
+     * - `attribute`：`attribute` 参数。
+     * 返回：处理结果。
      */
     public ValidatableResponse postAttribute(String accessToken, JsonNode attribute) {
         return given().spec(requestSpec).body(attribute)
                 .post("/api/v1/{accessToken}/attributes/", accessToken)
                 .then()
-                // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
                 .statusCode(HTTP_OK);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributes` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Attributes`。
+     * 参数：
+     * - `accessToken`：`accessToken` 参数。
+     * - `clientKeys`：客户端对象。
+     * - `sharedKeys`：键。
+     * 返回：处理结果。
      */
     public JsonNode getAttributes(String accessToken, String clientKeys, String sharedKeys) {
         return given().spec(requestSpec)
@@ -407,15 +318,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postProvisionRequest` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postProvisionRequest` 对应的处理。
+     * 参数：
+     * - `provisionRequest`：请求对象。
+     * 返回：处理结果。
      */
     public JsonPath postProvisionRequest(String provisionRequest) {
         return given().spec(requestSpec)
@@ -426,15 +332,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleChains` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Rule Chains`。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<RuleChain> getRuleChains(PageLink pageLink) {
         Map<String, String> params = new HashMap<>();
@@ -449,15 +350,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postRuleChain` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postRuleChain` 对应的处理。
+     * 参数：
+     * - `ruleChain`：`ruleChain` 参数。
+     * 返回：处理结果。
      */
     public RuleChain postRuleChain(RuleChain ruleChain) {
         return given().spec(requestSpec)
@@ -470,15 +366,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postRuleChainMetadata` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postRuleChainMetadata` 对应的处理。
+     * 参数：
+     * - `ruleChainMetaData`：待处理数据。
+     * 返回：处理结果。
      */
     public RuleChainMetaData postRuleChainMetadata(RuleChainMetaData ruleChainMetaData) {
         return given().spec(requestSpec)
@@ -491,15 +382,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setRootRuleChain` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：更新规则链。
+     * 参数：
+     * - `ruleChainId`：规则链ID。
+     * 返回：无。
      */
     public void setRootRuleChain(RuleChainId ruleChainId) {
         given().spec(requestSpec)
@@ -509,15 +395,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteRuleChain` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理规则链。
+     * 参数：
+     * - `ruleChainId`：规则链ID。
+     * 返回：无。
      */
     public void deleteRuleChain(RuleChainId ruleChainId) {
         given().spec(requestSpec)
@@ -527,15 +408,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getUrlParams` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取URL 地址。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：文本结果。
      */
     private String getUrlParams(PageLink pageLink) {
         String urlParams = "pageSize={pageSize}&page={page}";
@@ -549,15 +425,11 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addPageLinkToParam` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：保存或创建分页查询条件。
+     * 参数：
+     * - `params`：键值映射。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：无。
      */
     private void addPageLinkToParam(Map<String, String> params, PageLink pageLink) {
         params.put("pageSize", String.valueOf(pageLink.getPageSize()));
@@ -572,15 +444,11 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findRelationByFrom` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取关系。
+     * 参数：
+     * - `fromId`：`fromId`ID。
+     * - `relationTypeGroup`：类型。
+     * 返回：匹配的数据集合。
      */
     public List<EntityRelation> findRelationByFrom(EntityId fromId, RelationTypeGroup relationTypeGroup) {
         Map<String, String> params = new HashMap<>();
@@ -599,15 +467,11 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postServerSideRpc` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postServerSideRpc` 对应的处理。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * - `serverRpcPayload`：`serverRpcPayload` 参数。
+     * 返回：处理结果。
      */
     public JsonNode postServerSideRpc(DeviceId deviceId, JsonNode serverRpcPayload) {
         return given().spec(requestSpec)
@@ -620,15 +484,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceProfiles` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取设备。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<DeviceProfile> getDeviceProfiles(PageLink pageLink) {
         Map<String, String> params = new HashMap<>();
@@ -643,15 +502,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceProfileById` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取设备配置。
+     * 参数：
+     * - `deviceProfileId`：设备配置ID。
+     * 返回：处理结果。
      */
     public DeviceProfile getDeviceProfileById(DeviceProfileId deviceProfileId) {
         return given().spec(requestSpec).get("/api/deviceProfile/{deviceProfileId}", deviceProfileId.getId())
@@ -663,15 +517,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postDeviceProfile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postDeviceProfile` 对应的处理。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     public DeviceProfile postDeviceProfile(DeviceProfile deviceProfile) {
         return given().spec(requestSpec).body(deviceProfile)
@@ -683,15 +532,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDeviseProfile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理配置。
+     * 参数：
+     * - `deviceProfileId`：设备配置ID。
+     * 返回：无。
      */
     public void deleteDeviseProfile(DeviceProfileId deviceProfileId) {
         given().spec(requestSpec)
@@ -701,15 +545,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setDefaultDeviceProfile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：更新设备配置。
+     * 参数：
+     * - `deviceProfileId`：设备配置ID。
+     * 返回：无。
      */
     public void setDefaultDeviceProfile(DeviceProfileId deviceProfileId) {
         given().spec(requestSpec)
@@ -719,15 +558,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postAssetProfile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postAssetProfile` 对应的处理。
+     * 参数：
+     * - `assetProfile`：`assetProfile` 参数。
+     * 返回：匹配的数据集合。
      */
     public AssetProfile postAssetProfile(AssetProfile assetProfile) {
         return given().spec(requestSpec).body(assetProfile)
@@ -739,15 +573,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAssetProfiles` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取资产。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<AssetProfile> getAssetProfiles(PageLink pageLink) {
         Map<String, String> params = new HashMap<>();
@@ -762,15 +591,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAssetProfile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理资产配置。
+     * 参数：
+     * - `assetProfileId`：资产配置ID。
+     * 返回：无。
      */
     public void deleteAssetProfile(AssetProfileId assetProfileId) {
         given().spec(requestSpec)
@@ -780,15 +604,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setDefaultAssetProfile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：更新资产配置。
+     * 参数：
+     * - `assetProfileId`：资产配置ID。
+     * 返回：无。
      */
     public void setDefaultAssetProfile(AssetProfileId assetProfileId) {
         given().spec(requestSpec)
@@ -798,15 +617,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postCustomer` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postCustomer` 对应的处理。
+     * 参数：
+     * - `customer`：`customer` 参数。
+     * 返回：处理结果。
      */
     public Customer postCustomer(Customer customer) {
         return given().spec(requestSpec)
@@ -819,15 +633,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteCustomer` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理客户。
+     * 参数：
+     * - `customerId`：客户IDID。
+     * 返回：无。
      */
     public void deleteCustomer(CustomerId customerId) {
         given().spec(requestSpec)
@@ -837,15 +646,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomers` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Customers`。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<Customer> getCustomers(PageLink pageLink) {
         Map<String, String> params = new HashMap<>();
@@ -860,15 +664,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postAlarm` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postAlarm` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * 返回：处理结果。
      */
     public Alarm postAlarm(Alarm alarm) {
         return given().spec(requestSpec)
@@ -881,15 +680,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAlarm` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理告警。
+     * 参数：
+     * - `alarmId`：告警IDID。
+     * 返回：无。
      */
     public void deleteAlarm(AlarmId alarmId) {
         given().spec(requestSpec)
@@ -899,15 +693,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postUser` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postUser` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
     public User postUser(User user) {
         return given().spec(requestSpec)
@@ -920,15 +709,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteUser` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理用户。
+     * 参数：
+     * - `userId`：用户ID。
+     * 返回：无。
      */
     public void deleteUser(UserId userId) {
         given().spec(requestSpec)
@@ -938,45 +722,28 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getToken` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取令牌。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getToken() {
         return token;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRefreshToken` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取令牌。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getRefreshToken() {
         return refreshToken;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postAsset` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postAsset` 对应的处理。
+     * 参数：
+     * - `asset`：`asset` 参数。
+     * 返回：匹配的数据集合。
      */
     public Asset postAsset(Asset asset) {
         return given().spec(requestSpec)
@@ -989,15 +756,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAssetById` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取资产ID。
+     * 参数：
+     * - `assetId`：资产IDID。
+     * 返回：匹配的数据集合。
      */
     public Asset getAssetById(AssetId assetId) {
         return given().spec(requestSpec)
@@ -1009,15 +771,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAsset` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理资产。
+     * 参数：
+     * - `assetId`：资产IDID。
+     * 返回：无。
      */
     public void deleteAsset(AssetId assetId) {
         given().spec(requestSpec)
@@ -1027,15 +784,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postEntityView` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postEntityView` 对应的处理。
+     * 参数：
+     * - `entityView`：实体对象。
+     * 返回：处理结果。
      */
     public EntityView postEntityView(EntityView entityView) {
         return given().spec(requestSpec)
@@ -1048,15 +800,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityViewById` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取实体视图。
+     * 参数：
+     * - `entityViewId`：实体视图ID。
+     * 返回：处理结果。
      */
     public EntityView getEntityViewById(EntityViewId entityViewId) {
         return given().spec(requestSpec)
@@ -1068,15 +815,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteEntityView` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理实体视图。
+     * 参数：
+     * - `entityViewId`：实体视图ID。
+     * 返回：无。
      */
     public void deleteEntityView(EntityViewId entityViewId) {
         given().spec(requestSpec)
@@ -1086,15 +828,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `postDashboard` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `postDashboard` 对应的处理。
+     * 参数：
+     * - `dashboard`：`dashboard` 参数。
+     * 返回：处理结果。
      */
     public Dashboard postDashboard(Dashboard dashboard) {
         return given().spec(requestSpec)
@@ -1107,15 +844,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDashboard` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：删除或清理仪表盘。
+     * 参数：
+     * - `dashboardId`：仪表盘IDID。
+     * 返回：无。
      */
     public void deleteDashboard(DashboardId dashboardId) {
         given().spec(requestSpec)
@@ -1125,15 +857,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setDevicePublic` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：更新设备。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：无。
      */
     public void setDevicePublic(DeviceId deviceId) {
         given().spec(requestSpec)
@@ -1143,15 +870,13 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEvents` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Events`。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `eventType`：类型。
+     * - `tenantId`：租户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     public PageData<EventInfo> getEvents(EntityId entityId, EventType eventType, TenantId tenantId, TimePageLink pageLink) {
         Map<String, String> params = new HashMap<>();
@@ -1170,15 +895,11 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addTimePageLinkToParam` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：保存或创建分页查询条件。
+     * 参数：
+     * - `params`：键值映射。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：无。
      */
     private void addTimePageLinkToParam(Map<String, String> params, TimePageLink pageLink) {
         this.addPageLinkToParam(params, pageLink);
@@ -1191,15 +912,10 @@ public class TestRestClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimeUrlParams` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取时间。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：文本结果。
      */
     private String getTimeUrlParams(TimePageLink pageLink) {
         String urlParams = getUrlParams(pageLink);

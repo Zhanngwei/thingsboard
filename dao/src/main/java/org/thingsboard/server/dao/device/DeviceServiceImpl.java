@@ -89,8 +89,6 @@ import static org.thingsboard.server.dao.service.Validator.validateIds;
 import static org.thingsboard.server.dao.service.Validator.validatePageLink;
 import static org.thingsboard.server.dao.service.Validator.validateString;
 
-@Service("DeviceDaoService")
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DeviceServiceImpl` 是 ThingsBoard DAO 模块 中的设备持久化服务类型，用于维护设备、凭据、配置、声明、连接状态和设备画像相关的数据库访问流程。
@@ -102,279 +100,182 @@ import static org.thingsboard.server.dao.service.Validator.validateString;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Service / Repository / Factory。
  */
+@Service("DeviceDaoService")
+@Slf4j
 public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKey, Device, DeviceCacheEvictEvent> implements DeviceService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `INCORRECT_TENANT_ID` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户ID常量，用于统一引用固定值。
      */
     public static final String INCORRECT_TENANT_ID = "Incorrect tenantId ";
     public static final String INCORRECT_DEVICE_PROFILE_ID = "Incorrect deviceProfileId ";
     /**
-     * 字段说明：
-     * 1. 保存 `INCORRECT_PAGE_LINK` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 分页查询条件常量，用于统一引用固定值。
      */
     public static final String INCORRECT_PAGE_LINK = "Incorrect page link ";
     public static final String INCORRECT_CUSTOMER_ID = "Incorrect customerId ";
     /**
-     * 字段说明：
-     * 1. 保存 `INCORRECT_DEVICE_ID` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备ID常量，用于统一引用固定值。
      */
     public static final String INCORRECT_DEVICE_ID = "Incorrect deviceId ";
     public static final String INCORRECT_EDGE_ID = "Incorrect edgeId ";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备，用于读取或保存对应领域对象。
      */
+    @Autowired
     private DeviceDao deviceDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceCredentialsService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备凭据，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceCredentialsService deviceCredentialsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceProfileService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备配置，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceProfileService deviceProfileService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `eventService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 事件，提供当前类调用的业务操作。
      */
+    @Autowired
     private EventService eventService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceValidator` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 设备对象，用于描述当前业务场景。
      */
+    @Autowired
     private DataValidator<Device> deviceValidator;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `countService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private EntityCountService countService;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDeviceInfoById` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取设备ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
+    @Override
     public DeviceInfo findDeviceInfoById(TenantId tenantId, DeviceId deviceId) {
         log.trace("Executing findDeviceInfoById [{}]", deviceId);
         validateId(deviceId, INCORRECT_DEVICE_ID + deviceId);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return deviceDao.findDeviceInfoById(tenantId, deviceId.getId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDeviceById` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取设备ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
+    @Override
     public Device findDeviceById(TenantId tenantId, DeviceId deviceId) {
         log.trace("Executing findDeviceById [{}]", deviceId);
         validateId(deviceId, INCORRECT_DEVICE_ID + deviceId);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (TenantId.SYS_TENANT_ID.equals(tenantId)) {
-            // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
             return cache.getAndPutInTransaction(new DeviceCacheKey(deviceId),
-                    // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
                     () -> deviceDao.findById(tenantId, deviceId.getId()), true);
         } else {
-            // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
             return cache.getAndPutInTransaction(new DeviceCacheKey(tenantId, deviceId),
-                    // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
                     () -> deviceDao.findDeviceByTenantIdAndId(tenantId, deviceId.getId()), true);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDeviceByIdAsync` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取设备ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Device> findDeviceByIdAsync(TenantId tenantId, DeviceId deviceId) {
         log.trace("Executing findDeviceById [{}]", deviceId);
         validateId(deviceId, INCORRECT_DEVICE_ID + deviceId);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (TenantId.SYS_TENANT_ID.equals(tenantId)) {
-            // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
             return deviceDao.findByIdAsync(tenantId, deviceId.getId());
         } else {
-            // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
             return deviceDao.findDeviceByTenantIdAndIdAsync(tenantId, deviceId.getId());
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDeviceByTenantIdAndName` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `name`：名称。
+     * 返回：处理结果。
      */
+    @Override
     public Device findDeviceByTenantIdAndName(TenantId tenantId, String name) {
         log.trace("Executing findDeviceByTenantIdAndName [{}][{}]", tenantId, name);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
-        // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
         return cache.getAndPutInTransaction(new DeviceCacheKey(tenantId, name),
-                // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
                 () -> deviceDao.findDeviceByTenantIdAndName(tenantId.getId(), name).orElse(null), true);
     }
 
+    /**
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `accessToken`：`accessToken` 参数。
+     * 返回：处理结果。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDeviceWithAccessToken` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Device saveDeviceWithAccessToken(Device device, String accessToken) {
         return doSaveDevice(device, accessToken, true);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDevice` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `doValidate`：`doValidate` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Device saveDevice(Device device, boolean doValidate) {
         return doSaveDevice(device, null, doValidate);
     }
 
+    /**
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：处理结果。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDevice` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Device saveDevice(Device device) {
         return doSaveDevice(device, null, true);
     }
 
+    /**
+     * 功能：保存或创建设备凭据。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `deviceCredentials`：设备信息或设备标识。
+     * 返回：处理结果。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDeviceWithCredentials` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Device saveDeviceWithCredentials(Device device, DeviceCredentials deviceCredentials) {
         Device savedDevice = this.saveDeviceWithoutCredentials(device, true);
         deviceCredentials.setDeviceId(savedDevice.getId());
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (device.getId() == null) {
             deviceCredentialsService.createDeviceCredentials(savedDevice.getTenantId(), deviceCredentials);
         } else {
             DeviceCredentials foundDeviceCredentials = deviceCredentialsService.findDeviceCredentialsByDeviceId(device.getTenantId(), savedDevice.getId());
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (foundDeviceCredentials == null) {
                 deviceCredentialsService.createDeviceCredentials(savedDevice.getTenantId(), deviceCredentials);
             } else {
@@ -386,20 +287,15 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doSaveDevice` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `doSaveDevice` 对应的处理。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `accessToken`：`accessToken` 参数。
+     * - `doValidate`：`doValidate` 参数。
+     * 返回：处理结果。
      */
     private Device doSaveDevice(Device device, String accessToken, boolean doValidate) {
         Device savedDevice = this.saveDeviceWithoutCredentials(device, doValidate);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (device.getId() == null) {
             DeviceCredentials deviceCredentials = new DeviceCredentials();
             deviceCredentials.setDeviceId(new DeviceId(savedDevice.getUuidId()));
@@ -411,16 +307,11 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDeviceWithoutCredentials` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：保存或创建设备凭据。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `doValidate`：`doValidate` 参数。
+     * 返回：处理结果。
      */
     private Device saveDeviceWithoutCredentials(Device device, boolean doValidate) {
         log.trace("Executing saveDevice [{}]", device);
@@ -468,20 +359,14 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         }
     }
 
+    /**
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
+     */
     @TransactionalEventListener(classes = DeviceCacheEvictEvent.class)
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `handleEvictEvent` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void handleEvictEvent(DeviceCacheEvictEvent event) {
         List<DeviceCacheKey> keys = new ArrayList<>(3);
         keys.add(new DeviceCacheKey(event.getTenantId(), event.getNewName()));
@@ -496,16 +381,11 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `syncDeviceData` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `syncDeviceData` 对应的处理。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * - `deviceData`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     private DeviceData syncDeviceData(DeviceProfile deviceProfile, DeviceData deviceData) {
         if (deviceData == null) {
@@ -538,60 +418,46 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceData;
     }
 
+    /**
+     * 功能：执行 `assignDeviceToCustomer` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `customerId`：客户IDID。
+     * 返回：处理结果。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDeviceToCustomer` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Device assignDeviceToCustomer(TenantId tenantId, DeviceId deviceId, CustomerId customerId) {
         Device device = findDeviceById(tenantId, deviceId);
         device.setCustomerId(customerId);
         return saveDevice(device);
     }
 
+    /**
+     * 功能：执行 `unassignDeviceFromCustomer` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDeviceFromCustomer` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Device unassignDeviceFromCustomer(TenantId tenantId, DeviceId deviceId) {
         Device device = findDeviceById(tenantId, deviceId);
         device.setCustomerId(null);
         return saveDevice(device);
     }
 
+    /**
+     * 功能：删除或清理设备。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * 返回：无。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDevice` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void deleteDevice(final TenantId tenantId, final DeviceId deviceId) {
         validateId(deviceId, INCORRECT_DEVICE_ID + deviceId);
         if (entityViewService.existsByTenantIdAndEntityId(tenantId, deviceId)) {
@@ -604,16 +470,11 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDevice` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：删除或清理设备。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `device`：设备信息或设备标识。
+     * 返回：无。
      */
     private void deleteDevice(TenantId tenantId, Device device) {
         log.trace("Executing deleteDevice [{}]", device.getId());
@@ -628,19 +489,14 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         eventPublisher.publishEvent(DeleteEntityEvent.builder().tenantId(tenantId).entityId(device.getId()).build());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantId` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Device> findDevicesByTenantId(TenantId tenantId, PageLink pageLink) {
         log.trace("Executing findDevicesByTenantId, tenantId [{}], pageLink [{}]", tenantId, pageLink);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -649,19 +505,14 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDeviceInfosByFilter` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取设备。
+     * 参数：
+     * - `filter`：`filter` 参数。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<DeviceInfo> findDeviceInfosByFilter(DeviceInfoFilter filter, PageLink pageLink) {
         log.trace("Executing findDeviceInfosByFilter, filter [{}], pageLink [{}]", filter, pageLink);
         if (filter == null) {
@@ -673,38 +524,28 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
 
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDeviceIdInfos` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取设备ID。
+     * 参数：
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<DeviceIdInfo> findDeviceIdInfos(PageLink pageLink) {
         log.trace("Executing findTenantDeviceIdPairs, pageLink [{}]", pageLink);
         validatePageLink(pageLink);
         return deviceDao.findDeviceIdInfos(pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdAndType` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `type`：类型。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Device> findDevicesByTenantIdAndType(TenantId tenantId, String type, PageLink pageLink) {
         log.trace("Executing findDevicesByTenantIdAndType, tenantId [{}], type [{}], pageLink [{}]", tenantId, type, pageLink);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -713,19 +554,16 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.findDevicesByTenantIdAndType(tenantId.getId(), type, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdAndTypeAndEmptyOtaPackage` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceProfileId`：设备配置ID。
+     * - `type`：类型。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Device> findDevicesByTenantIdAndTypeAndEmptyOtaPackage(TenantId tenantId,
                                                                            DeviceProfileId deviceProfileId,
                                                                            OtaPackageType type,
@@ -738,19 +576,15 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.findDevicesByTenantIdAndTypeAndEmptyOtaPackage(tenantId.getId(), deviceProfileId.getId(), type, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `countDevicesByTenantIdAndDeviceProfileIdAndEmptyOtaPackage` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：统计设备配置数量。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceProfileId`：设备配置ID。
+     * - `type`：类型。
+     * 返回：数值结果。
      */
+    @Override
     public Long countDevicesByTenantIdAndDeviceProfileIdAndEmptyOtaPackage(TenantId tenantId, DeviceProfileId deviceProfileId, OtaPackageType type) {
         log.trace("Executing countDevicesByTenantIdAndDeviceProfileIdAndEmptyOtaPackage, tenantId [{}], deviceProfileId [{}], type [{}]", tenantId, deviceProfileId, type);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -758,19 +592,14 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.countDevicesByTenantIdAndDeviceProfileIdAndEmptyOtaPackage(tenantId.getId(), deviceProfileId.getId(), type);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdAndIdsAsync` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceIds`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<Device>> findDevicesByTenantIdAndIdsAsync(TenantId tenantId, List<DeviceId> deviceIds) {
         log.trace("Executing findDevicesByTenantIdAndIdsAsync, tenantId [{}], deviceIds [{}]", tenantId, deviceIds);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -778,77 +607,55 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.findDevicesByTenantIdAndIdsAsync(tenantId.getId(), toUUIDs(deviceIds));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByIds` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`Devices By Ids`。
+     * 参数：
+     * - `deviceIds`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<Device> findDevicesByIds(List<DeviceId> deviceIds) {
         log.trace("Executing findDevicesByIdsAsync, deviceIds [{}]", deviceIds);
         validateIds(deviceIds, "Incorrect deviceIds " + deviceIds);
         return deviceDao.findDevicesByIds(toUUIDs(deviceIds));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByIdsAsync` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`Devices By Ids Async`。
+     * 参数：
+     * - `deviceIds`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<Device>> findDevicesByIdsAsync(List<DeviceId> deviceIds) {
         log.trace("Executing findDevicesByIdsAsync, deviceIds [{}]", deviceIds);
         validateIds(deviceIds, "Incorrect deviceIds " + deviceIds);
         return deviceDao.findDevicesByIdsAsync(toUUIDs(deviceIds));
     }
 
+    /**
+     * 功能：删除或清理租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDevicesByTenantId` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void deleteDevicesByTenantId(TenantId tenantId) {
         log.trace("Executing deleteDevicesByTenantId, tenantId [{}]", tenantId);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
         tenantDevicesRemover.removeEntities(tenantId, tenantId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdAndCustomerId` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Device> findDevicesByTenantIdAndCustomerId(TenantId tenantId, CustomerId customerId, PageLink pageLink) {
         log.trace("Executing findDevicesByTenantIdAndCustomerId, tenantId [{}], customerId [{}], pageLink [{}]", tenantId, customerId, pageLink);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -857,19 +664,16 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.findDevicesByTenantIdAndCustomerId(tenantId.getId(), customerId.getId(), pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdAndCustomerIdAndType` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `type`：类型。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Device> findDevicesByTenantIdAndCustomerIdAndType(TenantId tenantId, CustomerId customerId, String type, PageLink pageLink) {
         log.trace("Executing findDevicesByTenantIdAndCustomerIdAndType, tenantId [{}], customerId [{}], type [{}], pageLink [{}]", tenantId, customerId, type, pageLink);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -879,19 +683,15 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.findDevicesByTenantIdAndCustomerIdAndType(tenantId.getId(), customerId.getId(), type, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdCustomerIdAndIdsAsync` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `deviceIds`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<Device>> findDevicesByTenantIdCustomerIdAndIdsAsync(TenantId tenantId, CustomerId customerId, List<DeviceId> deviceIds) {
         log.trace("Executing findDevicesByTenantIdCustomerIdAndIdsAsync, tenantId [{}], customerId [{}], deviceIds [{}]", tenantId, customerId, deviceIds);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -901,19 +701,14 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
                 customerId.getId(), toUUIDs(deviceIds));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignCustomerDevices` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `unassignCustomerDevices` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * 返回：无。
      */
+    @Override
     public void unassignCustomerDevices(TenantId tenantId, CustomerId customerId) {
         log.trace("Executing unassignCustomerDevices, tenantId [{}], customerId [{}]", tenantId, customerId);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -921,19 +716,14 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         customerDeviceUnasigner.removeEntities(tenantId, customerId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByQuery` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取查询条件。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `query`：`query` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<Device>> findDevicesByQuery(TenantId tenantId, DeviceSearchQuery query) {
         ListenableFuture<List<EntityRelation>> relations = relationService.findByQuery(tenantId, query.toEntitySearchQuery());
         return Futures.transform(relations, r -> {
@@ -952,39 +742,28 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         }, MoreExecutors.directExecutor());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDeviceTypesByTenantId` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<EntitySubtype>> findDeviceTypesByTenantId(TenantId tenantId) {
         log.trace("Executing findDeviceTypesByTenantId, tenantId [{}]", tenantId);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
         return deviceDao.findTenantDeviceTypesAsync(tenantId.getId());
     }
 
+    /**
+     * 功能：执行 `assignDeviceToTenant` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `device`：设备信息或设备标识。
+     * 返回：处理结果。
+     */
     @Transactional
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDeviceToTenant` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Device assignDeviceToTenant(TenantId tenantId, Device device) {
         log.trace("Executing assignDeviceToTenant [{}][{}]", tenantId, device);
         List<EntityView> entityViews = entityViewService.findEntityViewsByTenantIdAndEntityId(device.getTenantId(), device.getId());
@@ -1014,20 +793,15 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return savedDevice;
     }
 
+    /**
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `provisionRequest`：请求对象。
+     * - `profile`：`profile` 参数。
+     * 返回：处理结果。
+     */
     @Override
     @Transactional
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDevice` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Device saveDevice(ProvisionRequest provisionRequest, DeviceProfile profile) {
         Device device = new Device();
         device.setName(provisionRequest.getDeviceName());
@@ -1074,36 +848,27 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return savedDevice;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesIdsByDeviceProfileTransportType` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取设备配置。
+     * 参数：
+     * - `transportType`：类型。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<UUID> findDevicesIdsByDeviceProfileTransportType(DeviceTransportType transportType, PageLink pageLink) {
         return deviceDao.findDevicesIdsByDeviceProfileTransportType(transportType, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDeviceToEdge` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `assignDeviceToEdge` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `edgeId`：边缘节点ID。
+     * 返回：处理结果。
      */
+    @Override
     public Device assignDeviceToEdge(TenantId tenantId, DeviceId deviceId, EdgeId edgeId) {
         Device device = findDeviceById(tenantId, deviceId);
         Edge edge = edgeService.findEdgeById(tenantId, edgeId);
@@ -1124,19 +889,15 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return device;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDeviceFromEdge` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `unassignDeviceFromEdge` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `edgeId`：边缘节点ID。
+     * 返回：处理结果。
      */
+    @Override
     public Device unassignDeviceFromEdge(TenantId tenantId, DeviceId deviceId, EdgeId edgeId) {
         Device device = findDeviceById(tenantId, deviceId);
         Edge edge = edgeService.findEdgeById(tenantId, edgeId);
@@ -1157,19 +918,15 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return device;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdAndEdgeId` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Device> findDevicesByTenantIdAndEdgeId(TenantId tenantId, EdgeId edgeId, PageLink pageLink) {
         log.trace("Executing findDevicesByTenantIdAndEdgeId, tenantId [{}], edgeId [{}], pageLink [{}]", tenantId, edgeId, pageLink);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -1178,19 +935,16 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.findDevicesByTenantIdAndEdgeId(tenantId.getId(), edgeId.getId(), pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findDevicesByTenantIdAndEdgeIdAndType` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `edgeId`：边缘节点ID。
+     * - `type`：类型。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public PageData<Device> findDevicesByTenantIdAndEdgeIdAndType(TenantId tenantId, EdgeId edgeId, String type, PageLink pageLink) {
         log.trace("Executing findDevicesByTenantIdAndEdgeIdAndType, tenantId [{}], edgeId [{}], type [{}] pageLink [{}]", tenantId, edgeId, type, pageLink);
         validateId(tenantId, INCORRECT_TENANT_ID + tenantId);
@@ -1200,37 +954,26 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         return deviceDao.findDevicesByTenantIdAndEdgeIdAndType(tenantId.getId(), edgeId.getId(), type, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `countByTenantId` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：统计租户ID数量。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：数值结果。
      */
+    @Override
     public long countByTenantId(TenantId tenantId) {
         return deviceDao.countByTenantId(tenantId);
     }
 
+    /**
+     * 功能：删除或清理实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `id`：`id`ID。
+     * 返回：无。
+     */
     @Override
     @Transactional
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteEntity` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void deleteEntity(TenantId tenantId, EntityId id) {
         deleteDevice(tenantId, (DeviceId) id);
     }
@@ -1261,36 +1004,24 @@ public class DeviceServiceImpl extends AbstractCachedEntityService<DeviceCacheKe
         }
     };
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findEntity` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * 返回：可能存在的结果。
      */
+    @Override
     public Optional<HasId<?>> findEntity(TenantId tenantId, EntityId entityId) {
         return Optional.ofNullable(findDeviceById(tenantId, new DeviceId(entityId.getId())));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityType` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public EntityType getEntityType() {
         return EntityType.DEVICE;
     }

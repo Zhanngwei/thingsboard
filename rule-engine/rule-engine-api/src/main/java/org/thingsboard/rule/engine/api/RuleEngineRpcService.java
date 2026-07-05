@@ -37,41 +37,31 @@ import java.util.function.Consumer;
 public interface RuleEngineRpcService {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：把服务端生成的 RPC 回复发送给设备会话。
-     * 2. 输入参数：serviceId 是目标服务标识，sessionId 是设备会话，requestId 是请求编号，body 是回复内容。
-     * 3. 返回值：无；发送失败由实现内部处理或记录。
-     * 4. 调用时机：规则节点处理完来自设备的 RPC 请求后调用。
-     * 5. 调用方：RPC Reply 规则节点。
-     * 6. 使用流程：属于 Rule Engine 到设备传输层的 RPC 回复流程。
-     * 7. 线程安全：接口无状态，实现需保证会话查找和发送并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务或数据库；实现可能通过 MQTT/其它传输协议和集群通信发送，直接服务 Rule Engine。
+     * 功能：发送或提交设备。
+     * 参数：
+     * - `serviceId`：服务ID。
+     * - `sessionId`：会话ID。
+     * - `requestId`：请求ID。
+     * - `body`：`body` 参数。
+     * 返回：无。
      */
     void sendRpcReplyToDevice(String serviceId, UUID sessionId, int requestId, String body);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：向设备发送服务端 RPC 请求并注册响应消费者。
-     * 2. 输入参数：request 是 RPC 请求上下文，consumer 是响应或错误回调。
-     * 3. 返回值：无；结果通过 consumer 异步返回。
-     * 4. 调用时机：RPC Request 规则节点或 REST API 发起设备 RPC 时调用。
-     * 5. 调用方：RPC Request 规则节点、REST RPC 入口。
-     * 6. 使用流程：属于 Rule Engine 设备 RPC 请求流程。
-     * 7. 线程安全：实现需保证请求注册、超时和回调并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务；实现可能访问持久化 RPC、缓存会话并通过 MQTT/传输层或 Actor/集群通信发送。
+     * 功能：发送或提交设备。
+     * 参数：
+     * - `request`：请求对象。
+     * - `consumer`：`consumer` 参数。
+     * 返回：无。
      */
     void sendRpcRequestToDevice(RuleEngineDeviceRpcRequest request, Consumer<RuleEngineDeviceRpcResponse> consumer);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按租户和 RPC ID 查询持久化 RPC 记录。
-     * 2. 输入参数：tenantId 是租户边界，id 是 RPC 记录标识。
-     * 3. 返回值：匹配的 Rpc 记录，未找到时由实现决定返回 null 或抛出异常。
-     * 4. 调用时机：规则节点或 API 需要读取持久化 RPC 状态时调用。
-     * 5. 调用方：RPC 相关规则节点、REST 查询流程。
-     * 6. 使用流程：属于 RPC 状态查询流程。
-     * 7. 线程安全：接口无状态，实现需保证 DAO 访问并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT/Actor；实现通常访问数据库，可能使用缓存，服务 Rule Engine。
+     * 功能：获取RPC。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `id`：`id`ID。
+     * 返回：处理结果。
      */
     Rpc findRpcById(TenantId tenantId, RpcId id);
 }

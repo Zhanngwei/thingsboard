@@ -66,10 +66,6 @@ import static org.thingsboard.common.util.SystemUtil.getMemoryUsage;
 import static org.thingsboard.common.util.SystemUtil.getTotalDiscSpace;
 import static org.thingsboard.common.util.SystemUtil.getTotalMemory;
 
-@TbCoreComponent
-@Service
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultSystemInfoService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -80,6 +76,10 @@ import static org.thingsboard.common.util.SystemUtil.getTotalMemory;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@TbCoreComponent
+@Service
+@RequiredArgsConstructor
+@Slf4j
 public class DefaultSystemInfoService extends TbApplicationEventListener<PartitionChangeEvent> implements SystemInfoService {
 
     public static final FutureCallback<Integer> CALLBACK = new FutureCallback<>() {
@@ -94,96 +94,54 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     };
 
     /**
-     * 字段说明：
-     * 1. 保存 `serviceInfoProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TbServiceInfoProvider serviceInfoProvider;
     private final PartitionService partitionService;
     /**
-     * 字段说明：
-     * 1. 保存 `discoveryService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final DiscoveryService discoveryService;
     private final TelemetrySubscriptionService telemetryService;
     /**
-     * 字段说明：
-     * 1. 保存 `apiUsageStateClient` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 状态，用于发起外部调用或协议交互。
      */
     private final TbApiUsageStateClient apiUsageStateClient;
     private final AdminSettingsService adminSettingsService;
     /**
-     * 字段说明：
-     * 1. 保存 `oAuth2Service` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final OAuth2Service oAuth2Service;
     private final MailService mailService;
     /**
-     * 字段说明：
-     * 1. 保存 `smsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final SmsService smsService;
     private volatile ScheduledExecutorService scheduler;
 
+    /**
+     * 信息对象，表示当前对象的对应属性。
+     */
     @Value("${metrics.system_info.persist_frequency:60}")
-    /**
-     * 字段说明：
-     * 1. 保存 `systemInfoPersistFrequencySeconds` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int systemInfoPersistFrequencySeconds;
-    @Value("#{${metrics.system_info.ttl:7} * 86400}")
     /**
-     * 字段说明：
-     * 1. 保存 `systemInfoTtlSeconds` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 信息对象，表示当前对象的对应属性。
      */
+    @Value("#{${metrics.system_info.ttl:7} * 86400}")
     private int systemInfoTtlSeconds;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onTbApplicationEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `partitionChangeEvent`：分区标识或分区信息。
+     * 返回：无。
      */
+    @Override
     protected void onTbApplicationEvent(PartitionChangeEvent partitionChangeEvent) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (ServiceType.TB_CORE.equals(partitionChangeEvent.getServiceType())) {
             boolean myPartition = partitionService.resolve(ServiceType.TB_CORE, TenantId.SYS_TENANT_ID, TenantId.SYS_TENANT_ID).isMyPartition();
             synchronized (this) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (myPartition) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (scheduler == null) {
                         scheduler = Executors.newSingleThreadScheduledExecutor(ThingsBoardThreadFactory.forName("tb-system-info-scheduler"));
                         scheduler.scheduleWithFixedDelay(this::saveCurrentSystemInfo, 0, systemInfoPersistFrequencySeconds, TimeUnit.SECONDS);
@@ -195,21 +153,15 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSystemInfo` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取信息对象。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public SystemInfo getSystemInfo() {
         SystemInfo systemInfo = new SystemInfo();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (discoveryService.isMonolith()) {
             systemInfo.setMonolith(true);
             systemInfo.setSystemData(Collections.singletonList(createSystemInfoData(serviceInfoProvider.generateNewServiceInfoWithCurrentSystemInfo())));
@@ -221,17 +173,11 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveCurrentSystemInfo` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建信息对象。
+     * 参数：无。
+     * 返回：无。
      */
     protected void saveCurrentSystemInfo() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (discoveryService.isMonolith()) {
             saveCurrentMonolithSystemInfo();
         } else {
@@ -239,17 +185,12 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getFeaturesInfo` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取信息对象。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public FeaturesInfo getFeaturesInfo() {
         FeaturesInfo featuresInfo = new FeaturesInfo();
         featuresInfo.setEmailEnabled(isEmailEnabled());
@@ -261,41 +202,28 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isEmailEnabled` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断邮箱。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean isEmailEnabled() {
         try {
             mailService.testConnection(TenantId.SYS_TENANT_ID);
             return true;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             return false;
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isTwoFaEnabled` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Two Fa Enabled`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean isTwoFaEnabled() {
         AdminSettings twoFaSettings = adminSettingsService.findAdminSettingsByKey(TenantId.SYS_TENANT_ID, "twoFaSettings");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (twoFaSettings != null) {
             var providers = twoFaSettings.getJsonValue().get("providers");
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (providers != null) {
                 return providers.size() > 0;
             }
@@ -304,18 +232,12 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isSlackEnabled` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Slack Enabled`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean isSlackEnabled() {
         AdminSettings notifications = adminSettingsService.findAdminSettingsByKey(TenantId.SYS_TENANT_ID, "notifications");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (notifications != null) {
             return notifications.getJsonValue().get("deliveryMethodsConfigs").has("SLACK");
         }
@@ -323,14 +245,9 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveCurrentClusterSystemInfo` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建信息对象。
+     * 参数：无。
+     * 返回：无。
      */
     private void saveCurrentClusterSystemInfo() {
         long ts = System.currentTimeMillis();
@@ -340,14 +257,9 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveCurrentMonolithSystemInfo` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建信息对象。
+     * 参数：无。
+     * 返回：无。
      */
     private void saveCurrentMonolithSystemInfo() {
         long ts = System.currentTimeMillis();
@@ -365,14 +277,10 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doSave` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doSave` 对应的处理。
+     * 参数：
+     * - `telemetry`：数据列表。
+     * 返回：无。
      */
     private void doSave(List<TsKvEntry> telemetry) {
         ApiUsageState apiUsageState = apiUsageStateClient.getApiUsageState(TenantId.SYS_TENANT_ID);
@@ -380,14 +288,10 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSystemData` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取数据。
+     * 参数：
+     * - `serviceInfo`：服务对象。
+     * 返回：匹配的数据集合。
      */
     private List<SystemInfoData> getSystemData(ServiceInfo serviceInfo) {
         List<SystemInfoData> clusterSystemData = new ArrayList<>();
@@ -400,14 +304,10 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSystemInfoData` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建数据。
+     * 参数：
+     * - `serviceInfo`：服务对象。
+     * 返回：处理结果。
      */
     private SystemInfoData createSystemInfoData(ServiceInfo serviceInfo) {
         ProtocolStringList serviceTypes = serviceInfo.getServiceTypesList();
@@ -426,19 +326,13 @@ public class DefaultSystemInfoService extends TbApplicationEventListener<Partiti
         return infoData;
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     private void destroy() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (scheduler != null) {
             scheduler.shutdownNow();
             scheduler = null;

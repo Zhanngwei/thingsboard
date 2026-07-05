@@ -27,30 +27,21 @@ package org.thingsboard.rule.engine.api.sms.exception;
 public class SmsParseException extends SmsException {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：用解析错误消息创建异常。
-     * 2. 输入参数：msg 是配置解析失败原因。
-     * 3. 返回值：构造函数无返回值。
-     * 4. 调用时机：短信配置缺失、格式错误或供应商参数非法时调用。
-     * 5. 调用方：SmsSenderFactory 或配置解析工具。
-     * 6. 使用流程：属于短信配置验证流程。
-     * 7. 线程安全：异常对象随单次错误传播使用。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；间接影响 Rule Engine 短信节点可用性。
+     * 功能：创建 `SmsParseException` 实例，并初始化必要字段。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：新创建的对象实例。
      */
     public SmsParseException(String msg) {
         super(msg);
     }
 
     /**
-     * 中文说明：
-     * 1. 方法职责：用解析错误消息和底层原因创建异常。
-     * 2. 输入参数：msg 是错误描述，cause 是 JSON/配置转换底层异常。
-     * 3. 返回值：构造函数无返回值。
-     * 4. 调用时机：需要保留配置解析堆栈时调用。
-     * 5. 调用方：SmsSenderFactory 或配置解析工具。
-     * 6. 使用流程：属于短信配置验证失败包装流程。
-     * 7. 线程安全：异常对象随单次错误传播使用。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；服务 Rule Engine 配置错误处理。
+     * 功能：创建 `SmsParseException` 实例，并初始化必要字段。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `cause`：`cause` 参数。
+     * 返回：新创建的对象实例。
      */
     public SmsParseException(String msg, Throwable cause) {
         super(msg, cause);

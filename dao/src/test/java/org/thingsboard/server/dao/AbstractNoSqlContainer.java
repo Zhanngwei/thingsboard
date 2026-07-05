@@ -31,7 +31,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractNoSqlContainer` 是 ThingsBoard DAO 测试模块 中的持久化实现层类型，用于承载服务端实体、关系、属性、遥测、事件和配置数据的持久化访问实现。
@@ -43,6 +42,7 @@ import java.util.List;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Service / Template。
  */
+@Slf4j
 public abstract class AbstractNoSqlContainer {
 
     public static final List<String> INIT_SCRIPTS = List.of(
@@ -56,29 +56,24 @@ public abstract class AbstractNoSqlContainer {
         @Override
         protected void containerIsStarted(InspectContainerResponse containerInfo) {
             super.containerIsStarted(containerInfo);
-            // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
             DatabaseDelegate db = new CassandraDatabaseDelegate(this);
             INIT_SCRIPTS.forEach(script -> runInitScriptIfRequired(db, script));
         }
 
         private void runInitScriptIfRequired(DatabaseDelegate db, String initScriptPath) {
             logger().info("Init script [{}]", initScriptPath);
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (initScriptPath != null) {
                 try {
                     URL resource = Thread.currentThread().getContextClassLoader().getResource(initScriptPath);
-                    // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                     if (resource == null) {
                         logger().warn("Could not load classpath init script: {}", initScriptPath);
                         throw new ScriptUtils.ScriptLoadException("Could not load classpath init script: " + initScriptPath + ". Resource not found.");
                     }
                     String cql = IOUtils.toString(resource, StandardCharsets.UTF_8);
                     ScriptUtils.executeDatabaseScript(db, initScriptPath, cql);
-                // 异常在这里被转换为 DAO 层统一失败路径，避免数据库或底层驱动异常直接泄漏给上层调用方。
                 } catch (IOException e) {
                     logger().warn("Could not load classpath init script: {}", initScriptPath);
                     throw new ScriptUtils.ScriptLoadException("Could not load classpath init script: " + initScriptPath, e);
-                // 异常在这里被转换为 DAO 层统一失败路径，避免数据库或底层驱动异常直接泄漏给上层调用方。
                 } catch (ScriptException e) {
                     logger().error("Error while executing init script: {}", initScriptPath, e);
                     throw new ScriptUtils.UncategorizedScriptException("Error while executing init script: " + initScriptPath, e);
@@ -94,19 +89,14 @@ public abstract class AbstractNoSqlContainer {
     public static ExternalResource resource = new ExternalResource() {
         @Override
         protected void before() throws Throwable {
-            // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
             cassandra.start();
-            // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
             String cassandraUrl = String.format("%s:%s", cassandra.getHost(), cassandra.getMappedPort(9042));
-            // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
             log.debug("Cassandra url [{}]", cassandraUrl);
-            // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
             System.setProperty("cassandra.url", cassandraUrl);
         }
 
         @Override
         protected void after() {
-            // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
             cassandra.stop();
             List.of("cassandra.url")
                     .forEach(System.getProperties()::remove);

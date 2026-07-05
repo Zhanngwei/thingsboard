@@ -51,7 +51,6 @@ import static org.thingsboard.server.common.data.DataConstants.LATEST_TS;
 import static org.thingsboard.server.common.data.DataConstants.SERVER_SCOPE;
 import static org.thingsboard.server.common.data.DataConstants.SHARED_SCOPE;
 
-@Slf4j
 /**
  * 中文说明：`TbAbstractGetAttributesNode` 是抽象获取属性节点规则节点，用于读取、补充或映射消息元数据、实体字段、属性和遥测上下文信息。
  * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
@@ -60,45 +59,50 @@ import static org.thingsboard.server.common.data.DataConstants.SHARED_SCOPE;
  * 配置对象：`泛型或父类定义的配置对象`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
  * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
  */
+@Slf4j
 public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeConfiguration, T extends EntityId> extends TbAbstractNodeWithFetchTo<C> {
 
     /**
-     * 常量字段：定义 `VALUE`，用于计算值或最近值，本身不触发外部系统调用。
+     * 值常量，用于统一引用固定值。
      */
     private static final String VALUE = "value";
     /**
-     * 常量字段：定义 `TS`，用于时间戳，本身不触发外部系统调用。
+     * 时间戳常量，用于统一引用固定值。
      */
     private static final String TS = "ts";
     /**
-     * 字段说明：保存 `isTellFailureIfAbsent`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 是否为失败信息。
      */
     private boolean isTellFailureIfAbsent;
     /**
-     * 字段说明：保存 `getLatestValueWithTs`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * 时间戳，用于标识当前数据或事件发生的时间。
      */
     private boolean getLatestValueWithTs;
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         super.init(ctx, configuration);
         getLatestValueWithTs = config.isGetLatestValueWithTs();
         isTellFailureIfAbsent = BooleanUtils.toBooleanDefaultIfNull(config.isTellFailureIfAbsent(), true);
     }
 
-    @Override
     /**
-     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
-     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
-     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onMsg(TbContext ctx, TbMsg msg) throws TbNodeException {
         var msgDataAsObjectNode = TbMsgSource.DATA.equals(fetchTo) ? getMsgDataAsObjectNode(msg) : null;
-        // 异步回调用于把服务或转换结果映射为规则链成功/失败关系。
         withCallback(
                 findEntityIdAsync(ctx, msg),
                 entityId -> safePutAttributes(ctx, msg, msgDataAsObjectNode, entityId),
@@ -106,14 +110,22 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：按租户、实体或关系条件查询数据，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取实体ID。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     protected abstract ListenableFuture<T> findEntityIdAsync(TbContext ctx, TbMsg msg);
 
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `upgradeRuleNodesWithOldPropertyToUseFetchTo` 对应的处理。
+     * 参数：
+     * - `oldConfiguration`：配置对象。
+     * - `oldProperty`：`oldProperty` 参数。
+     * - `ifTrue`：`ifTrue` 参数。
+     * - `ifFalse`：`ifFalse` 参数。
+     * 返回：处理结果。
      */
     protected TbPair<Boolean, JsonNode> upgradeRuleNodesWithOldPropertyToUseFetchTo(
             JsonNode oldConfiguration,
@@ -135,19 +147,22 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：执行 `safePutAttributes` 对应的辅助逻辑，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `safePutAttributes` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `msgDataNode`：待处理消息。
+     * - `entityId`：实体IDID。
+     * 返回：无。
      */
     private void safePutAttributes(TbContext ctx, TbMsg msg, ObjectNode msgDataNode, T entityId) {
         Set<TbPair<String, List<String>>> failuresPairSet = ConcurrentHashMap.newKeySet();
-        // 异步聚合或转换服务返回值，完成后再继续规则链处理。
         var getKvEntryPairFutures = Futures.allAsList(
                 getAttrAsync(ctx, entityId, CLIENT_SCOPE, TbNodeUtils.processPatterns(config.getClientAttributeNames(), msg), failuresPairSet),
                 getAttrAsync(ctx, entityId, SHARED_SCOPE, TbNodeUtils.processPatterns(config.getSharedAttributeNames(), msg), failuresPairSet),
                 getAttrAsync(ctx, entityId, SERVER_SCOPE, TbNodeUtils.processPatterns(config.getServerAttributeNames(), msg), failuresPairSet),
                 getLatestTelemetry(ctx, entityId, TbNodeUtils.processPatterns(config.getLatestTsKeyNames(), msg), failuresPairSet)
         );
-        // 异步回调用于把服务或转换结果映射为规则链成功/失败关系。
         withCallback(getKvEntryPairFutures, futuresList -> {
             var msgMetaData = msg.getMetaData().copy();
             futuresList.stream().filter(Objects::nonNull).forEach(kvEntriesPair -> {
@@ -169,8 +184,14 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AttributesService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Attr Async`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `keys`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbPair<String, List<AttributeKvEntry>>> getAttrAsync(
             TbContext ctx,
@@ -182,9 +203,7 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
         if (CollectionUtils.isEmpty(keys)) {
             return Futures.immediateFuture(null);
         }
-        // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
         var attributeKvEntryListFuture = ctx.getAttributesService().find(ctx.getTenantId(), entityId, scope, keys);
-        // 异步聚合或转换服务返回值，完成后再继续规则链处理。
         return Futures.transform(attributeKvEntryListFuture, attributeKvEntryList -> {
             if (isTellFailureIfAbsent && attributeKvEntryList.size() != keys.size()) {
                 List<String> nonExistentKeys = getNonExistentKeys(attributeKvEntryList, keys);
@@ -195,16 +214,19 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `TimeseriesService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取遥测。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityId`：实体IDID。
+     * - `keys`：键。
+     * - `failuresPairSet`：数据列表。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<TbPair<String, List<TsKvEntry>>> getLatestTelemetry(TbContext ctx, EntityId entityId, List<String> keys, Set<TbPair<String, List<String>>> failuresPairSet) {
         if (CollectionUtils.isEmpty(keys)) {
             return Futures.immediateFuture(null);
         }
-        // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
         ListenableFuture<List<TsKvEntry>> latestTelemetryFutures = ctx.getTimeseriesService().findLatest(ctx.getTenantId(), entityId, keys);
-        // 异步聚合或转换服务返回值，完成后再继续规则链处理。
         return Futures.transform(latestTelemetryFutures, tsKvEntries -> {
             var listTsKvEntry = new ArrayList<TsKvEntry>();
             var nonExistentKeys = new ArrayList<String>();
@@ -227,8 +249,10 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `tsKvEntry`：`tsKvEntry` 参数。
+     * 返回：处理结果。
      */
     private TsKvEntry getValueWithTs(TsKvEntry tsKvEntry) {
         var mapper = TbMsgSource.DATA.equals(fetchTo) ? JacksonUtil.OBJECT_MAPPER : JacksonUtil.ALLOW_UNQUOTED_FIELD_NAMES_MAPPER;
@@ -239,8 +263,10 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Prefix`。
+     * 参数：
+     * - `scope`：`scope` 参数。
+     * 返回：文本结果。
      */
     private String getPrefix(String scope) {
         var prefix = "";
@@ -259,8 +285,11 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Non Existent Keys`。
+     * 参数：
+     * - `existingAttributesKvEntry`：数据列表。
+     * - `allKeys`：键。
+     * 返回：匹配的数据集合。
      */
     private List<String> getNonExistentKeys(List<AttributeKvEntry> existingAttributesKvEntry, List<String> allKeys) {
         List<String> existingKeys = existingAttributesKvEntry.stream().map(KvEntry::getKey).collect(Collectors.toList());
@@ -268,8 +297,10 @@ public abstract class TbAbstractGetAttributesNode<C extends TbGetAttributesNodeC
     }
 
     /**
-     * 方法说明：执行 `reportFailures` 对应的辅助逻辑，供 `TbAbstractGetAttributesNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：上报失败信息。
+     * 参数：
+     * - `failuresPairSet`：数据列表。
+     * 返回：处理结果。
      */
     private RuntimeException reportFailures(Set<TbPair<String, List<String>>> failuresPairSet) {
         var errorMessage = new StringBuilder("The following attribute/telemetry keys is not present in the DB: ").append("\n");

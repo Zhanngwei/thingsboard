@@ -73,57 +73,83 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 测试目标：验证 {@code TbGetCustomerDetailsNodeTest} 覆盖的 元数据增强节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbGetCustomerDetailsNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbGetCustomerDetailsNodeTest` 测试类，用于验证 `TbGetCustomerDetailsNode` 相关行为。
  */
 @ExtendWith(MockitoExtension.class)
 public class TbGetCustomerDetailsNodeTest {
 
-    /** 测试常量字段：{@code DUMMY_DEVICE_ORIGINATOR} 保存 {@code DeviceId} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 设备常量，用于统一引用固定值。
+     */
     private static final DeviceId DUMMY_DEVICE_ORIGINATOR = new DeviceId(UUID.randomUUID());
-    /** 测试常量字段：{@code TENANT_ID} 保存 {@code TenantId} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 租户ID常量，用于统一引用固定值。
+     */
     private static final TenantId TENANT_ID = new TenantId(UUID.randomUUID());
-    /** 测试常量字段：{@code DB_EXECUTOR} 保存 {@code ListeningExecutor} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 执行器常量，用于统一引用固定值。
+     */
     private static final ListeningExecutor DB_EXECUTOR = new TestDbCallbackExecutor();
-    /** Mock 依赖字段：{@code ctxMock} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctxMock;
-    /** Mock 依赖字段：{@code customerServiceMock} 保存 {@code CustomerService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 客户，提供当前类调用的业务操作。
+     */
     @Mock
     private CustomerService customerServiceMock;
-    /** Mock 依赖字段：{@code deviceServiceMock} 保存 {@code DeviceService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 设备，提供当前类调用的业务操作。
+     */
     @Mock
     private DeviceService deviceServiceMock;
-    /** Mock 依赖字段：{@code assetServiceMock} 保存 {@code AssetService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 资产集合，用于去重保存或快速判断对象是否存在。
+     */
     @Mock
     private AssetService assetServiceMock;
-    /** Mock 依赖字段：{@code entityViewServiceMock} 保存 {@code EntityViewService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 实体视图，提供当前类调用的业务操作。
+     */
     @Mock
     private EntityViewService entityViewServiceMock;
-    /** Mock 依赖字段：{@code userServiceMock} 保存 {@code UserService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 用户，提供当前类调用的业务操作。
+     */
     @Mock
     private UserService userServiceMock;
-    /** Mock 依赖字段：{@code edgeServiceMock} 保存 {@code EdgeService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 边缘节点，提供当前类调用的业务操作。
+     */
     @Mock
     private EdgeService edgeServiceMock;
-    /** 可变 fixture 字段：{@code node} 保存 {@code TbGetCustomerDetailsNode} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，表示当前对象的对应属性。
+     */
     private TbGetCustomerDetailsNode node;
-    /** 可变 fixture 字段：{@code config} 保存 {@code TbGetCustomerDetailsNodeConfiguration} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 配置，保存当前对象的配置选项。
+     */
     private TbGetCustomerDetailsNodeConfiguration config;
-    /** 可变 fixture 字段：{@code nodeConfiguration} 保存 {@code TbNodeConfiguration} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，保存当前对象的配置选项。
+     */
     private TbNodeConfiguration nodeConfiguration;
-    /** 可变 fixture 字段：{@code msg} 保存 {@code TbMsg} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 消息，承载当前步骤需要处理的内容。
+     */
     private TbMsg msg;
-    /** 可变 fixture 字段：{@code customer} 保存 {@code Customer} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 客户对象，用于描述当前业务场景。
+     */
     private Customer customer;
 
     /**
-     * 生命周期方法：{@code setUp} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
     @BeforeEach
     public void setUp() {
@@ -145,15 +171,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenConfigWithNullFetchTo_whenInit_thenException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenConfigWithNullFetchTo_whenInit_thenException` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenConfigWithNullFetchTo_whenInit_thenException() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         config.setDetailsList(List.of(ContactBasedEntityDetails.ID));
         config.setFetchTo(null);
@@ -168,29 +191,23 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenDefaultConfig_whenInit_thenOK} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenDefaultConfig_whenInit_thenOK` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenDefaultConfig_whenInit_thenOK() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         assertThat(config.getDetailsList()).isEqualTo(Collections.emptyList());
         assertThat(config.getFetchTo()).isEqualTo(TbMsgSource.DATA);
     }
 
     /**
-     * 测试方法：覆盖 {@code givenCustomConfig_whenInit_thenOK} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenCustomConfig_whenInit_thenOK` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenCustomConfig_whenInit_thenOK() throws TbNodeException {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         config.setDetailsList(List.of(ContactBasedEntityDetails.ID, ContactBasedEntityDetails.PHONE));
         config.setFetchTo(TbMsgSource.METADATA);
@@ -207,15 +224,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenMsgDataIsNotAnJsonObjectAndFetchToData_whenOnMsg_thenException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenMsgDataIsNotAnJsonObjectAndFetchToData_whenOnMsg_thenException` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenMsgDataIsNotAnJsonObjectAndFetchToData_whenOnMsg_thenException() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node.fetchTo = TbMsgSource.DATA;
         msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, DUMMY_DEVICE_ORIGINATOR, TbMsgMetaData.EMPTY, TbMsg.EMPTY_JSON_ARRAY);
@@ -229,15 +243,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenAllEntityDetailsAndFetchToData_whenOnMsg_thenShouldTellSuccessAndFetchAllToData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenAllEntityDetailsAndFetchToData_whenOnMsg_thenShouldTellSuccessAndFetchAllToData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenAllEntityDetailsAndFetchToData_whenOnMsg_thenShouldTellSuccessAndFetchAllToData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         var device = new Device();
         device.setId(new DeviceId(UUID.randomUUID()));
@@ -279,15 +290,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenSomeEntityDetailsAndFetchToMetadata_whenOnMsg_thenShouldTellSuccessAndFetchSomeToMetaData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenSomeEntityDetailsAndFetchToMetadata_whenOnMsg_thenShouldTellSuccessAndFetchSomeToMetaData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenSomeEntityDetailsAndFetchToMetadata_whenOnMsg_thenShouldTellSuccessAndFetchSomeToMetaData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         var asset = new Asset();
         asset.setId(new AssetId(UUID.randomUUID()));
@@ -321,15 +329,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenNotPresentEntityDetailsAndFetchToData_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenNotPresentEntityDetailsAndFetchToData_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenNotPresentEntityDetailsAndFetchToData_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         customer.setZip(null);
         customer.setAddress(null);
@@ -362,15 +367,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenDidNotFindCustomer_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenDidNotFindCustomer_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenDidNotFindCustomer_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         var edge = new Edge();
         edge.setId(new EdgeId(UUID.randomUUID()));
@@ -402,15 +404,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenDidNotFindOriginator_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenDidNotFindOriginator_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenDidNotFindOriginator_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         var edge = new Edge();
         edge.setId(new EdgeId(UUID.randomUUID()));
@@ -439,15 +438,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenOriginatorNotAssignedToCustomer_whenOnMsg_thenShouldTellFailureAndFetchNothingToData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOriginatorNotAssignedToCustomer_whenOnMsg_thenShouldTellFailureAndFetchNothingToData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOriginatorNotAssignedToCustomer_whenOnMsg_thenShouldTellFailureAndFetchNothingToData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         var device = new Device();
         device.setId(new DeviceId(UUID.randomUUID()));
@@ -483,15 +479,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenNullDescriptionAndAddInfoEntityDetails_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenNullDescriptionAndAddInfoEntityDetails_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenNullDescriptionAndAddInfoEntityDetails_whenOnMsg_thenShouldTellSuccessAndFetchNothingToData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         customer.setAdditionalInfo(JacksonUtil.toJsonNode("{\"someProperty\":\"someValue\",\"description\":null}"));
 
@@ -522,15 +515,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenUnsupportedEntityType_whenOnMsg_thenShouldTellFailureAndFetchNothingToMetaData} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenUnsupportedEntityType_whenOnMsg_thenShouldTellFailureAndFetchNothingToMetaData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenUnsupportedEntityType_whenOnMsg_thenShouldTellFailureAndFetchNothingToMetaData() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         var dashboard = new Dashboard();
         dashboard.setId(new DashboardId(UUID.randomUUID()));
@@ -558,15 +548,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var defaultConfig = new TbGetCustomerDetailsNodeConfiguration().defaultConfiguration();
         var node = new TbGetCustomerDetailsNode();
         String oldConfig = "{\"detailsList\":[],\"addToMetadata\":false}";
@@ -577,9 +564,12 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 辅助方法：{@code prepareMsgAndConfig} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `prepareMsgAndConfig` 对应的处理。
+     * 参数：
+     * - `fetchTo`：`fetchTo` 参数。
+     * - `detailsList`：数据列表。
+     * - `originator`：`originator` 参数。
+     * 返回：无。
      */
     private void prepareMsgAndConfig(TbMsgSource fetchTo, List<ContactBasedEntityDetails> detailsList, EntityId originator) {
         config.setDetailsList(detailsList);
@@ -598,9 +588,9 @@ public class TbGetCustomerDetailsNodeTest {
     }
 
     /**
-     * 辅助方法：{@code mockFindCustomer} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `mockFindCustomer` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void mockFindCustomer() {
         when(ctxMock.getTenantId()).thenReturn(TENANT_ID);

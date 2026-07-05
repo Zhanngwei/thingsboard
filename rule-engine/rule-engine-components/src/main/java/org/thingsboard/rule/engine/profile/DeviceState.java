@@ -66,46 +66,52 @@ import static org.thingsboard.server.common.data.msg.TbMsgType.INACTIVITY_EVENT;
 import static org.thingsboard.server.common.data.msg.TbMsgType.POST_ATTRIBUTES_REQUEST;
 import static org.thingsboard.server.common.data.msg.TbMsgType.POST_TELEMETRY_REQUEST;
 
-@Slf4j
 /**
  * 中文说明：`DeviceState` 是设备状态辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Slf4j
 class DeviceState {
 
     /**
-     * 字段说明：保存 `persistState`，表示运行状态，供本类方法在规则节点处理流程中使用。
+     * 是否满足状态条件。
      */
     private final boolean persistState;
     /**
-     * 字段说明：保存 `deviceId`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 设备ID，用于定位对应业务对象。
      */
     private final DeviceId deviceId;
     /**
-     * 字段说明：保存 `deviceProfile`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 设备配置，保存当前对象的配置选项。
      */
     private final ProfileState deviceProfile;
     /**
-     * 字段说明：保存 `state`，表示运行状态，供本类方法在规则节点处理流程中使用。
+     * 状态，表示当前对象所处状态。
      */
     private RuleNodeState state;
     /**
-     * 字段说明：保存 `pds`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * `pds` 字段，保存当前对象的对应属性。
      */
     private PersistedDeviceState pds;
     /**
-     * 字段说明：保存 `latestValues`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * `latestValues`，保存当前处理得到的具体内容。
      */
     private DataSnapshot latestValues;
     private final ConcurrentMap<String, AlarmState> alarmStates = new ConcurrentHashMap<>();
     /**
-     * 字段说明：保存 `dynamicPredicateValueCtx`，表示规则引擎上下文，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
     private final DynamicPredicateValueCtx dynamicPredicateValueCtx;
 
     /**
-     * 方法说明：构造 `DeviceState` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `DeviceState` 实例，并初始化必要字段。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `config`：配置对象。
+     * - `deviceId`：设备IDID。
+     * - `deviceProfile`：设备信息或设备标识。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     DeviceState(TbContext ctx, TbDeviceProfileNodeConfiguration config, DeviceId deviceId, ProfileState deviceProfile, RuleNodeState state) {
         this.persistState = config.isPersistAlarmRulesState();
@@ -139,8 +145,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行 `updateProfile` 对应的辅助逻辑，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新配置。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：无。
      */
     public void updateProfile(TbContext ctx, DeviceProfile deviceProfile) throws ExecutionException, InterruptedException {
         Set<AlarmConditionFilterKey> oldKeys = Set.copyOf(this.deviceProfile.getEntityKeys());
@@ -164,8 +173,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行 `harvestAlarms` 对应的辅助逻辑，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `harvestAlarms` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `ts`：时间戳。
+     * 返回：无。
      */
     public void harvestAlarms(TbContext ctx, long ts) throws ExecutionException, InterruptedException {
         log.debug("[{}] Going to harvest alarms: {}", ctx.getSelfId(), ts);
@@ -180,8 +192,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `process` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     public void process(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException {
         if (latestValues == null) {
@@ -217,8 +232,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理设备。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean processDeviceActivityEvent(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException {
         String scope = msg.getMetaData().getValue(DataConstants.SCOPE);
@@ -230,8 +248,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理告警。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean processAlarmClearNotification(TbContext ctx, TbMsg msg) {
         boolean stateChanged = false;
@@ -246,8 +267,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理告警。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     private void processAlarmAckNotification(TbContext ctx, TbMsg msg) {
         Alarm alarmNf = JacksonUtil.fromString(msg.getData(), Alarm.class);
@@ -260,8 +284,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理告警。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     private void processAlarmDeleteNotification(TbContext ctx, TbMsg msg) {
         Alarm alarm = JacksonUtil.fromString(msg.getData(), Alarm.class);
@@ -271,8 +298,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理通知。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean processAttributesUpdateNotification(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException {
         String scope = msg.getMetaData().getValue(DataConstants.SCOPE);
@@ -283,8 +313,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理通知。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean processAttributesDeleteNotification(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException {
         boolean stateChanged = false;
@@ -312,16 +345,23 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理请求。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     protected boolean processAttributesUpdateRequest(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException {
         return processAttributes(ctx, msg, DataConstants.CLIENT_SCOPE);
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理`Attributes`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `scope`：`scope` 参数。
+     * 返回：判断结果。
      */
     private boolean processAttributes(TbContext ctx, TbMsg msg, String scope) throws ExecutionException, InterruptedException {
         boolean stateChanged = false;
@@ -339,8 +379,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理遥测。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     protected boolean processTelemetry(TbContext ctx, TbMsg msg) throws ExecutionException, InterruptedException {
         boolean stateChanged = false;
@@ -368,8 +411,12 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行 `merge` 对应的辅助逻辑，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `merge` 对应的处理。
+     * 参数：
+     * - `latestValues`：值。
+     * - `newTs`：时间戳。
+     * - `data`：待处理数据。
+     * 返回：处理结果。
      */
     private SnapshotUpdate merge(DataSnapshot latestValues, Long newTs, List<KvEntry> data) {
         Set<AlarmConditionFilterKey> keys = new HashSet<>();
@@ -384,8 +431,12 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行 `merge` 对应的辅助逻辑，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `merge` 对应的处理。
+     * 参数：
+     * - `latestValues`：值。
+     * - `attributes`：`attributes` 参数。
+     * - `scope`：`scope` 参数。
+     * 返回：处理结果。
      */
     private SnapshotUpdate merge(DataSnapshot latestValues, Set<AttributeKvEntry> attributes, String scope) {
         long newTs = 0;
@@ -402,8 +453,10 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取键。
+     * 参数：
+     * - `scope`：`scope` 参数。
+     * 返回：处理结果。
      */
     private static EntityKeyType getKeyTypeFromScope(String scope) {
         switch (scope) {
@@ -418,8 +471,11 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：从消息或服务层获取需要补充的数据，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Latest Values`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `originator`：`originator` 参数。
+     * 返回：处理结果。
      */
     private DataSnapshot fetchLatestValues(TbContext ctx, EntityId originator) throws ExecutionException, InterruptedException {
         Set<AlarmConditionFilterKey> entityKeysToFetch = deviceProfile.getEntityKeys();
@@ -429,8 +485,13 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AttributesService`, `DeviceService`, `TimeseriesService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `originator`：`originator` 参数。
+     * - `entityKeysToFetch`：实体对象。
+     * - `result`：`result` 参数。
+     * 返回：无。
      */
     private void addEntityKeysToSnapshot(TbContext ctx, EntityId originator, Set<AlarmConditionFilterKey> entityKeysToFetch, DataSnapshot result) throws InterruptedException, ExecutionException {
         Set<String> attributeKeys = new HashSet<>();
@@ -448,7 +509,6 @@ class DeviceState {
                     break;
                 case ENTITY_FIELD:
                     if (device == null) {
-                        // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
                         device = ctx.getDeviceService().findDeviceById(ctx.getTenantId(), new DeviceId(originator.getId()));
                     }
                     if (device != null) {
@@ -472,7 +532,6 @@ class DeviceState {
         }
 
         if (!latestTsKeys.isEmpty()) {
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             List<TsKvEntry> data = ctx.getTimeseriesService().findLatest(ctx.getTenantId(), originator, latestTsKeys).get();
             for (TsKvEntry entry : data) {
                 if (entry.getValue() != null) {
@@ -481,18 +540,18 @@ class DeviceState {
             }
         }
         if (!attributeKeys.isEmpty()) {
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             addToSnapshot(result, ctx.getAttributesService().find(ctx.getTenantId(), originator, DataConstants.CLIENT_SCOPE, attributeKeys).get());
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             addToSnapshot(result, ctx.getAttributesService().find(ctx.getTenantId(), originator, DataConstants.SHARED_SCOPE, attributeKeys).get());
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             addToSnapshot(result, ctx.getAttributesService().find(ctx.getTenantId(), originator, DataConstants.SERVER_SCOPE, attributeKeys).get());
         }
     }
 
     /**
-     * 方法说明：向消息、元数据、集合或缓存追加数据，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建`To Snapshot`。
+     * 参数：
+     * - `snapshot`：`snapshot` 参数。
+     * - `data`：待处理数据。
+     * 返回：无。
      */
     private void addToSnapshot(DataSnapshot snapshot, List<AttributeKvEntry> data) {
         for (AttributeKvEntry entry : data) {
@@ -504,8 +563,10 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：执行 `toEntityValue` 对应的辅助逻辑，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `toEntityValue` 对应的处理。
+     * 参数：
+     * - `entry`：`entry` 参数。
+     * 返回：处理结果。
      */
     public static EntityKeyValue toEntityValue(KvEntry entry) {
         switch (entry.getDataType()) {
@@ -525,16 +586,19 @@ class DeviceState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public DeviceProfileId getProfileId() {
         return deviceProfile.getProfileId();
     }
 
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态，供 `DeviceState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取告警。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * 返回：处理结果。
      */
     private PersistedAlarmState getOrInitPersistedAlarmState(DeviceProfileAlarm alarm) {
         if (pds != null) {

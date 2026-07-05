@@ -57,10 +57,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHO
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH;
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 
-@RestController
-@TbCoreComponent
-@RequiredArgsConstructor
-@RequestMapping("/api")
 /**
  * 中文说明：
  * 1. 类目的：`CustomerController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -71,53 +67,42 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequiredArgsConstructor
+@RequestMapping("/api")
 public class CustomerController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbCustomerService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户，提供当前类调用的业务操作。
      */
     private final TbCustomerService tbCustomerService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `IS_PUBLIC` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `IS_PUBLIC`常量，用于统一引用固定值。
      */
     public static final String IS_PUBLIC = "isPublic";
     public static final String CUSTOMER_SECURITY_CHECK = "If the user has the authority of 'Tenant Administrator', the server checks that the customer is owned by the same tenant. " +
             "If the user has the authority of 'Customer User', the server checks that the user belongs to the customer.";
 
+    /**
+     * 功能：获取客户ID。
+     * 参数：
+     * - `strCustomerId`：客户IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Customer (getCustomerById)",
             notes = "Get the Customer object based on the provided Customer Id. "
                     + CUSTOMER_SECURITY_CHECK + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/{customerId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomerById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Customer getCustomerById(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION)
             @PathVariable(CUSTOMER_ID) String strCustomerId) throws ThingsboardException {
         checkParameter(CUSTOMER_ID, strCustomerId);
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         Customer customer = checkCustomerId(customerId, Operation.READ);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!customer.getAdditionalInfo().isNull()) {
             processDashboardIdFromAdditionalInfo((ObjectNode) customer.getAdditionalInfo(), HOME_DASHBOARD);
         }
@@ -125,22 +110,18 @@ public class CustomerController extends BaseController {
     }
 
 
+    /**
+     * 功能：获取客户ID。
+     * 参数：
+     * - `strCustomerId`：客户IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get short Customer info (getShortCustomerInfoById)",
             notes = "Get the short customer object that contains only the title and 'isPublic' flag. "
                     + CUSTOMER_SECURITY_CHECK + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/{customerId}/shortInfo", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getShortCustomerInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public JsonNode getShortCustomerInfoById(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION)
             @PathVariable(CUSTOMER_ID) String strCustomerId) throws ThingsboardException {
@@ -153,22 +134,18 @@ public class CustomerController extends BaseController {
         return infoObject;
     }
 
+    /**
+     * 功能：获取客户ID。
+     * 参数：
+     * - `strCustomerId`：客户IDID。
+     * 返回：文本结果。
+     */
     @ApiOperation(value = "Get Customer Title (getCustomerTitleById)",
             notes = "Get the title of the customer. "
                     + CUSTOMER_SECURITY_CHECK + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/{customerId}/title", method = RequestMethod.GET, produces = "application/text")
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomerTitleById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public String getCustomerTitleById(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION)
             @PathVariable(CUSTOMER_ID) String strCustomerId) throws ThingsboardException {
@@ -178,6 +155,12 @@ public class CustomerController extends BaseController {
         return customer.getTitle();
     }
 
+    /**
+     * 功能：保存或创建客户。
+     * 参数：
+     * - `customer`：`customer` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create or update Customer (saveCustomer)",
             notes = "Creates or Updates the Customer. When creating customer, platform generates Customer Id as " + UUID_WIKI_LINK +
                     "The newly created Customer Id will be present in the response. " +
@@ -188,22 +171,18 @@ public class CustomerController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Customer saveCustomer(@ApiParam(value = "A JSON value representing the customer.") @RequestBody Customer customer) throws Exception {
         customer.setTenantId(getTenantId());
         checkEntity(customer.getId(), customer, Resource.CUSTOMER);
         return tbCustomerService.save(customer, getCurrentUser());
     }
 
+    /**
+     * 功能：删除或清理客户。
+     * 参数：
+     * - `strCustomerId`：客户IDID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete Customer (deleteCustomer)",
             notes = "Deletes the Customer and all customer Users. " +
                     "All assigned Dashboards, Assets, Devices, etc. will be unassigned but not deleted. " +
@@ -211,16 +190,6 @@ public class CustomerController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/{customerId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteCustomer(@ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION)
                                @PathVariable(CUSTOMER_ID) String strCustomerId) throws ThingsboardException {
         checkParameter(CUSTOMER_ID, strCustomerId);
@@ -229,22 +198,22 @@ public class CustomerController extends BaseController {
         tbCustomerService.delete(customer, getCurrentUser());
     }
 
+    /**
+     * 功能：获取`Customers`。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Tenant Customers (getCustomers)",
             notes = "Returns a page of customers owned by tenant. " +
                     PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customers", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomers` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<Customer> getCustomers(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -261,21 +230,17 @@ public class CustomerController extends BaseController {
         return checkNotNull(customerService.findCustomersByTenantId(tenantId, pageLink));
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `customerTitle`：`customerTitle` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Tenant Customer by Customer title (getTenantCustomer)",
             notes = "Get the Customer using Customer Title. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/customers", params = {"customerTitle"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Customer getTenantCustomer(
             @ApiParam(value = "A string value representing the Customer title.")
             @RequestParam String customerTitle) throws ThingsboardException {

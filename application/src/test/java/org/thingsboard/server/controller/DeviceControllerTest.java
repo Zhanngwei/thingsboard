@@ -93,8 +93,6 @@ import static org.thingsboard.server.common.data.ota.OtaPackageType.FIRMWARE;
 import static org.thingsboard.server.common.data.ota.OtaPackageType.SOFTWARE;
 import static org.thingsboard.server.dao.model.ModelConstants.NULL_UUID;
 
-@ContextConfiguration(classes = {DeviceControllerTest.Config.class})
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`DeviceControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -105,73 +103,45 @@ import static org.thingsboard.server.dao.model.ModelConstants.NULL_UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@ContextConfiguration(classes = {DeviceControllerTest.Config.class})
+@DaoSqlTest
 public class DeviceControllerTest extends AbstractControllerTest {
     static final TypeReference<PageData<Device>> PAGE_DATA_DEVICE_TYPE_REF = new TypeReference<>() {
     };
 
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器列表，用于保存一组待处理对象。
      */
     ListeningExecutorService executor;
 
     /**
-     * 字段说明：
-     * 1. 保存 `futures` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `futures`列表，用于保存一组待处理对象。
      */
     List<ListenableFuture<Device>> futures;
     PageData<Device> pageData;
 
     /**
-     * 字段说明：
-     * 1. 保存 `savedTenant` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
     private Tenant savedTenant;
     private User tenantAdmin;
 
-    @SpyBean
     /**
-     * 字段说明：
-     * 1. 保存 `gatewayNotificationsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @SpyBean
     private GatewayNotificationsService gatewayNotificationsService;
 
-    @SpyBean
     /**
-     * 字段说明：
-     * 1. 保存 `deviceStateService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
+    @SpyBean
     private DeviceStateService deviceStateService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceDao` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，用于读取或保存对应领域对象。
      */
+    @Autowired
     private DeviceDao deviceDao;
 
     /**
@@ -185,35 +155,25 @@ public class DeviceControllerTest extends AbstractControllerTest {
      * 7. 设计模式：主要体现 MVC Controller / Facade。
      */
     static class Config {
+        /**
+         * 功能：执行 `deviceDao` 对应的处理。
+         * 参数：
+         * - `deviceDao`：设备信息或设备标识。
+         * 返回：处理结果。
+         */
         @Bean
         @Primary
-        /**
-         * 方法说明：
-         * 1. 职责：执行 `deviceDao` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-         */
         public DeviceDao deviceDao(DeviceDao deviceDao) {
-            // DAO 调用是数据库访问边界，事务和缓存一致性由上层服务约定控制。
             return Mockito.mock(DeviceDao.class, AdditionalAnswers.delegatesTo(deviceDao));
         }
     }
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeTest() throws Exception {
         executor = MoreExecutors.listeningDecorator(ThingsBoardExecutors.newWorkStealingPool(8, getClass()));
 
@@ -234,17 +194,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         tenantAdmin = createUserAndLogin(tenantAdmin, "testPassword1");
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void afterTest() throws Exception {
         executor.shutdownNow();
 
@@ -254,17 +209,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDevice() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -311,17 +261,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(foundDevice.getName(), savedDevice.getName());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithCredentials` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithCredentials() throws Exception {
         String testToken = "TEST_TOKEN";
 
@@ -373,17 +318,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayOneTime(savedDevice, oldDevice);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithCredentials_CredentialsIsNull` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithCredentials_CredentialsIsNull() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -394,17 +334,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString("Validation error: credentials must not be null")));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithCredentials_DeviceIsNull` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithCredentials_DeviceIsNull() throws Exception {
         String testToken = "TEST_TOKEN";
 
@@ -417,17 +352,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString("Validation error: device must not be null")));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithCredentials_WithExistingName` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithCredentials_WithExistingName() throws Exception {
         String testToken = "TEST_TOKEN";
 
@@ -450,17 +380,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString("Device with such name already exists!")));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDeviceWithViolationOfValidation` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void saveDeviceWithViolationOfValidation() throws Exception {
         Device device = new Device();
         device.setName(StringUtils.randomAlphabetic(300));
@@ -502,17 +427,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testUpdateDeviceFromDifferentTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testUpdateDeviceFromDifferentTenant() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -542,17 +462,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         deleteDifferentTenant();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithProfileFromDifferentTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备配置相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithProfileFromDifferentTenant() throws Exception {
         loginDifferentTenant();
         DeviceProfile differentProfile = createDeviceProfile("Different profile");
@@ -566,17 +481,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString("Device can`t be referencing to device profile from different tenant!")));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithFirmwareFromDifferentTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithFirmwareFromDifferentTenant() throws Exception {
         loginDifferentTenant();
         DeviceProfile differentProfile = createDeviceProfile("Different profile");
@@ -599,17 +509,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString("Can't assign firmware from different tenant!")));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithSoftwareFromDifferentTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithSoftwareFromDifferentTenant() throws Exception {
         loginDifferentTenant();
         DeviceProfile differentProfile = createDeviceProfile("Different profile");
@@ -632,17 +537,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString("Can't assign software from different tenant!")));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindDeviceById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备ID相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindDeviceById() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -653,17 +553,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(savedDevice, foundDevice);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindDeviceTypesByTenantId` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户ID相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindDeviceTypesByTenantId() throws Exception {
         DeviceProfile deviceProfile = createDeviceProfile("typeB");
         deviceProfile = doPost("/api/deviceProfile", deviceProfile, DeviceProfile.class);
@@ -674,7 +569,6 @@ public class DeviceControllerTest extends AbstractControllerTest {
 
         Mockito.reset(tbClusterService, auditLogService, gatewayNotificationsService);
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < cntEntity; i++) {
             Device device = new Device();
             device.setName("My device B" + i);
@@ -688,14 +582,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 ActionType.ADDED, cntEntity, cntEntity, cntEntity);
         testNotificationUpdateGatewayNever();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 7; i++) {
             Device device = new Device();
             device.setName("My device C" + i);
             device.setType("typeC");
             devices.add(doPost("/api/device", device, Device.class));
         }
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 9; i++) {
             Device device = new Device();
             device.setName("My device A" + i);
@@ -715,17 +607,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         deleteEntitiesAsync("/api/device/", devices, executor).get(TIMEOUT, TimeUnit.SECONDS);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteDevice() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -747,17 +634,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString(msgErrorNoFound("Device", savedDeviceId.getId().toString()))));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteDeviceWithAlarmsAndAlarmTypes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteDeviceWithAlarmsAndAlarmTypes() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -790,17 +672,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString(msgErrorNoFound("Device", alarm.getId().getId().toString()))));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithEmptyType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithEmptyType() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -816,17 +693,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceWithEmptyName` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceWithEmptyName() throws Exception {
         Device device = new Device();
         device.setType("default");
@@ -843,17 +715,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignUnassignDeviceToCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignUnassignDeviceToCustomer() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -895,17 +762,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(ModelConstants.NULL_UUID, foundDevice.getCustomerId().getId());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignUnassignDeviceToPublicCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignUnassignDeviceToPublicCustomer() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -944,17 +806,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(ModelConstants.NULL_UUID, foundDevice.getCustomerId().getId());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignDeviceToNonExistentCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignDeviceToNonExistentCustomer() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -973,17 +830,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignDeviceToCustomerFromDifferentTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignDeviceToCustomerFromDifferentTenant() throws Exception {
         loginSysAdmin();
 
@@ -1028,17 +880,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindDeviceCredentialsByDeviceId` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindDeviceCredentialsByDeviceId() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -1049,17 +896,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(savedDevice.getId(), deviceCredentials.getDeviceId());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceCredentials` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceCredentials() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -1086,17 +928,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(deviceCredentials, foundDeviceCredentials);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceCredentialsWithEmptyDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceCredentialsWithEmptyDevice() throws Exception {
         DeviceCredentials deviceCredentials = new DeviceCredentials();
 
@@ -1110,17 +947,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceCredentialsWithEmptyCredentialsType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceCredentialsWithEmptyCredentialsType() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -1143,17 +975,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceCredentialsWithEmptyCredentialsId` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceCredentialsWithEmptyCredentialsId() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -1176,17 +1003,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveNonExistentDeviceCredentials` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveNonExistentDeviceCredentials() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -1213,17 +1035,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDeviceCredentialsWithNonExistentDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDeviceCredentialsWithNonExistentDevice() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -1244,35 +1061,26 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantDevices` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantDevices() throws Exception {
         int cntEntity = 178;
 
         Mockito.reset(tbClusterService, auditLogService, gatewayNotificationsService);
 
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         futures = new ArrayList<>(cntEntity);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < cntEntity; i++) {
             Device device = new Device();
             device.setName("Device" + i);
             device.setType("default");
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             futures.add(executor.submit(() ->
                     doPost("/api/device", device, Device.class)));
         }
 
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<Device> devices = Futures.allAsList(futures).get(TIMEOUT, TimeUnit.SECONDS);
 
         testNotifyManyEntityManyTimeMsgToEdgeServiceEntityEqAny(new Device(), new Device(),
@@ -1287,7 +1095,6 @@ public class DeviceControllerTest extends AbstractControllerTest {
                     PAGE_DATA_DEVICE_TYPE_REF, pageLink);
 
             loadedDevices.addAll(pageData.getData());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pageData.hasNext()) {
                 pageLink = pageLink.nextPageLink();
             }
@@ -1305,23 +1112,16 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantDevicesByName` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantDevicesByName() throws Exception {
         String title1 = "Device title 1";
 
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         futures = new ArrayList<>(143);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 143; i++) {
             Device device = new Device();
             String suffix = StringUtils.randomAlphanumeric(15);
@@ -1329,7 +1129,6 @@ public class DeviceControllerTest extends AbstractControllerTest {
             name = i % 2 == 0 ? name.toLowerCase() : name.toUpperCase();
             device.setName(name);
             device.setType("default");
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             futures.add(executor.submit(() ->
                     doPost("/api/device", device, Device.class)));
         }
@@ -1392,17 +1191,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(0, pageData.getData().size());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantDevicesByType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantDevicesByType() throws Exception {
         String title1 = "Device title 1";
         String type1 = "typeA";
@@ -1484,17 +1278,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(0, pageData.getData().size());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindCustomerDevices` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindCustomerDevices() throws Exception {
         Customer customer = new Customer();
         customer.setTitle("Test customer");
@@ -1545,17 +1334,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         testNotificationUpdateGatewayNever();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindCustomerDevicesByName` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindCustomerDevicesByName() throws Exception {
         Customer customer = new Customer();
         customer.setTitle("Test customer");
@@ -1637,17 +1421,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(0, pageData.getData().size());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindCustomerDevicesByType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindCustomerDevicesByType() throws Exception {
         Customer customer = new Customer();
         customer.setTitle("Test customer");
@@ -1737,17 +1516,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(0, pageData.getData().size());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignDeviceToTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignDeviceToTenant() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -1834,17 +1608,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignDeviceToEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignDeviceToEdge() throws Exception {
         Edge edge = constructEdge("My edge", "default");
         Edge savedEdge = doPost("/api/edge", edge, Edge.class);
@@ -1887,105 +1656,73 @@ public class DeviceControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationUpdateGatewayOneTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证时间相关场景。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `oldDevice`：设备信息或设备标识。
+     * 返回：无。
      */
     protected void testNotificationUpdateGatewayOneTime(Device device, Device oldDevice) {
         Mockito.verify(gatewayNotificationsService, times(1)).onDeviceUpdated(Mockito.eq(device), Mockito.eq(oldDevice));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationUpdateGatewayNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证通知相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     protected void testNotificationUpdateGatewayNever() {
         Mockito.verify(gatewayNotificationsService, never()).onDeviceUpdated(Mockito.any(Device.class), Mockito.any(Device.class));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationDeleteGatewayOneTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证时间相关场景。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：无。
      */
     protected void testNotificationDeleteGatewayOneTime(Device device) {
         Mockito.verify(gatewayNotificationsService, times(1)).onDeviceDeleted(device);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationDeleteGatewayNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证通知相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     protected void testNotificationDeleteGatewayNever() {
         Mockito.verify(gatewayNotificationsService, never()).onDeviceDeleted(Mockito.any(Device.class));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteDashboardWithDeleteRelationsOk` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteDashboardWithDeleteRelationsOk() throws Exception {
         DeviceId deviceId = createDevice("Device for Test WithRelationsOk").getId();
         testEntityDaoWithRelationsOk(savedTenant.getId(), deviceId, "/api/device/" + deviceId);
     }
 
+    /**
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
+     */
     @Ignore
     @Test
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteDeviceExceptionWithRelationsTransactional` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void testDeleteDeviceExceptionWithRelationsTransactional() throws Exception {
         DeviceId deviceId = createDevice("Device for Test WithRelations Transactional Exception").getId();
         testEntityDaoWithRelationsTransactionalException(deviceDao, savedTenant.getId(), deviceId, "/api/device/" + deviceId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testBulkImportDeviceWithoutCredentials` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testBulkImportDeviceWithoutCredentials() throws Exception {
         String deviceName = "some_device";
         String deviceType = "some_type";
@@ -2045,17 +1782,12 @@ public class DeviceControllerTest extends AbstractControllerTest {
         Assert.assertEquals(savedCredentials, updatedCredentials);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testBulkImportDeviceWithUpdateFalse` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testBulkImportDeviceWithUpdateFalse() throws Exception {
         String deviceName = "firstDevice";
         String attributeValue = "testValue";
@@ -2123,14 +1855,10 @@ public class DeviceControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `name`：名称。
+     * 返回：处理结果。
      */
     private Device createDevice(String name) {
         Device device = new Device();

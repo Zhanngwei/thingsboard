@@ -54,9 +54,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Service
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`EntityActionService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -67,99 +64,80 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@RequiredArgsConstructor
+@Slf4j
 public class EntityActionService {
     /**
-     * 字段说明：
-     * 1. 保存 `tbClusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TbClusterService tbClusterService;
     private final AuditLogService auditLogService;
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRuleProcessor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 处理器，负责处理对应任务或消息。
      */
     private final NotificationRuleProcessor notificationRuleProcessor;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `pushEntityActionToRuleEngine` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交规则引擎。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `entity`：实体对象。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     public void pushEntityActionToRuleEngine(EntityId entityId, HasName entity, TenantId tenantId, CustomerId customerId,
                                              ActionType actionType, User user, Object... additionalInfo) {
         Optional<TbMsgType> msgType = actionType.getRuleEngineMsgType();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (msgType.isPresent()) {
             try {
                 TbMsgMetaData metaData = new TbMsgMetaData();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (user != null) {
                     metaData.putValue("userId", user.getId().toString());
                     metaData.putValue("userName", user.getName());
                     metaData.putValue("userEmail", user.getEmail());
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (user.getFirstName() != null) {
                         metaData.putValue("userFirstName", user.getFirstName());
                     }
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (user.getLastName() != null) {
                         metaData.putValue("userLastName", user.getLastName());
                     }
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (customerId != null && !customerId.isNullUid()) {
                     metaData.putValue("customerId", customerId.toString());
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (actionType == ActionType.ASSIGNED_TO_CUSTOMER) {
                     String strCustomerId = extractParameter(String.class, 1, additionalInfo);
                     String strCustomerName = extractParameter(String.class, 2, additionalInfo);
                     metaData.putValue("assignedCustomerId", strCustomerId);
                     metaData.putValue("assignedCustomerName", strCustomerName);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (actionType == ActionType.UNASSIGNED_FROM_CUSTOMER) {
                     String strCustomerId = extractParameter(String.class, 1, additionalInfo);
                     String strCustomerName = extractParameter(String.class, 2, additionalInfo);
                     metaData.putValue("unassignedCustomerId", strCustomerId);
                     metaData.putValue("unassignedCustomerName", strCustomerName);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (actionType == ActionType.ASSIGNED_FROM_TENANT) {
                     String strTenantId = extractParameter(String.class, 0, additionalInfo);
                     String strTenantName = extractParameter(String.class, 1, additionalInfo);
                     metaData.putValue("assignedFromTenantId", strTenantId);
                     metaData.putValue("assignedFromTenantName", strTenantName);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (actionType == ActionType.ASSIGNED_TO_TENANT) {
                     String strTenantId = extractParameter(String.class, 0, additionalInfo);
                     String strTenantName = extractParameter(String.class, 1, additionalInfo);
                     metaData.putValue("assignedToTenantId", strTenantId);
                     metaData.putValue("assignedToTenantName", strTenantName);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (actionType == ActionType.ASSIGNED_TO_EDGE) {
                     String strEdgeId = extractParameter(String.class, 1, additionalInfo);
                     String strEdgeName = extractParameter(String.class, 2, additionalInfo);
                     metaData.putValue("assignedEdgeId", strEdgeId);
                     metaData.putValue("assignedEdgeName", strEdgeName);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (actionType == ActionType.UNASSIGNED_FROM_EDGE) {
                     String strEdgeId = extractParameter(String.class, 1, additionalInfo);
                     String strEdgeName = extractParameter(String.class, 2, additionalInfo);
                     metaData.putValue("unassignedEdgeId", strEdgeId);
                     metaData.putValue("unassignedEdgeName", strEdgeName);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (actionType == ActionType.ADDED_COMMENT || actionType == ActionType.UPDATED_COMMENT) {
                     AlarmComment comment = extractParameter(AlarmComment.class, 0, additionalInfo);
                     metaData.putValue("comment", JacksonUtil.toString(comment));
@@ -228,14 +206,14 @@ public class EntityActionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processNotificationRules` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理通知。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `entity`：实体对象。
+     * - `actionType`：类型。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void processNotificationRules(TenantId tenantId, EntityId originatorId, HasName entity, ActionType actionType, User user, Object... additionalInfo) {
         EntityId entityId = entity instanceof HasId ? ((HasId<? extends EntityId>) entity).getId() : originatorId;
@@ -286,14 +264,14 @@ public class EntityActionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logEntityAction` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logEntityAction` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `entity`：实体对象。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     public <E extends HasName, I extends EntityId> void logEntityAction(User user, I entityId, E entity, CustomerId customerId,
                                                                         ActionType actionType, Exception e, Object... additionalInfo) {
@@ -307,14 +285,12 @@ public class EntityActionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractParameter` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractParameter` 对应的处理。
+     * 参数：
+     * - `clazz`：`clazz` 参数。
+     * - `index`：`index` 参数。
+     * - `additionalInfo`：`additionalInfo` 参数。
+     * 返回：处理结果。
      */
     private <T> T extractParameter(Class<T> clazz, int index, Object... additionalInfo) {
         T result = null;
@@ -328,14 +304,11 @@ public class EntityActionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addTimeseries` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建时序数据。
+     * 参数：
+     * - `entityNode`：实体对象。
+     * - `timeseries`：数据列表。
+     * 返回：无。
      */
     private void addTimeseries(ObjectNode entityNode, List<TsKvEntry> timeseries) throws Exception {
         if (timeseries != null && !timeseries.isEmpty()) {

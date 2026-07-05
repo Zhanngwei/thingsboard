@@ -30,28 +30,18 @@ import org.thingsboard.rule.engine.api.sms.exception.SmsException;
 public interface SmsSender {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：向单个号码发送短信。
-     * 2. 输入参数：numberTo 是目标手机号，message 是短信内容。
-     * 3. 返回值：供应商返回的发送结果码或内部状态码。
-     * 4. 调用时机：SmsService 已选择供应商并准备好消息内容后调用。
-     * 5. 调用方：SmsService 实现。
-     * 6. 使用流程：属于 Rule Engine/通知短信发送流程。
-     * 7. 线程安全：取决于具体供应商实现，复用客户端时需要保证并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；执行外部短信 API 调用并可被 Rule Engine 间接触发。
+     * 功能：发送或提交`Sms`。
+     * 参数：
+     * - `numberTo`：`numberTo` 参数。
+     * - `message`：待处理消息。
+     * 返回：数值结果。
      */
     int sendSms(String numberTo, String message) throws SmsException;
 
     /**
-     * 中文说明：
-     * 1. 方法职责：释放短信发送器持有的外部资源。
-     * 2. 输入参数：无。
-     * 3. 返回值：无。
-     * 4. 调用时机：短信配置刷新、服务关闭或发送器不再使用时调用。
-     * 5. 调用方：SmsService 实现或短信发送器管理器。
-     * 6. 使用流程：属于外部客户端生命周期清理流程。
-     * 7. 线程安全：实现需处理发送中与销毁并发的情况。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不涉及事务、缓存、MQTT、Actor、数据库；间接服务 Rule Engine 外部调用资源管理。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     void destroy();
 

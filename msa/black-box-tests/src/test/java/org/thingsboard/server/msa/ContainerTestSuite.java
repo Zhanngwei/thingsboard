@@ -40,7 +40,6 @@ import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.testng.Assert.fail;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`ContainerTestSuite` 是 ThingsBoard MSA 测试模块 中的微服务测试和部署支撑类型，用于支撑微服务部署、黑盒测试、UI 自动化、协议连通性验证或版本控制执行器路由。
@@ -52,147 +51,86 @@ import static org.testng.Assert.fail;
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 Test Fixture / Page Object / Service。
  */
+@Slf4j
 public class ContainerTestSuite {
     final static boolean IS_REDIS_CLUSTER = Boolean.parseBoolean(System.getProperty("blackBoxTests.redisCluster"));
     final static boolean IS_REDIS_SENTINEL = Boolean.parseBoolean(System.getProperty("blackBoxTests.redisSentinel"));
     final static boolean IS_HYBRID_MODE = Boolean.parseBoolean(System.getProperty("blackBoxTests.hybridMode"));
     final static String QUEUE_TYPE = System.getProperty("blackBoxTests.queue", "kafka");
     /**
-     * 字段说明：
-     * 1. 保存 `SOURCE_DIR` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * `SOURCE_DIR`常量，用于统一引用固定值。
      */
     private static final String SOURCE_DIR = "./../../docker/";
     private static final String TB_CORE_LOG_REGEXP = ".*Starting polling for events.*";
     /**
-     * 字段说明：
-     * 1. 保存 `TRANSPORTS_LOG_REGEXP` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * `TRANSPORTS_LOG_REGEXP`常量，用于统一引用固定值。
      */
     private static final String TRANSPORTS_LOG_REGEXP = ".*Going to recalculate partitions.*";
     private static final String TB_VC_LOG_REGEXP = TRANSPORTS_LOG_REGEXP;
     /**
-     * 字段说明：
-     * 1. 保存 `TB_JS_EXECUTOR_LOG_REGEXP` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 执行器常量，用于统一引用固定值。
      */
     private static final String TB_JS_EXECUTOR_LOG_REGEXP = ".*template started.*";
     private static final Duration CONTAINER_STARTUP_TIMEOUT = Duration.ofSeconds(400);
 
     /**
-     * 字段说明：
-     * 1. 保存 `testContainer` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * `testContainer` 字段，保存当前对象的对应属性。
      */
     private  DockerComposeContainer<?> testContainer;
     private  ThingsBoardDbInstaller installTb;
     /**
-     * 字段说明：
-     * 1. 保存 `isActive` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 当前对象是否处于激活状态。
      */
     private boolean isActive;
 
     /**
-     * 字段说明：
-     * 1. 保存 `containerTestSuite` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * `containerTestSuite` 字段，保存当前对象的对应属性。
      */
     private static ContainerTestSuite containerTestSuite;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isActive` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：判断`Active`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean isActive() {
         return isActive;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setActive` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：更新`Active`。
+     * 参数：
+     * - `active`：`active` 参数。
+     * 返回：无。
      */
     public void setActive(boolean active) {
         isActive = active;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ContainerTestSuite` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：创建 `ContainerTestSuite` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     private ContainerTestSuite() {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getInstance` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Instance`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public static ContainerTestSuite getInstance() {
-        // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
         if (containerTestSuite == null) {
-            // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
             containerTestSuite = new ContainerTestSuite();
         }
-        // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
         return containerTestSuite;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `start` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `start` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void start() {
         installTb = new ThingsBoardDbInstaller();
@@ -200,7 +138,6 @@ public class ContainerTestSuite {
         log.info("System property of blackBoxTests.redisCluster is {}", IS_REDIS_CLUSTER);
         log.info("System property of blackBoxTests.redisSentinel is {}", IS_REDIS_SENTINEL);
         log.info("System property of blackBoxTests.hybridMode is {}", IS_HYBRID_MODE);
-        // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
         boolean skipTailChildContainers = Boolean.parseBoolean(System.getProperty("blackBoxTests.skipTailChildContainers"));
         try {
             final String targetDir = FileUtils.getTempDirectoryPath() + "/" + "ContainerTestSuite-" + UUID.randomUUID() + "/";
@@ -223,40 +160,27 @@ public class ContainerTestSuite {
              */
             class DockerComposeContainerImpl<SELF extends DockerComposeContainer<SELF>> extends DockerComposeContainer<SELF> {
                 /**
-                 * 方法说明：
-                 * 1. 职责：执行 `DockerComposeContainerImpl` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-                 * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-                 * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-                 * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-                 * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-                 * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-                 * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-                 * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+                 * 功能：创建 `ContainerTestSuite` 实例，并初始化必要字段。
+                 * 参数：
+                 * - `composeFiles`：数据列表。
+                 * 返回：新创建的对象实例。
                  */
                 public DockerComposeContainerImpl(List<File> composeFiles) {
-                    // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
                     super(composeFiles);
                 }
 
-                @Override
                 /**
-                 * 方法说明：
-                 * 1. 职责：执行 `stop` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-                 * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-                 * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-                 * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-                 * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-                 * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-                 * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-                 * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+                 * 功能：执行 `stop` 对应的处理。
+                 * 参数：无。
+                 * 返回：无。
                  */
+                @Override
                 public void stop() {
                     super.stop();
                     tryDeleteDir(targetDir);
                 }
             }
 
-            // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
             List<File> composeFiles = new ArrayList<>(Arrays.asList(
                     new File(targetDir + "docker-compose.yml"),
                     new File(targetDir + "docker-compose.volumes.yml"),
@@ -265,19 +189,15 @@ public class ContainerTestSuite {
                     new File(targetDir + (IS_HYBRID_MODE ? "docker-compose.hybrid-test-extras.yml" : "docker-compose.postgres-test-extras.yml")),
                     new File(targetDir + "docker-compose.postgres.volumes.yml"),
                     new File(targetDir + "docker-compose." + QUEUE_TYPE + ".yml"),
-                    // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
                     new File(targetDir + resolveRedisComposeFile()),
-                    // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
                     new File(targetDir + resolveRedisComposeVolumesFile()),
                     new File(targetDir + ("docker-selenium.yml"))
             ));
 
             Map<String, String> queueEnv = new HashMap<>();
             queueEnv.put("TB_QUEUE_TYPE", QUEUE_TYPE);
-            // 按协议类型、状态或测试场景分支，保持不同链路的处理语义独立。
             switch (QUEUE_TYPE) {
                 case "kafka":
-                    // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
                     composeFiles.add(new File(targetDir + "docker-compose.kafka.yml"));
                     break;
                 case "aws-sqs":
@@ -287,7 +207,6 @@ public class ContainerTestSuite {
                                     "YOUR_REGION", getSysProp("blackBoxTests.awsRegion")));
                     break;
                 case "rabbitmq":
-                    // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
                     composeFiles.add(new File(targetDir + "docker-compose.rabbitmq-server.yml"));
                     replaceInFile(targetDir, "queue-rabbitmq.env",
                             Map.of("localhost", "rabbitmq"));
@@ -308,13 +227,10 @@ public class ContainerTestSuite {
                     throw new RuntimeException("Unsupported queue type: " + QUEUE_TYPE);
             }
 
-            // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
             if (IS_HYBRID_MODE) {
-                // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
                 composeFiles.add(new File(targetDir + "docker-compose.cassandra.volumes.yml"));
             }
 
-            // 容器生命周期决定黑盒测试环境是否可用，启动和清理顺序需要保持稳定。
             testContainer = new DockerComposeContainerImpl<>(composeFiles)
                     .withPull(false)
                     .withLocalCompose(true)
@@ -343,15 +259,9 @@ public class ContainerTestSuite {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolveRedisComposeFile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `resolveRedisComposeFile` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     private static String resolveRedisComposeFile() {
         if (IS_REDIS_CLUSTER) {
@@ -364,15 +274,9 @@ public class ContainerTestSuite {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolveRedisComposeVolumesFile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `resolveRedisComposeVolumesFile` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     private static String resolveRedisComposeVolumesFile() {
         if (IS_REDIS_CLUSTER) {
@@ -385,15 +289,9 @@ public class ContainerTestSuite {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stop` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `stop` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void stop() {
         if (isActive) {
@@ -404,15 +302,12 @@ public class ContainerTestSuite {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `replaceInFile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `replaceInFile` 对应的处理。
+     * 参数：
+     * - `targetDir`：`targetDir` 参数。
+     * - `fileName`：名称。
+     * - `replacements`：键值映射。
+     * 返回：无。
      */
     private static void replaceInFile(String targetDir, String fileName, Map<String, String> replacements) throws IOException {
         Path envFilePath = Path.of(targetDir, fileName);
@@ -424,15 +319,10 @@ public class ContainerTestSuite {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSysProp` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Sys Prop`。
+     * 参数：
+     * - `propertyName`：名称。
+     * 返回：文本结果。
      */
     private static String getSysProp(String propertyName) {
         var value = System.getProperty(propertyName);
@@ -443,15 +333,10 @@ public class ContainerTestSuite {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `tryDeleteDir` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `tryDeleteDir` 对应的处理。
+     * 参数：
+     * - `targetDir`：`targetDir` 参数。
+     * 返回：无。
      */
     private static void tryDeleteDir(String targetDir) {
         try {
@@ -470,15 +355,13 @@ public class ContainerTestSuite {
      * Using the latest testcontainers and waiting for the fix...
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `replaceInFile` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `replaceInFile` 对应的处理。
+     * 参数：
+     * - `sourceFilename`：名称。
+     * - `target`：`target` 参数。
+     * - `replacement`：`replacement` 参数。
+     * - `verifyPhrase`：`verifyPhrase` 参数。
+     * 返回：无。
      */
     private static void replaceInFile(String sourceFilename, String target, String replacement, String verifyPhrase) {
         try {
@@ -498,15 +381,9 @@ public class ContainerTestSuite {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTestContainer` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：获取`Test Container`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public DockerComposeContainer<?> getTestContainer() {
         return testContainer;

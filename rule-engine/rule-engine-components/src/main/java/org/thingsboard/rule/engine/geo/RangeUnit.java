@@ -21,26 +21,30 @@ package org.thingsboard.rule.engine.geo;
  */
 public enum RangeUnit {
     /**
-     * 枚举项说明：本行枚举常量定义 `RangeUnit` 支持的取值，用于配置或处理流程中的分支判断。
+     * `METER`常量，用于统一引用固定值。
      */
     METER(1000.0), KILOMETER(1.0), FOOT(3280.84), MILE(0.62137), NAUTICAL_MILE(0.539957);
 
     /**
-     * 字段说明：保存 `fromKm`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * `fromKm` 字段，保存当前对象的对应属性。
      */
     private final double fromKm;
 
     /**
-     * 方法说明：构造 `RangeUnit` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `RangeUnit` 实例，并初始化必要字段。
+     * 参数：
+     * - `fromKm`：`fromKm` 参数。
+     * 返回：新创建的对象实例。
      */
     RangeUnit(double fromKm) {
         this.fromKm = fromKm;
     }
 
     /**
-     * 方法说明：执行 `fromKm` 对应的辅助逻辑，供 `RangeUnit` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromKm` 对应的处理。
+     * 参数：
+     * - `v`：`v` 参数。
+     * 返回：数值结果。
      */
     public double fromKm(double v) {
         return v * fromKm;

@@ -37,58 +37,41 @@ import java.util.Map;
 public class TbJson {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stringify` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `stringify` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：文本结果。
      */
     public static String stringify(Object value) {
         return value != null ? JacksonUtil.toString(value) : "null";
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `parse` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static Object parse(ExecutionContext ctx, String value) throws IOException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (value != null) {
             JsonNode node = JacksonUtil.toJsonNode(value);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (node.isObject()) {
                 return ArgsRepackUtil.repack(ctx, JacksonUtil.convertValue(node, Map.class));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isArray()) {
                 return ArgsRepackUtil.repack(ctx, JacksonUtil.convertValue(node, List.class));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isDouble()) {
                 return node.doubleValue();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isLong()) {
                 return node.longValue();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isInt()) {
                 return node.intValue();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isBoolean()) {
                 return node.booleanValue();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isTextual()) {
                 return node.asText();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isBinary()) {
                 return node.binaryValue();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (node.isNull()) {
                 return null;
             } else {

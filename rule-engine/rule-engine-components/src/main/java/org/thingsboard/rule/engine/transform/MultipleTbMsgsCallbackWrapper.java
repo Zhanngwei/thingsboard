@@ -27,39 +27,45 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MultipleTbMsgsCallbackWrapper implements TbMsgCallbackWrapper {
 
     /**
-     * 字段说明：保存 `tbMsgsCallbackCount`，表示当前规则链消息，供本类方法在规则节点处理流程中使用。
+     * 回调，用于接收异步处理完成后的结果。
      */
     private final AtomicInteger tbMsgsCallbackCount;
     /**
-     * 字段说明：保存 `callback`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 回调，用于接收异步处理完成后的结果。
      */
     private final TbMsgCallback callback;
 
     /**
-     * 方法说明：构造 `MultipleTbMsgsCallbackWrapper` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `MultipleTbMsgsCallbackWrapper` 实例，并初始化必要字段。
+     * 参数：
+     * - `tbMsgsCallbackCount`：处理完成后的回调。
+     * - `callback`：处理完成后的回调。
+     * 返回：新创建的对象实例。
      */
     public MultipleTbMsgsCallbackWrapper(int tbMsgsCallbackCount, TbMsgCallback callback) {
         this.tbMsgsCallbackCount = new AtomicInteger(tbMsgsCallbackCount);
         this.callback = callback;
     }
 
-    @Override
     /**
-     * 方法说明：处理异步调用成功回调并继续规则链投递。
-     * 调用边界：由异步 Future 或消息回调触发；本方法本身只衔接规则链结果，数据库、缓存、MQTT 或事务通常发生在触发该回调的上游调用链中。
+     * 功能：处理`on Success`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void onSuccess() {
         if (tbMsgsCallbackCount.decrementAndGet() <= 0) {
             callback.onSuccess();
         }
     }
 
-    @Override
     /**
-     * 方法说明：处理异步调用失败回调并转入失败关系。
-     * 调用边界：由异步 Future 或消息回调触发；本方法本身只衔接规则链结果，数据库、缓存、MQTT 或事务通常发生在触发该回调的上游调用链中。
+     * 功能：处理失败信息。
+     * 参数：
+     * - `t`：`t` 参数。
+     * 返回：无。
      */
+    @Override
     public void onFailure(Throwable t) {
         callback.onFailure(new RuleEngineException(t.getMessage(), t));
     }

@@ -117,9 +117,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.thingsboard.server.common.data.DataConstants.DEFAULT_DEVICE_TYPE;
 
-@Service
-@Profile("install")
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultSystemDataLoaderService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -130,336 +127,198 @@ import static org.thingsboard.server.common.data.DataConstants.DEFAULT_DEVICE_TY
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Profile("install")
+@Slf4j
 public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `CUSTOMER_CRED` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户常量，用于统一引用固定值。
      */
     public static final String CUSTOMER_CRED = "customer";
     public static final String ACTIVITY_STATE = "active";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `installScripts` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `installScripts` 字段，保存当前对象的对应属性。
      */
+    @Autowired
     private InstallScripts installScripts;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `passwordEncoder` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `userService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，提供当前类调用的业务操作。
      */
+    @Autowired
     private UserService userService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `adminSettingsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private AdminSettingsService adminSettingsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `widgetTypeService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 部件类型，提供当前类调用的业务操作。
      */
+    @Autowired
     private WidgetTypeService widgetTypeService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `widgetsBundleService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 部件包，提供当前类调用的业务操作。
      */
+    @Autowired
     private WidgetsBundleService widgetsBundleService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户，提供当前类调用的业务操作。
      */
+    @Autowired
     private TenantService tenantService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户，提供当前类调用的业务操作。
      */
+    @Autowired
     private TenantProfileService tenantProfileService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `customerService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户，提供当前类调用的业务操作。
      */
+    @Autowired
     private CustomerService customerService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceService deviceService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceProfileService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备配置，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceProfileService deviceProfileService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `attributesService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private AttributesService attributesService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceCredentialsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备凭据，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceCredentialsService deviceCredentialsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `ruleChainService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 规则链，提供当前类调用的业务操作。
      */
+    @Autowired
     private RuleChainService ruleChainService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，提供当前类调用的业务操作。
      */
+    @Autowired
     private TimeseriesService tsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `connectivityConfiguration` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `connectivityConfiguration`，保存当前对象的配置选项。
      */
+    @Autowired
     private DeviceConnectivityConfiguration connectivityConfiguration;
 
+    /**
+     * 是否满足遥测条件。
+     */
     @Value("${state.persistToTelemetry:false}")
     @Getter
-    /**
-     * 字段说明：
-     * 1. 保存 `persistActivityToTelemetry` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean persistActivityToTelemetry;
 
+    /**
+     * 队列，提供当前类调用的业务操作。
+     */
     @Lazy
     @Autowired
-    /**
-     * 字段说明：
-     * 1. 保存 `queueService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private QueueService queueService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `jwtSettingsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private JwtSettingsService jwtSettingsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationSettingsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private NotificationSettingsService notificationSettingsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationTargetService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private NotificationTargetService notificationTargetService;
 
-    @Bean
     /**
-     * 方法说明：
-     * 1. 职责：执行 `passwordEncoder` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `passwordEncoder` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Bean
     protected BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     /**
-     * 字段说明：
-     * 1. 保存 `tsCallBackExecutor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，负责处理对应任务或消息。
      */
     private ExecutorService tsCallBackExecutor;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initExecutor` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void initExecutor() {
         tsCallBackExecutor = Executors.newSingleThreadExecutor(ThingsBoardThreadFactory.forName("sys-loader-ts-callback"));
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `shutdownExecutor` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭执行器。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void shutdownExecutor() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tsCallBackExecutor != null) {
             tsCallBackExecutor.shutdownNow();
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSysAdmin` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Sys Admin`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void createSysAdmin() {
         createUser(Authority.SYS_ADMIN, null, null, "sysadmin@thingsboard.org", "sysadmin");
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDefaultTenantProfiles` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建租户。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void createDefaultTenantProfiles() throws Exception {
         tenantProfileService.findOrCreateDefaultTenantProfile(TenantId.SYS_TENANT_ID);
 
@@ -496,23 +355,17 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
 
         try {
             tenantProfileService.saveTenantProfile(TenantId.SYS_TENANT_ID, isolatedTbRuleEngineProfile);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (DataValidationException e) {
             log.warn(e.getMessage());
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createAdminSettings` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建配置。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void createAdminSettings() throws Exception {
         AdminSettings generalSettings = new AdminSettings();
         generalSettings.setTenantId(TenantId.SYS_TENANT_ID);
@@ -548,47 +401,32 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         adminSettingsService.saveAdminSettings(TenantId.SYS_TENANT_ID, connectivitySettings);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createRandomJwtSettings` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建配置。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void createRandomJwtSettings() throws Exception {
         jwtSettingsService.createRandomJwtSettings();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createOAuth2Templates` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`O Auth2 Templates`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void createOAuth2Templates() throws Exception {
         installScripts.createOAuth2Templates();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadDemoData` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取数据。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void loadDemoData() throws Exception {
         Tenant demoTenant = new Tenant();
         demoTenant.setRegion("Global");
@@ -633,7 +471,6 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         thermostatDeviceProfile.setDefault(false);
         thermostatDeviceProfile.setName("thermostat");
         thermostatDeviceProfile.setType(DeviceProfileType.DEFAULT);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         thermostatDeviceProfile.setTransportType(DeviceTransportType.DEFAULT);
         thermostatDeviceProfile.setProvisionType(DeviceProfileProvisionType.DISABLED);
         thermostatDeviceProfile.setDescription("Thermostat device profile");
@@ -642,11 +479,9 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
 
         DeviceProfileData deviceProfileData = new DeviceProfileData();
         DefaultDeviceProfileConfiguration configuration = new DefaultDeviceProfileConfiguration();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         DefaultDeviceProfileTransportConfiguration transportConfiguration = new DefaultDeviceProfileTransportConfiguration();
         DisabledDeviceProfileProvisionConfiguration provisionConfiguration = new DisabledDeviceProfileProvisionConfiguration(null);
         deviceProfileData.setConfiguration(configuration);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         deviceProfileData.setTransportConfiguration(transportConfiguration);
         deviceProfileData.setProvisionConfiguration(provisionConfiguration);
         thermostatDeviceProfile.setProfileData(deviceProfileData);
@@ -779,30 +614,25 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         installScripts.createDefaultTenantDashboards(demoTenant.getId(), null);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadSystemWidgets` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取部件。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void loadSystemWidgets() throws Exception {
         installScripts.loadSystemWidgets();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createUser` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建用户。
+     * 参数：
+     * - `authority`：`authority` 参数。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `email`：`email` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private User createUser(Authority authority,
                             TenantId tenantId,
@@ -824,14 +654,14 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDevice` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `deviceProfileId`：设备配置ID。
+     * - `name`：名称。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private Device createDevice(TenantId tenantId,
                                 CustomerId customerId,
@@ -844,7 +674,6 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         device.setCustomerId(customerId);
         device.setDeviceProfileId(deviceProfileId);
         device.setName(name);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (description != null) {
             ObjectNode additionalInfo = JacksonUtil.newObjectNode();
             additionalInfo.put("description", description);
@@ -859,31 +688,24 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
     private void save(DeviceId deviceId, String key, boolean value) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (persistActivityToTelemetry) {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             ListenableFuture<Integer> saveFuture = tsService.save(
                     TenantId.SYS_TENANT_ID,
                     deviceId,
                     Collections.singletonList(new BasicTsKvEntry(System.currentTimeMillis(), new BooleanDataEntry(key, value))), 0L);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             addTsCallback(saveFuture, new TelemetrySaveCallback<>(deviceId, key, value));
         } else {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             ListenableFuture<List<String>> saveFuture = attributesService.save(TenantId.SYS_TENANT_ID, deviceId, DataConstants.SERVER_SCOPE,
                     Collections.singletonList(new BaseAttributeKvEntry(new BooleanDataEntry(key, value)
                     , System.currentTimeMillis())));
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             addTsCallback(saveFuture, new TelemetrySaveCallback<>(deviceId, key, value));
         }
     }
@@ -900,22 +722,12 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
      */
     private static class TelemetrySaveCallback<T> implements FutureCallback<T> {
         /**
-         * 字段说明：
-         * 1. 保存 `deviceId` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 设备ID，用于定位对应业务对象。
          */
         private final DeviceId deviceId;
         private final String key;
         /**
-         * 字段说明：
-         * 1. 保存 `value` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 值，保存当前处理得到的具体内容。
          */
         private final Object value;
 
@@ -925,49 +737,37 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
             this.value = value;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `result`：`result` 参数。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(@Nullable T result) {
             log.trace("[{}] Successfully updated attribute [{}] with value [{}]", deviceId, key, value);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onFailure` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理失败信息。
+         * 参数：
+         * - `t`：`t` 参数。
+         * 返回：无。
          */
+        @Override
         public void onFailure(Throwable t) {
             log.warn("[{}] Failed to update attribute [{}] with value [{}]", deviceId, key, value, t);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addTsCallback` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建时间戳。
+     * 参数：
+     * - `saveFuture`：数据列表。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     private <S> void addTsCallback(ListenableFuture<S> saveFuture, final FutureCallback<S> callback) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         Futures.addCallback(saveFuture, new FutureCallback<S>() {
             @Override
             public void onSuccess(@Nullable S result) {
@@ -981,17 +781,12 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         }, tsCallBackExecutor);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createQueues` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Queues`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void createQueues() {
         Queue mainQueue = queueService.findQueueByTenantIdAndName(TenantId.SYS_TENANT_ID, DataConstants.MAIN_QUEUE_NAME);
         if (mainQueue == null) {
@@ -1066,18 +861,13 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         }
     }
 
+    /**
+     * 功能：保存或创建通知。
+     * 参数：无。
+     * 返回：无。
+     */
     @Override
     @SneakyThrows
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `createDefaultNotificationConfigs` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void createDefaultNotificationConfigs() {
         log.info("Creating default notification configs for system admin");
         if (notificationTargetService.countNotificationTargetsByTenantId(TenantId.SYS_TENANT_ID) == 0) {
@@ -1102,18 +892,13 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
         executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
     }
 
+    /**
+     * 功能：更新通知。
+     * 参数：无。
+     * 返回：无。
+     */
     @Override
     @SneakyThrows
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `updateDefaultNotificationConfigs` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void updateDefaultNotificationConfigs() {
         PageDataIterable<TenantId> tenants = new PageDataIterable<>(tenantService::findTenantsIds, 500);
         ExecutorService executor = Executors.newFixedThreadPool(Math.max(Runtime.getRuntime().availableProcessors(), 4));

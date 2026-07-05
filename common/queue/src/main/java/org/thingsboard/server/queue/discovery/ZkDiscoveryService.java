@@ -56,9 +56,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED;
 
-@Service
-@ConditionalOnProperty(prefix = "zk", value = "enabled", havingValue = "true", matchIfMissing = false)
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`ZkDiscoveryService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -69,148 +66,84 @@ import static org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent.
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Service
+@ConditionalOnProperty(prefix = "zk", value = "enabled", havingValue = "true", matchIfMissing = false)
+@Slf4j
 public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheListener {
 
+    /**
+     * URL 地址，用于定位外部资源或本地资源。
+     */
     @Value("${zk.url}")
-    /**
-     * 字段说明：
-     * 1. 保存 `zkUrl` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String zkUrl;
+    /**
+     * 时间间隔，用于控制时间范围或等待时长。
+     */
     @Value("${zk.retry_interval_ms}")
-    /**
-     * 字段说明：
-     * 1. 保存 `zkRetryInterval` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer zkRetryInterval;
+    /**
+     * 超时时间，用于控制时间范围或等待时长。
+     */
     @Value("${zk.connection_timeout_ms}")
-    /**
-     * 字段说明：
-     * 1. 保存 `zkConnectionTimeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer zkConnectionTimeout;
+    /**
+     * 会话，保存当前连接或交互过程的会话信息。
+     */
     @Value("${zk.session_timeout_ms}")
-    /**
-     * 字段说明：
-     * 1. 保存 `zkSessionTimeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer zkSessionTimeout;
+    /**
+     * `zkDir` 字段，保存当前对象的对应属性。
+     */
     @Value("${zk.zk_dir}")
-    /**
-     * 字段说明：
-     * 1. 保存 `zkDir` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String zkDir;
-    @Value("${zk.recalculate_delay:0}")
     /**
-     * 字段说明：
-     * 1. 保存 `recalculateDelay` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 延迟时间，用于控制时间范围或等待时长。
      */
+    @Value("${zk.recalculate_delay:0}")
     private Long recalculateDelay;
 
     /**
-     * 字段说明：
-     * 1. 保存 `delayedTasks` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `delayedTasks`映射关系，用于按键查找对应值。
      */
     protected final ConcurrentHashMap<String, ScheduledFuture<?>> delayedTasks;
 
     /**
-     * 字段说明：
-     * 1. 保存 `applicationEventPublisher` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 事件，表示当前对象的对应属性。
      */
     private final ApplicationEventPublisher applicationEventPublisher;
     private final TbServiceInfoProvider serviceInfoProvider;
     /**
-     * 字段说明：
-     * 1. 保存 `partitionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
     private final PartitionService partitionService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `zkExecutorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private ScheduledExecutorService zkExecutorService;
     private CuratorFramework client;
     /**
-     * 字段说明：
-     * 1. 保存 `cache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `cache` 字段，保存当前对象的对应属性。
      */
     private PathChildrenCache cache;
     private String nodePath;
     /**
-     * 字段说明：
-     * 1. 保存 `zkNodesDir` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `zkNodesDir` 字段，保存当前对象的对应属性。
      */
     private String zkNodesDir;
 
     /**
-     * 字段说明：
-     * 1. 保存 `stopped` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前处理是否已经停止。
      */
     private volatile boolean stopped = true;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ZkDiscoveryService` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `ZkDiscoveryService` 实例，并初始化必要字段。
+     * 参数：
+     * - `applicationEventPublisher`：`applicationEventPublisher` 参数。
+     * - `serviceInfoProvider`：服务对象。
+     * - `partitionService`：服务对象。
+     * 返回：新创建的对象实例。
      */
     public ZkDiscoveryService(ApplicationEventPublisher applicationEventPublisher,
                               TbServiceInfoProvider serviceInfoProvider,
@@ -221,17 +154,12 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
         delayedTasks = new ConcurrentHashMap<>();
     }
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() {
         log.info("Initializing...");
         Assert.hasLength(zkUrl, missingProperty("zk.url"));
@@ -247,26 +175,18 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
         initZkClient();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOtherServers` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Other Servers`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<TransportProtos.ServiceInfo> getOtherServers() {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         return cache.getCurrentData().stream()
                 .filter(cd -> !cd.getPath().equals(nodePath))
                 .map(cd -> {
                     try {
-                        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                         return TransportProtos.ServiceInfo.parseFrom(cd.getData());
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (NoSuchElementException | InvalidProtocolBufferException e) {
                         log.error("Failed to decode ZK node", e);
                         throw new RuntimeException(e);
@@ -275,41 +195,30 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
                 .collect(Collectors.toList());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isMonolith` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Monolith`。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public boolean isMonolith() {
         return false;
     }
 
-    @AfterStartUp(order = AfterStartUp.DISCOVERY_SERVICE)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onApplicationEvent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @AfterStartUp(order = AfterStartUp.DISCOVERY_SERVICE)
     public void onApplicationEvent(ApplicationReadyEvent event) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (stopped) {
             log.debug("Ignoring application ready event. Service is stopped.");
             return;
         } else {
             log.info("Received application ready event. Starting current ZK node.");
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (client.getState() != CuratorFrameworkState.STARTED) {
             log.debug("Ignoring application ready event, ZK client is not started, ZK client state [{}]", client.getState());
             return;
@@ -322,21 +231,14 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
         zkExecutorService.scheduleAtFixedRate(this::publishCurrentServer, 1, 1, TimeUnit.MINUTES);
     }
 
-    @SneakyThrows
     /**
-     * 方法说明：
-     * 1. 职责：执行 `publishCurrentServer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交服务端。
+     * 参数：无。
+     * 返回：无。
      */
+    @SneakyThrows
     public synchronized void publishCurrentServer() {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.ServiceInfo self = serviceInfoProvider.getServiceInfo();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (currentServerExists()) {
             log.trace("[{}] Updating ZK node for current instance: {}", self.getServiceId(), nodePath);
             client.setData().forPath(nodePath, serviceInfoProvider.generateNewServiceInfoWithCurrentSystemInfo().toByteArray());
@@ -348,7 +250,6 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
                         .withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(zkNodesDir + "/", self.toByteArray());
                 log.info("[{}] Created ZK node for current instance: {}", self.getServiceId(), nodePath);
                 client.getConnectionStateListenable().addListener(checkReconnect(self));
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.error("Failed to create ZK node", e);
                 throw new RuntimeException(e);
@@ -357,26 +258,17 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `currentServerExists` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `currentServerExists` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean currentServerExists() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (nodePath == null) {
             return false;
         }
         try {
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             TransportProtos.ServiceInfo self = serviceInfoProvider.getServiceInfo();
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             TransportProtos.ServiceInfo registeredServerInfo = null;
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             registeredServerInfo = TransportProtos.ServiceInfo.parseFrom(client.getData().forPath(nodePath));
             if (self.equals(registeredServerInfo)) {
                 return true;
@@ -390,14 +282,10 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkReconnect` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Reconnect`。
+     * 参数：
+     * - `self`：`self` 参数。
+     * 返回：判断结果。
      */
     private ConnectionStateListener checkReconnect(TransportProtos.ServiceInfo self) {
         return (client, newState) -> {
@@ -409,24 +297,14 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
     }
 
     /**
-     * 字段说明：
-     * 1. 保存 `reconnectInProgress` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足`reconnectInProgress`条件。
      */
     private volatile boolean reconnectInProgress = false;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reconnect` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `reconnect` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private synchronized void reconnect() {
         if (!reconnectInProgress) {
@@ -444,14 +322,9 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initZkClient` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动客户端。
+     * 参数：无。
+     * 返回：无。
      */
     private void initZkClient() {
         try {
@@ -472,14 +345,9 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unpublishCurrentServer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `unpublishCurrentServer` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void unpublishCurrentServer() {
         try {
@@ -493,14 +361,9 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroyZkClient` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭客户端。
+     * 参数：无。
+     * 返回：无。
      */
     private void destroyZkClient() {
         stopped = true;
@@ -513,17 +376,12 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
         log.info("ZK client disconnected");
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void destroy() {
         destroyZkClient();
         zkExecutorService.shutdownNow();
@@ -531,30 +389,23 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `missingProperty` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `missingProperty` 对应的处理。
+     * 参数：
+     * - `propertyName`：名称。
+     * 返回：文本结果。
      */
     public static String missingProperty(String propertyName) {
         return "The " + propertyName + " property need to be set!";
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `childEvent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `childEvent` 对应的处理。
+     * 参数：
+     * - `curatorFramework`：`curatorFramework` 参数。
+     * - `pathChildrenCacheEvent`：文件或资源路径。
+     * 返回：无。
      */
+    @Override
     public void childEvent(CuratorFramework curatorFramework, PathChildrenCacheEvent pathChildrenCacheEvent) throws Exception {
         if (stopped) {
             log.debug("Ignoring {}. Service is stopped.", pathChildrenCacheEvent);
@@ -631,14 +482,9 @@ public class ZkDiscoveryService implements DiscoveryService, PathChildrenCacheLi
      * Synchronized to ensure that other servers info is up to date
      * */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `recalculatePartitions` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `recalculatePartitions` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     synchronized void recalculatePartitions() {
         delayedTasks.values().forEach(future -> future.cancel(false));

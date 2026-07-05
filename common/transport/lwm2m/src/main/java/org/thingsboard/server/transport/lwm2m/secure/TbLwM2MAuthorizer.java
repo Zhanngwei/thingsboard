@@ -33,10 +33,6 @@ import org.thingsboard.server.transport.lwm2m.server.store.TbMainSecurityStore;
 
 import java.util.Arrays;
 
-@Component
-@RequiredArgsConstructor
-@TbLwM2mTransportComponent
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbLwM2MAuthorizer` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -47,47 +43,36 @@ import java.util.Arrays;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Component
+@RequiredArgsConstructor
+@TbLwM2mTransportComponent
+@Slf4j
 public class TbLwM2MAuthorizer implements Authorizer {
 
     /**
-     * 字段说明：
-     * 1. 保存 `sessionStorage` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 会话，保存当前连接或交互过程的会话信息。
      */
     private final TbLwM2MDtlsSessionStore sessionStorage;
     private final TbMainSecurityStore securityStore;
     private final SecurityChecker securityChecker = new SecurityChecker();
     /**
-     * 字段说明：
-     * 1. 保存 `clientContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，用于发起外部调用或协议交互。
      */
     private final LwM2mClientContext clientContext;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isAuthorized` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Authorized`。
+     * 参数：
+     * - `request`：请求对象。
+     * - `registration`：`registration` 参数。
+     * - `senderIdentity`：实体对象。
+     * 返回：判断结果。
      */
+    @Override
     public Registration isAuthorized(UplinkRequest<?> request, Registration registration, Identity senderIdentity) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (senderIdentity.isX509()) {
             TbX509DtlsSessionInfo sessionInfo = sessionStorage.get(registration.getEndpoint());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sessionInfo != null) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (sessionInfo.getX509CommonName().endsWith(senderIdentity.getX509CommonName())) {
                     clientContext.registerClient(registration, sessionInfo.getCredentials());
                     // X509 certificate is valid and matches endpoint.
@@ -102,18 +87,15 @@ public class TbLwM2MAuthorizer implements Authorizer {
         SecurityInfo expectedSecurityInfo;
             try {
                 expectedSecurityInfo = securityStore.getByEndpoint(registration.getEndpoint());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (expectedSecurityInfo != null && expectedSecurityInfo.usePSK() && expectedSecurityInfo.getEndpoint().equals(SecurityMode.NO_SEC.toString())
                         && expectedSecurityInfo.getIdentity().equals(SecurityMode.NO_SEC.toString())
                         && Arrays.equals(SecurityMode.NO_SEC.toString().getBytes(), expectedSecurityInfo.getPreSharedKey())) {
                     expectedSecurityInfo = null;
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (LwM2MAuthException e) {
                 log.info("Registration failed: FORBIDDEN, endpointId: [{}]", registration.getEndpoint());
                 return null;
             }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (securityChecker.checkSecurityInfo(registration.getEndpoint(), senderIdentity, expectedSecurityInfo)) {
             return registration;
         } else {

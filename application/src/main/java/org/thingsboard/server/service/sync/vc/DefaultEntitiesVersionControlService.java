@@ -97,10 +97,6 @@ import java.util.stream.Collectors;
 import static com.google.common.util.concurrent.Futures.transform;
 import static org.thingsboard.server.common.data.sync.vc.VcUtils.checkBranchName;
 
-@Service
-@TbCoreComponent
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultEntitiesVersionControlService` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
@@ -111,79 +107,53 @@ import static org.thingsboard.server.common.data.sync.vc.VcUtils.checkBranchName
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Observer。
  */
+@Service
+@TbCoreComponent
+@RequiredArgsConstructor
+@Slf4j
 public class DefaultEntitiesVersionControlService implements EntitiesVersionControlService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `repositorySettingsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
     private final TbRepositorySettingsService repositorySettingsService;
     private final TbAutoCommitSettingsService autoCommitSettingsService;
     /**
-     * 字段说明：
-     * 1. 保存 `gitServiceQueue` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，提供当前类调用的业务操作。
      */
     private final GitVersionControlQueueService gitServiceQueue;
     private final EntitiesExportImportService exportImportService;
     /**
-     * 字段说明：
-     * 1. 保存 `exportableEntitiesService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final ExportableEntitiesService exportableEntitiesService;
     private final TbNotificationEntityService entityNotificationService;
     /**
-     * 字段说明：
-     * 1. 保存 `transactionTemplate` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 事务执行模板，表示当前对象的对应属性。
      */
     private final TransactionTemplate transactionTemplate;
     private final TbTransactionalCache<UUID, VersionControlTaskCacheEntry> taskCache;
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     private final VersionControlExecutor executor;
 
+    /**
+     * 功能：保存或创建版本号。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `request`：请求对象。
+     * 返回：匹配的数据集合。
+     */
     @SuppressWarnings("UnstableApiUsage")
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntitiesVersion` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ListenableFuture<UUID> saveEntitiesVersion(User user, VersionCreateRequest request) throws Exception {
         checkBranchName(request.getBranch());
         var pendingCommit = gitServiceQueue.prepareCommit(user, request);
         DonAsynchron.withCallback(pendingCommit, commit -> {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             cachePut(commit.getTxId(), new VersionCreationResult());
             try {
                 EntitiesExportCtx<?> theCtx;
-                // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
                 switch (request.getType()) {
                     case SINGLE_ENTITY: {
                         var ctx = new SimpleEntitiesExportCtx(user, commit, (SingleEntityVersionCreateRequest) request);
@@ -200,11 +170,8 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
                     default:
                         throw new RuntimeException("Unsupported request type: " + request.getType());
                 }
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 var resultFuture = Futures.transformAsync(Futures.allAsList(theCtx.getFutures()), f -> gitServiceQueue.push(commit), executor);
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 DonAsynchron.withCallback(resultFuture, result -> cachePut(commit.getTxId(), result), e -> processCommitError(user, request, commit, e), executor);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 processCommitError(user, request, commit, e);
             }
@@ -213,62 +180,47 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         return transform(pendingCommit, CommitGitRequest::getTxId, MoreExecutors.directExecutor());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getVersionCreateStatus` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取状态。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `requestId`：请求ID。
+     * 返回：处理结果。
      */
+    @Override
     public VersionCreationResult getVersionCreateStatus(User user, UUID requestId) throws ThingsboardException {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         return getStatus(user, requestId, VersionControlTaskCacheEntry::getExportResult);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getVersionLoadStatus` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取状态。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `requestId`：请求ID。
+     * 返回：处理结果。
      */
+    @Override
     public VersionLoadResult getVersionLoadStatus(User user, UUID requestId) throws ThingsboardException {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         return getStatus(user, requestId, VersionControlTaskCacheEntry::getImportResult);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStatus` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取状态。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `requestId`：请求ID。
+     * - `getter`：`getter` 参数。
+     * 返回：处理结果。
      */
     private <T> T getStatus(User user, UUID requestId, Function<VersionControlTaskCacheEntry, T> getter) throws ThingsboardException {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         var cacheEntry = taskCache.get(requestId);
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         if (cacheEntry == null || cacheEntry.get() == null) {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             log.debug("[{}] No cache record: {}", requestId, cacheEntry);
             throw new ThingsboardException(ThingsboardErrorCode.ITEM_NOT_FOUND);
         } else {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             var entry = cacheEntry.get();
             log.trace("[{}] Cache get: {}", requestId, entry);
             var result = getter.apply(entry);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (result == null) {
                 throw new ThingsboardException(ThingsboardErrorCode.BAD_REQUEST_PARAMS);
             } else {
@@ -278,28 +230,20 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleSingleEntityRequest` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理实体。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
     private void handleSingleEntityRequest(SimpleEntitiesExportCtx ctx) throws Exception {
         ctx.add(saveEntityData(ctx, ctx.getRequest().getEntityId()));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleComplexRequest` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `parentCtx`：处理上下文。
+     * 返回：无。
      */
     private void handleComplexRequest(ComplexEntitiesExportCtx parentCtx) {
         ComplexVersionCreateRequest request = parentCtx.getRequest();
@@ -331,107 +275,92 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveEntityData` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建实体。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityId`：实体IDID。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Void> saveEntityData(EntitiesExportCtx<?> ctx, EntityId entityId) throws Exception {
         EntityExportData<ExportableEntity<EntityId>> entityData = exportImportService.exportEntity(ctx, entityId);
         return gitServiceQueue.addToCommit(ctx.getCommit(), entityData);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listEntityVersions` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `branch`：`branch` 参数。
+     * - `externalId`：`externalId`ID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<PageData<EntityVersion>> listEntityVersions(TenantId tenantId, String branch, EntityId externalId, PageLink pageLink) throws Exception {
         return gitServiceQueue.listVersions(tenantId, branch, externalId, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listEntityTypeVersions` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `branch`：`branch` 参数。
+     * - `entityType`：实体对象。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<PageData<EntityVersion>> listEntityTypeVersions(TenantId tenantId, String branch, EntityType entityType, PageLink pageLink) throws Exception {
         return gitServiceQueue.listVersions(tenantId, branch, entityType, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listVersions` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Versions`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `branch`：`branch` 参数。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<PageData<EntityVersion>> listVersions(TenantId tenantId, String branch, PageLink pageLink) throws Exception {
         return gitServiceQueue.listVersions(tenantId, branch, pageLink);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listEntitiesAtVersion` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取版本号。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `versionId`：版本号ID。
+     * - `entityType`：实体对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<VersionedEntityInfo>> listEntitiesAtVersion(TenantId tenantId, String versionId, EntityType entityType) throws Exception {
         return gitServiceQueue.listEntitiesAtVersion(tenantId, versionId, entityType);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listAllEntitiesAtVersion` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取版本号。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `versionId`：版本号ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<VersionedEntityInfo>> listAllEntitiesAtVersion(TenantId tenantId, String versionId) throws Exception {
         return gitServiceQueue.listEntitiesAtVersion(tenantId, versionId);
     }
 
+    /**
+     * 功能：获取版本号。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `request`：请求对象。
+     * 返回：处理结果。
+     */
     @SuppressWarnings({"rawtypes"})
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `loadEntitiesVersion` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public UUID loadEntitiesVersion(User user, VersionLoadRequest request) throws Exception {
         EntitiesImportCtx ctx = new EntitiesImportCtx(UUID.randomUUID(), user, request.getVersionId());
         cachePut(ctx.getRequestId(), VersionLoadResult.empty());
@@ -458,14 +387,12 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doInTemplate` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doInTemplate` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `request`：请求对象。
+     * - `function`：`function` 参数。
+     * 返回：处理结果。
      */
     private <R> VersionLoadResult doInTemplate(EntitiesImportCtx ctx, VersionLoadRequest request, Function<EntitiesImportCtx, VersionLoadResult> function) {
         try {
@@ -492,14 +419,12 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadSingleEntity` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `config`：配置对象。
+     * - `entityData`：待处理数据。
+     * 返回：处理结果。
      */
     private VersionLoadResult loadSingleEntity(EntitiesImportCtx ctx, VersionLoadConfig config, EntityExportData entityData) {
         try {
@@ -525,17 +450,14 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         }
     }
 
-    @SneakyThrows
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadMultipleEntities` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Multiple Entities`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `request`：请求对象。
+     * 返回：处理结果。
      */
+    @SneakyThrows
     private VersionLoadResult loadMultipleEntities(EntitiesImportCtx ctx, EntityTypeVersionLoadRequest request) {
         var sw = TbStopWatch.create("before");
 
@@ -572,14 +494,11 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityImportSettings` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `request`：请求对象。
+     * - `entityType`：实体对象。
+     * 返回：匹配的数据集合。
      */
     private EntityImportSettings getEntityImportSettings(EntityTypeVersionLoadRequest request, EntityType entityType) {
         var config = request.getEntityTypes().get(entityType);
@@ -591,18 +510,15 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
                 .build();
     }
 
+    /**
+     * 功能：执行 `importEntities` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityType`：实体对象。
+     * 返回：无。
+     */
     @SneakyThrows
     @SuppressWarnings({"rawtypes", "unchecked"})
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `importEntities` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     private void importEntities(EntitiesImportCtx ctx, EntityType entityType) {
         int limit = 100;
         int offset = 0;
@@ -636,17 +552,13 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         } while (entityDataList.size() == limit);
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reimport` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `reimport` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private void reimport(EntitiesImportCtx ctx) {
         ctx.setFinalImportAttempt(true);
         ctx.getToReimport().forEach((externalId, task) -> {
@@ -665,14 +577,11 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeOtherEntities` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Other Entities`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityType`：实体对象。
+     * 返回：无。
      */
     private void removeOtherEntities(EntitiesImportCtx ctx, EntityType entityType) {
         DaoUtil.processInBatches(pageLink -> {
@@ -691,28 +600,22 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onError` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理错误信息。
+     * 参数：
+     * - `externalId`：`externalId`ID。
+     * - `e`：`e` 参数。
+     * 返回：处理结果。
      */
     private VersionLoadResult onError(EntityId externalId, Throwable e) {
         return analyze(e, externalId).orElse(VersionLoadResult.error(EntityLoadError.runtimeError(e)));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `analyze` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `analyze` 对应的处理。
+     * 参数：
+     * - `e`：`e` 参数。
+     * - `externalId`：`externalId`ID。
+     * 返回：可能存在的结果。
      */
     private Optional<VersionLoadResult> analyze(Throwable e, EntityId externalId) {
         if (e == null) {
@@ -728,17 +631,15 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `compareEntityDataToVersion` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `compareEntityDataToVersion` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `versionId`：版本号ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<EntityDataDiff> compareEntityDataToVersion(User user, EntityId entityId, String versionId) throws Exception {
         HasId<EntityId> entity = exportableEntitiesService.findEntityByTenantIdAndId(user.getTenantId(), entityId);
         if (!(entity instanceof ExportableEntity)) throw new IllegalArgumentException("Unsupported entity type");
@@ -763,64 +664,51 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
                 }, MoreExecutors.directExecutor());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityDataInfo` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * - `versionId`：版本号ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<EntityDataInfo> getEntityDataInfo(User user, EntityId entityId, String versionId) {
         return Futures.transform(gitServiceQueue.getEntity(user.getTenantId(), versionId, entityId),
                 entity -> new EntityDataInfo(entity.hasRelations(), entity.hasAttributes(), entity.hasCredentials()), MoreExecutors.directExecutor());
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `listBranches` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Branches`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<BranchInfo>> listBranches(TenantId tenantId) throws Exception {
         return gitServiceQueue.listBranches(tenantId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getVersionControlSettings` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取配置。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public RepositorySettings getVersionControlSettings(TenantId tenantId) {
         return repositorySettingsService.get(tenantId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveVersionControlSettings` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建配置。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `versionControlSettings`：配置对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<RepositorySettings> saveVersionControlSettings(TenantId tenantId, RepositorySettings versionControlSettings) {
         checkBranchName(versionControlSettings.getDefaultBranch());
         var restoredSettings = this.repositorySettingsService.restore(tenantId, versionControlSettings);
@@ -833,17 +721,13 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteVersionControlSettings` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理配置。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Void> deleteVersionControlSettings(TenantId tenantId) throws Exception {
         if (repositorySettingsService.delete(tenantId)) {
             return gitServiceQueue.clearRepository(tenantId);
@@ -852,17 +736,14 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkVersionControlAccess` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验版本号。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `settings`：配置对象。
+     * 返回：判断结果。
      */
+    @Override
     public ListenableFuture<Void> checkVersionControlAccess(TenantId tenantId, RepositorySettings settings) throws ThingsboardException {
         checkBranchName(settings.getDefaultBranch());
         settings = this.repositorySettingsService.restore(tenantId, settings);
@@ -874,17 +755,14 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `autoCommit` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `autoCommit` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityId`：实体IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<UUID> autoCommit(User user, EntityId entityId) throws Exception {
         var repositorySettings = repositorySettingsService.get(user.getTenantId());
         if (repositorySettings == null || repositorySettings.isReadOnly()) {
@@ -911,17 +789,15 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
         return saveEntitiesVersion(user, vcr);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `autoCommit` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `autoCommit` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `entityType`：实体对象。
+     * - `entityIds`：实体对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<UUID> autoCommit(User user, EntityType entityType, List<UUID> entityIds) throws Exception {
         var repositorySettings = repositorySettingsService.get(user.getTenantId());
         if (repositorySettings == null || repositorySettings.isReadOnly()) {
@@ -951,14 +827,10 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCauseMessage` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息。
+     * 参数：
+     * - `e`：`e` 参数。
+     * 返回：文本结果。
      */
     private String getCauseMessage(Exception e) {
         String message;
@@ -971,14 +843,12 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerResult` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Result`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityType`：实体对象。
+     * - `importResult`：`importResult` 参数。
+     * 返回：无。
      */
     private void registerResult(EntitiesImportCtx ctx, EntityType entityType, EntityImportResult<?> importResult) {
         if (importResult.isCreated()) {
@@ -989,14 +859,13 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processCommitError` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理错误信息。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `request`：请求对象。
+     * - `commit`：`commit` 参数。
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
     private void processCommitError(User user, VersionCreateRequest request, CommitGitRequest commit, Throwable e) {
         log.debug("[{}] Failed to prepare the commit: {}", user.getId(), request, e);
@@ -1004,14 +873,11 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processLoadError` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理错误信息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
     private void processLoadError(EntitiesImportCtx ctx, Throwable e) {
         log.debug("[{}] Failed to load the commit: {}", ctx.getRequestId(), ctx.getVersionId(), e);
@@ -1019,28 +885,22 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cachePut` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cachePut` 对应的处理。
+     * 参数：
+     * - `requestId`：请求ID。
+     * - `result`：`result` 参数。
+     * 返回：无。
      */
     private void cachePut(UUID requestId, VersionCreationResult result) {
         taskCache.put(requestId, VersionControlTaskCacheEntry.newForExport(result));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cachePut` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cachePut` 对应的处理。
+     * 参数：
+     * - `requestId`：请求ID。
+     * - `result`：`result` 参数。
+     * 返回：处理结果。
      */
     private VersionLoadResult cachePut(UUID requestId, VersionLoadResult result) {
         log.trace("[{}] Cache put: {}", requestId, result);
@@ -1049,14 +909,10 @@ public class DefaultEntitiesVersionControlService implements EntitiesVersionCont
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `persistToCache` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `persistToCache` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
     private void persistToCache(EntitiesImportCtx ctx) {
         cachePut(ctx.getRequestId(), VersionLoadResult.success(new ArrayList<>(ctx.getResults().values())));

@@ -52,36 +52,21 @@ import static org.mockito.BDDMockito.willReturn;
 public abstract class AbstractDeviceProcessorTest extends BaseEdgeProcessorTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `deviceId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备ID，用于定位对应业务对象。
      */
     protected DeviceId deviceId;
     protected DeviceProfileId deviceProfileId;
     /**
-     * 字段说明：
-     * 1. 保存 `deviceProfile` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备配置，保存当前对象的配置选项。
      */
     protected DeviceProfile deviceProfile;
 
-    @BeforeEach
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setUp` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
+    @BeforeEach
     public void setUp() {
         edgeId = new EdgeId(UUID.randomUUID());
         tenantId = new TenantId(UUID.randomUUID());
@@ -95,7 +80,6 @@ public abstract class AbstractDeviceProcessorTest extends BaseEdgeProcessorTest 
         deviceProfile.setType(DeviceProfileType.DEFAULT);
         DeviceProfileData deviceProfileData = new DeviceProfileData();
         deviceProfile.setProfileData(deviceProfileData);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         deviceProfile.setTransportType(DeviceTransportType.DEFAULT);
 
         Device device = new Device();
@@ -116,14 +100,13 @@ public abstract class AbstractDeviceProcessorTest extends BaseEdgeProcessorTest 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateDeviceProfileDefaultFields` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新设备配置。
+     * 参数：
+     * - `expectedDashboardIdMSB`：`expectedDashboardIdMSB` 参数。
+     * - `expectedDashboardIdLSB`：`expectedDashboardIdLSB` 参数。
+     * - `expectedRuleChainIdMSB`：`expectedRuleChainIdMSB` 参数。
+     * - `expectedRuleChainIdLSB`：`expectedRuleChainIdLSB` 参数。
+     * 返回：无。
      */
     protected void updateDeviceProfileDefaultFields(long expectedDashboardIdMSB, long expectedDashboardIdLSB,
                                                     long expectedRuleChainIdMSB, long expectedRuleChainIdLSB) {
@@ -136,14 +119,14 @@ public abstract class AbstractDeviceProcessorTest extends BaseEdgeProcessorTest 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verify` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `verify` 对应的处理。
+     * 参数：
+     * - `downlinkMsg`：待处理消息。
+     * - `expectedDashboardIdMSB`：`expectedDashboardIdMSB` 参数。
+     * - `expectedDashboardIdLSB`：`expectedDashboardIdLSB` 参数。
+     * - `expectedRuleChainIdMSB`：`expectedRuleChainIdMSB` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void verify(DownlinkMsg downlinkMsg, long expectedDashboardIdMSB, long expectedDashboardIdLSB,
                           long expectedRuleChainIdMSB, long expectedRuleChainIdLSB) {

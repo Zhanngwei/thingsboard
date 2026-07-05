@@ -40,21 +40,19 @@ import java.util.Optional;
 public final class RuleEngineDeviceRpcResponse {
 
     /**
-     * 中文说明：响应所属设备标识，来源于请求上下文或传输会话；生命周期用于把响应关联回原 RPC 请求。
+     * 设备ID，用于定位对应业务对象。
      */
     private final DeviceId deviceId;
     /**
-     * 中文说明：响应对应的请求 ID，来源于原始 RPC 请求；生命周期用于会话内请求/响应匹配。
+     * 请求ID，用于定位对应业务对象。
      */
     private final int requestId;
     /**
-     * 中文说明：设备返回的成功响应体，来源于设备传输层；生命周期随回调消费结束。
-     * 设计为 Optional 是为了明确表达可能没有成功响应。
+     * 当前响应对象，封装处理完成后的返回信息。
      */
     private final Optional<String> response;
     /**
-     * 中文说明：RPC 错误信息，来源于超时、设备离线、传输失败或服务端处理失败；生命周期随回调消费结束。
-     * 设计为 Optional 是为了与成功响应互斥表达，避免使用 null 传递错误语义。
+     * 错误信息，记录当前处理过程中的失败原因。
      */
     private final Optional<RpcError> error;
 

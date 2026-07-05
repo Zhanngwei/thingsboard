@@ -33,9 +33,6 @@ import java.util.function.Consumer;
 
 import static org.thingsboard.server.dao.model.ModelConstants.NULL_UUID;
 
-@Slf4j
-@Service
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbCoreToTransportService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -46,78 +43,63 @@ import static org.thingsboard.server.dao.model.ModelConstants.NULL_UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Slf4j
+@Service
+@TbCoreComponent
 public class DefaultTbCoreToTransportService implements TbCoreToTransportService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `topicService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主题，提供当前类调用的业务操作。
      */
     private final TopicService topicService;
     private final TbQueueProducer<TbProtoQueueMsg<ToTransportMsg>> tbTransportProducer;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultTbCoreToTransportService` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultTbCoreToTransportService` 实例，并初始化必要字段。
+     * 参数：
+     * - `topicService`：服务对象。
+     * - `tbQueueProducerProvider`：队列名称或队列对象。
+     * 返回：新创建的对象实例。
      */
     public DefaultTbCoreToTransportService(TopicService topicService, TbQueueProducerProvider tbQueueProducerProvider) {
         this.topicService = topicService;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.tbTransportProducer = tbQueueProducerProvider.getTransportNotificationsMsgProducer();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `process` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `process` 对应的处理。
+     * 参数：
+     * - `nodeId`：节点实例ID。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void process(String nodeId, ToTransportMsg msg) {
         process(nodeId, msg, null, null);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `process` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `process` 对应的处理。
+     * 参数：
+     * - `nodeId`：节点实例ID。
+     * - `msg`：待处理消息。
+     * - `onSuccess`：`onSuccess` 参数。
+     * - `onFailure`：`onFailure` 参数。
+     * 返回：无。
      */
+    @Override
     public void process(String nodeId, ToTransportMsg msg, Runnable onSuccess, Consumer<Throwable> onFailure) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (nodeId == null || nodeId.isEmpty()) {
             log.trace("process: skipping message without nodeId [{}], (ToTransportMsg) msg [{}]", nodeId, msg);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (onSuccess != null) {
                 onSuccess.run();
             }
             return;
         }
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TopicPartitionInfo tpi = topicService.getNotificationsTopic(ServiceType.TB_TRANSPORT, nodeId);
         UUID sessionId = new UUID(msg.getSessionIdMSB(), msg.getSessionIdLSB());
         log.trace("[{}][{}] Pushing session data to topic: {}", tpi.getFullTopicName(), sessionId, msg);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TbProtoQueueMsg<ToTransportMsg> queueMsg = new TbProtoQueueMsg<>(NULL_UUID, msg);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         tbTransportProducer.send(tpi, queueMsg, new QueueCallbackAdaptor(onSuccess, onFailure));
     }
 
@@ -133,12 +115,7 @@ public class DefaultTbCoreToTransportService implements TbCoreToTransportService
      */
     private static class QueueCallbackAdaptor implements TbQueueCallback {
         /**
-         * 字段说明：
-         * 1. 保存 `onSuccess` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `onSuccess` 字段，保存当前对象的对应属性。
          */
         private final Runnable onSuccess;
         private final Consumer<Throwable> onFailure;
@@ -148,37 +125,27 @@ public class DefaultTbCoreToTransportService implements TbCoreToTransportService
             this.onFailure = onFailure;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `metadata`：待处理数据。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(TbQueueMsgMetadata metadata) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (onSuccess != null) {
                 onSuccess.run();
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onFailure` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理失败信息。
+         * 参数：
+         * - `t`：`t` 参数。
+         * 返回：无。
          */
+        @Override
         public void onFailure(Throwable t) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (onFailure != null) {
                 onFailure.accept(t);
             }

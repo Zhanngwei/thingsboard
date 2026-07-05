@@ -30,14 +30,10 @@ import org.thingsboard.server.common.data.id.TenantId;
 public class VoidGitRequest extends PendingGitRequest<Void> {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `VoidGitRequest` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `VoidGitRequest` 实例，并初始化必要字段。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：新创建的对象实例。
      */
     public VoidGitRequest(TenantId tenantId) {
         super(tenantId);

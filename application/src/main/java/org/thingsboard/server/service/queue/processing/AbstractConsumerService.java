@@ -58,7 +58,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractConsumerService` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
@@ -69,89 +68,55 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
  */
+@Slf4j
 public abstract class AbstractConsumerService<N extends com.google.protobuf.GeneratedMessageV3> extends TbApplicationEventListener<PartitionChangeEvent> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `notificationsConsumerExecutor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器，负责处理对应任务或消息。
      */
     protected volatile ExecutorService notificationsConsumerExecutor;
     protected volatile boolean stopped = false;
     /**
-     * 字段说明：
-     * 1. 保存 `isReady` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前对象是否已准备就绪。
      */
     protected volatile boolean isReady = false;
     protected final ActorSystemContext actorContext;
     /**
-     * 字段说明：
-     * 1. 保存 `encodingService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     protected final DataDecodingEncodingService encodingService;
     protected final TbTenantProfileCache tenantProfileCache;
     /**
-     * 字段说明：
-     * 1. 保存 `deviceProfileCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备配置，保存当前对象的配置选项。
      */
     protected final TbDeviceProfileCache deviceProfileCache;
     protected final TbAssetProfileCache assetProfileCache;
     /**
-     * 字段说明：
-     * 1. 保存 `apiUsageStateService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 状态，提供当前类调用的业务操作。
      */
     protected final TbApiUsageStateService apiUsageStateService;
     protected final PartitionService partitionService;
     /**
-     * 字段说明：
-     * 1. 保存 `eventPublisher` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 事件，表示当前对象的对应属性。
      */
     protected final ApplicationEventPublisher eventPublisher;
 
     /**
-     * 字段说明：
-     * 1. 保存 `nfConsumer` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息消费者，承载当前流程需要传递的内容。
      */
     protected final TbQueueConsumer<TbProtoQueueMsg<N>> nfConsumer;
     protected final JwtSettingsService jwtSettingsService;
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `AbstractConsumerService` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `AbstractConsumerService` 实例，并初始化必要字段。
+     * 参数：
+     * - `actorContext`：处理上下文。
+     * - `encodingService`：服务对象。
+     * - `tenantProfileCache`：租户信息或租户标识。
+     * - `deviceProfileCache`：设备信息或设备标识。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public AbstractConsumerService(ActorSystemContext actorContext, DataDecodingEncodingService encodingService,
                                    TbTenantProfileCache tenantProfileCache, TbDeviceProfileCache deviceProfileCache,
@@ -160,11 +125,8 @@ public abstract class AbstractConsumerService<N extends com.google.protobuf.Gene
                                    TbQueueConsumer<TbProtoQueueMsg<N>> nfConsumer, JwtSettingsService jwtSettingsService) {
         this.actorContext = actorContext;
         this.encodingService = encodingService;
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         this.tenantProfileCache = tenantProfileCache;
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         this.deviceProfileCache = deviceProfileCache;
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         this.assetProfileCache = assetProfileCache;
         this.apiUsageStateService = apiUsageStateService;
         this.partitionService = partitionService;
@@ -174,30 +136,22 @@ public abstract class AbstractConsumerService<N extends com.google.protobuf.Gene
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `nfConsumerThreadName`：名称。
+     * 返回：无。
      */
     public void init(String nfConsumerThreadName) {
         this.notificationsConsumerExecutor = Executors.newSingleThreadExecutor(ThingsBoardThreadFactory.forName(nfConsumerThreadName));
     }
 
-    @AfterStartUp(order = AfterStartUp.REGULAR_SERVICE)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onApplicationEvent` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @AfterStartUp(order = AfterStartUp.REGULAR_SERVICE)
     public void onApplicationEvent(ApplicationReadyEvent event) {
         log.info("Subscribing to notifications: {}", nfConsumer.getTopic());
         this.nfConsumer.subscribe();
@@ -206,98 +160,62 @@ public abstract class AbstractConsumerService<N extends com.google.protobuf.Gene
         launchMainConsumers();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `filterTbApplicationEvent` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `filterTbApplicationEvent` 对应的处理。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：判断结果。
      */
+    @Override
     protected boolean filterTbApplicationEvent(PartitionChangeEvent event) {
         return event.getServiceType() == getServiceType();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getServiceType` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取类型。
+     * 参数：无。
+     * 返回：处理结果。
      */
     protected abstract ServiceType getServiceType();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `launchMainConsumers` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `launchMainConsumers` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     protected abstract void launchMainConsumers();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stopConsumers` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭`Consumers`。
+     * 参数：无。
+     * 返回：无。
      */
     protected abstract void stopConsumers();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationPollDuration` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取轮询间隔。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected abstract long getNotificationPollDuration();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationPackProcessingTimeout` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取版本包处理超时时间。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected abstract long getNotificationPackProcessingTimeout();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `launchNotificationsConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `launchNotificationsConsumer` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     protected void launchNotificationsConsumer() {
         notificationsConsumerExecutor.submit(() -> {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             while (!stopped) {
                 try {
                     List<TbProtoQueueMsg<N>> msgs = nfConsumer.poll(getNotificationPollDuration());
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (msgs.isEmpty()) {
                         continue;
                     }
@@ -314,26 +232,21 @@ public abstract class AbstractConsumerService<N extends com.google.protobuf.Gene
                         TbCallback callback = new TbPackCallback<>(id, ctx);
                         try {
                             handleNotification(id, msg, callback);
-                        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                         } catch (Throwable e) {
                             log.warn("[{}] Failed to process notification: {}", id, msg, e);
                             callback.onFailure(e);
                         }
                     });
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!processingTimeoutLatch.await(getNotificationPackProcessingTimeout(), TimeUnit.MILLISECONDS)) {
                         ctx.getAckMap().forEach((id, msg) -> log.warn("[{}] Timeout to process notification: {}", id, msg.getValue()));
                         ctx.getFailedMap().forEach((id, msg) -> log.warn("[{}] Failed to process notification: {}", id, msg.getValue()));
                     }
                     nfConsumer.commit();
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (Exception e) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!stopped) {
                         log.warn("Failed to obtain notifications from queue.", e);
                         try {
                             Thread.sleep(getNotificationPollDuration());
-                        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                         } catch (InterruptedException e2) {
                             log.trace("Failed to wait until the server has capacity to handle new notifications", e2);
                         }
@@ -345,23 +258,18 @@ public abstract class AbstractConsumerService<N extends com.google.protobuf.Gene
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleComponentLifecycleMsg` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `id`：`id`ID。
+     * - `componentLifecycleMsg`：待处理消息。
+     * 返回：无。
      */
     protected final void handleComponentLifecycleMsg(UUID id, ComponentLifecycleMsg componentLifecycleMsg) {
         TenantId tenantId = componentLifecycleMsg.getTenantId();
         log.debug("[{}][{}][{}] Received Lifecycle event: {}", tenantId, componentLifecycleMsg.getEntityId().getEntityType(),
                 componentLifecycleMsg.getEntityId(), componentLifecycleMsg.getEvent());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (EntityType.TENANT_PROFILE.equals(componentLifecycleMsg.getEntityId().getEntityType())) {
             TenantProfileId tenantProfileId = new TenantProfileId(componentLifecycleMsg.getEntityId().getId());
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             tenantProfileCache.evict(tenantProfileId);
             if (componentLifecycleMsg.getEvent().equals(ComponentLifecycleEvent.UPDATED)) {
                 apiUsageStateService.onTenantProfileUpdate(tenantProfileId);
@@ -404,28 +312,21 @@ public abstract class AbstractConsumerService<N extends com.google.protobuf.Gene
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleNotification` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理通知。
+     * 参数：
+     * - `id`：`id`ID。
+     * - `msg`：待处理消息。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     protected abstract void handleNotification(UUID id, TbProtoQueueMsg<N> msg, TbCallback callback) throws Exception;
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void destroy() {
         stopped = true;
         stopConsumers();

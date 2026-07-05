@@ -51,46 +51,60 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
 /**
- * 测试目标：验证 {@code TbMsgPushToEdgeNodeTest} 覆盖的 边缘同步节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbMsgPushToEdgeNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbMsgPushToEdgeNodeTest` 测试类，用于验证 `TbMsgPushToEdgeNode` 相关行为。
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TbMsgPushToEdgeNodeTest {
 
-    /** 测试常量字段：{@code MISC_EVENTS} 保存 {@code List<TbMsgType>} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `MISC_EVENTS`常量，用于统一引用固定值。
+     */
     private static final List<TbMsgType> MISC_EVENTS = List.of(TbMsgType.CONNECT_EVENT, TbMsgType.DISCONNECT_EVENT,
-            /** 可变 fixture 字段：{@code TbMsgType} 保存 {@code TbMsgType.ACTIVITY_EVENT,} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+            /**
+             * 消息，用于区分不同处理分支。
+             */
             TbMsgType.ACTIVITY_EVENT, TbMsgType.INACTIVITY_EVENT);
 
-    /** 可变 fixture 字段：{@code node} 保存 {@code TbMsgPushToEdgeNode} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，表示当前对象的对应属性。
+     */
     TbMsgPushToEdgeNode node;
 
-    /** 固定 fixture 字段：{@code tenantId} 保存 {@code TenantId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * 租户ID，用于定位对应业务对象。
+     */
     private final TenantId tenantId = TenantId.fromUUID(UUID.randomUUID());
-    /** 固定 fixture 字段：{@code deviceId} 保存 {@code DeviceId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * 设备ID，用于定位对应业务对象。
+     */
     private final DeviceId deviceId = new DeviceId(UUID.randomUUID());
 
-    /** Mock 依赖字段：{@code ctx} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctx;
 
-    /** Mock 依赖字段：{@code edgeService} 保存 {@code EdgeService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 边缘节点，提供当前类调用的业务操作。
+     */
     @Mock
     private EdgeService edgeService;
-    /** Mock 依赖字段：{@code edgeEventService} 保存 {@code EdgeEventService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 边缘节点，提供当前类调用的业务操作。
+     */
     @Mock
     private EdgeEventService edgeEventService;
-    /** Mock 依赖字段：{@code dbCallbackExecutor} 保存 {@code ListeningExecutor} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 回调列表，用于保存一组待处理对象。
+     */
     @Mock
     private ListeningExecutor dbCallbackExecutor;
 
     /**
-     * 生命周期方法：{@code setUp} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
     @Before
     public void setUp() throws TbNodeException {
@@ -100,15 +114,12 @@ public class TbMsgPushToEdgeNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code ackMsgInCaseNoEdgeRelated} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：执行 `ackMsgInCaseNoEdgeRelated` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void ackMsgInCaseNoEdgeRelated() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Mockito.when(ctx.getTenantId()).thenReturn(tenantId);
         Mockito.when(ctx.getEdgeService()).thenReturn(edgeService);
         Mockito.when(edgeService.findRelatedEdgeIdsByEntityId(tenantId, deviceId, new PageLink(TbMsgPushToEdgeNode.DEFAULT_PAGE_SIZE))).thenReturn(new PageData<>());
@@ -122,15 +133,12 @@ public class TbMsgPushToEdgeNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testAttributeUpdateMsg_userEntity} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证用户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testAttributeUpdateMsg_userEntity() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Mockito.when(ctx.getTenantId()).thenReturn(tenantId);
         Mockito.when(ctx.getEdgeService()).thenReturn(edgeService);
         Mockito.when(ctx.getEdgeEventService()).thenReturn(edgeEventService);
@@ -151,15 +159,12 @@ public class TbMsgPushToEdgeNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testMiscEventsProcessedAsAttributesUpdated} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证`Misc Events Processed As Attributes Updated`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testMiscEventsProcessedAsAttributesUpdated() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         for (var event : MISC_EVENTS) {
             TbMsgMetaData metaData = new TbMsgMetaData();
             metaData.putValue(DataConstants.SCOPE, DataConstants.SERVER_SCOPE);
@@ -168,24 +173,25 @@ public class TbMsgPushToEdgeNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testMiscEventsProcessedAsTimeseriesUpdated} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证时序数据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testMiscEventsProcessedAsTimeseriesUpdated() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         for (var event : MISC_EVENTS) {
             testEvent(event, TbMsgMetaData.EMPTY, EdgeEventActionType.TIMESERIES_UPDATED, "data");
         }
     }
 
     /**
-     * 辅助方法：{@code testEvent} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证事件相关场景。
+     * 参数：
+     * - `event`：`event` 参数。
+     * - `metaData`：待处理数据。
+     * - `expectedType`：类型。
+     * - `dataKey`：待处理数据。
+     * 返回：无。
      */
     private void testEvent(TbMsgType event, TbMsgMetaData metaData, EdgeEventActionType expectedType, String dataKey) {
         Mockito.when(ctx.getTenantId()).thenReturn(tenantId);

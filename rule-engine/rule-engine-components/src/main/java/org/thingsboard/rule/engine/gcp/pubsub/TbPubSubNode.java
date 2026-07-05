@@ -43,6 +43,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+    /**
+     * 字段名，表示当前对象的对应属性。
+     */
 @Slf4j
 @RuleNode(
         type = ComponentType.EXTERNAL,
@@ -56,35 +59,11 @@ import java.util.concurrent.TimeUnit;
         configDirective = "tbExternalNodePubSubConfig",
         iconUrl = "data:image/svg+xml;base64,PHN2ZyBpZD0iTGF5ZXJfMSIgZGF0YS1uYW1lPSJMYXllciAxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTI4IDEyOCI+Cjx0aXRsZT5DbG91ZCBQdWJTdWI8L3RpdGxlPgo8Zz4KPHBhdGggZD0iTTEyNi40Nyw1OC4xMmwtMjYuMy00NS43NEExMS41NiwxMS41NiwwLDAsMCw5MC4zMSw2LjVIMzcuN2ExMS41NSwxMS41NSwwLDAsMC05Ljg2LDUuODhMMS41Myw1OGExMS40OCwxMS40OCwwLDAsMCwwLDExLjQ0bDI2LjMsNDZhMTEuNzcsMTEuNzcsMCwwLDAsOS44Niw2LjA5SDkwLjNhMTEuNzMsMTEuNzMsMCwwLDAsOS44Ny02LjA2bDI2LjMtNDUuNzRBMTEuNzMsMTEuNzMsMCwwLDAsMTI2LjQ3LDU4LjEyWiIgc3R5bGU9ImZpbGw6ICM3MzViMmYiLz4KPHBhdGggZD0iTTg5LjIyLDQ3Ljc0LDgzLjM2LDQ5bC0xNC42LTE0LjZMNjQuMDksNDMuMSw2MS41NSw1My4ybDQuMjksNC4yOUw1Ny42LDU5LjE4LDQ2LjMsNDcuODhsLTcuNjcsNy4zOEw1Mi43Niw2OS4zN2wtMTUsMTEuOUw3OCwxMjEuNUg5MC4zYTExLjczLDExLjczLDAsMCwwLDkuODctNi4wNmwyMC43Mi0zNloiIHN0eWxlPSJvcGFjaXR5OiAwLjA3MDAwMDAwMDI5ODAyMztpc29sYXRpb246IGlzb2xhdGUiLz4KPHBhdGggZD0iTTgyLjg2LDQ3YTUuMzIsNS4zMiwwLDEsMS0xLjk1LDcuMjdBNS4zMiw1LjMyLDAsMCwxLDgyLjg2LDQ3IiBzdHlsZT0iZmlsbDogI2ZmZiIvPgo8cGF0aCBkPSJNMzkuODIsNTYuMThhNS4zMiw1LjMyLDAsMSwxLDcuMjctMS45NSw1LjMyLDUuMzIsMCwwLDEtNy4yNywxLjk1IiBzdHlsZT0iZmlsbDogI2ZmZiIvPgo8cGF0aCBkPSJNNjkuMzIsODguODVBNS4zMiw1LjMyLDAsMSwxLDY0LDgzLjUyYTUuMzIsNS4zMiwwLDAsMSw1LjMyLDUuMzIiIHN0eWxlPSJmaWxsOiAjZmZmIi8+CjxnPgo8cGF0aCBkPSJNNjQsNTIuOTRhMTEuMDYsMTEuMDYsMCwwLDEsMi40Ni4yOFYzOS4xNUg2MS41NFY1My4yMkExMS4wNiwxMS4wNiwwLDAsMSw2NCw1Mi45NFoiIHN0eWxlPSJmaWxsOiAjZmZmIi8+CjxwYXRoIGQ9Ik03NC41Nyw2Ny4yNmExMSwxMSwwLDAsMS0yLjQ3LDQuMjVsMTIuMTksNywyLjQ2LTQuMjZaIiBzdHlsZT0iZmlsbDogI2ZmZiIvPgo8cGF0aCBkPSJNNTMuNDMsNjcuMjZsLTEyLjE4LDcsMi40Niw0LjI2LDEyLjE5LTdBMTEsMTEsMCwwLDEsNTMuNDMsNjcuMjZaIiBzdHlsZT0iZmlsbDogI2ZmZiIvPgo8L2c+CjxwYXRoIGQ9Ik03Mi42LDY0QTguNiw4LjYsMCwxLDEsNjQsNTUuNCw4LjYsOC42LDAsMCwxLDcyLjYsNjQiIHN0eWxlPSJmaWxsOiAjZmZmIi8+CjxwYXRoIGQ9Ik0zOS4xLDcwLjU3YTYuNzYsNi43NiwwLDEsMS0yLjQ3LDkuMjMsNi43Niw2Ljc2LDAsMCwxLDIuNDctOS4yMyIgc3R5bGU9ImZpbGw6ICNmZmYiLz4KPHBhdGggZD0iTTgyLjE0LDgyLjI3YTYuNzYsNi43NiwwLDEsMSw5LjIzLTIuNDcsNi43NSw2Ljc1LDAsMCwxLTkuMjMsMi40NyIgc3R5bGU9ImZpbGw6ICNmZmYiLz4KPHBhdGggZD0iTTcwLjc2LDM5LjE1QTYuNzYsNi43NiwwLDEsMSw2NCwzMi4zOWE2Ljc2LDYuNzYsMCwwLDEsNi43Niw2Ljc2IiBzdHlsZT0iZmlsbDogI2ZmZiIvPgo8L2c+Cjwvc3ZnPgo="
 )
-/**
- * GCP Pub/Sub 外部发布节点，直接持有 Google Publisher 并发布消息到 Pub/Sub Topic。
- * 本类不直接访问数据库或缓存；发布结果通过 Google ApiFuture 回调路由到 Rule Engine 成功或失败。
- */
 public class TbPubSubNode extends TbAbstractExternalNode {
-
-    /**
-     * Pub/Sub 发布结果 messageId 写入消息元数据时使用的键名。
-     */
     private static final String MESSAGE_ID = "messageId";
-    /**
-     * Pub/Sub 发布异常写入消息元数据时使用的键名。
-     */
     private static final String ERROR = "error";
-
-    /**
-     * Pub/Sub 节点配置，包含项目、Topic、属性和服务账号密钥。
-     */
     private TbPubSubNodeConfiguration config;
-    /**
-     * Google Pub/Sub Publisher 客户端，生命周期由 init/destroy 管理。
-     */
     private Publisher pubSubClient;
-
-    /**
-     * 初始化 Google Pub/Sub Publisher。
-     * 本方法直接创建云 SDK 客户端；项目、Topic、服务账号密钥和执行器来自配置与上下文。
-     * 本方法本身不直接访问数据库或缓存，线程安全依赖 Publisher 实现。
-     */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         super.init(ctx);
@@ -95,21 +74,11 @@ public class TbPubSubNode extends TbAbstractExternalNode {
             throw new TbNodeException(e);
         }
     }
-
-    /**
-     * 处理 Rule Engine 消息并调用 Pub/Sub 异步发布。
-     * 消息先经 ackIfNeeded 处理确认关系；SDK future 回调决定 Success 或 Failure。
-     */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         msg = ackIfNeeded(ctx, msg);
         publishMessage(ctx, msg);
     }
-
-    /**
-     * 关闭 Pub/Sub Publisher 并等待短时间终止。
-     * 本方法直接结束云 SDK 客户端生命周期，不处理消息确认或失败路由。
-     */
     @Override
     public void destroy() {
         if (this.pubSubClient != null) {
@@ -123,15 +92,17 @@ public class TbPubSubNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 构造 PubsubMessage 并调用 Publisher.publish。
-     * 消息属性来自配置模板；外部调用边界是 pubSubClient.publish，结果通过 ApiFutureCallback 异步返回。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     private void publishMessage(TbContext ctx, TbMsg msg) {
         ByteString data = ByteString.copyFromUtf8(msg.getData());
         PubsubMessage.Builder pubsubMessageBuilder = PubsubMessage.newBuilder();
         pubsubMessageBuilder.setData(data);
         this.config.getMessageAttributes().forEach((k, v) -> {
-            // Pub/Sub attribute 的键和值都支持基于当前 TbMsg 解析。
             String name = TbNodeUtils.processPattern(k, msg);
             String val = TbNodeUtils.processPattern(v, msg);
             pubsubMessageBuilder.putAttributes(name, val);
@@ -139,8 +110,10 @@ public class TbPubSubNode extends TbAbstractExternalNode {
         ApiFuture<String> messageIdFuture = this.pubSubClient.publish(pubsubMessageBuilder.build());
         ApiFutures.addCallback(messageIdFuture, new ApiFutureCallback<String>() {
                     /**
-                     * Pub/Sub 发布成功回调，将 messageId 写入元数据并走 Success。
-                     * 回调通过 externalCallExecutor 执行，不直接访问数据库或缓存。
+                     * 功能：处理`on Success`。
+                     * 参数：
+                     * - `messageId`：消息ID。
+                     * 返回：无。
                      */
                     public void onSuccess(String messageId) {
                         TbMsg next = processPublishResult(msg, messageId);
@@ -148,8 +121,10 @@ public class TbPubSubNode extends TbAbstractExternalNode {
                     }
 
                     /**
-                     * Pub/Sub 发布失败回调，将异常写入元数据并走 Failure。
-                     * 失败来源通常是 Google SDK 或网络调用链。
+                     * 功能：处理失败信息。
+                     * 参数：
+                     * - `t`：`t` 参数。
+                     * 返回：无。
                      */
                     public void onFailure(Throwable t) {
                         TbMsg next = processException(msg, t);
@@ -160,8 +135,11 @@ public class TbPubSubNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 将 Pub/Sub 返回的 messageId 写入消息元数据。
-     * 本方法只处理本地消息副本，不直接访问 Pub/Sub、数据库或缓存。
+     * 功能：处理`Publish Result`。
+     * 参数：
+     * - `origMsg`：待处理消息。
+     * - `messageId`：消息ID。
+     * 返回：处理结果。
      */
     private TbMsg processPublishResult(TbMsg origMsg, String messageId) {
         TbMsgMetaData metaData = origMsg.getMetaData().copy();
@@ -170,8 +148,11 @@ public class TbPubSubNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 将 Pub/Sub 发布异常写入消息元数据。
-     * 本方法供 Failure 路由携带错误信息，不直接执行外部调用。
+     * 功能：处理`Exception`。
+     * 参数：
+     * - `origMsg`：待处理消息。
+     * - `t`：`t` 参数。
+     * 返回：处理结果。
      */
     private TbMsg processException(TbMsg origMsg, Throwable t) {
         TbMsgMetaData metaData = origMsg.getMetaData().copy();
@@ -180,8 +161,10 @@ public class TbPubSubNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 创建 Google Pub/Sub Publisher 客户端。
-     * 服务账号密钥从配置字符串解析，重试和执行器在此绑定；本方法不直接发布消息。
+     * 功能：初始化或启动客户端。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：处理结果。
      */
     private Publisher initPubSubClient(TbContext ctx) throws IOException {
         ProjectTopicName topicName = ProjectTopicName.of(config.getProjectId(), config.getTopicName());

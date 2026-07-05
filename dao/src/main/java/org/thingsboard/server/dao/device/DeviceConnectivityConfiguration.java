@@ -23,10 +23,6 @@ import org.springframework.context.annotation.Profile;
 import java.util.HashMap;
 import java.util.Map;
 
-@Profile("install")
-@Configuration
-@ConfigurationProperties(prefix = "device")
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`DeviceConnectivityConfiguration` 是 ThingsBoard DAO 模块 中的设备持久化服务类型，用于维护设备、凭据、配置、声明、连接状态和设备画像相关的数据库访问流程。
@@ -38,36 +34,28 @@ import java.util.Map;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Service / Repository / Factory。
  */
+@Profile("install")
+@Configuration
+@ConfigurationProperties(prefix = "device")
+@Data
 public class DeviceConnectivityConfiguration {
     private Map<String, DeviceConnectivityInfo> connectivity = new HashMap<>();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getConnectivity` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`Connectivity`。
+     * 参数：
+     * - `protocol`：`protocol` 参数。
+     * 返回：处理结果。
      */
     public DeviceConnectivityInfo getConnectivity(String protocol) {
         return connectivity.get(protocol);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isEnabled` 对应的设备持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由设备创建、认证、更新、删除、声明或传输层认证流程触发，随事务完成后释放上下文时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：围绕租户和设备标识执行校验、DAO 调用、缓存失效、审计记录和下游通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：判断`Enabled`。
+     * 参数：
+     * - `protocol`：`protocol` 参数。
+     * 返回：判断结果。
      */
     public boolean isEnabled(String protocol) {
         var info = connectivity.get(protocol);

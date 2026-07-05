@@ -47,8 +47,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-@Service
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`EdgeGrpcClient` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -59,132 +57,79 @@ import java.util.function.Consumer;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Service
+@Slf4j
 public class EdgeGrpcClient implements EdgeRpcClient {
 
+    /**
+     * 主机地址，用于描述服务监听或访问地址。
+     */
     @Value("${cloud.rpc.host}")
-    /**
-     * 字段说明：
-     * 1. 保存 `rpcHost` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String rpcHost;
+    /**
+     * 端口号，用于描述服务监听或访问地址。
+     */
     @Value("${cloud.rpc.port}")
-    /**
-     * 字段说明：
-     * 1. 保存 `rpcPort` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int rpcPort;
+    /**
+     * 超时时间，用于控制时间范围或等待时长。
+     */
     @Value("${cloud.rpc.timeout}")
-    /**
-     * 字段说明：
-     * 1. 保存 `timeoutSecs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int timeoutSecs;
+    /**
+     * 时间，用于控制时间范围或等待时长。
+     */
     @Value("${cloud.rpc.keep_alive_time_sec:10}")
-    /**
-     * 字段说明：
-     * 1. 保存 `keepAliveTimeSec` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int keepAliveTimeSec;
+    /**
+     * 超时时间，用于控制时间范围或等待时长。
+     */
     @Value("${cloud.rpc.keep_alive_timeout_sec:5}")
-    /**
-     * 字段说明：
-     * 1. 保存 `keepAliveTimeoutSec` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int keepAliveTimeoutSec;
+    /**
+     * 是否启用 SSL。
+     */
     @Value("${cloud.rpc.ssl.enabled}")
-    /**
-     * 字段说明：
-     * 1. 保存 `sslEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean sslEnabled;
+    /**
+     * `certResource` 字段，保存当前对象的对应属性。
+     */
     @Value("${cloud.rpc.ssl.cert:}")
-    /**
-     * 字段说明：
-     * 1. 保存 `certResource` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String certResource;
+    /**
+     * 消息，承载当前步骤需要处理的内容。
+     */
     @Value("${cloud.rpc.max_inbound_message_size:4194304}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxInboundMessageSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxInboundMessageSize;
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `serverMaxInboundMessageSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
+    @Getter
     private int serverMaxInboundMessageSize;
 
     /**
-     * 字段说明：
-     * 1. 保存 `channel` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 网络通道，表示当前网络连接使用的通道。
      */
     private ManagedChannel channel;
 
     /**
-     * 字段说明：
-     * 1. 保存 `inputStream` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `inputStream` 字段，保存当前对象的对应属性。
      */
     private StreamObserver<RequestMsg> inputStream;
 
     private static final ReentrantLock uplinkMsgLock = new ReentrantLock();
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `connect` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `connect` 对应的处理。
+     * 参数：
+     * - `edgeKey`：键。
+     * - `edgeSecret`：`edgeSecret` 参数。
+     * - `onUplinkResponse`：响应对象。
+     * - `onEdgeUpdate`：`onEdgeUpdate` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void connect(String edgeKey,
                         String edgeSecret,
                         Consumer<UplinkResponseMsg> onUplinkResponse,
@@ -196,16 +141,13 @@ public class EdgeGrpcClient implements EdgeRpcClient {
                 .keepAliveTime(keepAliveTimeSec, TimeUnit.SECONDS)
                 .keepAliveTimeout(keepAliveTimeoutSec, TimeUnit.SECONDS)
                 .keepAliveWithoutCalls(true);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sslEnabled) {
             try {
                 SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (StringUtils.isNotEmpty(certResource)) {
                     sslContextBuilder.trustManager(ResourceUtils.getInputStream(this, certResource));
                 }
                 builder.sslContext(sslContextBuilder.build());
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (SSLException e) {
                 log.error("Failed to initialize channel!", e);
                 throw new RuntimeException(e);
@@ -229,14 +171,14 @@ public class EdgeGrpcClient implements EdgeRpcClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initOutputStream` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Output Stream`。
+     * 参数：
+     * - `edgeKey`：键。
+     * - `onUplinkResponse`：响应对象。
+     * - `onEdgeUpdate`：`onEdgeUpdate` 参数。
+     * - `onDownlink`：`onDownlink` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     private StreamObserver<ResponseMsg> initOutputStream(String edgeKey,
                                                          Consumer<UplinkResponseMsg> onUplinkResponse,
@@ -246,12 +188,9 @@ public class EdgeGrpcClient implements EdgeRpcClient {
         return new StreamObserver<>() {
             @Override
             public void onNext(ResponseMsg responseMsg) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (responseMsg.hasConnectResponseMsg()) {
                     ConnectResponseMsg connectResponseMsg = responseMsg.getConnectResponseMsg();
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (connectResponseMsg.getResponseCode().equals(ConnectResponseCode.ACCEPTED)) {
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (connectResponseMsg.hasMaxInboundMessageSize()) {
                             log.debug("[{}] Server max inbound message size: {}", edgeKey, connectResponseMsg.getMaxInboundMessageSize());
                             serverMaxInboundMessageSize = connectResponseMsg.getMaxInboundMessageSize();
@@ -262,21 +201,17 @@ public class EdgeGrpcClient implements EdgeRpcClient {
                         log.error("[{}] Failed to establish the connection! Code: {}. Error message: {}.", edgeKey, connectResponseMsg.getResponseCode(), connectResponseMsg.getErrorMsg());
                         try {
                             EdgeGrpcClient.this.disconnect(true);
-                        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                         } catch (InterruptedException e) {
                             log.error("[{}] Got interruption during disconnect!", edgeKey, e);
                         }
                         onError.accept(new EdgeConnectionException("Failed to establish the connection! Response code: " + connectResponseMsg.getResponseCode().name()));
                     }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (responseMsg.hasEdgeUpdateMsg()) {
                     log.debug("[{}] Edge update message received {}", edgeKey, responseMsg.getEdgeUpdateMsg());
                     onEdgeUpdate.accept(responseMsg.getEdgeUpdateMsg().getConfiguration());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (responseMsg.hasUplinkResponseMsg()) {
                     log.debug("[{}] Uplink response message received {}", edgeKey, responseMsg.getUplinkResponseMsg());
                     onUplinkResponse.accept(responseMsg.getUplinkResponseMsg());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (responseMsg.hasDownlinkMsg()) {
                     log.debug("[{}] Downlink message received {}", edgeKey, responseMsg.getDownlinkMsg());
                     onDownlink.accept(responseMsg.getDownlinkMsg());
@@ -288,7 +223,6 @@ public class EdgeGrpcClient implements EdgeRpcClient {
                 log.warn("[{}] Stream was terminated due to error:", edgeKey, t);
                 try {
                     EdgeGrpcClient.this.disconnect(true);
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (InterruptedException e) {
                     log.error("[{}] Got interruption during disconnect!", edgeKey, e);
                 }
@@ -302,19 +236,14 @@ public class EdgeGrpcClient implements EdgeRpcClient {
         };
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `disconnect` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `disconnect` 对应的处理。
+     * 参数：
+     * - `onError`：错误信息。
+     * 返回：无。
      */
+    @Override
     public void disconnect(boolean onError) throws InterruptedException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!onError) {
             try {
                 if (inputStream != null) {
@@ -347,17 +276,13 @@ public class EdgeGrpcClient implements EdgeRpcClient {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendUplinkMsg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void sendUplinkMsg(UplinkMsg msg) {
         uplinkMsgLock.lock();
         try {
@@ -370,17 +295,13 @@ public class EdgeGrpcClient implements EdgeRpcClient {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendSyncRequestMsg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `fullSyncRequired`：`fullSyncRequired` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendSyncRequestMsg(boolean fullSyncRequired) {
         uplinkMsgLock.lock();
         try {
@@ -396,17 +317,13 @@ public class EdgeGrpcClient implements EdgeRpcClient {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendDownlinkResponseMsg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `downlinkResponseMsg`：响应对象。
+     * 返回：无。
      */
+    @Override
     public void sendDownlinkResponseMsg(DownlinkResponseMsg downlinkResponseMsg) {
         uplinkMsgLock.lock();
         try {

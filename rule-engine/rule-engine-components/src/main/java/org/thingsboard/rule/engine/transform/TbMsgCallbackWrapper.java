@@ -22,14 +22,17 @@ package org.thingsboard.rule.engine.transform;
 public interface TbMsgCallbackWrapper {
 
     /**
-     * 方法说明：处理异步调用成功回调并继续规则链投递。
-     * 调用边界：由异步 Future 或消息回调触发；本方法本身只衔接规则链结果，数据库、缓存、MQTT 或事务通常发生在触发该回调的上游调用链中。
+     * 功能：处理`on Success`。
+     * 参数：无。
+     * 返回：无。
      */
     void onSuccess();
 
     /**
-     * 方法说明：处理异步调用失败回调并转入失败关系。
-     * 调用边界：由异步 Future 或消息回调触发；本方法本身只衔接规则链结果，数据库、缓存、MQTT 或事务通常发生在触发该回调的上游调用链中。
+     * 功能：处理失败信息。
+     * 参数：
+     * - `t`：`t` 参数。
+     * 返回：无。
      */
     void onFailure(Throwable t);
     /*

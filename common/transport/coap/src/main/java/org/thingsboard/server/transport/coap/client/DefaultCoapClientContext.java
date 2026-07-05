@@ -78,9 +78,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.eclipse.californium.core.coap.Message.MAX_MID;
 import static org.eclipse.californium.core.coap.Message.NONE;
 
-@Slf4j
-@Service
-@ConditionalOnExpression("'${service.type:null}'=='tb-transport' || ('${service.type:null}'=='monolith' && '${transport.api_enabled:true}'=='true' && '${transport.coap.enabled}'=='true')")
 /**
  * 中文说明：
  * 1. 类目的：`DefaultCoapClientContext` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -91,84 +88,63 @@ import static org.eclipse.californium.core.coap.Message.NONE;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Service
+@ConditionalOnExpression("'${service.type:null}'=='tb-transport' || ('${service.type:null}'=='monolith' && '${transport.api_enabled:true}'=='true' && '${transport.coap.enabled}'=='true')")
 public class DefaultCoapClientContext implements CoapClientContext {
 
     /**
-     * 字段说明：
-     * 1. 保存 `config` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置，保存当前对象的配置选项。
      */
     private final CoapServerContext config;
     private final CoapTransportContext transportContext;
     /**
-     * 字段说明：
-     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TransportService transportService;
     private final TransportDeviceProfileCache profileCache;
     /**
-     * 字段说明：
-     * 1. 保存 `partitionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
     private final PartitionService partitionService;
     private final ConcurrentMap<DeviceId, TbCoapClientState> clients = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, TbCoapClientState> clientsByToken = new ConcurrentHashMap<>();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultCoapClientContext` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultCoapClientContext` 实例，并初始化必要字段。
+     * 参数：
+     * - `config`：配置对象。
+     * - `transportContext`：处理上下文。
+     * - `transportService`：服务对象。
+     * - `profileCache`：`profileCache` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public DefaultCoapClientContext(CoapServerContext config, @Lazy CoapTransportContext transportContext,
                                     TransportService transportService, TransportDeviceProfileCache profileCache,
                                     PartitionService partitionService) {
         this.config = config;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.transportContext = transportContext;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.transportService = transportService;
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         this.profileCache = profileCache;
         this.partitionService = partitionService;
     }
 
-    @EventListener(DeviceProfileUpdatedEvent.class)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onApplicationEvent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @EventListener(DeviceProfileUpdatedEvent.class)
     public void onApplicationEvent(DeviceProfileUpdatedEvent event) {
         var deviceProfile = event.getDeviceProfile();
         clients.values().stream().filter(state -> state.getSession() == null).forEach(state -> {
             state.lock();
             try {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (deviceProfile.getId().equals(state.getProfileId())) {
                     initStateAdaptor(deviceProfile, state);
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (AdaptorException e) {
                 log.trace("[{}] Failed to update client state due to: ", state.getDeviceId(), e);
             } finally {
@@ -177,27 +153,21 @@ public class DefaultCoapClientContext implements CoapClientContext {
         });
     }
 
-    @EventListener(DeviceUpdatedEvent.class)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onApplicationEvent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @EventListener(DeviceUpdatedEvent.class)
     public void onApplicationEvent(DeviceUpdatedEvent event) {
         var device = event.getDevice();
         var state = clients.get(device.getId());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (state == null) {
             return;
         }
         state.lock();
         try {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (state.getSession() == null) {
                 clients.remove(device.getId());
             }
@@ -206,76 +176,61 @@ public class DefaultCoapClientContext implements CoapClientContext {
         }
     }
 
-    @EventListener(DeviceDeletedEvent.class)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onApplicationEvent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @EventListener(DeviceDeletedEvent.class)
     public void onApplicationEvent(DeviceDeletedEvent event) {
         clients.remove(event.getDeviceId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerAttributeObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建属性。
+     * 参数：
+     * - `clientState`：客户端对象。
+     * - `token`：`token` 参数。
+     * - `exchange`：`exchange` 参数。
+     * 返回：判断结果。
      */
+    @Override
     public boolean registerAttributeObservation(TbCoapClientState clientState, String token, CoapExchange exchange) {
         return registerFeatureObservation(clientState, token, exchange, FeatureType.ATTRIBUTES);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerRpcObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建RPC。
+     * 参数：
+     * - `clientState`：客户端对象。
+     * - `token`：`token` 参数。
+     * - `exchange`：`exchange` 参数。
+     * 返回：判断结果。
      */
+    @Override
     public boolean registerRpcObservation(TbCoapClientState clientState, String token, CoapExchange exchange) {
         return registerFeatureObservation(clientState, token, exchange, FeatureType.RPC);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationCounterByToken` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取通知。
+     * 参数：
+     * - `token`：`token` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public AtomicInteger getNotificationCounterByToken(String token) {
         TbCoapClientState state = clientsByToken.get(token);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (state == null) {
             log.trace("Failed to find state using token: {}", token);
             return null;
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (state.getAttrs() != null && state.getAttrs().getToken().equals(token)) {
             return state.getAttrs().getObserveCounter();
         } else {
             log.trace("Failed to find attr subscription using token: {}", token);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (state.getRpc() != null && state.getRpc().getToken().equals(token)) {
             return state.getRpc().getObserveCounter();
         } else {
@@ -284,25 +239,20 @@ public class DefaultCoapClientContext implements CoapClientContext {
         return null;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerObserveRelation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建关系。
+     * 参数：
+     * - `token`：`token` 参数。
+     * - `relation`：`relation` 参数。
+     * 返回：无。
      */
+    @Override
     public void registerObserveRelation(String token, ObserveRelation relation) {
         TbCoapClientState state = clientsByToken.get(token);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (state == null) {
             log.trace("Failed to find state using token: {}", token);
             return;
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (state.getAttrs() != null && state.getAttrs().getToken().equals(token)) {
             state.getAttrs().setObserveRelation(relation);
         } else {
@@ -315,17 +265,13 @@ public class DefaultCoapClientContext implements CoapClientContext {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deregisterObserveRelation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `deregisterObserveRelation` 对应的处理。
+     * 参数：
+     * - `token`：`token` 参数。
+     * 返回：无。
      */
+    @Override
     public void deregisterObserveRelation(String token) {
         TbCoapClientState state = clientsByToken.remove(token);
         if (state == null) {
@@ -344,17 +290,12 @@ public class DefaultCoapClientContext implements CoapClientContext {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportActivity` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：上报`Activity`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void reportActivity() {
         for (TbCoapClientState state : clients.values()) {
             if (state.getSession() != null) {
@@ -364,14 +305,12 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onUplink` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Uplink`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `notifyOtherServers`：`notifyOtherServers` 参数。
+     * - `uplinkTs`：时间戳。
+     * 返回：无。
      */
     private void onUplink(TbCoapClientState client, boolean notifyOtherServers, long uplinkTs) {
         PowerMode powerMode = client.getPowerMode();
@@ -413,14 +352,12 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimeout` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取超时时间。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `powerMode`：`powerMode` 参数。
+     * - `profileSettings`：配置对象。
+     * 返回：数值结果。
      */
     private long getTimeout(TbCoapClientState client, PowerMode powerMode, PowerSavingConfiguration profileSettings) {
         long timeout;
@@ -450,14 +387,13 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerFeatureObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建功能项。
+     * 参数：
+     * - `state`：`state` 参数。
+     * - `token`：`token` 参数。
+     * - `exchange`：`exchange` 参数。
+     * - `featureType`：类型。
+     * 返回：判断结果。
      */
     private boolean registerFeatureObservation(TbCoapClientState state, String token, CoapExchange exchange, FeatureType featureType) {
         state.lock();
@@ -517,17 +453,15 @@ public class DefaultCoapClientContext implements CoapClientContext {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deregisterAttributeObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `deregisterAttributeObservation` 对应的处理。
+     * 参数：
+     * - `state`：`state` 参数。
+     * - `token`：`token` 参数。
+     * - `exchange`：`exchange` 参数。
+     * 返回：无。
      */
+    @Override
     public void deregisterAttributeObservation(TbCoapClientState state, String token, CoapExchange exchange) {
         state.lock();
         try {
@@ -550,17 +484,15 @@ public class DefaultCoapClientContext implements CoapClientContext {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deregisterRpcObservation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `deregisterRpcObservation` 对应的处理。
+     * 参数：
+     * - `state`：`state` 参数。
+     * - `token`：`token` 参数。
+     * - `exchange`：`exchange` 参数。
+     * 返回：无。
      */
+    @Override
     public void deregisterRpcObservation(TbCoapClientState state, String token, CoapExchange exchange) {
         state.lock();
         try {
@@ -583,17 +515,15 @@ public class DefaultCoapClientContext implements CoapClientContext {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrCreateClient` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取客户端。
+     * 参数：
+     * - `type`：类型。
+     * - `deviceCredentials`：设备信息或设备标识。
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：处理结果。
      */
+    @Override
     public TbCoapClientState getOrCreateClient(CoapSessionMsgType type, ValidateDeviceCredentialsResponse deviceCredentials, DeviceProfile deviceProfile) throws AdaptorException {
         DeviceId deviceId = deviceCredentials.getDeviceInfo().getDeviceId();
         TbCoapClientState state = getClientState(deviceId);
@@ -611,44 +541,32 @@ public class DefaultCoapClientContext implements CoapClientContext {
         return state;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getNewSyncSession` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取会话。
+     * 参数：
+     * - `state`：`state` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public TransportProtos.SessionInfoProto getNewSyncSession(TbCoapClientState state) {
         return SessionInfoCreator.create(state.getCredentials(), transportContext, UUID.randomUUID());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getClientState` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取状态。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
     private TbCoapClientState getClientState(DeviceId deviceId) {
         return clients.computeIfAbsent(deviceId, TbCoapClientState::new);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSessionEventMsg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取会话。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：处理结果。
      */
     private static TransportProtos.SessionEventMsg getSessionEventMsg(TransportProtos.SessionEvent event) {
         return TransportProtos.SessionEventMsg.newBuilder()
@@ -657,14 +575,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTransportConfigurationContainer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取传输层。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     private TransportConfigurationContainer getTransportConfigurationContainer(DeviceProfile deviceProfile) throws AdaptorException {
         DeviceProfileTransportConfiguration transportConfiguration = deviceProfile.getProfileData().getTransportConfiguration();
@@ -705,14 +619,11 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initStateAdaptor` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动状态。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * - `state`：`state` 参数。
+     * 返回：无。
      */
     private void initStateAdaptor(DeviceProfile deviceProfile, TbCoapClientState state) throws AdaptorException {
         state.setConfiguration(getTransportConfigurationContainer(deviceProfile));
@@ -721,20 +632,15 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCoapTransportAdaptor` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取传输层。
+     * 参数：
+     * - `jsonPayloadType`：类型。
+     * 返回：处理结果。
      */
     private CoapTransportAdaptor getCoapTransportAdaptor(boolean jsonPayloadType) {
         return jsonPayloadType ? transportContext.getJsonCoapAdaptor() : transportContext.getProtoCoapAdaptor();
     }
 
-    @RequiredArgsConstructor
     /**
      * 中文说明：
      * 1. 类目的：`CoapSessionListener` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -745,29 +651,21 @@ public class DefaultCoapClientContext implements CoapClientContext {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @RequiredArgsConstructor
     public class CoapSessionListener implements SessionMsgListener {
 
         /**
-         * 字段说明：
-         * 1. 保存 `state` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 状态，表示当前对象所处状态。
          */
         private final TbCoapClientState state;
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onGetAttributesResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理响应。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onGetAttributesResponse(TransportProtos.GetAttributeResponseMsg msg) {
             TbCoapObservationState attrs = state.getAttrs();
             if (attrs != null) {
@@ -784,17 +682,14 @@ public class DefaultCoapClientContext implements CoapClientContext {
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onAttributeUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理属性。
+         * 参数：
+         * - `sessionId`：会话ID。
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onAttributeUpdate(UUID sessionId, TransportProtos.AttributeUpdateNotificationMsg msg) {
             if (!isDownlinkAllowed(state)) {
                 log.trace("[{}] ignore downlink request cause client is sleeping.", state.getDeviceId());
@@ -829,17 +724,14 @@ public class DefaultCoapClientContext implements CoapClientContext {
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onDeviceProfileUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理设备配置。
+         * 参数：
+         * - `newSessionInfo`：会话对象。
+         * - `deviceProfile`：设备信息或设备标识。
+         * 返回：无。
          */
+        @Override
         public void onDeviceProfileUpdate(TransportProtos.SessionInfoProto newSessionInfo, DeviceProfile deviceProfile) {
             try {
                 initStateAdaptor(deviceProfile, state);
@@ -848,17 +740,15 @@ public class DefaultCoapClientContext implements CoapClientContext {
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onDeviceUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理设备。
+         * 参数：
+         * - `sessionInfo`：会话对象。
+         * - `device`：设备信息或设备标识。
+         * - `deviceProfileOpt`：设备信息或设备标识。
+         * 返回：无。
          */
+        @Override
         public void onDeviceUpdate(TransportProtos.SessionInfoProto sessionInfo, Device device, Optional<DeviceProfile> deviceProfileOpt) {
             if (deviceProfileOpt.isPresent()) {
                 try {
@@ -870,50 +760,40 @@ public class DefaultCoapClientContext implements CoapClientContext {
             state.onDeviceUpdate(device);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onDeviceDeleted` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理设备。
+         * 参数：
+         * - `deviceId`：设备IDID。
+         * 返回：无。
          */
+        @Override
         public void onDeviceDeleted(DeviceId deviceId) {
             cancelRpcSubscription(state);
             cancelAttributeSubscription(state);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onRemoteSessionCloseCommand` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理会话。
+         * 参数：
+         * - `sessionId`：会话ID。
+         * - `sessionCloseNotification`：会话对象。
+         * 返回：无。
          */
+        @Override
         public void onRemoteSessionCloseCommand(UUID sessionId, TransportProtos.SessionCloseNotificationProto sessionCloseNotification) {
             log.trace("[{}] Received the remote command to close the session: {}", sessionId, sessionCloseNotification.getMessage());
             cancelRpcSubscription(state);
             cancelAttributeSubscription(state);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onToDeviceRpcRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理设备。
+         * 参数：
+         * - `sessionId`：会话ID。
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onToDeviceRpcRequest(UUID sessionId, TransportProtos.ToDeviceRpcRequestMsg msg) {
             DeviceId deviceId = state.getDeviceId();
             log.trace("[{}][{}] Received RPC command to device: {}", deviceId, sessionId, msg);
@@ -994,45 +874,33 @@ public class DefaultCoapClientContext implements CoapClientContext {
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onToServerRpcResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理RPC。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onToServerRpcResponse(TransportProtos.ToServerRpcResponseMsg msg) {
             log.trace("[{}] Received server rpc response in the wrong session.", state.getSession());
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onUplinkNotification` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理通知。
+         * 参数：
+         * - `notificationMsg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onUplinkNotification(TransportProtos.UplinkNotificationMsg notificationMsg) {
             awake(state, false, notificationMsg.getUplinkTs());
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `cancelObserveRelation` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `cancelObserveRelation` 对应的处理。
+         * 参数：
+         * - `attrs`：`attrs` 参数。
+         * 返回：无。
          */
         private void cancelObserveRelation(TbCoapObservationState attrs) {
             if (attrs.getObserveRelation() != null) {
@@ -1042,14 +910,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `asleep` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `asleep` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：判断结果。
      */
     private boolean asleep(TbCoapClientState client) {
         boolean changed = compareAndSetSleepFlag(client, true);
@@ -1060,30 +924,24 @@ public class DefaultCoapClientContext implements CoapClientContext {
         return changed;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `awake` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `awake` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：判断结果。
      */
+    @Override
     public boolean awake(TbCoapClientState client) {
         return awake(client, true, System.currentTimeMillis());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `awake` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `awake` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `notifyOtherServers`：`notifyOtherServers` 参数。
+     * - `uplinkTs`：时间戳。
+     * 返回：判断结果。
      */
     private boolean awake(TbCoapClientState client, boolean notifyOtherServers, long uplinkTs) {
         onUplink(client, notifyOtherServers, uplinkTs);
@@ -1097,14 +955,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendMsgsAfterSleeping` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Msgs After Sleeping`。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     private void sendMsgsAfterSleeping(TbCoapClientState client) {
         if (client.getRpc() != null) {
@@ -1121,14 +975,11 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `compareAndSetSleepFlag` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `compareAndSetSleepFlag` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `sleeping`：`sleeping` 参数。
+     * 返回：判断结果。
      */
     private boolean compareAndSetSleepFlag(TbCoapClientState client, boolean sleeping) {
         if (sleeping == client.isAsleep()) {
@@ -1158,14 +1009,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isDownlinkAllowed` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Downlink Allowed`。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：判断结果。
      */
     private boolean isDownlinkAllowed(TbCoapClientState client) {
         PowerMode powerMode = client.getPowerMode();
@@ -1217,14 +1064,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getPowerMode` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Power Mode`。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：处理结果。
      */
     private PowerMode getPowerMode(TbCoapClientState client) {
         PowerMode powerMode = client.getPowerMode();
@@ -1241,14 +1084,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getProfile` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取配置。
+     * 参数：
+     * - `profileId`：配置ID。
+     * 返回：可能存在的结果。
      */
     public Optional<CoapDeviceProfileTransportConfiguration> getProfile(DeviceProfileId profileId) {
         DeviceProfile deviceProfile = profileCache.get(profileId);
@@ -1263,28 +1102,19 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getNextMsgId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected int getNextMsgId() {
         return ThreadLocalRandom.current().nextInt(NONE, MAX_MID + 1);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cancelRpcSubscription` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cancelRpcSubscription` 对应的处理。
+     * 参数：
+     * - `state`：`state` 参数。
+     * 返回：无。
      */
     private void cancelRpcSubscription(TbCoapClientState state) {
         if (state.getRpc() != null) {
@@ -1301,14 +1131,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cancelAttributeSubscription` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `cancelAttributeSubscription` 对应的处理。
+     * 参数：
+     * - `state`：`state` 参数。
+     * 返回：无。
      */
     private void cancelAttributeSubscription(TbCoapClientState state) {
         if (state.getAttrs() != null) {
@@ -1325,14 +1151,10 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `closeAndCleanup` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭`And Cleanup`。
+     * 参数：
+     * - `state`：`state` 参数。
+     * 返回：无。
      */
     private void closeAndCleanup(TbCoapClientState state) {
         transportService.process(state.getSession(), getSessionEventMsg(TransportProtos.SessionEvent.CLOSED), null);
@@ -1345,14 +1167,12 @@ public class DefaultCoapClientContext implements CoapClientContext {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `respond` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `respond` 对应的处理。
+     * 参数：
+     * - `exchange`：`exchange` 参数。
+     * - `response`：响应对象。
+     * - `defContentFormat`：`defContentFormat` 参数。
+     * 返回：无。
      */
     private void respond(CoapExchange exchange, Response response, int defContentFormat) {
         response.getOptions().setContentFormat(TbCoapContentFormatUtil.getContentFormat(exchange.getRequestOptions().getContentFormat(), defContentFormat));

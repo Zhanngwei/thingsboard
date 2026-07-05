@@ -44,6 +44,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * `TbMqttNode` 类，封装当前模块中的一组相关职责。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.EXTERNAL,
@@ -56,36 +59,34 @@ import java.util.concurrent.TimeoutException;
         configDirective = "tbExternalNodeMqttConfig",
         icon = "call_split"
 )
-/**
- * MQTT 外部发布节点，直接持有并使用 ThingsBoard MQTT 客户端把 Rule Engine 消息载荷发布到外部 Broker。
- * 本类不直接访问数据库或缓存；Rule Engine 确认、失败路由和线程执行由 {@link TbAbstractExternalNode} 与 {@link TbContext} 调用链处理。
- */
 public class TbMqttNode extends TbAbstractExternalNode {
 
     /**
-     * MQTT 发布载荷使用的字符集，确保消息字符串按 UTF-8 转换为 Netty ByteBuf。
+     * `UTF8`常量，用于统一引用固定值。
      */
     private static final Charset UTF8 = StandardCharsets.UTF_8;
 
     /**
-     * 发布异常写入消息元数据时使用的键名。
+     * 错误信息常量，用于统一引用固定值。
      */
     private static final String ERROR = "error";
 
     /**
-     * 当前节点配置，Topic、QoS 以外的连接参数、保留消息标志和凭据均来源于该配置。
+     * 节点实例，保存当前对象的配置选项。
      */
     protected TbMqttNodeConfiguration mqttNodeConfiguration;
 
     /**
-     * 连接生命周期由本节点直接管理的 MQTT 客户端，init 建立连接，destroy 断开连接。
+     * 客户端，用于发起外部调用或协议交互。
      */
     protected MqttClient mqttClient;
 
     /**
-     * 初始化 MQTT 节点配置并立即创建 MQTT 客户端连接。
-     * 本方法直接触达 MQTT 客户端连接生命周期；Topic、host、port、clientId、cleanSession、SSL 等均来自节点配置。
-     * 本方法本身不直接访问数据库或缓存，Rule Engine/Actor 调用链可能在调度和上下文获取时涉及。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
@@ -99,16 +100,16 @@ public class TbMqttNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 处理 Rule Engine 消息并异步发布到 MQTT Broker。
-     * Topic 从配置的 topicPattern 和消息内容解析，QoS 固定为 AT_LEAST_ONCE，retained 标志来自配置。
-     * 调用 ackIfNeeded 后再发布，发布完成监听器根据 MQTT 客户端回调路由到 Success 或 Failure。
-     * 本方法直接使用 MQTT 客户端；线程安全依赖 MQTT 客户端实现和 Rule Engine 对节点实例的调用约束。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         String topic = TbNodeUtils.processPattern(this.mqttNodeConfiguration.getTopicPattern(), msg);
         var tbMsg = ackIfNeeded(ctx, msg);
-        // MQTT publish 返回 Netty future，Rule Engine 消息的后续路由在该异步回调中完成。
         this.mqttClient.publish(topic, Unpooled.wrappedBuffer(tbMsg.getData().getBytes(UTF8)), MqttQoS.AT_LEAST_ONCE, mqttNodeConfiguration.isRetainedMessage())
                 .addListener(future -> {
                             if (future.isSuccess()) {
@@ -121,8 +122,11 @@ public class TbMqttNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 将 MQTT 发布异常转写到消息元数据，供 Failure 路由上的后续节点读取。
-     * 本方法本身不直接访问外部系统、数据库或缓存。
+     * 功能：处理`Exception`。
+     * 参数：
+     * - `origMsg`：待处理消息。
+     * - `e`：`e` 参数。
+     * 返回：处理结果。
      */
     private TbMsg processException(TbMsg origMsg, Throwable e) {
         TbMsgMetaData metaData = origMsg.getMetaData().copy();
@@ -131,8 +135,9 @@ public class TbMqttNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 销毁节点时断开 MQTT 客户端连接。
-     * 本方法直接管理 MQTT 连接生命周期，不负责 Rule Engine 消息确认。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Override
     public void destroy() {
@@ -142,17 +147,20 @@ public class TbMqttNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 构造 MQTT 客户端 ownerId，便于客户端日志和资源归属定位。
-     * 本方法本身不直接访问 MQTT、数据库或缓存。
+     * 功能：获取`Owner Id`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：文本结果。
      */
     String getOwnerId(TbContext ctx) {
         return "Tenant[" + ctx.getTenantId().getId() + "]RuleNode[" + ctx.getSelf().getId().getId() + "]";
     }
 
     /**
-     * 根据节点配置创建、配置并同步等待 MQTT 连接完成。
-     * 本方法直接使用 MQTT 客户端；host、port、clientId、cleanSession、SSL 和认证均来自配置。
-     * 连接超时或失败时会主动断开客户端并抛出异常，外层 init 将其转换为 TbNodeException。
+     * 功能：初始化或启动客户端。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：处理结果。
      */
     protected MqttClient initClient(TbContext ctx) throws Exception {
         MqttClientConfig config = new MqttClientConfig(getSslContext());
@@ -169,7 +177,6 @@ public class TbMqttNode extends TbAbstractExternalNode {
         Promise<MqttConnectResult> connectFuture = client.connect(this.mqttNodeConfiguration.getHost(), this.mqttNodeConfiguration.getPort());
         MqttConnectResult result;
         try {
-            // 连接建立阶段阻塞等待配置的超时时间，避免节点初始化后留下未连接客户端。
             result = connectFuture.get(this.mqttNodeConfiguration.getConnectTimeoutSec(), TimeUnit.SECONDS);
         } catch (TimeoutException ex) {
             connectFuture.cancel(true);
@@ -187,8 +194,10 @@ public class TbMqttNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 将基础用户名密码凭据写入 MQTT 客户端配置。
-     * 本方法只准备客户端参数，不直接建立连接；证书、SAS 等特殊认证可由子类覆盖。
+     * 功能：执行 `prepareMqttClientConfig` 对应的处理。
+     * 参数：
+     * - `config`：配置对象。
+     * 返回：无。
      */
     protected void prepareMqttClientConfig(MqttClientConfig config) throws SSLException {
         ClientCredentials credentials = this.mqttNodeConfiguration.getCredentials();
@@ -200,8 +209,9 @@ public class TbMqttNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 按配置决定是否初始化 SSL 上下文。
-     * 本方法本身不直接访问数据库或缓存；证书内容来自节点凭据配置，具体解析由凭据实现完成。
+     * 功能：获取上下文。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private SslContext getSslContext() throws SSLException {
         return this.mqttNodeConfiguration.isSsl() ? this.mqttNodeConfiguration.getCredentials().initSslContext() : null;

@@ -54,8 +54,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AnnotationComponentDiscoveryService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -66,49 +64,31 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Slf4j
 public class AnnotationComponentDiscoveryService implements ComponentDiscoveryService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `MAX_OPTIMISITC_RETRIES` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `MAX_OPTIMISITC_RETRIES`常量，用于统一引用固定值。
      */
     public static final int MAX_OPTIMISITC_RETRIES = 3;
 
-    @Value("${plugins.scan_packages}")
     /**
-     * 字段说明：
-     * 1. 保存 `scanPackages` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `scanPackages`列表，用于保存一组待处理对象。
      */
+    @Value("${plugins.scan_packages}")
     private String[] scanPackages;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `environment` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 环境配置，保存当前对象的配置选项。
      */
+    @Autowired
     private Environment environment;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `componentDescriptorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private ComponentDescriptorService componentDescriptorService;
 
     private final Map<String, RuleNodeClassInfo> ruleNodeClasses = new HashMap<>();
@@ -120,116 +100,82 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
     private final Map<ComponentType, List<ComponentDescriptor>> edgeComponentsMap = new HashMap<>();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isInstall` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Install`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean isInstall() {
         return environment.acceptsProfiles(Profiles.of("install"));
     }
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() {
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (var def : discoverBeansByAnnotationType(RuleNode.class)) {
             String clazzName = def.getBeanClassName();
             try {
                 var clazz = Class.forName(clazzName);
                 RuleNode annotation = clazz.getAnnotation(RuleNode.class);
                 ruleNodeClasses.put(clazzName, new RuleNodeClassInfo(clazz, annotation));
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.warn("Failed to create instance of rule node type: {} due to: ", clazzName, e);
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!isInstall()) {
             discoverComponents();
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `discoverBeansByAnnotationType` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `discoverBeansByAnnotationType` 对应的处理。
+     * 参数：
+     * - `annotationType`：类型。
+     * 返回：匹配的数据集合。
      */
     private Set<BeanDefinition> discoverBeansByAnnotationType(Class<? extends Annotation> annotationType) {
         ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AnnotationTypeFilter(annotationType));
         Set<BeanDefinition> defs = new HashSet<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (String scanPackage : scanPackages) {
             defs.addAll(scanner.findCandidateComponents(scanPackage));
         }
         return defs;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleNodeInfo` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取规则节点。
+     * 参数：
+     * - `clazz`：`clazz` 参数。
+     * 返回：可能存在的结果。
      */
+    @Override
     public Optional<RuleNodeClassInfo> getRuleNodeInfo(String clazz) {
         return Optional.ofNullable(ruleNodeClasses.get(clazz));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getVersionedNodes` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Versioned Nodes`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<RuleNodeClassInfo> getVersionedNodes() {
         return ruleNodeClasses.values().stream().filter(RuleNodeClassInfo::isVersioned).collect(Collectors.toList());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerRuleNodeComponents` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建规则节点。
+     * 参数：无。
+     * 返回：无。
      */
     private void registerRuleNodeComponents() {
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (RuleNodeClassInfo def : ruleNodeClasses.values()) {
             int retryCount = 0;
             Exception cause = null;
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             while (retryCount < MAX_OPTIMISITC_RETRIES) {
                 try {
                     ComponentType type = def.getAnnotation().type();
@@ -237,20 +183,17 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
                     components.put(component.getClazz(), component);
                     putComponentIntoMaps(type, def.getAnnotation(), component);
                     break;
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (Exception e) {
                     log.trace("Can't initialize component {}, due to {}", def.getClassName(), e.getMessage(), e);
                     cause = e;
                     retryCount++;
                     try {
                         Thread.sleep(1000);
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (InterruptedException e1) {
                         throw new RuntimeException(e1);
                     }
                 }
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (cause != null && retryCount == MAX_OPTIMISITC_RETRIES) {
                 log.error("Can't initialize component {}, due to {}", def.getClassName(), cause.getMessage(), cause);
                 throw new RuntimeException(cause);
@@ -259,29 +202,24 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `putComponentIntoMaps` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `putComponentIntoMaps` 对应的处理。
+     * 参数：
+     * - `type`：类型。
+     * - `ruleNodeAnnotation`：`ruleNodeAnnotation` 参数。
+     * - `component`：`component` 参数。
+     * 返回：无。
      */
     private void putComponentIntoMaps(ComponentType type, RuleNode ruleNodeAnnotation, ComponentDescriptor component) {
         boolean ruleChainTypesMethodAvailable;
         try {
             ruleNodeAnnotation.getClass().getMethod("ruleChainTypes");
             ruleChainTypesMethodAvailable = true;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (NoSuchMethodException exception) {
             log.warn("[{}] does not have ruleChainTypes. Probably extension class compiled before 3.3 release. " +
                     "Please update your extensions and compile using latest 3.3 release dependency", ruleNodeAnnotation.name());
             ruleChainTypesMethodAvailable = false;
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (ruleChainTypesMethodAvailable) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ruleChainTypeContainsArray(RuleChainType.CORE, ruleNodeAnnotation.ruleChainTypes())) {
                 coreComponentsMap.computeIfAbsent(type, k -> new ArrayList<>()).add(component);
             }
@@ -294,14 +232,11 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ruleChainTypeContainsArray` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `ruleChainTypeContainsArray` 对应的处理。
+     * 参数：
+     * - `ruleChainType`：类型。
+     * - `array`：`array` 参数。
+     * 返回：判断结果。
      */
     private boolean ruleChainTypeContainsArray(RuleChainType ruleChainType, RuleChainType[] array) {
         for (RuleChainType tmp : array) {
@@ -313,14 +248,11 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `scanAndPersistComponent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `scanAndPersistComponent` 对应的处理。
+     * 参数：
+     * - `def`：`def` 参数。
+     * - `type`：类型。
+     * 返回：处理结果。
      */
     private ComponentDescriptor scanAndPersistComponent(RuleNodeClassInfo def, ComponentType type) {
         ComponentDescriptor scannedComponent = new ComponentDescriptor();
@@ -362,14 +294,11 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `prepareNodeDefinition` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `prepareNodeDefinition` 对应的处理。
+     * 参数：
+     * - `clazz`：`clazz` 参数。
+     * - `nodeAnnotation`：`nodeAnnotation` 参数。
+     * 返回：处理结果。
      */
     private NodeDefinition prepareNodeDefinition(Class<?> clazz, RuleNode nodeAnnotation) throws Exception {
         NodeDefinition nodeDefinition = new NodeDefinition();
@@ -393,14 +322,11 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRelationTypesWithFailureRelation` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取关系。
+     * 参数：
+     * - `clazz`：`clazz` 参数。
+     * - `nodeAnnotation`：`nodeAnnotation` 参数。
+     * 返回：处理结果。
      */
     private String[] getRelationTypesWithFailureRelation(Class<?> clazz, RuleNode nodeAnnotation) {
         List<String> relationTypes = new ArrayList<>(Arrays.asList(nodeAnnotation.relationTypes()));
@@ -417,33 +343,25 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
         return relationTypes.toArray(new String[relationTypes.size()]);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `discoverComponents` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `discoverComponents` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void discoverComponents() {
         registerRuleNodeComponents();
         log.debug("Found following definitions: {}", components.values());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponents` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Components`。
+     * 参数：
+     * - `type`：类型。
+     * - `ruleChainType`：类型。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<ComponentDescriptor> getComponents(ComponentType type, RuleChainType ruleChainType) {
         if (RuleChainType.CORE.equals(ruleChainType)) {
             if (coreComponentsMap.containsKey(type)) {
@@ -463,17 +381,14 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponents` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Components`。
+     * 参数：
+     * - `types`：类型。
+     * - `ruleChainType`：类型。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<ComponentDescriptor> getComponents(Set<ComponentType> types, RuleChainType ruleChainType) {
         if (RuleChainType.CORE.equals(ruleChainType)) {
             return getComponents(types, coreComponentsMap);
@@ -485,30 +400,23 @@ public class AnnotationComponentDiscoveryService implements ComponentDiscoverySe
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Component`。
+     * 参数：
+     * - `clazz`：`clazz` 参数。
+     * 返回：可能存在的结果。
      */
+    @Override
     public Optional<ComponentDescriptor> getComponent(String clazz) {
         return Optional.ofNullable(components.get(clazz));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponents` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Components`。
+     * 参数：
+     * - `types`：类型。
+     * - `componentsMap`：数据列表。
+     * 返回：匹配的数据集合。
      */
     private List<ComponentDescriptor> getComponents(Set<ComponentType> types, Map<ComponentType, List<ComponentDescriptor>> componentsMap) {
         List<ComponentDescriptor> result = new ArrayList<>();

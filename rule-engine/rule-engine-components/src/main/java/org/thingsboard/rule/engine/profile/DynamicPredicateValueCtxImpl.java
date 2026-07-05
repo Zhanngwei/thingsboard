@@ -28,32 +28,36 @@ import org.thingsboard.server.common.data.kv.AttributeKvEntry;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
-@Slf4j
 /**
  * 中文说明：`DynamicPredicateValueCtxImpl` 是动态谓词值上下文实现辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Slf4j
 public class DynamicPredicateValueCtxImpl implements DynamicPredicateValueCtx {
     /**
-     * 字段说明：保存 `tenantId`，表示租户上下文，供本类方法在规则节点处理流程中使用。
+     * 租户ID，用于定位对应业务对象。
      */
     private final TenantId tenantId;
     /**
-     * 字段说明：保存 `customerId`，表示客户名称、客户标识或客户缓存，供本类方法在规则节点处理流程中使用。
+     * 客户ID，用于定位对应业务对象。
      */
     private CustomerId customerId;
     /**
-     * 字段说明：保存 `deviceId`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 设备ID，用于定位对应业务对象。
      */
     private final DeviceId deviceId;
     /**
-     * 字段说明：保存 Rule Engine 上下文引用；本字段本身不直接代表数据库、MQTT 或事务资源。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private final TbContext ctx;
 
     /**
-     * 方法说明：构造 `DynamicPredicateValueCtxImpl` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `DynamicPredicateValueCtxImpl` 实例，并初始化必要字段。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `ctx`：处理上下文。
+     * 返回：新创建的对象实例。
      */
     public DynamicPredicateValueCtxImpl(TenantId tenantId, DeviceId deviceId, TbContext ctx) {
         this.tenantId = tenantId;
@@ -62,31 +66,35 @@ public class DynamicPredicateValueCtxImpl implements DynamicPredicateValueCtx {
         resetCustomer();
     }
 
-    @Override
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DynamicPredicateValueCtxImpl` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取租户。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
+    @Override
     public EntityKeyValue getTenantValue(String key) {
         return getValue(tenantId, key);
     }
 
-    @Override
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DynamicPredicateValueCtxImpl` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取客户。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
+    @Override
     public EntityKeyValue getCustomerValue(String key) {
         return customerId == null || customerId.isNullUid() ? null : getValue(customerId, key);
     }
 
-    @Override
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `DynamicPredicateValueCtxImpl` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `DeviceService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `resetCustomer` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void resetCustomer() {
-        // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
         Device device = ctx.getDeviceService().findDeviceById(tenantId, deviceId);
         if (device != null) {
             this.customerId = device.getCustomerId();
@@ -94,12 +102,14 @@ public class DynamicPredicateValueCtxImpl implements DynamicPredicateValueCtx {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DynamicPredicateValueCtxImpl` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AttributesService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `key`：键。
+     * 返回：处理结果。
      */
     private EntityKeyValue getValue(EntityId entityId, String key) {
         try {
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             Optional<AttributeKvEntry> entry = ctx.getAttributesService().find(tenantId, entityId, DataConstants.SERVER_SCOPE, key).get();
             if (entry.isPresent()) {
                 return DeviceState.toEntityValue(entry.get());

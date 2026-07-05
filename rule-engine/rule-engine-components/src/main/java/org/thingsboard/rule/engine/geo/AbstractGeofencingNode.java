@@ -43,19 +43,22 @@ import java.util.List;
 public abstract class AbstractGeofencingNode<T extends TbGpsGeofencingFilterNodeConfiguration> implements TbNode {
 
     /**
-     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     * 配置，保存当前对象的配置选项。
      */
     protected T config;
     /**
-     * 字段说明：保存 `jtsCtx`，表示规则引擎上下文，供本类方法在规则节点处理流程中使用。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     protected JtsSpatialContext jtsCtx;
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = TbNodeUtils.convert(configuration, getConfigClazz());
         JtsSpatialContextFactory factory = new JtsSpatialContextFactory();
@@ -64,14 +67,17 @@ public abstract class AbstractGeofencingNode<T extends TbGpsGeofencingFilterNode
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AbstractGeofencingNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     abstract protected Class<T> getConfigClazz();
 
     /**
-     * 方法说明：检查状态、关系、配置或数据合法性，供 `AbstractGeofencingNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：校验`Matches`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     protected boolean checkMatches(TbMsg msg) throws TbNodeException {
         JsonElement msgDataElement = JsonParser.parseString(msg.getData());
@@ -93,8 +99,12 @@ public abstract class AbstractGeofencingNode<T extends TbGpsGeofencingFilterNode
     }
 
     /**
-     * 方法说明：检查状态、关系、配置或数据合法性，供 `AbstractGeofencingNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：校验`Matches`。
+     * 参数：
+     * - `perimeter`：`perimeter` 参数。
+     * - `latitude`：`latitude` 参数。
+     * - `longitude`：`longitude` 参数。
+     * 返回：判断结果。
      */
     protected boolean checkMatches(Perimeter perimeter, double latitude, double longitude) throws TbNodeException {
         if (perimeter.getPerimeterType() == PerimeterType.CIRCLE) {
@@ -109,8 +119,10 @@ public abstract class AbstractGeofencingNode<T extends TbGpsGeofencingFilterNode
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AbstractGeofencingNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Perimeters`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     protected List<Perimeter> getPerimeters(TbMsg msg) throws TbNodeException {
         if (config.isFetchPerimeterInfoFromMessageMetadata()) {
@@ -168,8 +180,12 @@ public abstract class AbstractGeofencingNode<T extends TbGpsGeofencingFilterNode
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AbstractGeofencingNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取消息。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `msgDataObj`：待处理消息。
+     * - `keyName`：名称。
+     * 返回：数值结果。
      */
     protected Double getValueFromMessageByName(TbMsg msg, JsonObject msgDataObj, String keyName) throws TbNodeException {
         double value;

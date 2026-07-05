@@ -21,66 +21,67 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 /**
  * Created by ashvayka on 19.01.18.
  */
-@Data
 /**
  * 中文说明：`TbGpsGeofencingFilterNodeConfiguration` 是GPS地理围栏过滤节点配置对象，用于承载规则节点 JSON 中的配置项和默认值。
  * 配置来源：实例字段通常由前端规则节点配置 JSON 反序列化得到，`defaultConfiguration` 提供缺省配置。
  * 调用边界：本类本身不直接涉及数据库、缓存、MQTT、Actor 或事务；具体实现和调用链可能在使用这些配置的节点中涉及。
  */
+@Data
 public class TbGpsGeofencingFilterNodeConfiguration implements NodeConfiguration<TbGpsGeofencingFilterNodeConfiguration> {
 
     /**
-     * 配置字段：来自规则节点 JSON 的 `latitudeKeyName` 配置项，控制消息体、元数据、属性或遥测中的键名。
+     * 键，用于标识或展示当前对象。
      */
     private String latitudeKeyName;
     /**
-     * 配置字段：来自规则节点 JSON 的 `longitudeKeyName` 配置项，控制消息体、元数据、属性或遥测中的键名。
+     * 键，用于标识或展示当前对象。
      */
     private String longitudeKeyName;
     /**
-     * 配置字段：来自规则节点 JSON 的 `perimeterType` 配置项，控制类型匹配条件。
+     * 类型，用于区分不同处理分支。
      */
     private PerimeterType perimeterType;
 
     /**
-     * 配置字段：来自规则节点 JSON 的 `fetchPerimeterInfoFromMessageMetadata` 配置项，控制消息元数据。
+     * 是否满足消息条件。
      */
     private boolean fetchPerimeterInfoFromMessageMetadata;
     // If Perimeter is fetched from metadata
     /**
-     * 配置字段：来自规则节点 JSON 的 `perimeterKeyName` 配置项，控制消息体、元数据、属性或遥测中的键名。
+     * 键，用于标识或展示当前对象。
      */
     private String perimeterKeyName;
 
     //For Polygons
     /**
-     * 配置字段：来自规则节点 JSON 的 `polygonsDefinition` 配置项，控制与本类处理流程相关的运行时值。
+     * `polygonsDefinition` 字段，保存当前对象的对应属性。
      */
     private String polygonsDefinition;
 
     //For Circles
     /**
-     * 配置字段：来自规则节点 JSON 的 `centerLatitude` 配置项，控制纬度。
+     * `centerLatitude` 字段，保存当前对象的对应属性。
      */
     private Double centerLatitude;
     /**
-     * 配置字段：来自规则节点 JSON 的 `centerLongitude` 配置项，控制经度。
+     * `centerLongitude` 字段，保存当前对象的对应属性。
      */
     private Double centerLongitude;
     /**
-     * 配置字段：来自规则节点 JSON 的 `range` 配置项，控制距离范围。
+     * `range` 字段，保存当前对象的对应属性。
      */
     private Double range;
     /**
-     * 配置字段：来自规则节点 JSON 的 `rangeUnit` 配置项，控制距离范围。
+     * 单位，表示当前对象的对应属性。
      */
     private RangeUnit rangeUnit;
 
-    @Override
     /**
-     * 方法说明：构建规则节点 JSON 未显式提供字段时使用的默认配置。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public TbGpsGeofencingFilterNodeConfiguration defaultConfiguration() {
         TbGpsGeofencingFilterNodeConfiguration configuration = new TbGpsGeofencingFilterNodeConfiguration();
         configuration.setLatitudeKeyName("latitude");

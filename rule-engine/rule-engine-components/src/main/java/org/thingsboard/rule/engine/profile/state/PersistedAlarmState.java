@@ -20,7 +20,6 @@ import org.thingsboard.server.common.data.alarm.AlarmSeverity;
 
 import java.util.Map;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：保存某一种设备画像告警的可持久化状态，包含创建规则状态和清除规则状态。
@@ -32,22 +31,15 @@ import java.util.Map;
  * 7. 显式方法：本类没有手写方法，访问器由 Lombok 生成；对象本身不保证线程安全，由外层设备状态流程控制并发。
  * 8. 设计模式：可视为 Memento/DTO，用于保存告警状态恢复所需的最小快照。
  */
+@Data
 public class PersistedAlarmState {
 
     /**
-     * 字段说明：
-     * 1. 保存按告警严重级别划分的创建规则持久化状态。
-     * 2. 数据来源是 `AlarmState` 对设备画像中各 `AlarmSeverity` 创建规则的运行期评估结果。
-     * 3. 生命周期与对应告警类型的设备状态一致，配置变化或状态清理时由外层逻辑替换或清空。
-     * 4. 使用 Map 是因为同一告警类型可以按严重级别维护多条创建规则，按 `AlarmSeverity` 查找比列表遍历更直接。
+     * `createRuleStates`映射关系，用于按键查找对应值。
      */
     private Map<AlarmSeverity, PersistedAlarmRuleState> createRuleStates;
     /**
-     * 字段说明：
-     * 1. 保存清除该告警时使用的规则持久化状态。
-     * 2. 数据来源是 `AlarmState` 中清除条件的持续时间、事件计数和最近事件时间。
-     * 3. 生命周期与告警清除规则一致，在告警未清除时持续参与后续消息评估。
-     * 4. 单独字段表达清除规则，是因为清除逻辑与创建规则不是按严重级别扩展的集合关系。
+     * 状态，表示当前对象所处状态。
      */
     private PersistedAlarmRuleState clearRuleState;
 

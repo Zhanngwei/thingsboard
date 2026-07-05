@@ -31,15 +31,11 @@ import org.thingsboard.server.common.data.id.TenantId;
 public interface RuleEngineApiUsageStateService {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按租户和状态 ID 查询 API 使用状态。
-     * 2. 输入参数：tenantId 是租户边界，id 是 API 使用状态标识。
-     * 3. 返回值：匹配的 ApiUsageState，未找到时由实现决定返回 null 或抛出异常。
-     * 4. 调用时机：规则节点或系统流程需要判断租户 API 使用状态时调用。
-     * 5. 调用方：Rule Engine 相关服务、限额和通知流程。
-     * 6. 使用流程：属于 API 使用状态查询流程。
-     * 7. 线程安全：接口无状态，实现需保证 DAO/缓存并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT/Actor；实现可能访问数据库和缓存，直接服务 Rule Engine。
+     * 功能：获取状态。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `id`：`id`ID。
+     * 返回：处理结果。
      */
     ApiUsageState findApiUsageStateById(TenantId tenantId, ApiUsageStateId id);
 

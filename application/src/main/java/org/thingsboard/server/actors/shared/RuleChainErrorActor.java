@@ -29,7 +29,6 @@ import org.thingsboard.server.common.msg.queue.RuleEngineException;
 
 import java.util.UUID;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`RuleChainErrorActor` 是ThingsBoard Application 模块中的Actor 通信与消息处理类型，用于管理租户、设备、规则链或规则节点的异步消息路由。
@@ -40,28 +39,22 @@ import java.util.UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Actor / Command。
  */
+@Slf4j
 public class RuleChainErrorActor extends ContextAwareActor {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tenantId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户ID，用于定位对应业务对象。
      */
     private final TenantId tenantId;
     private final RuleEngineException error;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `RuleChainErrorActor` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `RuleChainErrorActor` 实例，并初始化必要字段。
+     * 参数：
+     * - `systemContext`：处理上下文。
+     * - `tenantId`：租户IDID。
+     * - `error`：错误信息。
+     * 返回：新创建的对象实例。
      */
     private RuleChainErrorActor(ActorSystemContext systemContext, TenantId tenantId, RuleEngineException error) {
         super(systemContext);
@@ -69,19 +62,14 @@ public class RuleChainErrorActor extends ContextAwareActor {
         this.error = error;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doProcess` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doProcess` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
+    @Override
     protected boolean doProcess(TbActorMsg msg) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (msg instanceof RuleChainAwareMsg) {
             log.debug("[{}] Reply with {} for message {}", tenantId, error.getMessage(), msg);
             var rcMsg = (RuleChainAwareMsg) msg;
@@ -105,25 +93,18 @@ public class RuleChainErrorActor extends ContextAwareActor {
     public static class ActorCreator extends ContextBasedCreator {
 
         /**
-         * 字段说明：
-         * 1. 保存 `tenantId` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 租户ID，用于定位对应业务对象。
          */
         private final TenantId tenantId;
         private final RuleEngineException error;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `ActorCreator` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `RuleChainErrorActor` 实例，并初始化必要字段。
+         * 参数：
+         * - `context`：处理上下文。
+         * - `tenantId`：租户IDID。
+         * - `error`：错误信息。
+         * 返回：新创建的对象实例。
          */
         public ActorCreator(ActorSystemContext context, TenantId tenantId, RuleEngineException error) {
             super(context);
@@ -131,32 +112,22 @@ public class RuleChainErrorActor extends ContextAwareActor {
             this.error = error;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `createActorId` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：保存或创建Actor 实例。
+         * 参数：无。
+         * 返回：处理结果。
          */
+        @Override
         public TbActorId createActorId() {
             return new TbStringActorId(UUID.randomUUID().toString());
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `createActor` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：保存或创建Actor 实例。
+         * 参数：无。
+         * 返回：处理结果。
          */
+        @Override
         public TbActor createActor() {
             return new RuleChainErrorActor(context, tenantId, error);
         }

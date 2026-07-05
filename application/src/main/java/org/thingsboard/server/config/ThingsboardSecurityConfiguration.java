@@ -59,11 +59,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-@Configuration
-@EnableWebSecurity
-@EnableGlobalMethodSecurity(prePostEnabled = true)
-@Order(SecurityProperties.BASIC_AUTH_ORDER)
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`ThingsboardSecurityConfiguration` 是ThingsBoard Application 模块中的Spring 配置类型，用于声明应用启动、Web、安全、跨域、Swagger 或调度相关 Bean。
@@ -74,141 +69,89 @@ import java.util.List;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Configuration / Factory。
  */
+@Configuration
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+@Order(SecurityProperties.BASIC_AUTH_ORDER)
+@TbCoreComponent
 public class ThingsboardSecurityConfiguration {
 
     /**
-     * 字段说明：
-     * 1. 保存 `JWT_TOKEN_HEADER_PARAM` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 令牌常量，用于统一引用固定值。
      */
     public static final String JWT_TOKEN_HEADER_PARAM = "X-Authorization";
     public static final String JWT_TOKEN_HEADER_PARAM_V2 = "Authorization";
     /**
-     * 字段说明：
-     * 1. 保存 `JWT_TOKEN_QUERY_PARAM` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 查询条件常量，用于统一引用固定值。
      */
     public static final String JWT_TOKEN_QUERY_PARAM = "token";
 
     /**
-     * 字段说明：
-     * 1. 保存 `WEBJARS_ENTRY_POINT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `WEBJARS_ENTRY_POINT`常量，用于统一引用固定值。
      */
     public static final String WEBJARS_ENTRY_POINT = "/webjars/**";
     public static final String DEVICE_API_ENTRY_POINT = "/api/v1/**";
     /**
-     * 字段说明：
-     * 1. 保存 `FORM_BASED_LOGIN_ENTRY_POINT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `FORM_BASED_LOGIN_ENTRY_POINT`常量，用于统一引用固定值。
      */
     public static final String FORM_BASED_LOGIN_ENTRY_POINT = "/api/auth/login";
     public static final String PUBLIC_LOGIN_ENTRY_POINT = "/api/auth/login/public";
     /**
-     * 字段说明：
-     * 1. 保存 `TOKEN_REFRESH_ENTRY_POINT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 令牌常量，用于统一引用固定值。
      */
     public static final String TOKEN_REFRESH_ENTRY_POINT = "/api/auth/token";
     protected static final String[] NON_TOKEN_BASED_AUTH_ENTRY_POINTS = new String[] {"/index.html", "/assets/**", "/static/**", "/api/noauth/**", "/webjars/**",  "/api/license/**", "/api/images/public/**"};
     /**
-     * 字段说明：
-     * 1. 保存 `TOKEN_BASED_AUTH_ENTRY_POINT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 令牌常量，用于统一引用固定值。
      */
     public static final String TOKEN_BASED_AUTH_ENTRY_POINT = "/api/**";
     public static final String WS_ENTRY_POINT = "/api/ws/**";
     /**
-     * 字段说明：
-     * 1. 保存 `MAIL_OAUTH2_PROCESSING_ENTRY_POINT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `MAIL_OAUTH2_PROCESSING_ENTRY_POINT`常量，用于统一引用固定值。
      */
     public static final String MAIL_OAUTH2_PROCESSING_ENTRY_POINT = "/api/admin/mail/oauth2/code";
     public static final String DEVICE_CONNECTIVITY_CERTIFICATE_DOWNLOAD_ENTRY_POINT = "/api/device-connectivity/mqtts/certificate/download";
 
 
+    /**
+     * 处理器，负责处理对应任务或消息。
+     */
     @Autowired private ThingsboardErrorResponseHandler restAccessDeniedHandler;
 
     @Autowired(required = false)
     @Qualifier("oauth2AuthenticationSuccessHandler")
-    /**
-     * 字段说明：
-     * 1. 保存 `oauth2AuthenticationSuccessHandler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler;
 
+    /**
+     * 处理器，负责处理对应任务或消息。
+     */
     @Autowired(required = false)
     @Qualifier("oauth2AuthenticationFailureHandler")
-    /**
-     * 字段说明：
-     * 1. 保存 `oauth2AuthenticationFailureHandler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private AuthenticationFailureHandler oauth2AuthenticationFailureHandler;
 
-    @Autowired(required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `httpCookieOAuth2AuthorizationRequestRepository` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 请求，用于读取或保存对应领域对象。
      */
+    @Autowired(required = false)
     private HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
 
+    /**
+     * 处理器，负责处理对应任务或消息。
+     */
     @Autowired
     @Qualifier("defaultAuthenticationSuccessHandler")
-    /**
-     * 字段说明：
-     * 1. 保存 `successHandler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private AuthenticationSuccessHandler successHandler;
 
+    /**
+     * 处理器，负责处理对应任务或消息。
+     */
     @Autowired
     @Qualifier("defaultAuthenticationFailureHandler")
-    /**
-     * 字段说明：
-     * 1. 保存 `failureHandler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private AuthenticationFailureHandler failureHandler;
 
+    /**
+     * 令牌，用于认证或安全校验。
+     */
     @Autowired private RestAuthenticationProvider restAuthenticationProvider;
     @Autowired private JwtAuthenticationProvider jwtAuthenticationProvider;
     @Autowired private RefreshTokenAuthenticationProvider refreshTokenAuthenticationProvider;
@@ -217,31 +160,18 @@ public class ThingsboardSecurityConfiguration {
 
     @Autowired
     @Qualifier("jwtHeaderTokenExtractor")
-    /**
-     * 字段说明：
-     * 1. 保存 `jwtHeaderTokenExtractor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private TokenExtractor jwtHeaderTokenExtractor;
 
+    /**
+     * 功能：构建`Etag Filter`。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @Autowired private AuthenticationManager authenticationManager;
 
     @Autowired private RateLimitProcessingFilter rateLimitProcessingFilter;
 
     @Bean
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `buildEtagFilter` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     protected FilterRegistrationBean<ShallowEtagHeaderFilter> buildEtagFilter() throws Exception {
         ShallowEtagHeaderFilter etagFilter = new ShallowEtagHeaderFilter();
         etagFilter.setWriteWeakETag(true);
@@ -252,34 +182,24 @@ public class ThingsboardSecurityConfiguration {
         return filterRegistrationBean;
     }
 
-    @Bean
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildRestLoginProcessingFilter` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建`Rest Login Processing Filter`。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Bean
     protected RestLoginProcessingFilter buildRestLoginProcessingFilter() throws Exception {
         RestLoginProcessingFilter filter = new RestLoginProcessingFilter(FORM_BASED_LOGIN_ENTRY_POINT, successHandler, failureHandler);
         filter.setAuthenticationManager(this.authenticationManager);
         return filter;
     }
 
-    @Bean
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildRestPublicLoginProcessingFilter` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建`Rest Public Login Processing Filter`。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Bean
     protected RestPublicLoginProcessingFilter buildRestPublicLoginProcessingFilter() throws Exception {
         RestPublicLoginProcessingFilter filter = new RestPublicLoginProcessingFilter(PUBLIC_LOGIN_ENTRY_POINT, successHandler, failureHandler);
         filter.setAuthenticationManager(this.authenticationManager);
@@ -287,14 +207,9 @@ public class ThingsboardSecurityConfiguration {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildJwtTokenAuthenticationProcessingFilter` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建令牌。
+     * 参数：无。
+     * 返回：处理结果。
      */
     protected JwtTokenAuthenticationProcessingFilter buildJwtTokenAuthenticationProcessingFilter() throws Exception {
         List<String> pathsToSkip = new ArrayList<>(Arrays.asList(NON_TOKEN_BASED_AUTH_ENTRY_POINTS));
@@ -308,34 +223,25 @@ public class ThingsboardSecurityConfiguration {
         return filter;
     }
 
-    @Bean
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildRefreshTokenProcessingFilter` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建令牌。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Bean
     protected RefreshTokenProcessingFilter buildRefreshTokenProcessingFilter() throws Exception {
         RefreshTokenProcessingFilter filter = new RefreshTokenProcessingFilter(TOKEN_REFRESH_ENTRY_POINT, successHandler, failureHandler);
         filter.setAuthenticationManager(this.authenticationManager);
         return filter;
     }
 
-    @Bean
     /**
-     * 方法说明：
-     * 1. 职责：执行 `authenticationManager` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `authenticationManager` 对应的处理。
+     * 参数：
+     * - `objectPostProcessor`：处理器对象。
+     * 返回：处理结果。
      */
+    @Bean
     public AuthenticationManager authenticationManager(ObjectPostProcessor<Object> objectPostProcessor) throws Exception {
         DefaultAuthenticationEventPublisher eventPublisher = objectPostProcessor
                 .postProcess(new DefaultAuthenticationEventPublisher());
@@ -347,57 +253,41 @@ public class ThingsboardSecurityConfiguration {
         return auth.build();
     }
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `oAuth2AuthorizationRequestResolver` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
+    @Autowired
     private OAuth2AuthorizationRequestResolver oAuth2AuthorizationRequestResolver;
 
+    /**
+     * 功能：执行 `resources` 对应的处理。
+     * 参数：
+     * - `http`：`http` 参数。
+     * 返回：处理结果。
+     */
     @Bean
     @Order(0)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `resources` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     SecurityFilterChain resources(HttpSecurity http) throws Exception {
         http
                 .requestMatchers((matchers) -> matchers.antMatchers("/*.js","/*.css","/*.ico","/assets/**","/static/**"))
                 .headers().defaultsDisabled()
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 .addHeaderWriter(new StaticHeadersWriter(HttpHeaders.CACHE_CONTROL, "max-age=0, public"))
                 .and()
                 .authorizeHttpRequests((authorize) -> authorize.anyRequest().permitAll())
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 .requestCache().disable()
                 .securityContext().disable()
                 .sessionManagement().disable();
         return http.build();
     }
 
-    @Bean
     /**
-     * 方法说明：
-     * 1. 职责：执行 `filterChain` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `filterChain` 对应的处理。
+     * 参数：
+     * - `http`：`http` 参数。
+     * 返回：处理结果。
      */
+    @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         http.headers().cacheControl().and().frameOptions().disable()
                 .and()
                 .cors()
@@ -429,7 +319,6 @@ public class ThingsboardSecurityConfiguration {
                 .addFilterBefore(buildJwtTokenAuthenticationProcessingFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(buildRefreshTokenProcessingFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(rateLimitProcessingFilter, UsernamePasswordAuthenticationFilter.class);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (oauth2Configuration != null) {
             http.oauth2Login()
                     .authorizationEndpoint()
@@ -444,20 +333,15 @@ public class ThingsboardSecurityConfiguration {
         return http.build();
     }
 
+    /**
+     * 功能：执行 `corsFilter` 对应的处理。
+     * 参数：
+     * - `mvcCorsProperties`：`mvcCorsProperties` 参数。
+     * 返回：处理结果。
+     */
     @Bean
     @ConditionalOnMissingBean(CorsFilter.class)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `corsFilter` 对应的Spring 配置类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public CorsFilter corsFilter(@Autowired MvcCorsProperties mvcCorsProperties) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (mvcCorsProperties.getMappings().size() == 0) {
             return new CorsFilter(new UrlBasedCorsConfigurationSource());
         } else {

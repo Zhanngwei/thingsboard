@@ -94,12 +94,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.thingsboard.server.common.data.DataConstants.MAIN_QUEUE_NAME;
 import static org.thingsboard.server.common.data.DataConstants.MAIN_QUEUE_TOPIC;
 
-@TestPropertySource(properties = {
-        "js.evaluator=mock",
-        "queue.rule-engine.topic-deletion-delay=10"
-})
-@Slf4j
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`TenantControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -110,6 +104,12 @@ import static org.thingsboard.server.common.data.DataConstants.MAIN_QUEUE_TOPIC;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@TestPropertySource(properties = {
+        "js.evaluator=mock",
+        "queue.rule-engine.topic-deletion-delay=10"
+})
+@Slf4j
+@DaoSqlTest
 public class TenantControllerTest extends AbstractControllerTest {
 
     static final TypeReference<PageData<Tenant>> PAGE_DATA_TENANT_TYPE_REF = new TypeReference<>() {
@@ -118,77 +118,45 @@ public class TenantControllerTest extends AbstractControllerTest {
     };
 
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器列表，用于保存一组待处理对象。
      */
     ListeningExecutorService executor;
 
-    @SpyBean
     /**
-     * 字段说明：
-     * 1. 保存 `partitionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
+    @SpyBean
     private PartitionService partitionService;
-    @SpyBean
     /**
-     * 字段说明：
-     * 1. 保存 `actorContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @SpyBean
     private ActorSystemContext actorContext;
-    @SpyBean
     /**
-     * 字段说明：
-     * 1. 保存 `queueAdmin` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，用于标识消息投递或消费的队列。
      */
+    @SpyBean
     private TbQueueAdmin queueAdmin;
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setUp` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void setUp() throws Exception {
         executor = MoreExecutors.listeningDecorator(ThingsBoardExecutors.newWorkStealingPool(8, getClass()));
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `tearDown` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `tearDown` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void tearDown() throws Exception {
         loginSysAdmin();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Queue queue : doGetTypedWithPageLink("/api/queues?serviceType=TB_RULE_ENGINE&", new TypeReference<PageData<Queue>>() {}, new PageLink(100)).getData()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!queue.getName().equals(MAIN_QUEUE_NAME)) {
                 doDelete("/api/queues/" + queue.getId()).andExpect(status().isOk());
             }
@@ -196,17 +164,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         executor.shutdownNow();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveTenant() throws Exception {
         loginSysAdmin();
         Tenant tenant = new Tenant();
@@ -235,17 +198,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         testBroadcastEntityStateChangeEventTimeManyTimeTenant(savedTenant, ComponentLifecycleEvent.DELETED, 1);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveTenantWithViolationOfValidation` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveTenantWithViolationOfValidation() throws Exception {
         loginSysAdmin();
         Tenant tenant = new Tenant();
@@ -260,17 +218,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         testBroadcastEntityStateChangeEventNeverTenant();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户ID相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantById() throws Exception {
         loginSysAdmin();
         Tenant tenant = new Tenant();
@@ -283,17 +236,12 @@ public class TenantControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户ID相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantInfoById() throws Exception {
         loginSysAdmin();
         Tenant tenant = new Tenant();
@@ -306,17 +254,12 @@ public class TenantControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveTenantWithEmptyTitle` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveTenantWithEmptyTitle() throws Exception {
         loginSysAdmin();
 
@@ -330,17 +273,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         testBroadcastEntityStateChangeEventNeverTenant();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveTenantWithInvalidEmail` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveTenantWithInvalidEmail() throws Exception {
         loginSysAdmin();
 
@@ -356,17 +294,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         testBroadcastEntityStateChangeEventNeverTenant();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteTenant() throws Exception {
         loginSysAdmin();
         Tenant tenant = new Tenant();
@@ -381,17 +314,12 @@ public class TenantControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString(msgErrorNoFound("Tenant", tenantIdStr))));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenants` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Find Tenants`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenants() throws Exception {
         loginSysAdmin();
         List<Tenant> tenants = new ArrayList<>();
@@ -404,17 +332,13 @@ public class TenantControllerTest extends AbstractControllerTest {
         Mockito.reset(tbClusterService);
 
         int cntEntity = 56;
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<ListenableFuture<Tenant>> createFutures = new ArrayList<>(56);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < cntEntity; i++) {
             Tenant tenant = new Tenant();
             tenant.setTitle("Tenant" + i);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             createFutures.add(executor.submit(() ->
                     doPost("/api/tenant", tenant, Tenant.class)));
         }
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         tenants.addAll(Futures.allAsList(createFutures).get(TIMEOUT, TimeUnit.SECONDS));
 
         testBroadcastEntityStateChangeEventTimeManyTimeTenant(new Tenant(), ComponentLifecycleEvent.CREATED, cntEntity);
@@ -424,7 +348,6 @@ public class TenantControllerTest extends AbstractControllerTest {
         do {
             pageData = doGetTypedWithPageLink("/api/tenants?", PAGE_DATA_TENANT_TYPE_REF, pageLink);
             loadedTenants.addAll(pageData.getData());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pageData.hasNext()) {
                 pageLink = pageLink.nextPageLink();
             }
@@ -444,42 +367,32 @@ public class TenantControllerTest extends AbstractControllerTest {
         Assert.assertEquals(1, pageData.getData().size());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantsByTitle` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Find Tenants By Title`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantsByTitle() throws Exception {
         log.debug("login sys admin");
         loginSysAdmin();
         log.debug("test started");
         String title1 = "Tenant title 1";
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<ListenableFuture<Tenant>> createFutures = new ArrayList<>(134);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 134; i++) {
             Tenant tenant = new Tenant();
             String suffix = StringUtils.randomAlphanumeric((int) (5 + Math.random() * 10));
             String title = title1 + suffix;
             title = i % 2 == 0 ? title.toLowerCase() : title.toUpperCase();
             tenant.setTitle(title);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             createFutures.add(executor.submit(() ->
                     doPost("/api/tenant", tenant, Tenant.class)));
         }
 
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<Tenant> tenantsTitle1 = Futures.allAsList(createFutures).get(TIMEOUT, TimeUnit.SECONDS);
         log.debug("saved '{}', qty {}", title1, tenantsTitle1.size());
 
         String title2 = "Tenant title 2";
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         createFutures = new ArrayList<>(127);
         for (int i = 0; i < 127; i++) {
             Tenant tenant = new Tenant();
@@ -545,17 +458,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         log.debug("tried to search another '{}', step 4", title2);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantInfos` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantInfos() throws Exception {
         loginSysAdmin();
         List<TenantInfo> tenants = new ArrayList<>();
@@ -597,14 +505,11 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTenantsAsync` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Tenants Async`。
+     * 参数：
+     * - `urlTemplate`：`urlTemplate` 参数。
+     * - `tenants`：租户信息或租户标识。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<List<ResultActions>> deleteTenantsAsync(String urlTemplate, List<Tenant> tenants) {
         List<ListenableFuture<ResultActions>> futures = new ArrayList<>(tenants.size());
@@ -616,17 +521,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         return Futures.allAsList(futures);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testUpdateQueueConfigForIsolatedTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testUpdateQueueConfigForIsolatedTenant() throws Exception {
         Comparator<Queue> queueComparator = Comparator.comparing(Queue::getName);
         final String username = "isolatedtenant@thingsboard.org";
@@ -756,17 +656,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         doDelete("/api/tenant/" + tenant.getId().getId().toString()).andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testUpdateTenantProfileToIsolated` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testUpdateTenantProfileToIsolated() throws Exception {
         loginSysAdmin();
         doPost("/api/queues?serviceType=TB_RULE_ENGINE", new Queue(TenantId.SYS_TENANT_ID, getQueueConfig(DataConstants.HP_QUEUE_NAME, DataConstants.HP_QUEUE_TOPIC))).andExpect(status().isOk());
@@ -851,17 +746,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testIsolatedQueueDeletion` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证队列相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testIsolatedQueueDeletion() throws Exception {
         loginSysAdmin();
         TenantProfile tenantProfile = new TenantProfile();
@@ -916,17 +806,12 @@ public class TenantControllerTest extends AbstractControllerTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `whenTenantIsDeleted_thenDeleteQueues` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `whenTenantIsDeleted_thenDeleteQueues` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void whenTenantIsDeleted_thenDeleteQueues() throws Exception {
         loginSysAdmin();
         TenantProfile tenantProfile = new TenantProfile();
@@ -966,14 +851,11 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `publishTbMsg` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `tpi`：`tpi` 参数。
+     * 返回：处理结果。
      */
     private TbMsg publishTbMsg(TenantId tenantId, TopicPartitionInfo tpi) {
         TbMsg tbMsg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, tenantId, TbMsgMetaData.EMPTY, "{\"test\":1}");
@@ -986,14 +868,14 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyUsedQueueAndMessage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验队列。
+     * 参数：
+     * - `queue`：队列名称或队列对象。
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `msgType`：待处理消息。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void verifyUsedQueueAndMessage(String queue, TenantId tenantId, EntityId entityId, String msgType, Runnable action, Consumer<TopicPartitionInfo> tpiAssert) {
         await().atMost(15, TimeUnit.SECONDS)
@@ -1011,14 +893,11 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `awaitTbMsg` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `awaitTbMsg` 对应的处理。
+     * 参数：
+     * - `predicate`：`predicate` 参数。
+     * - `timeoutMillis`：`timeoutMillis` 参数。
+     * 返回：处理结果。
      */
     protected TbMsg awaitTbMsg(Predicate<TbMsg> predicate, int timeoutMillis) {
         AtomicReference<TbMsg> tbMsgCaptor = new AtomicReference<>();
@@ -1037,14 +916,11 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addQueueConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建队列。
+     * 参数：
+     * - `tenantProfile`：租户信息或租户标识。
+     * - `queueName`：队列名称或队列对象。
+     * 返回：无。
      */
     private void addQueueConfig(TenantProfile tenantProfile, String queueName) {
         TenantProfileQueueConfiguration queueConfiguration = getQueueConfig(queueName, "tb_rule_engine." + queueName.toLowerCase());
@@ -1060,14 +936,11 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getQueueConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取队列。
+     * 参数：
+     * - `queueName`：队列名称或队列对象。
+     * - `topic`：主题名称或主题对象。
+     * 返回：处理结果。
      */
     private TenantProfileQueueConfiguration getQueueConfig(String queueName, String topic) {
         TenantProfileQueueConfiguration queueConfiguration = new TenantProfileQueueConfiguration();
@@ -1092,14 +965,11 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getQueuesFromConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取配置。
+     * 参数：
+     * - `queueConfiguration`：队列名称或队列对象。
+     * - `queues`：队列名称或队列对象。
+     * 返回：匹配的数据集合。
      */
     private List<Queue> getQueuesFromConfig(List<TenantProfileQueueConfiguration> queueConfiguration, List<Queue> queues) {
         List<Queue> result = new ArrayList<>();
@@ -1121,14 +991,12 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testBroadcastEntityStateChangeEventTimeManyTimeTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：
+     * - `tenant`：租户信息或租户标识。
+     * - `event`：`event` 参数。
+     * - `cntTime`：`cntTime` 参数。
+     * 返回：无。
      */
     private void testBroadcastEntityStateChangeEventTimeManyTimeTenant(Tenant tenant, ComponentLifecycleEvent event, int cntTime) {
         ArgumentMatcher<Tenant> matcherTenant = cntTime == 1 ? argument -> argument.equals(tenant) :
@@ -1146,14 +1014,9 @@ public class TenantControllerTest extends AbstractControllerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testBroadcastEntityStateChangeEventNeverTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     private void testBroadcastEntityStateChangeEventNeverTenant() {
         Mockito.verify(tbClusterService, never()).onTenantChange(Mockito.any(Tenant.class),

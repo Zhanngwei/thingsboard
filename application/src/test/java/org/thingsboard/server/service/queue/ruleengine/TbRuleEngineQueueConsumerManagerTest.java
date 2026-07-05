@@ -90,8 +90,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-@Slf4j
-@RunWith(MockitoJUnitRunner.class)
 /**
  * 中文说明：
  * 1. 类目的：`TbRuleEngineQueueConsumerManagerTest` 是ThingsBoard Application 测试模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
@@ -102,134 +100,76 @@ import static org.mockito.Mockito.when;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
  */
+@Slf4j
+@RunWith(MockitoJUnitRunner.class)
 public class TbRuleEngineQueueConsumerManagerTest {
 
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `actorContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @Mock
     private ActorSystemContext actorContext;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `statsFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
+    @Mock
     private StatsFactory statsFactory;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `queueFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，用于按场景创建或提供目标对象。
      */
+    @Mock
     private TbRuleEngineQueueFactory queueFactory;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `statisticsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Mock
     private RuleEngineStatisticsService statisticsService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `serviceInfoProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Mock
     private TbServiceInfoProvider serviceInfoProvider;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `partitionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
+    @Mock
     private PartitionService partitionService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `producerProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 提供者，用于按场景创建或提供目标对象。
      */
+    @Mock
     private TbQueueProducerProvider producerProvider;
     private TbQueueProducer<TbProtoQueueMsg<ToRuleEngineMsg>> ruleEngineMsgProducer;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `queueAdmin` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，用于标识消息投递或消费的队列。
      */
+    @Mock
     private TbQueueAdmin queueAdmin;
     private TbRuleEngineConsumerContext ruleEngineConsumerContext;
 
     /**
-     * 字段说明：
-     * 1. 保存 `consumerManager` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 管理器，负责处理对应任务或消息。
      */
     private TbRuleEngineQueueConsumerManager consumerManager;
     private Queue queue;
 
     /**
-     * 字段说明：
-     * 1. 保存 `consumers` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `consumers`集合，用于去重保存或快速判断对象是否存在。
      */
     private Set<TestConsumer> consumers;
     private boolean generateQueueMsgs;
     /**
-     * 字段说明：
-     * 1. 保存 `totalConsumedMsgs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `totalConsumedMsgs` 字段，保存当前对象的对应属性。
      */
     private AtomicInteger totalConsumedMsgs;
     private AtomicInteger totalProcessedMsgs;
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeEach` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeEach` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeEach() {
         ruleEngineConsumerContext = new TbRuleEngineConsumerContext(
                 actorContext, statsFactory, spy(new TbRuleEngineSubmitStrategyFactory()),
@@ -246,7 +186,6 @@ public class TbRuleEngineQueueConsumerManagerTest {
             totalProcessedMsgs.incrementAndGet();
             log.trace("totalProcessedMsgs = {}", totalProcessedMsgs);
             return null;
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         }).when(actorContext).tell(any());
         ruleEngineMsgProducer = mock(TbQueueProducer.class);
         when(producerProvider.getRuleEngineMsgProducer()).thenReturn(ruleEngineMsgProducer);
@@ -275,36 +214,28 @@ public class TbRuleEngineQueueConsumerManagerTest {
 
         doAnswer(i -> {
             TestConsumer consumer = spy(new TestConsumer(queue.getTopic()));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (generateQueueMsgs) {
                 consumer.setUpTestMsg();
             }
             consumers.add(consumer);
             return consumer;
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         }).when(queueFactory).createToRuleEngineMsgConsumer(any());
 
         QueueKey queueKey = new QueueKey(ServiceType.TB_RULE_ENGINE, queue);
         consumerManager = new TbRuleEngineQueueConsumerManager(ruleEngineConsumerContext, queueKey);
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterEach` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterEach` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void afterEach() {
         consumerManager.stop();
         consumerManager.awaitStop();
         ruleEngineConsumerContext.stop();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (generateQueueMsgs) {
             await().atMost(10, TimeUnit.SECONDS)
                     .untilAsserted(() -> {
@@ -314,17 +245,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
         }
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testInit_consumerPerPartition` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testInit_consumerPerPartition() {
         queue.setConsumerPerPartition(true);
         consumerManager.init(queue);
@@ -341,24 +267,18 @@ public class TbRuleEngineQueueConsumerManagerTest {
         ruleEngineConsumerContext.setReady(true);
         await().atMost(2, TimeUnit.SECONDS)
                 .until(() -> consumers.size() == 3);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (TopicPartitionInfo partition : partitions) {
             TestConsumer consumer = getConsumer(partition);
             verifySubscribedAndLaunched(consumer, Set.of(partition));
         }
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testInit_singleConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证消息消费者相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testInit_singleConsumer() {
         queue.setConsumerPerPartition(false);
         consumerManager.init(queue);
@@ -379,17 +299,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
         verifySubscribedAndLaunched(consumer, partitions);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPartitionsUpdate_singleConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证消息消费者相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPartitionsUpdate_singleConsumer() {
         queue.setConsumerPerPartition(false);
         consumerManager.init(queue);
@@ -397,7 +312,6 @@ public class TbRuleEngineQueueConsumerManagerTest {
 
         Set<TopicPartitionInfo> partitions = Collections.emptySet();
         consumerManager.update(partitions);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         verify(queueFactory, after(1000).never()).createToRuleEngineMsgConsumer(any());
 
         partitions = createTpis(1);
@@ -423,24 +337,18 @@ public class TbRuleEngineQueueConsumerManagerTest {
         verifySubscribedAndLaunched(consumer, partitions);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPartitionsUpdate_consumerPerPartition` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPartitionsUpdate_consumerPerPartition() {
         queue.setConsumerPerPartition(true);
         consumerManager.init(queue);
         ruleEngineConsumerContext.setReady(true);
 
         consumerManager.update(Collections.emptySet());
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         verify(queueFactory, after(1000).never()).createToRuleEngineMsgConsumer(any());
 
         consumerManager.update(createTpis(1));
@@ -477,17 +385,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
         verifySubscribedAndLaunched(consumer3, 3);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testConfigUpdate_singleConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证配置相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testConfigUpdate_singleConsumer() {
         queue.setConsumerPerPartition(false);
         consumerManager.init(queue);
@@ -513,17 +416,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
                 });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testConfigUpdate_consumerPerPartition` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testConfigUpdate_consumerPerPartition() {
         queue.setConsumerPerPartition(true);
         consumerManager.init(queue);
@@ -556,17 +454,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
         verifyNotTouched(consumer3);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testConfigUpdate_fromSingleToConsumerPerPartition` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testConfigUpdate_fromSingleToConsumerPerPartition() {
         queue.setConsumerPerPartition(false);
         consumerManager.init(queue);
@@ -586,17 +479,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
         verifySubscribedAndLaunched(getConsumer(3), 3);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testConfigUpdate_fromConsumerPerPartitionToSingle` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testConfigUpdate_fromConsumerPerPartitionToSingle() {
         queue.setConsumerPerPartition(true);
         consumerManager.init(queue);
@@ -620,17 +508,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
         verifySubscribedAndLaunched(getConsumer(), partitions);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testStop` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Stop`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testStop() {
         queue.setConsumerPerPartition(true);
         consumerManager.init(queue);
@@ -638,7 +521,6 @@ public class TbRuleEngineQueueConsumerManagerTest {
         consumerManager.update(createTpis(1));
         TestConsumer consumer = getConsumer(1);
         verifySubscribedAndLaunched(consumer, 1);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         verify(queueFactory, times(1)).createToRuleEngineMsgConsumer(any());
 
         consumerManager.stop();
@@ -649,17 +531,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
         verifyNoMoreInteractions(queueFactory);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDelete_consumerPerPartition` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDelete_consumerPerPartition() {
         queue.setConsumerPerPartition(true);
         consumerManager.init(queue);
@@ -699,22 +576,16 @@ public class TbRuleEngineQueueConsumerManagerTest {
         int totalMovedMsgs = totalConsumedMsgs.get() - msgCount;
         assertThat(totalMovedMsgs).isNotZero();
         verify(ruleEngineMsgProducer, atLeast(totalMovedMsgs)).send(any(), any(), any());
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         verify(actorContext, never()).tell(any());
         generateQueueMsgs = false;
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDelete_singleConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证消息消费者相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDelete_singleConsumer() {
         queue.setConsumerPerPartition(false);
         consumerManager.init(queue);
@@ -749,22 +620,16 @@ public class TbRuleEngineQueueConsumerManagerTest {
         int movedMsgs = totalConsumedMsgs.get() - msgCount;
         assertThat(movedMsgs).isNotZero();
         verify(ruleEngineMsgProducer, atLeast(movedMsgs)).send(any(), any(), any());
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         verify(actorContext, never()).tell(any());
         generateQueueMsgs = false;
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testManyDifferentUpdates` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Many Different Updates`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testManyDifferentUpdates() throws Exception {
         queue.setConsumerPerPartition(RandomUtils.nextBoolean());
         consumerManager.init(queue);
@@ -795,11 +660,9 @@ public class TbRuleEngineQueueConsumerManagerTest {
         int iterations = 100;
         Queue latestConfig = queue;
         Set<TopicPartitionInfo> latestPartitions = Collections.emptySet();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 1; i <= iterations; i++) {
             boolean updateQueueConfig = RandomUtils.nextBoolean();
             boolean updatePartitions = !updateQueueConfig;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (updateQueueConfig) {
                 latestConfig = queueConfigUpdater.get();
                 consumerManager.update(latestConfig);
@@ -856,14 +719,11 @@ public class TbRuleEngineQueueConsumerManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifySubscribedAndLaunched` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Subscribed And Launched`。
+     * 参数：
+     * - `consumer`：`consumer` 参数。
+     * - `expectedPartitions`：分区标识或分区信息。
+     * 返回：无。
      */
     private void verifySubscribedAndLaunched(TestConsumer consumer, Set<TopicPartitionInfo> expectedPartitions) {
         await().atMost(2, TimeUnit.SECONDS)
@@ -879,28 +739,21 @@ public class TbRuleEngineQueueConsumerManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifySubscribedAndLaunched` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Subscribed And Launched`。
+     * 参数：
+     * - `consumer`：`consumer` 参数。
+     * - `expectedPartitions`：分区标识或分区信息。
+     * 返回：无。
      */
     private void verifySubscribedAndLaunched(TestConsumer consumer, int... expectedPartitions) {
         verifySubscribedAndLaunched(consumer, createTpis(expectedPartitions));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyUnsubscribedAndStopped` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Unsubscribed And Stopped`。
+     * 参数：
+     * - `consumer`：`consumer` 参数。
+     * 返回：无。
      */
     private void verifyUnsubscribedAndStopped(TestConsumer consumer) {
         await().atMost(2, TimeUnit.SECONDS)
@@ -912,14 +765,10 @@ public class TbRuleEngineQueueConsumerManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyNotTouched` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Not Touched`。
+     * 参数：
+     * - `consumer`：`consumer` 参数。
+     * 返回：无。
      */
     private void verifyNotTouched(TestConsumer consumer) {
         verify(consumer, never()).subscribe(any());
@@ -930,14 +779,10 @@ public class TbRuleEngineQueueConsumerManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyMsgProcessed` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验消息。
+     * 参数：
+     * - `tbMsg`：待处理消息。
+     * 返回：无。
      */
     private void verifyMsgProcessed(TbMsg tbMsg) {
         await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> {
@@ -949,14 +794,10 @@ public class TbRuleEngineQueueConsumerManagerTest {
 
     // for consumer-per-partition
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息消费者。
+     * 参数：
+     * - `tpi`：`tpi` 参数。
+     * 返回：处理结果。
      */
     private TestConsumer getConsumer(TopicPartitionInfo tpi) {
         return await().atMost(5, TimeUnit.SECONDS)
@@ -968,14 +809,10 @@ public class TbRuleEngineQueueConsumerManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息消费者。
+     * 参数：
+     * - `partition`：分区标识或分区信息。
+     * 返回：处理结果。
      */
     private TestConsumer getConsumer(int partition) {
         return await().atMost(5, TimeUnit.SECONDS)
@@ -989,14 +826,9 @@ public class TbRuleEngineQueueConsumerManagerTest {
 
     // for single consumer
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息消费者。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private TestConsumer getConsumer() {
         return await().atMost(5, TimeUnit.SECONDS)
@@ -1004,14 +836,10 @@ public class TbRuleEngineQueueConsumerManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createTpis` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Tpis`。
+     * 参数：
+     * - `partitions`：分区标识或分区信息。
+     * 返回：匹配的数据集合。
      */
     private Set<TopicPartitionInfo> createTpis(int... partitions) {
         return Arrays.stream(partitions)
@@ -1037,64 +865,41 @@ public class TbRuleEngineQueueConsumerManagerTest {
      */
     class TestConsumer extends AbstractTbQueueConsumerTemplate<TbMsg, TbProtoQueueMsg<ToRuleEngineMsg>> {
 
-        @Getter
         /**
-         * 字段说明：
-         * 1. 保存 `topics` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `topics`列表，用于保存一组待处理对象。
          */
+        @Getter
         private List<String> topics;
 
         /**
-         * 字段说明：
-         * 1. 保存 `subscribed` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 是否满足`subscribed`条件。
          */
         private boolean subscribed;
         private boolean pollingStarted;
 
         /**
-         * 字段说明：
-         * 1. 保存 `testMsg` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 消息，承载当前步骤需要处理的内容。
          */
         private TbMsg testMsg;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `TestConsumer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `TbRuleEngineQueueConsumerManagerTest` 实例，并初始化必要字段。
+         * 参数：
+         * - `topic`：主题名称或主题对象。
+         * 返回：新创建的对象实例。
          */
         public TestConsumer(String topic) {
             super(topic);
         }
 
+        /**
+         * 功能：执行 `doPoll` 对应的处理。
+         * 参数：
+         * - `durationInMillis`：`durationInMillis` 参数。
+         * 返回：匹配的数据集合。
+         */
         @SneakyThrows
         @Override
-        /**
-         * 方法说明：
-         * 1. 职责：执行 `doPoll` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-         */
         protected List<TbMsg> doPoll(long durationInMillis) {
             log.debug("doPoll({} ms)", durationInMillis);
             if (!subscribed) {
@@ -1108,17 +913,13 @@ public class TbRuleEngineQueueConsumerManagerTest {
             return Collections.emptyList();
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `decode` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `decode` 对应的处理。
+         * 参数：
+         * - `tbMsg`：待处理消息。
+         * 返回：处理结果。
          */
+        @Override
         protected TbProtoQueueMsg<ToRuleEngineMsg> decode(TbMsg tbMsg) throws IOException {
             log.debug("decode()");
             UUID tenantId = UUID.randomUUID();
@@ -1130,34 +931,25 @@ public class TbRuleEngineQueueConsumerManagerTest {
                     .build());
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `doSubscribe` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `doSubscribe` 对应的处理。
+         * 参数：
+         * - `topicNames`：主题名称或主题对象。
+         * 返回：无。
          */
+        @Override
         protected void doSubscribe(List<String> topicNames) {
             log.debug("doSubscribe({})", topicNames);
             this.topics = topicNames;
             subscribed = true;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `doCommit` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `doCommit` 对应的处理。
+         * 参数：无。
+         * 返回：无。
          */
+        @Override
         protected void doCommit() {
             if (!subscribed) {
                 throw new IllegalStateException("Cannot commit because not subscribed");
@@ -1165,33 +957,23 @@ public class TbRuleEngineQueueConsumerManagerTest {
             log.debug("doCommit() totalConsumedMsgs = {}", totalConsumedMsgs.incrementAndGet());
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `unsubscribe` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `unsubscribe` 对应的处理。
+         * 参数：无。
+         * 返回：无。
          */
+        @Override
         public void unsubscribe() {
             super.unsubscribe();
             consumers.remove(this);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `doUnsubscribe` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `doUnsubscribe` 对应的处理。
+         * 参数：无。
+         * 返回：无。
          */
+        @Override
         protected void doUnsubscribe() {
             log.debug("doUnsubscribe()");
             if (!subscribed) {
@@ -1200,44 +982,29 @@ public class TbRuleEngineQueueConsumerManagerTest {
             subscribed = false;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `isLongPollingSupported` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：判断`Long Polling Supported`。
+         * 参数：无。
+         * 返回：判断结果。
          */
+        @Override
         protected boolean isLongPollingSupported() {
             return false;
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getPartitions` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取`Partitions`。
+         * 参数：无。
+         * 返回：匹配的数据集合。
          */
         public Set<TopicPartitionInfo> getPartitions() {
             return partitions;
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `setUpTestMsg` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：更新消息。
+         * 参数：无。
+         * 返回：无。
          */
         public void setUpTestMsg() {
             testMsg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, new DeviceId(UUID.randomUUID()), new TbMsgMetaData(), "{}");

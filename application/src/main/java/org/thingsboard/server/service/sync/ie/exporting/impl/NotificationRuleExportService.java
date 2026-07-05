@@ -44,8 +44,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@Service
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`NotificationRuleExportService` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
@@ -56,35 +54,32 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Observer。
  */
+@Service
+@TbCoreComponent
 public class NotificationRuleExportService<I extends EntityId, E extends ExportableEntity<I>, D extends EntityExportData<E>> extends BaseEntityExportService<NotificationRuleId, NotificationRule, EntityExportData<NotificationRule>> {
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setRelatedEntities` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Related Entities`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `notificationRule`：`notificationRule` 参数。
+     * - `exportData`：待处理数据。
+     * 返回：无。
      */
+    @Override
     protected void setRelatedEntities(EntitiesExportCtx<?> ctx, NotificationRule notificationRule, EntityExportData<NotificationRule> exportData) {
         notificationRule.setTemplateId(getExternalIdOrElseInternal(ctx, notificationRule.getTemplateId()));
 
         NotificationRuleTriggerConfig ruleTriggerConfig = notificationRule.getTriggerConfig();
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (ruleTriggerConfig.getTriggerType()) {
             case DEVICE_ACTIVITY: {
                 DeviceActivityNotificationRuleTriggerConfig triggerConfig = (DeviceActivityNotificationRuleTriggerConfig) ruleTriggerConfig;
                 Set<UUID> devices = triggerConfig.getDevices();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (devices != null) {
                     triggerConfig.setDevices(toExternalIds(devices, DeviceId::new, ctx).collect(Collectors.toSet()));
                 }
 
                 Set<UUID> deviceProfiles = triggerConfig.getDeviceProfiles();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (deviceProfiles != null) {
                     triggerConfig.setDeviceProfiles(toExternalIds(deviceProfiles, DeviceProfileId::new, ctx).collect(Collectors.toSet()));
                 }
@@ -93,7 +88,6 @@ public class NotificationRuleExportService<I extends EntityId, E extends Exporta
             case RULE_ENGINE_COMPONENT_LIFECYCLE_EVENT: {
                 RuleEngineComponentLifecycleEventNotificationRuleTriggerConfig triggerConfig = (RuleEngineComponentLifecycleEventNotificationRuleTriggerConfig) ruleTriggerConfig;
                 Set<UUID> ruleChains = triggerConfig.getRuleChains();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (ruleChains != null) {
                     triggerConfig.setRuleChains(toExternalIds(ruleChains, RuleChainId::new, ctx).collect(Collectors.toSet()));
                 }
@@ -112,7 +106,6 @@ public class NotificationRuleExportService<I extends EntityId, E extends Exporta
         }
 
         NotificationRuleRecipientsConfig ruleRecipientsConfig = notificationRule.getRecipientsConfig();
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (ruleTriggerConfig.getTriggerType()) {
             case ALARM: {
                 EscalatedNotificationRuleRecipientsConfig recipientsConfig = (EscalatedNotificationRuleRecipientsConfig) ruleRecipientsConfig;
@@ -133,17 +126,12 @@ public class NotificationRuleExportService<I extends EntityId, E extends Exporta
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSupportedEntityTypes` 对应的版本同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务、事件监听或同步任务触发时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Set<EntityType> getSupportedEntityTypes() {
         return Set.of(EntityType.NOTIFICATION_RULE);
     }

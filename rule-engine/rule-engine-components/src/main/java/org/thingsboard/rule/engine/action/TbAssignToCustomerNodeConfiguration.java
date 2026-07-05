@@ -18,24 +18,25 @@ package org.thingsboard.rule.engine.action;
 import lombok.Data;
 import org.thingsboard.rule.engine.api.NodeConfiguration;
 
-@Data
 /**
  * 中文说明：`TbAssignToCustomerNodeConfiguration` 是分配到客户节点配置对象，用于承载规则节点 JSON 中的配置项和默认值。
  * 配置来源：实例字段通常由前端规则节点配置 JSON 反序列化得到，`defaultConfiguration` 提供缺省配置。
  * 调用边界：本类本身不直接涉及数据库、缓存、MQTT、Actor 或事务；具体实现和调用链可能在使用这些配置的节点中涉及。
  */
+@Data
 public class TbAssignToCustomerNodeConfiguration extends TbAbstractCustomerActionNodeConfiguration implements NodeConfiguration<TbAssignToCustomerNodeConfiguration> {
 
     /**
-     * 配置字段：来自规则节点 JSON 的 `createCustomerIfNotExists` 配置项，控制客户名称、客户标识或客户缓存。
+     * 是否满足客户条件。
      */
     private boolean createCustomerIfNotExists;
 
-    @Override
     /**
-     * 方法说明：构建规则节点 JSON 未显式提供字段时使用的默认配置。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public TbAssignToCustomerNodeConfiguration defaultConfiguration() {
         TbAssignToCustomerNodeConfiguration configuration = new TbAssignToCustomerNodeConfiguration();
         configuration.setCustomerNamePattern("");

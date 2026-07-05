@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractActivityManager` 是ThingsBoard Common 模块中的传输协议契约或适配类型，用于抽象 MQTT、HTTP、CoAP、LwM2M、SNMP 与 ThingsBoard 核心消息之间的协议边界。
@@ -40,22 +39,17 @@ import java.util.concurrent.atomic.AtomicLong;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Adapter / Strategy / Command。
  */
+@Slf4j
 public abstract class AbstractActivityManager<Key, Metadata> implements ActivityManager<Key, Metadata> {
 
     private final ConcurrentMap<Key, ActivityStateWrapper> states = new ConcurrentHashMap<>();
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `scheduler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 调度器，用于安排延迟任务或周期任务。
      */
+    @Autowired
     protected SchedulerComponent scheduler;
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`ActivityStateWrapper` 是ThingsBoard Common 模块中的传输协议契约或适配类型，用于抽象 MQTT、HTTP、CoAP、LwM2M、SNMP 与 ThingsBoard 核心消息之间的协议边界。
@@ -66,39 +60,25 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 Adapter / Strategy / Command。
      */
+    @Data
     private class ActivityStateWrapper {
 
         /**
-         * 字段说明：
-         * 1. 保存 `state` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 状态，表示当前对象所处状态。
          */
         private volatile ActivityState<Metadata> state;
         private volatile long lastReportedTime;
         /**
-         * 字段说明：
-         * 1. 保存 `strategy` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 策略对象，封装可复用的处理规则。
          */
         private volatile ActivityStrategy strategy;
 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     protected void init() {
         var reportingPeriodMillis = getReportingPeriodMillis();
@@ -106,90 +86,66 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getReportingPeriodMillis` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取上报。
+     * 参数：无。
+     * 返回：数值结果。
      */
     protected abstract long getReportingPeriodMillis();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStrategy` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取策略对象。
+     * 参数：无。
+     * 返回：处理结果。
      */
     protected abstract ActivityStrategy getStrategy();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateState` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新状态。
+     * 参数：
+     * - `key`：键。
+     * - `state`：`state` 参数。
+     * 返回：处理结果。
      */
     protected abstract ActivityState<Metadata> updateState(Key key, ActivityState<Metadata> state);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hasExpired` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Expired`。
+     * 参数：
+     * - `lastRecordedTime`：`lastRecordedTime` 参数。
+     * 返回：判断结果。
      */
     protected abstract boolean hasExpired(long lastRecordedTime);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onStateExpiry` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理状态。
+     * 参数：
+     * - `key`：键。
+     * - `metadata`：待处理数据。
+     * 返回：无。
      */
     protected abstract void onStateExpiry(Key key, Metadata metadata);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportActivity` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：上报`Activity`。
+     * 参数：
+     * - `key`：键。
+     * - `metadata`：待处理数据。
+     * - `timeToReport`：`timeToReport` 参数。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     protected abstract void reportActivity(Key key, Metadata metadata, long timeToReport, ActivityReportCallback<Key> callback);
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onActivity` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Activity`。
+     * 参数：
+     * - `key`：键。
+     * - `metadata`：待处理数据。
+     * - `newLastRecordedTime`：`newLastRecordedTime` 参数。
+     * 返回：无。
      */
+    @Override
     public void onActivity(Key key, Metadata metadata, long newLastRecordedTime) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (key == null) {
             log.error("Failed to process activity event: provided activity key is null.");
             return;
@@ -201,7 +157,6 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
         var lastReportedTime = new AtomicLong();
 
         states.compute(key, (__, stateWrapper) -> {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (stateWrapper == null) {
                 ActivityState<Metadata> newState = new ActivityState<>();
                 stateWrapper = new ActivityStateWrapper();
@@ -210,7 +165,6 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
             }
             var state = stateWrapper.getState();
             state.setMetadata(metadata);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (state.getLastRecordedTime() < newLastRecordedTime) {
                 state.setLastRecordedTime(newLastRecordedTime);
             }
@@ -220,7 +174,6 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
             return stateWrapper;
         });
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (shouldReport.get() && lastReportedTime.get() < lastRecordedTime.get()) {
             log.debug("Going to report first activity event for key: [{}].", key);
             reportActivity(key, metadata, lastRecordedTime.get(), new ActivityReportCallback<>() {
@@ -237,20 +190,14 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onReportingPeriodEnd` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理上报。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void onReportingPeriodEnd() {
         log.debug("Going to end reporting period.");
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Map.Entry<Key, ActivityStateWrapper> entry : states.entrySet()) {
             var key = entry.getKey();
             var stateWrapper = entry.getValue();
@@ -264,7 +211,6 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
             boolean shouldReport;
 
             var updatedState = updateState(key, currentState);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (updatedState != null) {
                 stateWrapper.setState(updatedState);
                 lastRecordedTime = updatedState.getLastRecordedTime();
@@ -277,14 +223,12 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
                 shouldReport = true;
             }
 
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (hasExpired) {
                 states.remove(key);
                 onStateExpiry(key, metadata);
                 shouldReport = true;
             }
 
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (shouldReport && lastReportedTime < lastRecordedTime) {
                 log.debug("Going to report last activity event for key: [{}].", key);
                 reportActivity(key, metadata, lastRecordedTime, new ActivityReportCallback<>() {
@@ -302,31 +246,24 @@ public abstract class AbstractActivityManager<Key, Metadata> implements Activity
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLastRecordedTime` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间。
+     * 参数：
+     * - `key`：键。
+     * 返回：数值结果。
      */
+    @Override
     public long getLastRecordedTime(Key key) {
         ActivityStateWrapper stateWrapper = states.get(key);
         return stateWrapper == null ? 0L : stateWrapper.getState().getLastRecordedTime();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateLastReportedTime` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新时间。
+     * 参数：
+     * - `key`：键。
+     * - `newLastReportedTime`：`newLastReportedTime` 参数。
+     * 返回：无。
      */
     private void updateLastReportedTime(Key key, long newLastReportedTime) {
         states.computeIfPresent(key, (__, stateWrapper) -> {

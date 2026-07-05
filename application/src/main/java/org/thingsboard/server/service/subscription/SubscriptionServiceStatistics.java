@@ -20,7 +20,6 @@ import lombok.Data;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`SubscriptionServiceStatistics` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -31,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Data
 public class SubscriptionServiceStatistics {
     private AtomicInteger alarmQueryInvocationCnt = new AtomicInteger();
     private AtomicInteger regularQueryInvocationCnt = new AtomicInteger();

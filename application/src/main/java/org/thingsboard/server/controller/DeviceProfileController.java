@@ -70,11 +70,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TENANT_OR_CU
 import static org.thingsboard.server.controller.ControllerConstants.TRANSPORT_TYPE_ALLOWABLE_VALUES;
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DeviceProfileController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -85,30 +80,33 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
+@RequiredArgsConstructor
+@Slf4j
 public class DeviceProfileController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbDeviceProfileService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备配置，提供当前类调用的业务操作。
      */
     private final TbDeviceProfileService tbDeviceProfileService;
     private final ImageService imageService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `timeseriesService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时序数据，提供当前类调用的业务操作。
      */
+    @Autowired
     private TimeseriesService timeseriesService;
 
+    /**
+     * 功能：获取设备配置。
+     * 参数：
+     * - `strDeviceProfileId`：设备配置ID。
+     * - `INLINE_IMAGES`：`INLINE_IMAGES` 参数。
+     * - `inlineImages`：`inlineImages` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Device Profile (getDeviceProfileById)",
             notes = "Fetch the Device Profile object based on the provided Device Profile Id. " +
                     "The server checks that the device profile is owned by the same tenant. " + TENANT_AUTHORITY_PARAGRAPH,
@@ -116,16 +114,6 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/deviceProfile/{deviceProfileId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceProfileById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceProfile getDeviceProfileById(
             @ApiParam(value = DEVICE_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(DEVICE_PROFILE_ID) String strDeviceProfileId,
@@ -134,13 +122,18 @@ public class DeviceProfileController extends BaseController {
         checkParameter(DEVICE_PROFILE_ID, strDeviceProfileId);
         DeviceProfileId deviceProfileId = new DeviceProfileId(toUUID(strDeviceProfileId));
         var result = checkDeviceProfileId(deviceProfileId, Operation.READ);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (inlineImages) {
             imageService.inlineImage(result);
         }
         return result;
     }
 
+    /**
+     * 功能：获取设备配置。
+     * 参数：
+     * - `strDeviceProfileId`：设备配置ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Device Profile Info (getDeviceProfileInfoById)",
             notes = "Fetch the Device Profile Info object based on the provided Device Profile Id. "
                     + DEVICE_PROFILE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -148,16 +141,6 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/deviceProfileInfo/{deviceProfileId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceProfileInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceProfileInfo getDeviceProfileInfoById(
             @ApiParam(value = DEVICE_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(DEVICE_PROFILE_ID) String strDeviceProfileId) throws ThingsboardException {
@@ -166,6 +149,11 @@ public class DeviceProfileController extends BaseController {
         return new DeviceProfileInfo(checkDeviceProfileId(deviceProfileId, Operation.READ));
     }
 
+    /**
+     * 功能：获取设备配置。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Default Device Profile (getDefaultDeviceProfileInfo)",
             notes = "Fetch the Default Device Profile Info object. " +
                     DEVICE_PROFILE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -173,20 +161,17 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/deviceProfileInfo/default", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDefaultDeviceProfileInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceProfileInfo getDefaultDeviceProfileInfo() throws ThingsboardException {
         return checkNotNull(deviceProfileService.findDefaultDeviceProfileInfo(getTenantId()));
     }
 
+    /**
+     * 功能：获取时序数据。
+     * 参数：
+     * - `DEVICE_PROFILE_ID`：设备配置ID。
+     * - `deviceProfileIdStr`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get time-series keys (getTimeseriesKeys)",
             notes = "Get a set of unique time-series keys used by devices that belong to specified profile. " +
                     "If profile is not set returns a list of unique keys among all profiles. " +
@@ -197,21 +182,10 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/deviceProfile/devices/keys/timeseries", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimeseriesKeys` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<String> getTimeseriesKeys(
             @ApiParam(value = DEVICE_PROFILE_ID_PARAM_DESCRIPTION)
             @RequestParam(name = DEVICE_PROFILE_ID, required = false) String deviceProfileIdStr) throws ThingsboardException {
         DeviceProfileId deviceProfileId;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isNotEmpty(deviceProfileIdStr)) {
             deviceProfileId = new DeviceProfileId(UUID.fromString(deviceProfileIdStr));
             checkDeviceProfileId(deviceProfileId, Operation.READ);
@@ -222,6 +196,13 @@ public class DeviceProfileController extends BaseController {
         return timeseriesService.findAllKeysByDeviceProfileId(getTenantId(), deviceProfileId);
     }
 
+    /**
+     * 功能：获取`Attributes Keys`。
+     * 参数：
+     * - `DEVICE_PROFILE_ID`：设备配置ID。
+     * - `deviceProfileIdStr`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get attribute keys (getAttributesKeys)",
             notes = "Get a set of unique attribute keys used by devices that belong to specified profile. " +
                     "If profile is not set returns a list of unique keys among all profiles. " +
@@ -232,21 +213,10 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/deviceProfile/devices/keys/attributes", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributesKeys` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<String> getAttributesKeys(
             @ApiParam(value = DEVICE_PROFILE_ID_PARAM_DESCRIPTION)
             @RequestParam(name = DEVICE_PROFILE_ID, required = false) String deviceProfileIdStr) throws ThingsboardException {
         DeviceProfileId deviceProfileId;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isNotEmpty(deviceProfileIdStr)) {
             deviceProfileId = new DeviceProfileId(UUID.fromString(deviceProfileIdStr));
             checkDeviceProfileId(deviceProfileId, Operation.READ);
@@ -257,6 +227,12 @@ public class DeviceProfileController extends BaseController {
         return attributesService.findAllKeysByDeviceProfileId(getTenantId(), deviceProfileId);
     }
 
+    /**
+     * 功能：保存或创建设备配置。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create Or Update Device Profile (saveDeviceProfile)",
             notes = "Create or update the Device Profile. When creating device profile, platform generates device profile id as " + UUID_WIKI_LINK +
                     "The newly created device profile id will be present in the response. " +
@@ -270,16 +246,6 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/deviceProfile", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDeviceProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceProfile saveDeviceProfile(
             @ApiParam(value = "A JSON value representing the device profile.")
             @RequestBody DeviceProfile deviceProfile) throws Exception {
@@ -288,6 +254,12 @@ public class DeviceProfileController extends BaseController {
         return tbDeviceProfileService.save(deviceProfile, getCurrentUser());
     }
 
+    /**
+     * 功能：删除或清理设备配置。
+     * 参数：
+     * - `strDeviceProfileId`：设备配置ID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete device profile (deleteDeviceProfile)",
             notes = "Deletes the device profile. Referencing non-existing device profile Id will cause an error. " +
                     "Can't delete the device profile if it is referenced by existing devices." + TENANT_AUTHORITY_PARAGRAPH,
@@ -295,16 +267,6 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/deviceProfile/{deviceProfileId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDeviceProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteDeviceProfile(
             @ApiParam(value = DEVICE_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(DEVICE_PROFILE_ID) String strDeviceProfileId) throws ThingsboardException {
@@ -314,22 +276,18 @@ public class DeviceProfileController extends BaseController {
         tbDeviceProfileService.delete(deviceProfile, getCurrentUser());
     }
 
+    /**
+     * 功能：更新设备配置。
+     * 参数：
+     * - `strDeviceProfileId`：设备配置ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Make Device Profile Default (setDefaultDeviceProfile)",
             notes = "Marks device profile as default within a tenant scope." + TENANT_AUTHORITY_PARAGRAPH,
             produces = "application/json")
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/deviceProfile/{deviceProfileId}/default", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `setDefaultDeviceProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceProfile setDefaultDeviceProfile(
             @ApiParam(value = DEVICE_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(DEVICE_PROFILE_ID) String strDeviceProfileId) throws ThingsboardException {
@@ -340,6 +298,16 @@ public class DeviceProfileController extends BaseController {
         return tbDeviceProfileService.setDefaultDeviceProfile(deviceProfile, previousDefaultDeviceProfile, getCurrentUser());
     }
 
+    /**
+     * 功能：获取设备。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Device Profiles (getDeviceProfiles)",
             notes = "Returns a page of devices profile objects owned by tenant. " +
                     PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH,
@@ -347,16 +315,6 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/deviceProfiles", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceProfiles` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DeviceProfile> getDeviceProfiles(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -372,6 +330,16 @@ public class DeviceProfileController extends BaseController {
         return checkNotNull(deviceProfileService.findDeviceProfiles(getTenantId(), pageLink));
     }
 
+    /**
+     * 功能：获取设备配置。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Device Profiles for transport type (getDeviceProfileInfos)",
             notes = "Returns a page of devices profile info objects owned by tenant. " +
                     PAGE_DATA_PARAMETERS + DEVICE_PROFILE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -379,16 +347,6 @@ public class DeviceProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/deviceProfileInfos", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceProfileInfos` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DeviceProfileInfo> getDeviceProfileInfos(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -403,26 +361,23 @@ public class DeviceProfileController extends BaseController {
             @ApiParam(value = "Type of the transport", allowableValues = TRANSPORT_TYPE_ALLOWABLE_VALUES)
             @RequestParam(required = false) String transportType) throws ThingsboardException {
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return checkNotNull(deviceProfileService.findDeviceProfileInfos(getTenantId(), pageLink, transportType));
     }
 
+    /**
+     * 功能：获取设备配置。
+     * 参数：
+     * - `activeOnly`：`activeOnly` 参数。
+     * - `false`：`false` 参数。
+     * - `activeOnly`：`activeOnly` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Device Profile names (getDeviceProfileNames)",
             notes = "Returns a set of unique device profile names owned by the tenant."
                     + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/deviceProfile/names", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceProfileNames` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<EntityInfo> getDeviceProfileNames(
             @ApiParam(value = "Flag indicating whether to retrieve exclusively the names of device profiles that are referenced by tenant's devices.")
             @RequestParam(value = "activeOnly", required = false, defaultValue = "false") boolean activeOnly) throws ThingsboardException {

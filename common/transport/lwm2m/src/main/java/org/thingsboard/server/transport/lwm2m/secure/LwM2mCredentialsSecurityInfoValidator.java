@@ -50,10 +50,6 @@ import static org.eclipse.leshan.core.SecurityMode.RPK;
 import static org.eclipse.leshan.core.SecurityMode.X509;
 import static org.thingsboard.server.transport.lwm2m.server.uplink.LwM2mTypeServer.BOOTSTRAP;
 
-@Slf4j
-@Component
-@TbLwM2mTransportComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`LwM2mCredentialsSecurityInfoValidator` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -64,36 +60,30 @@ import static org.thingsboard.server.transport.lwm2m.server.uplink.LwM2mTypeServ
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Component
+@TbLwM2mTransportComponent
+@RequiredArgsConstructor
 public class LwM2mCredentialsSecurityInfoValidator {
 
     /**
-     * 字段说明：
-     * 1. 保存 `context` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private final LwM2mTransportContext context;
     private final LwM2MTransportServerConfig config;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEndpointSecurityInfoByCredentialsId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取凭据。
+     * 参数：
+     * - `credentialsId`：凭据ID。
+     * - `keyValue`：键。
+     * 返回：处理结果。
      */
     public TbLwM2MSecurityInfo getEndpointSecurityInfoByCredentialsId(String credentialsId, LwM2mTypeServer keyValue) {
         CountDownLatch latch = new CountDownLatch(1);
         final TbLwM2MSecurityInfo[] resultSecurityStore = new TbLwM2MSecurityInfo[1];
         log.trace("Validating credentials [{}]", credentialsId);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         context.getTransportService().process(ValidateDeviceLwM2MCredentialsRequestMsg.newBuilder().setCredentialsId(credentialsId).build(),
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 new TransportServiceCallback<>() {
                     @Override
                     public void onSuccess(ValidateDeviceCredentialsResponse msg) {
@@ -113,13 +103,11 @@ public class LwM2mCredentialsSecurityInfoValidator {
                 });
         try {
             latch.await(config.getTimeout(), TimeUnit.MILLISECONDS);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (InterruptedException e) {
             log.error("Failed to await credentials!", e);
         }
 
         TbLwM2MSecurityInfo securityInfo = resultSecurityStore[0];
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (securityInfo.getSecurityMode() == null) {
             throw new LwM2MAuthException();
         }
@@ -132,19 +120,16 @@ public class LwM2mCredentialsSecurityInfoValidator {
      * @return SecurityInfo
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSecurityInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建信息对象。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * - `msg`：待处理消息。
+     * - `keyValue`：键。
+     * 返回：处理结果。
      */
     private TbLwM2MSecurityInfo createSecurityInfo(String endpoint, ValidateDeviceCredentialsResponse msg, LwM2mTypeServer keyValue) {
         TbLwM2MSecurityInfo result = new TbLwM2MSecurityInfo();
         LwM2MClientCredentials credentials = JacksonUtil.fromString(msg.getCredentials(), LwM2MClientCredentials.class);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (credentials != null) {
             result.setMsg(msg);
             result.setDeviceProfile(msg.getDeviceProfile());
@@ -166,9 +151,7 @@ public class LwM2mCredentialsSecurityInfoValidator {
                 default:
                     break;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (keyValue.equals(BOOTSTRAP)) {
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 LwM2MBootstrapConfig bootstrapCredentialConfig = new LwM2MBootstrapConfig(((Lwm2mDeviceProfileTransportConfiguration) msg.getDeviceProfile().getProfileData().getTransportConfiguration()).getBootstrap(),
                         credentials.getBootstrap().getBootstrapServer(), credentials.getBootstrap().getLwm2mServer());
                 result.setBootstrapCredentialConfig(bootstrapCredentialConfig);
@@ -178,14 +161,10 @@ public class LwM2mCredentialsSecurityInfoValidator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createClientSecurityInfoNoSec` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建客户端。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：无。
      */
     private void createClientSecurityInfoNoSec(TbLwM2MSecurityInfo result) {
         result.setSecurityInfo(null);
@@ -193,30 +172,24 @@ public class LwM2mCredentialsSecurityInfoValidator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createClientSecurityInfoPSK` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建客户端。
+     * 参数：
+     * - `result`：`result` 参数。
+     * - `endpoint`：`endpoint` 参数。
+     * - `clientCredentialsConfig`：客户端对象。
+     * 返回：无。
      */
     private void createClientSecurityInfoPSK(TbLwM2MSecurityInfo result, String endpoint, LwM2MClientCredential clientCredentialsConfig) {
         PSKClientCredential pskConfig = (PSKClientCredential) clientCredentialsConfig;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isNotEmpty(pskConfig.getIdentity())) {
             try {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (pskConfig.getDecoded() != null && pskConfig.getDecoded().length > 0) {
                     endpoint = StringUtils.isNotEmpty(pskConfig.getEndpoint()) ? pskConfig.getEndpoint() : endpoint;
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (endpoint != null && !endpoint.isEmpty()) {
                         result.setSecurityInfo(SecurityInfo.newPreSharedKeyInfo(endpoint, pskConfig.getIdentity(), pskConfig.getDecoded()));
                         result.setSecurityMode(PSK);
                     }
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (IllegalArgumentException | DecoderException e) {
                 log.error("Missing PSK key: " + e.getMessage());
             }
@@ -226,19 +199,16 @@ public class LwM2mCredentialsSecurityInfoValidator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createClientSecurityInfoRPK` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建客户端。
+     * 参数：
+     * - `result`：`result` 参数。
+     * - `endpoint`：`endpoint` 参数。
+     * - `clientCredentialsConfig`：客户端对象。
+     * 返回：无。
      */
     private void createClientSecurityInfoRPK(TbLwM2MSecurityInfo result, String endpoint, LwM2MClientCredential clientCredentialsConfig) {
         RPKClientCredential rpkConfig = (RPKClientCredential) clientCredentialsConfig;
         try {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (rpkConfig.getDecoded() != null) {
                 PublicKey key = SecurityUtil.publicKey.decode(rpkConfig.getDecoded());
                 result.setSecurityInfo(SecurityInfo.newRawPublicKeyInfo(endpoint, key));
@@ -252,14 +222,11 @@ public class LwM2mCredentialsSecurityInfoValidator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createClientSecurityInfoX509` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建客户端。
+     * 参数：
+     * - `result`：`result` 参数。
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：无。
      */
     private void createClientSecurityInfoX509(TbLwM2MSecurityInfo result, String endpoint) {
         result.setSecurityInfo(SecurityInfo.newX509CertInfo(endpoint));

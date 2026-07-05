@@ -18,49 +18,49 @@ package org.thingsboard.rule.engine.mail;
 import lombok.Data;
 import org.thingsboard.rule.engine.api.NodeConfiguration;
 
-@Data
 /**
- * 邮件消息转换节点配置，保存 TbEmail 各字段的模板。
- * 配置类本身不直接发送邮件、不访问数据库/缓存，也不处理异步回调。
+ * `TbMsgToEmailNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbMsgToEmailNodeConfiguration implements NodeConfiguration<TbMsgToEmailNodeConfiguration> {
 
     /**
-     * 发件人模板。
+     * `fromTemplate` 字段，保存当前对象的对应属性。
      */
     private String fromTemplate;
     /**
-     * 收件人模板。
+     * `toTemplate` 字段，保存当前对象的对应属性。
      */
     private String toTemplate;
     /**
-     * 抄送人模板。
+     * `ccTemplate` 字段，保存当前对象的对应属性。
      */
     private String ccTemplate;
     /**
-     * 密送人模板。
+     * `bccTemplate` 字段，保存当前对象的对应属性。
      */
     private String bccTemplate;
     /**
-     * 邮件主题模板。
+     * `subjectTemplate` 字段，保存当前对象的对应属性。
      */
     private String subjectTemplate;
     /**
-     * 邮件正文模板。
+     * `bodyTemplate` 字段，保存当前对象的对应属性。
      */
     private String bodyTemplate;
     /**
-     * 动态 HTML 标志模板，仅在 mailBodyType 为 dynamic 时使用。
+     * 是否为`html template`。
      */
     private String isHtmlTemplate;
     /**
-     * 邮件正文类型配置，false 表示纯文本，true 表示 HTML，dynamic 表示从 isHtmlTemplate 解析。
+     * 类型，用于区分不同处理分支。
      */
     private String mailBodyType; // Plain Text -> false. HTML - true. Dynamic - value used from isHtmlTemplate.
 
     /**
-     * 构造邮件转换节点默认配置。
-     * 本方法只设置模板默认值，不直接发送邮件或处理 Rule Engine 消息确认。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbMsgToEmailNodeConfiguration defaultConfiguration() {

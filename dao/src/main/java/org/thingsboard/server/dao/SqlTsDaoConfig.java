@@ -23,13 +23,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.thingsboard.server.dao.util.SqlTsDao;
 import org.thingsboard.server.dao.util.TbAutoConfiguration;
 
-@Configuration
-@TbAutoConfiguration
-@ComponentScan({"org.thingsboard.server.dao.sqlts.sql", "org.thingsboard.server.dao.sqlts.insert.sql"})
-@EnableJpaRepositories({"org.thingsboard.server.dao.sqlts.ts", "org.thingsboard.server.dao.sqlts.insert.sql"})
-@EntityScan({"org.thingsboard.server.dao.model.sqlts.ts"})
-@EnableTransactionManagement
-@SqlTsDao
 /**
  * 中文说明：
  * 1. 类目的：`SqlTsDaoConfig` 是 ThingsBoard DAO 模块 中的持久化实现层类型，用于承载服务端实体、关系、属性、遥测、事件和配置数据的持久化访问实现。
@@ -41,6 +34,13 @@ import org.thingsboard.server.dao.util.TbAutoConfiguration;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Service / Template。
  */
+@Configuration
+@TbAutoConfiguration
+@ComponentScan({"org.thingsboard.server.dao.sqlts.sql", "org.thingsboard.server.dao.sqlts.insert.sql"})
+@EnableJpaRepositories({"org.thingsboard.server.dao.sqlts.ts", "org.thingsboard.server.dao.sqlts.insert.sql"})
+@EntityScan({"org.thingsboard.server.dao.model.sqlts.ts"})
+@EnableTransactionManagement
+@SqlTsDao
 public class SqlTsDaoConfig {
 
 }

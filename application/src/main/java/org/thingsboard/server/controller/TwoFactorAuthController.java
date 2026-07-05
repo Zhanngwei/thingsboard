@@ -52,10 +52,6 @@ import java.util.stream.Collectors;
 
 import static org.thingsboard.server.controller.ControllerConstants.NEW_LINE;
 
-@RestController
-@RequestMapping("/api/auth/2fa")
-@TbCoreComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`TwoFactorAuthController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -66,39 +62,34 @@ import static org.thingsboard.server.controller.ControllerConstants.NEW_LINE;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@RequestMapping("/api/auth/2fa")
+@TbCoreComponent
+@RequiredArgsConstructor
 public class TwoFactorAuthController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `twoFactorAuthService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TwoFactorAuthService twoFactorAuthService;
     private final TwoFaConfigManager twoFaConfigManager;
     /**
-     * 字段说明：
-     * 1. 保存 `tokenFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
     private final JwtTokenFactory tokenFactory;
     private final SystemSecurityService systemSecurityService;
     /**
-     * 字段说明：
-     * 1. 保存 `userService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，提供当前类调用的业务操作。
      */
     private final UserService userService;
 
 
+    /**
+     * 功能：执行 `requestTwoFaVerificationCode` 对应的处理。
+     * 参数：
+     * - `providerType`：类型。
+     * 返回：无。
+     */
     @ApiOperation(value = "Request 2FA verification code (requestTwoFaVerificationCode)",
             notes = "Request 2FA verification code." + NEW_LINE +
                     "To make a request to this endpoint, you need an access token with the scope of PRE_VERIFICATION_TOKEN, " +
@@ -108,21 +99,19 @@ public class TwoFactorAuthController extends BaseController {
                     "and Too Many Requests error if rate limits are exceeded.")
     @PostMapping("/verification/send")
     @PreAuthorize("hasAuthority('PRE_VERIFICATION_TOKEN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `requestTwoFaVerificationCode` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void requestTwoFaVerificationCode(@RequestParam TwoFaProviderType providerType) throws Exception {
         SecurityUser user = getCurrentUser();
         twoFactorAuthService.prepareVerificationCode(user, providerType, true);
     }
 
+    /**
+     * 功能：校验编码。
+     * 参数：
+     * - `providerType`：类型。
+     * - `verificationCode`：`verificationCode` 参数。
+     * - `servletRequest`：请求对象。
+     * 返回：判断结果。
+     */
     @ApiOperation(value = "Check 2FA verification code (checkTwoFaVerificationCode)",
             notes = "Checks 2FA verification code, and if it is correct the method returns a regular access and refresh token pair." + NEW_LINE +
                     "The API method is rate limited (using rate limit config from TwoFactorAuthSettings), and also will block a user " +
@@ -131,21 +120,10 @@ public class TwoFactorAuthController extends BaseController {
                     "and Too Many Requests error if rate limits are exceeded.")
     @PostMapping("/verification/check")
     @PreAuthorize("hasAuthority('PRE_VERIFICATION_TOKEN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `checkTwoFaVerificationCode` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public JwtPair checkTwoFaVerificationCode(@RequestParam TwoFaProviderType providerType,
                                               @RequestParam String verificationCode, HttpServletRequest servletRequest) throws Exception {
         SecurityUser user = getCurrentUser();
         boolean verificationSuccess = twoFactorAuthService.checkVerificationCode(user, providerType, verificationCode, true);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (verificationSuccess) {
             systemSecurityService.logLoginAction(user, new RestAuthenticationDetails(servletRequest), ActionType.LOGIN, null);
             user = new SecurityUser(userService.findUserById(user.getTenantId(), user.getId()), true, user.getUserPrincipal());
@@ -158,6 +136,11 @@ public class TwoFactorAuthController extends BaseController {
     }
 
 
+    /**
+     * 功能：获取`Available Two Fa Providers`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get available 2FA providers (getAvailableTwoFaProviders)", notes =
             "Get the list of 2FA provider infos available for user to use. Example:\n" +
                     "```\n[\n" +
@@ -167,16 +150,6 @@ public class TwoFactorAuthController extends BaseController {
                     "]\n```")
     @GetMapping("/providers")
     @PreAuthorize("hasAuthority('PRE_VERIFICATION_TOKEN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAvailableTwoFaProviders` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<TwoFaProviderInfo> getAvailableTwoFaProviders() throws ThingsboardException {
         SecurityUser user = getCurrentUser();
         Optional<PlatformTwoFaSettings> platformTwoFaSettings = twoFaConfigManager.getPlatformTwoFaSettings(user.getTenantId(), true);
@@ -184,7 +157,6 @@ public class TwoFactorAuthController extends BaseController {
                 .map(settings -> settings.getConfigs().values()).orElse(Collections.emptyList())
                 .stream().map(config -> {
                     String contact = null;
-                    // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
                     switch (config.getProviderType()) {
                         case SMS:
                             String phoneNumber = ((SmsTwoFaAccountConfig) config).getPhoneNumber();
@@ -205,9 +177,6 @@ public class TwoFactorAuthController extends BaseController {
                 .collect(Collectors.toList());
     }
 
-    @Data
-    @AllArgsConstructor
-    @Builder
     /**
      * 中文说明：
      * 1. 类目的：`TwoFaProviderInfo` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -218,24 +187,17 @@ public class TwoFactorAuthController extends BaseController {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 MVC Controller / Facade。
      */
+    @Data
+    @AllArgsConstructor
+    @Builder
     public static class TwoFaProviderInfo {
         /**
-         * 字段说明：
-         * 1. 保存 `type` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 类型，用于区分不同处理分支。
          */
         private TwoFaProviderType type;
         private boolean isDefault;
         /**
-         * 字段说明：
-         * 1. 保存 `contact` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `contact` 字段，保存当前对象的对应属性。
          */
         private String contact;
         private Integer minVerificationCodeSendPeriod;

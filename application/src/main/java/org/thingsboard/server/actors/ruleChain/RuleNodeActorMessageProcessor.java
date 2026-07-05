@@ -40,7 +40,6 @@ import org.thingsboard.server.gen.transport.TransportProtos;
 /**
  * @author Andrew Shvayka
  */
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`RuleNodeActorMessageProcessor` 是ThingsBoard Application 模块中的Actor 通信与消息处理类型，用于管理租户、设备、规则链或规则节点的异步消息路由。
@@ -51,35 +50,21 @@ import org.thingsboard.server.gen.transport.TransportProtos;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Actor / Command。
  */
+@Slf4j
 public class RuleNodeActorMessageProcessor extends ComponentMsgProcessor<RuleNodeId> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `ruleChainName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 规则链，用于标识或展示当前对象。
      */
     private final String ruleChainName;
     private final TbApiUsageReportClient apiUsageClient;
     /**
-     * 字段说明：
-     * 1. 保存 `defaultCtx` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private final DefaultTbContext defaultCtx;
     private RuleNode ruleNode;
     /**
-     * 字段说明：
-     * 1. 保存 `tbNode` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 节点实例，表示当前对象的对应属性。
      */
     private TbNode tbNode;
     private RuleNodeInfo info;
@@ -94,133 +79,101 @@ public class RuleNodeActorMessageProcessor extends ComponentMsgProcessor<RuleNod
         this.info = new RuleNodeInfo(ruleNodeId, ruleChainName, ruleNode != null ? ruleNode.getName() : "Unknown");
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `start` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `start` 对应的处理。
+     * 参数：
+     * - `context`：处理上下文。
+     * 返回：无。
      */
+    @Override
     public void start(TbActorCtx context) throws Exception {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (isMyNodePartition()) {
             log.debug("[{}][{}] Starting", tenantId, entityId);
             tbNode = initComponent(ruleNode);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (tbNode != null) {
                 state = ComponentLifecycleState.ACTIVE;
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onUpdate` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Update`。
+     * 参数：
+     * - `context`：处理上下文。
+     * 返回：无。
      */
+    @Override
     public void onUpdate(TbActorCtx context) throws Exception {
         RuleNode newRuleNode = systemContext.getRuleChainService().findRuleNodeById(tenantId, entityId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (isMyNodePartition(newRuleNode)) {
             this.info = new RuleNodeInfo(entityId, ruleChainName, newRuleNode != null ? newRuleNode.getName() : "Unknown");
             boolean restartRequired = state != ComponentLifecycleState.ACTIVE ||
                     !(ruleNode.getType().equals(newRuleNode.getType()) && ruleNode.getConfiguration().equals(newRuleNode.getConfiguration()));
             this.ruleNode = newRuleNode;
             this.defaultCtx.updateSelf(newRuleNode);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (restartRequired) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (tbNode != null) {
                     tbNode.destroy();
                 }
                 try {
                     start(context);
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (Exception e) {
                     throw new TbRuleNodeUpdateException("Failed to update rule node", e);
                 }
             }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (tbNode != null) {
             stop(null);
             tbNode = null;
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stop` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `stop` 对应的处理。
+     * 参数：
+     * - `context`：处理上下文。
+     * 返回：无。
      */
+    @Override
     public void stop(TbActorCtx context) {
         log.debug("[{}][{}] Stopping", tenantId, entityId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tbNode != null) {
             tbNode.destroy();
             state = ComponentLifecycleState.SUSPENDED;
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onPartitionChangeMsg` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理分区。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onPartitionChangeMsg(PartitionChangeMsg msg) throws Exception {
         log.debug("[{}][{}] onPartitionChangeMsg: [{}]", tenantId, entityId, msg);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tbNode != null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!isMyNodePartition()) {
                 stop(null);
                 tbNode = null;
             } else {
                 tbNode.onPartitionChangeMsg(defaultCtx, msg);
             }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (isMyNodePartition()) {
             start(null);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onRuleToSelfMsg` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     public void onRuleToSelfMsg(RuleNodeToSelfMsg msg) throws Exception {
         checkComponentStateActive(msg.getMsg());
         TbMsg tbMsg = msg.getMsg();
         int ruleNodeCount = tbMsg.getAndIncrementRuleNodeCounter();
         int maxRuleNodeExecutionsPerMessage = getTenantProfileConfiguration().getMaxRuleNodeExecsPerMessage();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (maxRuleNodeExecutionsPerMessage == 0 || ruleNodeCount < maxRuleNodeExecutionsPerMessage) {
             apiUsageClient.report(tenantId, tbMsg.getCustomerId(), ApiUsageRecordKey.RE_EXEC_COUNT);
             if (ruleNode.isDebugMode()) {
@@ -237,14 +190,10 @@ public class RuleNodeActorMessageProcessor extends ComponentMsgProcessor<RuleNod
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onRuleChainToRuleNodeMsg` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理规则链。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     void onRuleChainToRuleNodeMsg(RuleChainToRuleNodeMsg msg) throws Exception {
         if (!isMyNodePartition()) {
@@ -271,30 +220,21 @@ public class RuleNodeActorMessageProcessor extends ComponentMsgProcessor<RuleNod
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getComponentName` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String getComponentName() {
         return ruleNode.getName();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initComponent` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Component`。
+     * 参数：
+     * - `ruleNode`：`ruleNode` 参数。
+     * 返回：处理结果。
      */
     private TbNode initComponent(RuleNode ruleNode) throws Exception {
         TbNode tbNode = null;
@@ -306,44 +246,30 @@ public class RuleNodeActorMessageProcessor extends ComponentMsgProcessor<RuleNod
         return tbNode;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getInactiveException` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Inactive Exception`。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     protected RuleNodeException getInactiveException() {
         return new RuleNodeException("Rule Node is not active! Failed to initialize.", ruleChainName, ruleNode);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isMyNodePartition` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断分区。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean isMyNodePartition() {
         return isMyNodePartition(this.ruleNode);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isMyNodePartition` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断分区。
+     * 参数：
+     * - `ruleNode`：`ruleNode` 参数。
+     * 返回：判断结果。
      */
     private boolean isMyNodePartition(RuleNode ruleNode) {
         boolean result = ruleNode == null || !ruleNode.isSingletonMode()
@@ -357,14 +283,10 @@ public class RuleNodeActorMessageProcessor extends ComponentMsgProcessor<RuleNod
 
     //Message will return after processing. See RuleChainActorMessageProcessor.pushToTarget.
     /**
-     * 方法说明：
-     * 1. 职责：执行 `putToNodePartition` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `putToNodePartition` 对应的处理。
+     * 参数：
+     * - `source`：`source` 参数。
+     * 返回：无。
      */
     private void putToNodePartition(TbMsg source) {
         TbMsg tbMsg = TbMsg.newMsg(source, source.getQueueName(), source.getRuleChainId(), entityId);

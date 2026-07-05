@@ -16,17 +16,16 @@
 package org.thingsboard.rule.engine.util;
 
 /**
- * 指示规则节点从消息数据体还是元数据中读取值的枚举。
- * 本枚举本身不读写消息，只作为调用方选择数据来源的配置值。
+ * `TbMsgSource` 枚举，定义当前流程使用的固定取值。
  */
 public enum TbMsgSource {
 
     /**
-     * 从消息数据体读取。
+     * 数据常量，用于统一引用固定值。
      */
     DATA,
     /**
-     * 从消息元数据读取。
+     * `METADATA`常量，用于统一引用固定值。
      */
     METADATA
 

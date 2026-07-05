@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-@Component
 /**
  * 中文说明：
  * 1. 类目的：`TenantProfileDataValidator` 是 ThingsBoard DAO 模块 中的DAO 服务测试或服务支撑类型，用于组织 DAO 层测试、共享服务夹具或持久化服务的公共执行流程。
@@ -47,67 +46,47 @@ import java.util.Set;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Template Method / Service。
  */
+@Component
 public class TenantProfileDataValidator extends DataValidator<TenantProfile> {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户，用于读取或保存对应领域对象。
      */
+    @Autowired
     private TenantProfileDao tenantProfileDao;
 
+    /**
+     * 租户，提供当前类调用的业务操作。
+     */
     @Autowired
     @Lazy
-    /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private TenantProfileService tenantProfileService;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateDataImpl` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验数据。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `tenantProfile`：租户信息或租户标识。
+     * 返回：无。
      */
+    @Override
     protected void validateDataImpl(TenantId tenantId, TenantProfile tenantProfile) {
         validateString("Tenant profile name", tenantProfile.getName());
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenantProfile.getProfileData() == null) {
             throw new DataValidationException("Tenant profile data should be specified!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenantProfile.getProfileData().getConfiguration() == null) {
             throw new DataValidationException("Tenant profile data configuration should be specified!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenantProfile.isDefault()) {
             TenantProfile defaultTenantProfile = tenantProfileService.findDefaultTenantProfile(tenantId);
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (defaultTenantProfile != null && !defaultTenantProfile.getId().equals(tenantProfile.getId())) {
                 throw new DataValidationException("Another default tenant profile is present!");
             }
         }
 
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenantProfile.isIsolatedTbRuleEngine()) {
             List<TenantProfileQueueConfiguration> queueConfiguration = tenantProfile.getProfileData().getQueueConfiguration();
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (queueConfiguration == null) {
                 throw new DataValidationException("Tenant profile data queue configuration should be specified!");
             }
@@ -117,7 +96,6 @@ public class TenantProfileDataValidator extends DataValidator<TenantProfile> {
                             .stream()
                             .filter(q -> q.getName().equals(DataConstants.MAIN_QUEUE_NAME))
                             .findAny();
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (mainQueueConfig.isEmpty()) {
                 throw new DataValidationException("Main queue configuration should be specified!");
             }
@@ -128,7 +106,6 @@ public class TenantProfileDataValidator extends DataValidator<TenantProfile> {
 
             queueConfiguration.forEach(q -> {
                 String name = q.getName();
-                // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                 if (queueNames.contains(name)) {
                     throw new DataValidationException(String.format("Queue configuration name '%s' already present!", name));
                 } else {
@@ -138,23 +115,16 @@ public class TenantProfileDataValidator extends DataValidator<TenantProfile> {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateUpdate` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验`Update`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `tenantProfile`：租户信息或租户标识。
+     * 返回：判断结果。
      */
+    @Override
     protected TenantProfile validateUpdate(TenantId tenantId, TenantProfile tenantProfile) {
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         TenantProfile old = tenantProfileDao.findById(TenantId.SYS_TENANT_ID, tenantProfile.getId().getId());
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (old == null) {
             throw new DataValidationException("Can't update non existing tenant profile!");
         }
@@ -162,36 +132,26 @@ public class TenantProfileDataValidator extends DataValidator<TenantProfile> {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateQueueConfiguration` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验队列。
+     * 参数：
+     * - `queue`：队列名称或队列对象。
+     * 返回：无。
      */
     private void validateQueueConfiguration(TenantProfileQueueConfiguration queue) {
         validateQueueName(queue.getName());
         validateQueueTopic(queue.getTopic());
 
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (queue.getPollInterval() < 1) {
             throw new DataValidationException("Queue poll interval should be more then 0!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (queue.getPartitions() < 1) {
             throw new DataValidationException("Queue partitions should be more then 0!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (queue.getPackProcessingTimeout() < 1) {
             throw new DataValidationException("Queue pack processing timeout should be more then 0!");
         }
 
         SubmitStrategy submitStrategy = queue.getSubmitStrategy();
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (submitStrategy == null) {
             throw new DataValidationException("Queue submit strategy can't be null!");
         }

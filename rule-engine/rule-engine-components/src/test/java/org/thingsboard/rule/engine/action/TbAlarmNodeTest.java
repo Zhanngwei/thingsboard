@@ -72,59 +72,83 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * 测试目标：验证 {@code TbAlarmNodeTest} 覆盖的 动作节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbAlarmNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbAlarmNodeTest` 测试类，用于验证 `TbAlarmNode` 相关行为。
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TbAlarmNodeTest {
 
-    /** 可变 fixture 字段：{@code node} 保存 {@code TbAbstractAlarmNode} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，表示当前对象的对应属性。
+     */
     private TbAbstractAlarmNode node;
 
-    /** Mock 依赖字段：{@code ctx} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctx;
-    /** Mock 依赖字段：{@code alarmService} 保存 {@code RuleEngineAlarmService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 告警，提供当前类调用的业务操作。
+     */
     @Mock
     private RuleEngineAlarmService alarmService;
 
-    /** Mock 依赖字段：{@code detailsJs} 保存 {@code ScriptEngine} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * `detailsJs` 字段，保存当前对象的对应属性。
+     */
     @Mock
     private ScriptEngine detailsJs;
 
-    /** 参数捕获字段：{@code successCaptor} 保存 {@code ArgumentCaptor<Runnable>} 测试数据或依赖，来源：由 Mockito 注解创建，用于捕获被测逻辑传给 Mock 的参数，生命周期随单个测试实例。 */
+    /**
+     * `successCaptor` 字段，保存当前对象的对应属性。
+     */
     @Captor
     private ArgumentCaptor<Runnable> successCaptor;
-    /** 参数捕获字段：{@code failureCaptor} 保存 {@code ArgumentCaptor<Consumer<Throwable>>} 测试数据或依赖，来源：由 Mockito 注解创建，用于捕获被测逻辑传给 Mock 的参数，生命周期随单个测试实例。 */
+    /**
+     * 失败信息，表示当前对象的对应属性。
+     */
     @Captor
     private ArgumentCaptor<Consumer<Throwable>> failureCaptor;
 
-    /** 固定 fixture 字段：{@code ruleChainId} 保存 {@code RuleChainId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * 规则链ID，用于定位对应业务对象。
+     */
     private final RuleChainId ruleChainId = new RuleChainId(Uuids.timeBased());
-    /** 固定 fixture 字段：{@code ruleNodeId} 保存 {@code RuleNodeId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * 规则节点ID，用于定位对应业务对象。
+     */
     private final RuleNodeId ruleNodeId = new RuleNodeId(Uuids.timeBased());
 
-    /** 可变 fixture 字段：{@code dbExecutor} 保存 {@code ListeningExecutor} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 执行器列表，用于保存一组待处理对象。
+     */
     private ListeningExecutor dbExecutor;
 
-    /** 固定 fixture 字段：{@code originator} 保存 {@code EntityId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * `originator` 字段，保存当前对象的对应属性。
+     */
     private final EntityId originator = new DeviceId(Uuids.timeBased());
-    /** 固定 fixture 字段：{@code alarmOriginator} 保存 {@code EntityId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * 告警对象，用于描述当前业务场景。
+     */
     private final EntityId alarmOriginator = new AlarmId(Uuids.timeBased());
-    /** 固定 fixture 字段：{@code tenantId} 保存 {@code TenantId} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * 租户ID，用于定位对应业务对象。
+     */
     private final TenantId tenantId = TenantId.fromUUID(Uuids.timeBased());
-    /** 固定 fixture 字段：{@code metaData} 保存 {@code TbMsgMetaData} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * 数据，保存当前步骤读取或计算得到的内容。
+     */
     private final TbMsgMetaData metaData = new TbMsgMetaData();
-    /** 固定 fixture 字段：{@code rawJson} 保存 {@code String} 测试数据或依赖，来源：由测试实例构造时创建，生命周期随单个测试实例。 */
+    /**
+     * JSON，表示当前对象的对应属性。
+     */
     private final String rawJson = "{\"name\": \"Vit\", \"passed\": 5}";
 
     /**
-     * 生命周期方法：{@code before} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `before` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Before
     public void before() {
@@ -132,15 +156,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code newAlarmCanBeCreated} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：执行 `newAlarmCanBeCreated` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void newAlarmCanBeCreated() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         initWithCreateAlarmScript();
         metaData.putValue("key", "value");
         TbMsg msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, originator, metaData, TbMsgDataType.JSON, rawJson, ruleChainId, ruleNodeId);
@@ -188,15 +209,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code buildDetailsThrowsException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：构建`Details Throws Exception`。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void buildDetailsThrowsException() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         initWithCreateAlarmScript();
         metaData.putValue("key", "value");
         TbMsg msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, originator, metaData, TbMsgDataType.JSON, rawJson, ruleChainId, ruleNodeId);
@@ -219,15 +237,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code ifAlarmClearedCreateNew} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：执行 `ifAlarmClearedCreateNew` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void ifAlarmClearedCreateNew() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         initWithCreateAlarmScript();
         metaData.putValue("key", "value");
         TbMsg msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, originator, metaData, TbMsgDataType.JSON, rawJson, ruleChainId, ruleNodeId);
@@ -279,15 +294,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code alarmCanBeUpdated} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：执行 `alarmCanBeUpdated` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void alarmCanBeUpdated() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         initWithCreateAlarmScript();
         metaData.putValue("key", "value");
         TbMsg msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, originator, metaData, TbMsgDataType.JSON, rawJson, ruleChainId, ruleNodeId);
@@ -339,15 +351,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code alarmCanBeCleared} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：执行 `alarmCanBeCleared` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void alarmCanBeCleared() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         initWithClearAlarmScript();
         metaData.putValue("key", "value");
         TbMsg msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, originator, metaData, TbMsgDataType.JSON, rawJson, ruleChainId, ruleNodeId);
@@ -399,15 +408,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code alarmCanBeClearedWithAlarmOriginator} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：执行 `alarmCanBeClearedWithAlarmOriginator` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void alarmCanBeClearedWithAlarmOriginator() throws ScriptException, IOException {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         initWithClearAlarmScript();
         metaData.putValue("key", "value");
         TbMsg msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, alarmOriginator, metaData, TbMsgDataType.JSON, rawJson, ruleChainId, ruleNodeId);
@@ -462,15 +468,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testCreateAlarmWithDynamicSeverityFromMessageBody} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证告警相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testCreateAlarmWithDynamicSeverityFromMessageBody() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         TbCreateAlarmNodeConfiguration config = new TbCreateAlarmNodeConfiguration();
         config.setPropagate(true);
         config.setSeverity("$[alarmSeverity]");
@@ -537,15 +540,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testCreateAlarmWithDynamicSeverityFromMetadata} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证告警相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testCreateAlarmWithDynamicSeverityFromMetadata() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         TbCreateAlarmNodeConfiguration config = new TbCreateAlarmNodeConfiguration();
         config.setPropagate(true);
         config.setScriptLang(ScriptLanguage.JS);
@@ -610,15 +610,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testCreateAlarmsWithPropagationToTenantWithDynamicTypes} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testCreateAlarmsWithPropagationToTenantWithDynamicTypes() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         for (int i = 0; i < 10; i++) {
             var config = new TbCreateAlarmNodeConfiguration();
             config.setPropagateToTenant(true);
@@ -685,9 +682,9 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 辅助方法：{@code initWithCreateAlarmScript} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化或启动告警。
+     * 参数：无。
+     * 返回：无。
      */
     private void initWithCreateAlarmScript() {
         try {
@@ -713,9 +710,9 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 辅助方法：{@code initWithClearAlarmScript} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化或启动告警。
+     * 参数：无。
+     * 返回：无。
      */
     private void initWithClearAlarmScript() {
         try {
@@ -739,9 +736,12 @@ public class TbAlarmNodeTest {
     }
 
     /**
-     * 辅助方法：{@code verifyError} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：校验错误信息。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `message`：待处理消息。
+     * - `expectedClass`：`expectedClass` 参数。
+     * 返回：无。
      */
     private void verifyError(TbMsg msg, String message, Class expectedClass) {
         ArgumentCaptor<Throwable> captor = ArgumentCaptor.forClass(Throwable.class);

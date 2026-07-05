@@ -22,70 +22,70 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 import java.util.Collections;
 import java.util.Map;
 
-@Data
 /**
- * Kafka 节点配置模型，保存 Kafka Producer 参数、Topic/key 模板和 Header 转换选项。
- * 配置类本身不直接创建 KafkaProducer、不执行异步回调，也不涉及数据库或缓存。
+ * `TbKafkaNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbKafkaNodeConfiguration implements NodeConfiguration<TbKafkaNodeConfiguration> {
 
     /**
-     * Kafka Topic 模板，运行时基于 TbMsg 解析。
+     * 主题，用于匹配或发送对应主题的数据。
      */
     private String topicPattern;
     /**
-     * Kafka Key 模板，空值表示发送无 key 记录。
+     * 键，用于定位映射、配置或数据项。
      */
     private String keyPattern;
     /**
-     * Kafka bootstrap.servers 配置。
+     * `bootstrapServers` 字段，保存当前对象的对应属性。
      */
     private String bootstrapServers;
     /**
-     * Producer retries 配置。
+     * `retries` 字段，保存当前对象的对应属性。
      */
     private int retries;
     /**
-     * Producer batch.size 配置。
+     * 批量大小，用于控制处理规模或位置。
      */
     private int batchSize;
     /**
-     * Producer linger.ms 配置。
+     * `linger` 字段，保存当前对象的对应属性。
      */
     private int linger;
     /**
-     * Producer buffer.memory 配置。
+     * `bufferMemory` 字段，保存当前对象的对应属性。
      */
     private int bufferMemory;
     /**
-     * Producer acks 配置，决定 Kafka 端确认语义。
+     * `acks` 字段，保存当前对象的对应属性。
      */
     private String acks;
     /**
-     * Kafka key 序列化器类名。
+     * 键，用于定位映射、配置或数据项。
      */
     private String keySerializer;
     /**
-     * Kafka value 序列化器类名。
+     * 值，保存当前处理得到的具体内容。
      */
     private String valueSerializer;
     /**
-     * 透传给 Kafka Producer 的其它属性。
+     * `otherProperties`映射关系，用于按键查找对应值。
      */
     private Map<String, String> otherProperties;
 
     /**
-     * 是否把 TbMsg 元数据作为 Kafka Headers 发送。
+     * 是否满足键条件。
      */
     private boolean addMetadataKeyValuesAsKafkaHeaders;
     /**
-     * 元数据写入 Kafka Headers 时使用的字符集名称。
+     * `kafkaHeadersCharset` 字段，保存当前对象的对应属性。
      */
     private String kafkaHeadersCharset;
 
     /**
-     * 构造 Kafka 节点默认配置。
-     * 本方法仅设置默认值，不直接连接 Kafka，也不处理 Rule Engine 消息确认或失败路由。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbKafkaNodeConfiguration defaultConfiguration() {

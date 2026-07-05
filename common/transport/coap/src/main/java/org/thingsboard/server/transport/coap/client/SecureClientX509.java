@@ -54,34 +54,24 @@ import java.util.concurrent.Executors;
 public class SecureClientX509 {
 
     /**
-     * 字段说明：
-     * 1. 保存 `dtlsConnector` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `dtlsConnector` 字段，保存当前对象的对应属性。
      */
     private final DTLSConnector dtlsConnector;
     private ExecutorService executor = Executors.newFixedThreadPool(1, ThingsBoardThreadFactory.forName(getClass().getSimpleName()));
     /**
-     * 字段说明：
-     * 1. 保存 `coapClient` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户端，用于发起外部调用或协议交互。
      */
     private CoapClient coapClient;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `SecureClientX509` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `SecureClientX509` 实例，并初始化必要字段。
+     * 参数：
+     * - `dtlsConnector`：`dtlsConnector` 参数。
+     * - `host`：`host` 参数。
+     * - `port`：`port` 参数。
+     * - `clientKeys`：客户端对象。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public SecureClientX509(DTLSConnector dtlsConnector, String host, int port, String clientKeys, String sharedKeys) throws URISyntaxException {
         this.dtlsConnector = dtlsConnector;
@@ -89,29 +79,21 @@ public class SecureClientX509 {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `test` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `test` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void test() {
         executor.submit(() -> {
             try {
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 while (!Thread.interrupted()) {
                     CoapResponse response = null;
                     try {
                         response = coapClient.get();
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (ConnectorException | IOException e) {
                         System.err.println("Error occurred while sending request: " + e);
                         System.exit(-1);
                     }
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (response != null) {
 
                         System.out.println(response.getCode() + " - " + response.getCode().name());
@@ -121,7 +103,6 @@ public class SecureClientX509 {
                         System.out.println("ADVANCED:");
                         EndpointContext context = response.advanced().getSourceContext();
                         Principal identity = context.getPeerIdentity();
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (identity != null) {
                             System.out.println(context.getPeerIdentity());
                         } else {
@@ -134,7 +115,6 @@ public class SecureClientX509 {
                     }
                     Thread.sleep(5000);
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 System.out.println("Error occurred while sending COAP requests.");
             }
@@ -142,17 +122,15 @@ public class SecureClientX509 {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCoapClient` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取客户端。
+     * 参数：
+     * - `host`：`host` 参数。
+     * - `port`：`port` 参数。
+     * - `clientKeys`：客户端对象。
+     * - `sharedKeys`：键。
+     * 返回：处理结果。
      */
     private CoapClient getCoapClient(String host, Integer port, String clientKeys, String sharedKeys) throws URISyntaxException {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         URI uri = new URI(getFutureUrl(host, port, clientKeys, sharedKeys));
         CoapClient client = new CoapClient(uri);
         CoapEndpoint.Builder builder = new CoapEndpoint.Builder();
@@ -163,28 +141,23 @@ public class SecureClientX509 {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getFutureUrl` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取异步结果。
+     * 参数：
+     * - `host`：`host` 参数。
+     * - `port`：`port` 参数。
+     * - `clientKeys`：客户端对象。
+     * - `sharedKeys`：键。
+     * 返回：文本结果。
      */
     private String getFutureUrl(String host, Integer port, String clientKeys, String sharedKeys) {
         return "coaps://" + host + ":" + port + "/api/v1/attributes?clientKeys=" + clientKeys + "&sharedKeys=" + sharedKeys;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `main` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：作为当前类的入口方法，完成参数处理并触发主要逻辑。
+     * 参数：
+     * - `args`：传入程序的参数。
+     * 返回：无。
      */
     public static void main(String[] args) throws URISyntaxException {
         System.out.println("Usage: java -cp ... org.thingsboard.server.transport.coap.client.SecureClientX509 " +
@@ -209,14 +182,14 @@ public class SecureClientX509 {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setupCredentials` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `setupCredentials` 对应的处理。
+     * 参数：
+     * - `config`：配置对象。
+     * - `keyStoreUriPath`：键。
+     * - `keyStoreAlias`：键。
+     * - `trustedAliasPattern`：`trustedAliasPattern` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private static void setupCredentials(DtlsConnectorConfig.Builder config, String keyStoreUriPath, String keyStoreAlias, String trustedAliasPattern, String keyStorePassword) {
         StaticNewAdvancedCertificateVerifier.Builder trustBuilder = StaticNewAdvancedCertificateVerifier.builder();
@@ -228,11 +201,9 @@ public class SecureClientX509 {
             trustBuilder.setTrustedCertificates(trustedCertificates);
             config.setAdvancedCertificateVerifier(trustBuilder.build());
             config.setCertificateIdentityProvider(new SingleCertificateProvider(serverCredentials.getPrivateKey(), serverCredentials.getCertificateChain(), Collections.singletonList(CertificateType.X_509)));
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (GeneralSecurityException e) {
             System.err.println("certificates are invalid!");
             throw new IllegalArgumentException(e.getMessage());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             System.err.println("certificates are missing!");
             throw new IllegalArgumentException(e.getMessage());

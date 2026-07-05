@@ -36,74 +36,59 @@ import org.thingsboard.server.service.ws.telemetry.sub.TelemetrySubscriptionUpda
 public interface WebSocketService {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleSessionEvent` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理会话。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `sessionEvent`：会话对象。
+     * 返回：无。
      */
     void handleSessionEvent(WebSocketSessionRef sessionRef, SessionEvent sessionEvent);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleCommands` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Commands`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `commandsWrapper`：`commandsWrapper` 参数。
+     * 返回：无。
      */
     void handleCommands(WebSocketSessionRef sessionRef, WsCommandsWrapper commandsWrapper);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Update`。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * - `cmdId`：`cmdId`ID。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     void sendUpdate(String sessionId, int cmdId, TelemetrySubscriptionUpdate update);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Update`。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     void sendUpdate(String sessionId, CmdUpdate update);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendError` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交错误信息。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `subId`：`subId`ID。
+     * - `errorCode`：错误信息。
+     * - `errorMsg`：待处理消息。
+     * 返回：无。
      */
     void sendError(WebSocketSessionRef sessionRef, int subId, SubscriptionErrorCode errorCode, String errorMsg);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `close` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `close` 对应的处理。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * - `status`：`status` 参数。
+     * 返回：无。
      */
     void close(String sessionId, CloseStatus status);
 }

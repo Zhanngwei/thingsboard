@@ -18,21 +18,21 @@ package org.thingsboard.rule.engine.rpc;
 import lombok.Data;
 import org.thingsboard.rule.engine.api.NodeConfiguration;
 
-@Data
 /**
- * RPC 请求节点配置，保存默认超时时间。
- * 配置类本身不直接发送 RPC、不访问数据库/缓存，也不涉及异步回调。
+ * `TbSendRpcRequestNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbSendRpcRequestNodeConfiguration implements NodeConfiguration<TbSendRpcRequestNodeConfiguration> {
 
     /**
-     * 未从消息元数据提供 expirationTime 时使用的超时时间，单位秒。
+     * 超时时间，用于控制时间范围或等待时长。
      */
     private int timeoutInSeconds;
 
     /**
-     * 构造 RPC 请求节点默认配置。
-     * 本方法只设置默认超时，不直接调用 RpcService 或处理消息确认。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbSendRpcRequestNodeConfiguration defaultConfiguration() {

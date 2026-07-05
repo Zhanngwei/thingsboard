@@ -74,10 +74,6 @@ import java.util.function.Consumer;
 /**
  * @author Andrew Shvayka
  */
-@RestController
-@ConditionalOnExpression("'${service.type:null}'=='tb-transport' || ('${service.type:null}'=='monolith' && '${transport.api_enabled:true}'=='true' && '${transport.http.enabled}'=='true')")
-@RequestMapping("/api/v1")
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DeviceApiController` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -88,15 +84,14 @@ import java.util.function.Consumer;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@RestController
+@ConditionalOnExpression("'${service.type:null}'=='tb-transport' || ('${service.type:null}'=='monolith' && '${transport.api_enabled:true}'=='true' && '${transport.http.enabled}'=='true')")
+@RequestMapping("/api/v1")
+@Slf4j
 public class DeviceApiController implements TbTransportService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `MARKDOWN_CODE_BLOCK_START` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 编码常量，用于统一引用固定值。
      */
     private static final String MARKDOWN_CODE_BLOCK_START = "\n\n```json\n";
     private static final String MARKDOWN_CODE_BLOCK_END = "\n```\n\n";
@@ -141,26 +136,26 @@ public class DeviceApiController implements TbTransportService {
             MARKDOWN_CODE_BLOCK_END;
 
     /**
-     * 字段说明：
-     * 1. 保存 `ACCESS_TOKEN_PARAM_DESCRIPTION` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 描述信息常量，用于统一引用固定值。
      */
     private static final String ACCESS_TOKEN_PARAM_DESCRIPTION = "Your device access token.";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `transportContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @Autowired
     private HttpTransportContext transportContext;
 
+    /**
+     * 功能：获取设备。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `scope`：`scope` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get attributes (getDeviceAttributes)",
             notes = "Returns all attributes that belong to device. "
                     + "Use optional 'clientKeys' and/or 'sharedKeys' parameter to return specific attributes. "
@@ -171,16 +166,6 @@ public class DeviceApiController implements TbTransportService {
                     + REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/attributes", method = RequestMethod.GET, produces = "application/json")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getDeviceAttributes(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -189,35 +174,35 @@ public class DeviceApiController implements TbTransportService {
             @ApiParam(value = "Comma separated key names for attribute with shared scope", required = true, defaultValue = "configuration")
             @RequestParam(value = "sharedKeys", required = false, defaultValue = "") String sharedKeys) {
         DeferredResult<ResponseEntity> responseWriter = new DeferredResult<>();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportContext.getTransportService().process(DeviceTransportType.DEFAULT, ValidateDeviceTokenRequestMsg.newBuilder().setToken(deviceToken).build(),
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 new DeviceAuthCallback(transportContext, responseWriter, sessionInfo -> {
                     GetAttributeRequestMsg.Builder request = GetAttributeRequestMsg.newBuilder().setRequestId(0);
                     List<String> clientKeySet = !StringUtils.isEmpty(clientKeys) ? Arrays.asList(clientKeys.split(",")) : null;
                     List<String> sharedKeySet = !StringUtils.isEmpty(sharedKeys) ? Arrays.asList(sharedKeys.split(",")) : null;
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (clientKeySet != null) {
                         request.addAllClientAttributeNames(clientKeySet);
                     }
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (sharedKeySet != null) {
                         request.addAllSharedAttributeNames(sharedKeySet);
                     }
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     TransportService transportService = transportContext.getTransportService();
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     transportService.registerSyncSession(sessionInfo,
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             new HttpSessionListener(responseWriter, transportContext.getTransportService(), sessionInfo),
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             transportContext.getDefaultTimeout());
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     transportService.process(sessionInfo, request.build(), new SessionCloseOnErrorCallback(transportService, sessionInfo));
                 }));
         return responseWriter;
     }
 
+    /**
+     * 功能：执行 `postDeviceAttributes` 对应的处理。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `json`：`json` 参数。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Post attributes (postDeviceAttributes)",
             notes = "Post client attribute updates on behalf of device. "
                     + "\n Example of the request: "
@@ -227,27 +212,14 @@ public class DeviceApiController implements TbTransportService {
                     + REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/attributes", method = RequestMethod.POST)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `postDeviceAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> postDeviceAttributes(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
             @ApiParam(value = "JSON with attribute key-value pairs. See API call description for example.")
             @RequestBody String json) {
         DeferredResult<ResponseEntity> responseWriter = new DeferredResult<>();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportContext.getTransportService().process(DeviceTransportType.DEFAULT, ValidateDeviceTokenRequestMsg.newBuilder().setToken(deviceToken).build(),
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 new DeviceAuthCallback(transportContext, responseWriter, sessionInfo -> {
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     TransportService transportService = transportContext.getTransportService();
                     transportService.process(sessionInfo, JsonConverter.convertToAttributesProto(new JsonParser().parse(json)),
                             new HttpOkCallback(responseWriter));
@@ -255,6 +227,16 @@ public class DeviceApiController implements TbTransportService {
         return responseWriter;
     }
 
+    /**
+     * 功能：执行 `postTelemetry` 对应的处理。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `json`：`json` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Post time-series data (postTelemetry)",
             notes = "Post time-series data on behalf of device. "
                     + "\n Example of the request: "
@@ -262,16 +244,6 @@ public class DeviceApiController implements TbTransportService {
                     + REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/telemetry", method = RequestMethod.POST)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `postTelemetry` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> postTelemetry(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -286,6 +258,15 @@ public class DeviceApiController implements TbTransportService {
         return responseWriter;
     }
 
+    /**
+     * 功能：执行 `claimDevice` 对应的处理。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `json`：`json` 参数。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Save claiming information (claimDevice)",
             notes = "Saves the information required for user to claim the device. " +
                     "See more info about claiming in the corresponding 'Claiming devices' platform documentation."
@@ -298,16 +279,6 @@ public class DeviceApiController implements TbTransportService {
                     + REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/claim", method = RequestMethod.POST)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `claimDevice` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> claimDevice(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -323,6 +294,16 @@ public class DeviceApiController implements TbTransportService {
         return responseWriter;
     }
 
+    /**
+     * 功能：订阅`To Commands`。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `seconds`：`seconds` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Subscribe to RPC commands (subscribeToCommands) (Deprecated)",
             notes = "Subscribes to RPC commands using http long polling. " +
                     "Deprecated, since long polling is resource and network consuming. " +
@@ -330,16 +311,6 @@ public class DeviceApiController implements TbTransportService {
                     REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/rpc", method = RequestMethod.GET, produces = "application/json")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `subscribeToCommands` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> subscribeToCommands(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -359,21 +330,21 @@ public class DeviceApiController implements TbTransportService {
         return responseWriter;
     }
 
+    /**
+     * 功能：执行 `replyToCommand` 对应的处理。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `request`：请求对象。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Reply to RPC commands (replyToCommand)",
             notes = "Replies to server originated RPC command identified by 'requestId' parameter. The response is arbitrary JSON.\n\n" +
                     REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/rpc/{requestId}", method = RequestMethod.POST)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `replyToCommand` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> replyToCommand(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -390,6 +361,16 @@ public class DeviceApiController implements TbTransportService {
         return responseWriter;
     }
 
+    /**
+     * 功能：执行 `postRpcRequest` 对应的处理。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `JSON`：`JSON` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Send the RPC command (postRpcRequest)",
             notes = "Send the RPC request to server. The request payload is a JSON document that contains 'method' and 'params'. For example:" +
                     MARKDOWN_CODE_BLOCK_START +
@@ -402,16 +383,6 @@ public class DeviceApiController implements TbTransportService {
                     REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/rpc", method = RequestMethod.POST)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `postRpcRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> postRpcRequest(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -433,6 +404,16 @@ public class DeviceApiController implements TbTransportService {
         return responseWriter;
     }
 
+    /**
+     * 功能：订阅`To Attributes`。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `seconds`：`seconds` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Subscribe to attribute updates (subscribeToAttributes) (Deprecated)",
             notes = "Subscribes to client and shared scope attribute updates using http long polling. " +
                     "Deprecated, since long polling is resource and network consuming. " +
@@ -440,16 +421,6 @@ public class DeviceApiController implements TbTransportService {
                     REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/attributes/updates", method = RequestMethod.GET, produces = "application/json")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `subscribeToAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> subscribeToAttributes(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -469,6 +440,16 @@ public class DeviceApiController implements TbTransportService {
         return responseWriter;
     }
 
+    /**
+     * 功能：获取`Firmware`。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `firmware`：`firmware` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get Device Firmware (getFirmware)",
             notes = "Downloads the current firmware package." +
                     "When the platform initiates firmware update, " +
@@ -482,16 +463,6 @@ public class DeviceApiController implements TbTransportService {
                     REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/firmware", method = RequestMethod.GET)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getFirmware` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getFirmware(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -506,6 +477,16 @@ public class DeviceApiController implements TbTransportService {
         return getOtaPackageCallback(deviceToken, title, version, size, chunk, OtaPackageType.FIRMWARE);
     }
 
+    /**
+     * 功能：获取`Software`。
+     * 参数：
+     * - `ACCESS_TOKEN_PARAM_DESCRIPTION`：`ACCESS_TOKEN_PARAM_DESCRIPTION` 参数。
+     * - `true`：`true` 参数。
+     * - `deviceToken`：设备信息或设备标识。
+     * - `software`：`software` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Get Device Software (getSoftware)",
             notes = "Downloads the current software package." +
                     "When the platform initiates software update, " +
@@ -519,16 +500,6 @@ public class DeviceApiController implements TbTransportService {
                     REQUIRE_ACCESS_TOKEN,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/{deviceToken}/software", method = RequestMethod.GET)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getSoftware` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> getSoftware(
             @ApiParam(value = ACCESS_TOKEN_PARAM_DESCRIPTION, required = true, defaultValue = "YOUR_DEVICE_ACCESS_TOKEN")
             @PathVariable("deviceToken") String deviceToken,
@@ -543,6 +514,12 @@ public class DeviceApiController implements TbTransportService {
         return getOtaPackageCallback(deviceToken, title, version, size, chunk, OtaPackageType.SOFTWARE);
     }
 
+    /**
+     * 功能：执行 `provisionDevice` 对应的处理。
+     * 参数：
+     * - `json`：`json` 参数。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Provision new device (provisionDevice)",
             notes = "Exchange the provision request to the device credentials. " +
                     "See more info about provisioning in the corresponding 'Device provisioning' platform documentation." +
@@ -565,16 +542,6 @@ public class DeviceApiController implements TbTransportService {
             ,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @RequestMapping(value = "/provision", method = RequestMethod.POST)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `provisionDevice` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> provisionDevice(
             @ApiParam(value = "JSON with provision request. See API call description for example.")
             @RequestBody String json) {
@@ -585,14 +552,14 @@ public class DeviceApiController implements TbTransportService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOtaPackageCallback` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取回调。
+     * 参数：
+     * - `deviceToken`：设备信息或设备标识。
+     * - `title`：`title` 参数。
+     * - `version`：`version` 参数。
+     * - `size`：`size` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
      */
     private DeferredResult<ResponseEntity> getOtaPackageCallback(String deviceToken, String title, String version, int size, int chunk, OtaPackageType firmwareType) {
         DeferredResult<ResponseEntity> responseWriter = new DeferredResult<>();
@@ -621,22 +588,12 @@ public class DeviceApiController implements TbTransportService {
      */
     private static class DeviceAuthCallback implements TransportServiceCallback<ValidateDeviceCredentialsResponse> {
         /**
-         * 字段说明：
-         * 1. 保存 `transportContext` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 上下文，汇总当前处理所需的上下文信息。
          */
         private final TransportContext transportContext;
         private final DeferredResult<ResponseEntity> responseWriter;
         /**
-         * 字段说明：
-         * 1. 保存 `onSuccess` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `onSuccess` 字段，保存当前对象的对应属性。
          */
         private final Consumer<SessionInfoProto> onSuccess;
 
@@ -646,17 +603,13 @@ public class DeviceApiController implements TbTransportService {
             this.onSuccess = onSuccess;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(ValidateDeviceCredentialsResponse msg) {
             if (msg.hasDeviceInfo()) {
                 onSuccess.accept(SessionInfoCreator.create(msg, transportContext, UUID.randomUUID()));
@@ -665,17 +618,13 @@ public class DeviceApiController implements TbTransportService {
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理错误信息。
+         * 参数：
+         * - `e`：`e` 参数。
+         * 返回：无。
          */
+        @Override
         public void onError(Throwable e) {
             log.warn("Failed to process request", e);
             responseWriter.setResult(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR));
@@ -694,12 +643,7 @@ public class DeviceApiController implements TbTransportService {
      */
     private static class DeviceProvisionCallback implements TransportServiceCallback<ProvisionDeviceResponseMsg> {
         /**
-         * 字段说明：
-         * 1. 保存 `responseWriter` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 当前响应对象，封装处理完成后的返回信息。
          */
         private final DeferredResult<ResponseEntity> responseWriter;
 
@@ -707,32 +651,24 @@ public class DeviceApiController implements TbTransportService {
             this.responseWriter = responseWriter;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(ProvisionDeviceResponseMsg msg) {
             responseWriter.setResult(new ResponseEntity<>(JsonConverter.toJson(msg).toString(), HttpStatus.OK));
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理错误信息。
+         * 参数：
+         * - `e`：`e` 参数。
+         * 返回：无。
          */
+        @Override
         public void onError(Throwable e) {
             log.warn("Failed to process request", e);
             responseWriter.setResult(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR));
@@ -751,32 +687,17 @@ public class DeviceApiController implements TbTransportService {
      */
     private class GetOtaPackageCallback implements TransportServiceCallback<TransportProtos.GetOtaPackageResponseMsg> {
         /**
-         * 字段说明：
-         * 1. 保存 `responseWriter` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 当前响应对象，封装处理完成后的返回信息。
          */
         private final DeferredResult<ResponseEntity> responseWriter;
         private final String title;
         /**
-         * 字段说明：
-         * 1. 保存 `version` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 版本号，表示当前对象的对应属性。
          */
         private final String version;
         private final int chuckSize;
         /**
-         * 字段说明：
-         * 1. 保存 `chuck` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `chuck` 字段，保存当前对象的对应属性。
          */
         private final int chuck;
 
@@ -788,17 +709,13 @@ public class DeviceApiController implements TbTransportService {
             this.chuck = chuck;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `otaPackageResponseMsg`：响应对象。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(TransportProtos.GetOtaPackageResponseMsg otaPackageResponseMsg) {
             if (!TransportProtos.ResponseStatus.SUCCESS.equals(otaPackageResponseMsg.getResponseStatus())) {
                 responseWriter.setResult(new ResponseEntity<>(HttpStatus.NOT_FOUND));
@@ -817,17 +734,13 @@ public class DeviceApiController implements TbTransportService {
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理错误信息。
+         * 参数：
+         * - `e`：`e` 参数。
+         * 返回：无。
          */
+        @Override
         public void onError(Throwable e) {
             log.warn("Failed to process request", e);
             responseWriter.setResult(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR));
@@ -846,12 +759,7 @@ public class DeviceApiController implements TbTransportService {
      */
     private static class SessionCloseOnErrorCallback implements TransportServiceCallback<Void> {
         /**
-         * 字段说明：
-         * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 服务，提供当前类调用的业务操作。
          */
         private final TransportService transportService;
         private final SessionInfoProto sessionInfo;
@@ -861,31 +769,23 @@ public class DeviceApiController implements TbTransportService {
             this.sessionInfo = sessionInfo;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(Void msg) {
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理错误信息。
+         * 参数：
+         * - `e`：`e` 参数。
+         * 返回：无。
          */
+        @Override
         public void onError(Throwable e) {
             transportService.deregisterSession(sessionInfo);
         }
@@ -903,61 +803,43 @@ public class DeviceApiController implements TbTransportService {
      */
     private static class HttpOkCallback implements TransportServiceCallback<Void> {
         /**
-         * 字段说明：
-         * 1. 保存 `responseWriter` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 当前响应对象，封装处理完成后的返回信息。
          */
         private final DeferredResult<ResponseEntity> responseWriter;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `HttpOkCallback` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `DeviceApiController` 实例，并初始化必要字段。
+         * 参数：
+         * - `responseWriter`：响应对象。
+         * 返回：新创建的对象实例。
          */
         public HttpOkCallback(DeferredResult<ResponseEntity> responseWriter) {
             this.responseWriter = responseWriter;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Success`。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onSuccess(Void msg) {
             responseWriter.setResult(new ResponseEntity<>(HttpStatus.OK));
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理错误信息。
+         * 参数：
+         * - `e`：`e` 参数。
+         * 返回：无。
          */
+        @Override
         public void onError(Throwable e) {
             responseWriter.setResult(new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR));
         }
     }
 
-    @RequiredArgsConstructor
     /**
      * 中文说明：
      * 1. 类目的：`HttpSessionListener` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -968,118 +850,88 @@ public class DeviceApiController implements TbTransportService {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @RequiredArgsConstructor
     private static class HttpSessionListener implements SessionMsgListener {
 
         /**
-         * 字段说明：
-         * 1. 保存 `responseWriter` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 当前响应对象，封装处理完成后的返回信息。
          */
         private final DeferredResult<ResponseEntity> responseWriter;
         private final TransportService transportService;
         /**
-         * 字段说明：
-         * 1. 保存 `sessionInfo` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 会话，保存当前连接或交互过程的会话信息。
          */
         private final SessionInfoProto sessionInfo;
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onGetAttributesResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理响应。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onGetAttributesResponse(GetAttributeResponseMsg msg) {
             responseWriter.setResult(new ResponseEntity<>(JsonConverter.toJson(msg).toString(), HttpStatus.OK));
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onAttributeUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理属性。
+         * 参数：
+         * - `sessionId`：会话ID。
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onAttributeUpdate(UUID sessionId, AttributeUpdateNotificationMsg msg) {
             log.trace("[{}] Received attributes update notification to device", sessionId);
             responseWriter.setResult(new ResponseEntity<>(JsonConverter.toJson(msg).toString(), HttpStatus.OK));
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onRemoteSessionCloseCommand` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理会话。
+         * 参数：
+         * - `sessionId`：会话ID。
+         * - `sessionCloseNotification`：会话对象。
+         * 返回：无。
          */
+        @Override
         public void onRemoteSessionCloseCommand(UUID sessionId, SessionCloseNotificationProto sessionCloseNotification) {
             log.trace("[{}] Received the remote command to close the session: {}", sessionId, sessionCloseNotification.getMessage());
             responseWriter.setResult(new ResponseEntity<>(HttpStatus.REQUEST_TIMEOUT));
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onToDeviceRpcRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理设备。
+         * 参数：
+         * - `sessionId`：会话ID。
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onToDeviceRpcRequest(UUID sessionId, ToDeviceRpcRequestMsg msg) {
             log.trace("[{}] Received RPC command to device", sessionId);
             responseWriter.setResult(new ResponseEntity<>(JsonConverter.toJson(msg, true).toString(), HttpStatus.OK));
             transportService.process(sessionInfo, msg, RpcStatus.DELIVERED, TransportServiceCallback.EMPTY);
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onToServerRpcResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理RPC。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
+        @Override
         public void onToServerRpcResponse(ToServerRpcResponseMsg msg) {
             responseWriter.setResult(new ResponseEntity<>(JsonConverter.toJson(msg).toString(), HttpStatus.OK));
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onDeviceDeleted` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理设备。
+         * 参数：
+         * - `deviceId`：设备IDID。
+         * 返回：无。
          */
+        @Override
         public void onDeviceDeleted(DeviceId deviceId) {
             UUID sessionId = new UUID(sessionInfo.getSessionIdMSB(), sessionInfo.getSessionIdLSB());
             log.trace("[{}] Received device deleted notification for device with id: {}",sessionId, deviceId);
@@ -1089,14 +941,10 @@ public class DeviceApiController implements TbTransportService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseMediaType` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析类型。
+     * 参数：
+     * - `contentType`：类型。
+     * 返回：处理结果。
      */
     private static MediaType parseMediaType(String contentType) {
         try {
@@ -1106,17 +954,12 @@ public class DeviceApiController implements TbTransportService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String getName() {
         return DataConstants.HTTP_TRANSPORT_NAME;
     }

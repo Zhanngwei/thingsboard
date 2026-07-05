@@ -31,54 +31,46 @@ import org.thingsboard.server.common.msg.queue.TbCallback;
 public interface RuleEngineDeviceStateManager {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：处理设备连接事件。
-     * 2. 输入参数：tenantId 是租户，deviceId 是设备，connectTime 是连接时间戳，callback 用于异步确认。
-     * 3. 返回值：无；处理结果通过 callback 通知。
-     * 4. 调用时机：传输层或规则节点感知设备建立连接时调用。
-     * 5. 调用方：设备状态节点、传输状态桥接服务。
-     * 6. 使用流程：属于设备状态 Rule Engine 流程。
-     * 7. 线程安全：接口无状态，实现需要保护设备状态缓存和并发更新。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务、MQTT、Actor、数据库；实现可能更新缓存/数据库，直接服务 Rule Engine。
+     * 功能：处理设备。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `connectTime`：`connectTime` 参数。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     void onDeviceConnect(TenantId tenantId, DeviceId deviceId, long connectTime, TbCallback callback);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：处理设备活跃事件。
-     * 2. 输入参数：tenantId 是租户，deviceId 是设备，activityTime 是活跃时间戳，callback 用于异步确认。
-     * 3. 返回值：无；处理结果通过 callback 通知。
-     * 4. 调用时机：收到遥测、属性或其它设备活动消息时调用。
-     * 5. 调用方：设备状态节点、传输事件处理流程。
-     * 6. 使用流程：属于设备状态刷新和 Rule Engine 消息处理流程。
-     * 7. 线程安全：实现需要处理同一设备并发活动事件。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT/Actor/数据库；实现可能访问缓存或持久化状态，直接涉及 Rule Engine。
+     * 功能：处理设备。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `activityTime`：`activityTime` 参数。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     void onDeviceActivity(TenantId tenantId, DeviceId deviceId, long activityTime, TbCallback callback);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：处理设备断开连接事件。
-     * 2. 输入参数：tenantId 是租户，deviceId 是设备，disconnectTime 是断开时间戳，callback 用于异步确认。
-     * 3. 返回值：无；处理结果通过 callback 通知。
-     * 4. 调用时机：传输层检测到设备会话关闭时调用。
-     * 5. 调用方：传输状态桥接服务、设备状态节点。
-     * 6. 使用流程：属于设备状态迁移流程。
-     * 7. 线程安全：实现需要保证连接/断开事件顺序和并发更新一致性。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务、MQTT、Actor、数据库；实现可能更新缓存或状态存储。
+     * 功能：处理设备。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `disconnectTime`：`disconnectTime` 参数。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     void onDeviceDisconnect(TenantId tenantId, DeviceId deviceId, long disconnectTime, TbCallback callback);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：处理设备不活跃事件。
-     * 2. 输入参数：tenantId 是租户，deviceId 是设备，inactivityTime 是判定不活跃的时间戳，callback 用于异步确认。
-     * 3. 返回值：无；处理结果通过 callback 通知。
-     * 4. 调用时机：设备状态调度器或规则节点检测到设备超时未活动时调用。
-     * 5. 调用方：设备状态管理流程。
-     * 6. 使用流程：属于设备状态 Rule Engine 流程，可触发后续告警或消息路由。
-     * 7. 线程安全：实现需要处理定时检测与实时活动事件并发。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT、Actor；实现可能访问缓存/数据库并直接服务 Rule Engine。
+     * 功能：处理设备。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * - `inactivityTime`：`inactivityTime` 参数。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     void onDeviceInactivity(TenantId tenantId, DeviceId deviceId, long inactivityTime, TbCallback callback);
 

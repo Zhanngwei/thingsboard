@@ -41,7 +41,6 @@ import java.util.stream.Collectors;
 /**
  * Created by ashvayka on 24.09.18.
  */
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbKafkaProducerTemplate` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -52,87 +51,56 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class TbKafkaProducerTemplate<T extends TbQueueMsg> implements TbQueueProducer<T> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `producer` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息生产者列表，用于保存一组待处理对象。
      */
     private final KafkaProducer<String, byte[]> producer;
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `defaultTopic` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主题，用于匹配或发送对应主题的数据。
      */
+    @Getter
     private final String defaultTopic;
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `settings` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
+    @Getter
     private final TbKafkaSettings settings;
 
     /**
-     * 字段说明：
-     * 1. 保存 `admin` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `admin` 字段，保存当前对象的对应属性。
      */
     private final TbQueueAdmin admin;
 
     /**
-     * 字段说明：
-     * 1. 保存 `topics` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `topics`集合，用于去重保存或快速判断对象是否存在。
      */
     private final Set<TopicPartitionInfo> topics;
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `clientId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户端ID，用于定位对应业务对象。
      */
+    @Getter
     private final String clientId;
 
-    @Builder
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbKafkaProducerTemplate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbKafkaProducerTemplate` 实例，并初始化必要字段。
+     * 参数：
+     * - `settings`：配置对象。
+     * - `defaultTopic`：主题名称或主题对象。
+     * - `clientId`：客户端ID。
+     * - `admin`：`admin` 参数。
+     * 返回：新创建的对象实例。
      */
+    @Builder
     private TbKafkaProducerTemplate(TbKafkaSettings settings, String defaultTopic, String clientId, TbQueueAdmin admin) {
         Properties props = settings.toProducerProps();
 
         this.clientId = Objects.requireNonNull(clientId, "Kafka producer client.id is null");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!StringUtils.isEmpty(clientId)) {
             props.put(ProducerConfig.CLIENT_ID_CONFIG, clientId);
         }
@@ -144,60 +112,46 @@ public class TbKafkaProducerTemplate<T extends TbQueueMsg> implements TbQueuePro
         topics = ConcurrentHashMap.newKeySet();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void init() {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addAnalyticHeaders` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Analytic Headers`。
+     * 参数：
+     * - `headers`：数据列表。
+     * 返回：无。
      */
     void addAnalyticHeaders(List<Header> headers) {
         headers.add(new RecordHeader("_producerId", getClientId().getBytes(StandardCharsets.UTF_8)));
         headers.add(new RecordHeader("_threadName", Thread.currentThread().getName().getBytes(StandardCharsets.UTF_8)));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (log.isTraceEnabled()) {
             try {
                 StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
                 int maxLevel = Math.min(stackTrace.length, 20);
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 for (int i = 2; i < maxLevel; i++) { // ignore two levels: getStackTrace and addAnalyticHeaders
                     headers.add(new RecordHeader("_stackTrace" + i, stackTrace[i].toString().getBytes(StandardCharsets.UTF_8)));
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Throwable t) {
                 log.trace("Failed to add stacktrace headers in Kafka producer {}", getClientId(), t);
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `send` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `send` 对应的处理。
+     * 参数：
+     * - `tpi`：`tpi` 参数。
+     * - `msg`：待处理消息。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
+    @Override
     public void send(TopicPartitionInfo tpi, T msg, TbQueueCallback callback) {
         try {
             createTopicIfNotExist(tpi);
@@ -205,20 +159,16 @@ public class TbKafkaProducerTemplate<T extends TbQueueMsg> implements TbQueuePro
             byte[] data = msg.getData();
             ProducerRecord<String, byte[]> record;
             List<Header> headers = msg.getHeaders().getData().entrySet().stream().map(e -> new RecordHeader(e.getKey(), e.getValue())).collect(Collectors.toList());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (log.isDebugEnabled()) {
                 addAnalyticHeaders(headers);
             }
             record = new ProducerRecord<>(tpi.getFullTopicName(), null, key, data, headers);
             producer.send(record, (metadata, exception) -> {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (exception == null) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (callback != null) {
                         callback.onSuccess(new KafkaTbQueueMsgMetadata(metadata));
                     }
                 } else {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (callback != null) {
                         callback.onFailure(exception);
                     } else {
@@ -226,9 +176,7 @@ public class TbKafkaProducerTemplate<T extends TbQueueMsg> implements TbQueuePro
                     }
                 }
             });
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (callback != null) {
                 callback.onFailure(e);
             } else {
@@ -239,17 +187,12 @@ public class TbKafkaProducerTemplate<T extends TbQueueMsg> implements TbQueuePro
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createTopicIfNotExist` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建主题。
+     * 参数：
+     * - `tpi`：`tpi` 参数。
+     * 返回：无。
      */
     private void createTopicIfNotExist(TopicPartitionInfo tpi) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (topics.contains(tpi)) {
             return;
         }
@@ -257,19 +200,13 @@ public class TbKafkaProducerTemplate<T extends TbQueueMsg> implements TbQueuePro
         topics.add(tpi);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stop` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `stop` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void stop() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (producer != null) {
             producer.close();
         }

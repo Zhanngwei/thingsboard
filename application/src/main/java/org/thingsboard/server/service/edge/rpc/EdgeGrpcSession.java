@@ -100,8 +100,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 
-@Slf4j
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`EdgeGrpcSession` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
@@ -112,160 +110,87 @@ import java.util.function.BiConsumer;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
  */
+@Slf4j
+@Data
 public final class EdgeGrpcSession implements Closeable {
 
     private static final ReentrantLock downlinkMsgLock = new ReentrantLock();
 
     /**
-     * 字段说明：
-     * 1. 保存 `MAX_DOWNLINK_ATTEMPTS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 尝试次数常量，用于统一引用固定值。
      */
     private static final int MAX_DOWNLINK_ATTEMPTS = 10; // max number of attemps to send downlink message if edge connected
 
     /**
-     * 字段说明：
-     * 1. 保存 `QUEUE_START_TS_ATTR_KEY` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 开始时间戳常量，用于统一引用固定值。
      */
     private static final String QUEUE_START_TS_ATTR_KEY = "queueStartTs";
     private static final String QUEUE_START_SEQ_ID_ATTR_KEY = "queueStartSeqId";
     /**
-     * 字段说明：
-     * 1. 保存 `RATE_LIMIT_REACHED` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数量限制常量，用于统一引用固定值。
      */
     private static final String RATE_LIMIT_REACHED = "Rate limit reached";
 
     /**
-     * 字段说明：
-     * 1. 保存 `sessionId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 会话ID，用于定位对应业务对象。
      */
     private final UUID sessionId;
     private final BiConsumer<EdgeId, EdgeGrpcSession> sessionOpenListener;
     /**
-     * 字段说明：
-     * 1. 保存 `sessionCloseListener` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 会话，用于接收并处理对应事件。
      */
     private final BiConsumer<Edge, UUID> sessionCloseListener;
 
     private final EdgeSessionState sessionState = new EdgeSessionState();
 
     /**
-     * 字段说明：
-     * 1. 保存 `ctx` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private EdgeContextComponent ctx;
     private Edge edge;
     /**
-     * 字段说明：
-     * 1. 保存 `tenantId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户ID，用于定位对应业务对象。
      */
     private TenantId tenantId;
     private StreamObserver<RequestMsg> inputStream;
     /**
-     * 字段说明：
-     * 1. 保存 `outputStream` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `outputStream` 字段，保存当前对象的对应属性。
      */
     private StreamObserver<ResponseMsg> outputStream;
     private boolean connected;
     /**
-     * 字段说明：
-     * 1. 保存 `syncCompleted` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前处理是否已经完成。
      */
     private boolean syncCompleted;
 
     /**
-     * 字段说明：
-     * 1. 保存 `newStartTs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，用于标识当前数据或事件发生的时间。
      */
     private Long newStartTs;
     private Long previousStartTs;
     /**
-     * 字段说明：
-     * 1. 保存 `newStartSeqId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 序号ID，用于定位对应业务对象。
      */
     private Long newStartSeqId;
     private Long previousStartSeqId;
     /**
-     * 字段说明：
-     * 1. 保存 `seqIdEnd` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 序号，用于控制处理规模或位置。
      */
     private Long seqIdEnd;
 
     /**
-     * 字段说明：
-     * 1. 保存 `edgeVersion` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 边缘节点对象，用于描述当前业务场景。
      */
     private EdgeVersion edgeVersion;
 
     /**
-     * 字段说明：
-     * 1. 保存 `maxInboundMessageSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private int maxInboundMessageSize;
     private int clientMaxInboundMessageSize;
 
     /**
-     * 字段说明：
-     * 1. 保存 `sendDownlinkExecutorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private ScheduledExecutorService sendDownlinkExecutorService;
 
@@ -282,30 +207,22 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initInputStream` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Input Stream`。
+     * 参数：无。
+     * 返回：无。
      */
     private void initInputStream() {
         this.inputStream = new StreamObserver<>() {
             @Override
             public void onNext(RequestMsg requestMsg) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!connected && requestMsg.getMsgType().equals(RequestMsgType.CONNECT_RPC_MESSAGE)) {
                     ConnectResponseMsg responseMsg = processConnect(requestMsg.getConnectRequestMsg());
                     outputStream.onNext(ResponseMsg.newBuilder()
                             .setConnectResponseMsg(responseMsg)
                             .build());
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (ConnectResponseCode.ACCEPTED != responseMsg.getResponseCode()) {
                         outputStream.onError(new RuntimeException(responseMsg.getErrorMsg()));
                     } else {
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (requestMsg.getConnectRequestMsg().hasMaxInboundMessageSize()) {
                             log.debug("[{}][{}] Client max inbound message size: {}", tenantId, sessionId, requestMsg.getConnectRequestMsg().getMaxInboundMessageSize());
                             clientMaxInboundMessageSize = requestMsg.getConnectRequestMsg().getMaxInboundMessageSize();
@@ -313,14 +230,10 @@ public final class EdgeGrpcSession implements Closeable {
                         connected = true;
                     }
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (connected) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (requestMsg.getMsgType().equals(RequestMsgType.SYNC_REQUEST_RPC_MESSAGE)) {
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (requestMsg.hasSyncRequestMsg()) {
                             boolean fullSync = false;
-                            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                             if (requestMsg.getSyncRequestMsg().hasFullSync()) {
                                 fullSync = requestMsg.getSyncRequestMsg().getFullSync();
                             }
@@ -329,13 +242,10 @@ public final class EdgeGrpcSession implements Closeable {
                             syncCompleted = true;
                         }
                     }
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (requestMsg.getMsgType().equals(RequestMsgType.UPLINK_RPC_MESSAGE)) {
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (requestMsg.hasUplinkMsg()) {
                             onUplinkMsg(requestMsg.getUplinkMsg());
                         }
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (requestMsg.hasDownlinkResponseMsg()) {
                             onDownlinkResponse(requestMsg.getDownlinkResponseMsg());
                         }
@@ -357,11 +267,9 @@ public final class EdgeGrpcSession implements Closeable {
 
             private void closeSession() {
                 connected = false;
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (edge != null) {
                     try {
                         sessionCloseListener.accept(edge, sessionId);
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (Exception ignored) {
                     }
                 }
@@ -374,14 +282,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startSyncProcess` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Sync Process`。
+     * 参数：
+     * - `fullSync`：`fullSync` 参数。
+     * 返回：无。
      */
     public void startSyncProcess(boolean fullSync) {
         log.trace("[{}][{}][{}] Staring edge sync process", this.tenantId, edge.getId(), this.sessionId);
@@ -391,14 +295,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doSync` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doSync` 对应的处理。
+     * 参数：
+     * - `cursor`：`cursor` 参数。
+     * 返回：无。
      */
     private void doSync(EdgeSyncCursor cursor) {
         if (cursor.hasNext()) {
@@ -438,14 +338,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onUplinkMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `uplinkMsg`：待处理消息。
+     * 返回：无。
      */
     private void onUplinkMsg(UplinkMsg uplinkMsg) {
         if (isRateLimitViolated(uplinkMsg)) {
@@ -467,14 +363,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isRateLimitViolated` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断数量限制。
+     * 参数：
+     * - `uplinkMsg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean isRateLimitViolated(UplinkMsg uplinkMsg) {
         if (!ctx.getRateLimitService().checkRateLimit(LimitedApi.EDGE_UPLINK_MESSAGES, tenantId) ||
@@ -487,14 +379,12 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendResponseMessage` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `uplinkMsgId`：消息ID。
+     * - `success`：`success` 参数。
+     * - `errorMsg`：待处理消息。
+     * 返回：无。
      */
     private void sendResponseMessage(int uplinkMsgId, boolean success, String errorMsg) {
         UplinkResponseMsg.Builder responseBuilder = UplinkResponseMsg.newBuilder()
@@ -509,14 +399,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onDownlinkResponse` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     private void onDownlinkResponse(DownlinkResponseMsg msg) {
         try {
@@ -536,14 +422,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendDownlinkMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `downlinkMsg`：待处理消息。
+     * 返回：无。
      */
     private void sendDownlinkMsg(ResponseMsg downlinkMsg) {
         log.trace("[{}][{}] Sending downlink msg [{}]", this.tenantId, this.sessionId, downlinkMsg);
@@ -563,14 +445,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onConfigurationUpdate` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Configuration Update`。
+     * 参数：
+     * - `edge`：`edge` 参数。
+     * 返回：无。
      */
     void onConfigurationUpdate(Edge edge) {
         log.debug("[{}] onConfigurationUpdate [{}]", this.sessionId, edge);
@@ -585,14 +463,9 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processEdgeEvents` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<Boolean> processEdgeEvents() throws Exception {
         SettableFuture<Boolean> result = SettableFuture.create();
@@ -657,14 +530,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startProcessingEdgeEvents` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动边缘节点。
+     * 参数：
+     * - `fetcher`：`fetcher` 参数。
+     * 返回：处理结果。
      */
     private ListenableFuture<Pair<Long, Long>> startProcessingEdgeEvents(EdgeEventFetcher fetcher) {
         SettableFuture<Pair<Long, Long>> result = SettableFuture.create();
@@ -674,14 +543,12 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processEdgeEvents` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：
+     * - `fetcher`：`fetcher` 参数。
+     * - `pageLink`：`pageLink` 参数。
+     * - `result`：`result` 参数。
+     * 返回：无。
      */
     private void processEdgeEvents(EdgeEventFetcher fetcher, PageLink pageLink, SettableFuture<Pair<Long, Long>> result) {
         try {
@@ -729,14 +596,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendDownlinkMsgsPack` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Downlink Msgs Pack`。
+     * 参数：
+     * - `downlinkMsgsPack`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Boolean> sendDownlinkMsgsPack(List<DownlinkMsg> downlinkMsgsPack) {
         interruptPreviousSendDownlinkMsgsTask();
@@ -751,14 +614,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `scheduleDownlinkMsgsPackSend` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `scheduleDownlinkMsgsPackSend` 对应的处理。
+     * 参数：
+     * - `attempt`：`attempt` 参数。
+     * 返回：无。
      */
     private void scheduleDownlinkMsgsPackSend(int attempt) {
         Runnable sendDownlinkMsgsTask = () -> {
@@ -826,14 +685,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertToDownlinkMsgsPack` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换`To Downlink Msgs Pack`。
+     * 参数：
+     * - `edgeEvents`：数据列表。
+     * 返回：匹配的数据集合。
      */
     private List<DownlinkMsg> convertToDownlinkMsgsPack(List<EdgeEvent> edgeEvents) {
         List<DownlinkMsg> result = new ArrayList<>();
@@ -883,14 +738,9 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getQueueStartTsAndSeqId` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取开始时间戳。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private ListenableFuture<Pair<Long, Long>> getQueueStartTsAndSeqId() {
         ListenableFuture<List<AttributeKvEntry>> future =
@@ -914,14 +764,9 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isSeqIdStartedNewCycle` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断序号。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean isSeqIdStartedNewCycle() {
         try {
@@ -935,14 +780,9 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isNewEdgeEventsAvailable` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断边缘节点。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean isNewEdgeEventsAvailable() {
         try {
@@ -956,14 +796,9 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findStartSeqIdFromOldestEventIfAny` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取事件。
+     * 参数：无。
+     * 返回：数值结果。
      */
     private long findStartSeqIdFromOldestEventIfAny() {
         long startSeqId = 0L;
@@ -980,14 +815,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateQueueStartTsAndSeqId` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新开始时间戳。
+     * 参数：
+     * - `pair`：`pair` 参数。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<List<String>> updateQueueStartTsAndSeqId(Pair<Long, Long> pair) {
         this.newStartTs = pair.getFirst();
@@ -1000,14 +831,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertEntityEventToDownlink` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换实体。
+     * 参数：
+     * - `edgeEvent`：`edgeEvent` 参数。
+     * 返回：处理结果。
      */
     private DownlinkMsg convertEntityEventToDownlink(EdgeEvent edgeEvent) {
         log.trace("[{}] Executing convertEntityEventToDownlink, edgeEvent [{}], action [{}]", this.tenantId, edgeEvent, edgeEvent.getAction());
@@ -1063,14 +890,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processUplinkMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `uplinkMsg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<List<Void>> processUplinkMsg(UplinkMsg uplinkMsg) {
         List<ListenableFuture<Void>> result = new ArrayList<>();
@@ -1198,14 +1021,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processConnect` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Connect`。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：处理结果。
      */
     private ConnectResponseMsg processConnect(ConnectRequestMsg request) {
         log.trace("[{}] processConnect [{}]", this.sessionId, request);
@@ -1251,31 +1070,22 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processSaveEdgeVersionAsAttribute` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：
+     * - `edgeVersion`：`edgeVersion` 参数。
+     * 返回：无。
      */
     private void processSaveEdgeVersionAsAttribute(String edgeVersion) {
         AttributeKvEntry attributeKvEntry = new BaseAttributeKvEntry(new StringDataEntry(DataConstants.EDGE_VERSION_ATTR_KEY, edgeVersion), System.currentTimeMillis());
         ctx.getAttributesService().save(this.tenantId, this.edge.getId(), DataConstants.SERVER_SCOPE, attributeKvEntry);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `close` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `close` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void close() {
         log.debug("[{}][{}] Closing session", this.tenantId, sessionId);
         connected = false;
@@ -1287,14 +1097,9 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `interruptPreviousSendDownlinkMsgsTask` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `interruptPreviousSendDownlinkMsgsTask` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void interruptPreviousSendDownlinkMsgsTask() {
         if (sessionState.getSendDownlinkMsgsFuture() != null && !sessionState.getSendDownlinkMsgsFuture().isDone()
@@ -1305,14 +1110,9 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `interruptGeneralProcessingOnSync` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `interruptGeneralProcessingOnSync` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void interruptGeneralProcessingOnSync() {
         log.debug("[{}][{}][{}] Sync process started. General processing interrupted!", this.tenantId, edge.getId(), this.sessionId);
@@ -1320,14 +1120,10 @@ public final class EdgeGrpcSession implements Closeable {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stopCurrentSendDownlinkMsgsTask` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：停止或关闭`Current Send Downlink Msgs Task`。
+     * 参数：
+     * - `isInterrupted`：`isInterrupted` 参数。
+     * 返回：无。
      */
     public void stopCurrentSendDownlinkMsgsTask(Boolean isInterrupted) {
         if (sessionState.getSendDownlinkMsgsFuture() != null && !sessionState.getSendDownlinkMsgsFuture().isDone()) {

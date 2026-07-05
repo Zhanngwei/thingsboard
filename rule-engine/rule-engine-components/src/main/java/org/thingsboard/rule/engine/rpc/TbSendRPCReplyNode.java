@@ -41,6 +41,9 @@ import org.thingsboard.server.common.msg.TbMsg;
 
 import java.util.UUID;
 
+/**
+ * `TbSendRPCReplyNode` 类，封装当前模块中的一组相关职责。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.ACTION,
@@ -52,20 +55,19 @@ import java.util.UUID;
         configDirective = "tbActionNodeRpcReplyConfig",
         icon = "call_merge"
 )
-/**
- * 设备到服务端 RPC 回复节点，根据元数据定位 RPC 会话并发送回复。
- * 普通路径直接委托 RpcService；Edge 路径会异步保存 EdgeEvent，本类本身不直接管理底层传输连接。
- */
 public class TbSendRPCReplyNode implements TbNode {
 
     /**
-     * RPC 回复节点配置，定义 serviceId、sessionId 和 requestId 的元数据字段名。
+     * 配置，保存当前对象的配置选项。
      */
     private TbSendRpcReplyNodeConfiguration config;
 
     /**
-     * 初始化 RPC 回复节点配置。
-     * 本方法不直接发送 RPC、不访问数据库或缓存，也不处理消息确认。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
@@ -73,9 +75,11 @@ public class TbSendRPCReplyNode implements TbNode {
     }
 
     /**
-     * 校验 RPC 回复所需元数据并发送到设备会话。
-     * 非 Edge 场景直接调用 RpcService 并成功路由；Edge 场景保存 EdgeEvent 后由数据库回调决定成功或失败。
-     * RpcService 的 Actor/MQTT/传输细节不在本类直接实现，具体调用链可能间接涉及。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
@@ -103,8 +107,14 @@ public class TbSendRPCReplyNode implements TbNode {
     }
 
     /**
-     * 将 RPC 回复保存为 EdgeEvent，等待 Edge 同步链路处理。
-     * 本方法直接调用 EdgeEventService.saveAsync，属于数据库/持久化边界；保存结果通过 dbCallbackExecutor 回调路由。
+     * 功能：保存或创建边缘节点。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `serviceIdStr`：服务对象。
+     * - `sessionIdStr`：会话对象。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void saveRpcResponseToEdgeQueue(TbContext ctx, TbMsg msg, String serviceIdStr, String sessionIdStr, String requestIdStr) {
         EdgeId edgeId;
@@ -128,8 +138,10 @@ public class TbSendRPCReplyNode implements TbNode {
         ListenableFuture<Void> future = ctx.getEdgeEventService().saveAsync(edgeEvent);
         Futures.addCallback(future, new FutureCallback<>() {
             /**
-             * EdgeEvent 保存成功后通知 Edge 更新并走 Success。
-             * 本回调运行在 dbCallbackExecutor 上。
+             * 功能：处理`on Success`。
+             * 参数：
+             * - `result`：`result` 参数。
+             * 返回：无。
              */
             @Override
             public void onSuccess(Void result) {
@@ -138,8 +150,10 @@ public class TbSendRPCReplyNode implements TbNode {
             }
 
             /**
-             * EdgeEvent 保存失败后走 Failure。
-             * 失败通常来自数据库/持久化或 EdgeEventService 调用链。
+             * 功能：处理失败信息。
+             * 参数：
+             * - `t`：`t` 参数。
+             * 返回：无。
              */
             @Override
             public void onFailure(Throwable t) {

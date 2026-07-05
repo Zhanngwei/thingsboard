@@ -51,8 +51,6 @@ import java.util.List;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ContextConfiguration(classes = {DashboardControllerTest.Config.class})
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`DashboardControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -63,30 +61,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@ContextConfiguration(classes = {DashboardControllerTest.Config.class})
+@DaoSqlTest
 public class DashboardControllerTest extends AbstractControllerTest {
 
     private IdComparator<DashboardInfo> idComparator = new IdComparator<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `savedTenant` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
     private Tenant savedTenant;
     private User tenantAdmin;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `dashboardDao` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 仪表盘，用于读取或保存对应领域对象。
      */
+    @Autowired
     private DashboardDao dashboardDao;
 
     /**
@@ -100,35 +90,25 @@ public class DashboardControllerTest extends AbstractControllerTest {
      * 7. 设计模式：主要体现 MVC Controller / Facade。
      */
     static class Config {
+        /**
+         * 功能：执行 `dashboardDao` 对应的处理。
+         * 参数：
+         * - `dashboardDao`：`dashboardDao` 参数。
+         * 返回：处理结果。
+         */
         @Bean
         @Primary
-        /**
-         * 方法说明：
-         * 1. 职责：执行 `dashboardDao` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-         */
         public DashboardDao dashboardDao(DashboardDao dashboardDao) {
-            // DAO 调用是数据库访问边界，事务和缓存一致性由上层服务约定控制。
             return Mockito.mock(DashboardDao.class, AdditionalAnswers.delegatesTo(dashboardDao));
         }
     }
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeTest() throws Exception {
         loginSysAdmin();
 
@@ -147,17 +127,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         tenantAdmin = createUserAndLogin(tenantAdmin, "testPassword1");
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void afterTest() throws Exception {
         loginSysAdmin();
 
@@ -165,17 +140,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDashboardInfoWithViolationOfValidation` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDashboardInfoWithViolationOfValidation() throws Exception {
         Dashboard dashboard = new Dashboard();
         dashboard.setTitle(StringUtils.randomAlphabetic(300));
@@ -193,17 +163,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Mockito.reset(tbClusterService, auditLogService);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testUpdateDashboardFromDifferentTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testUpdateDashboardFromDifferentTenant() throws Exception {
         Dashboard dashboard = new Dashboard();
         dashboard.setTitle("My dashboard");
@@ -220,17 +185,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         deleteDifferentTenant();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindDashboardById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘ID相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindDashboardById() throws Exception {
         Dashboard dashboard = new Dashboard();
         dashboard.setTitle("My dashboard");
@@ -240,17 +200,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertEquals(savedDashboard, foundDashboard);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteDashboard` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteDashboard() throws Exception {
         Dashboard dashboard = new Dashboard();
         dashboard.setTitle("My dashboard");
@@ -270,17 +225,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
                 .andExpect(statusReason(containsString(msgErrorNoFound("Dashboard", dashboardIdStr))));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSaveDashboardWithEmptyTitle` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSaveDashboardWithEmptyTitle() throws Exception {
         Dashboard dashboard = new Dashboard();
         String msgError = "Dashboard title " + msgErrorShouldBeSpecified;;
@@ -295,17 +245,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
                 tenantAdmin.getId(), tenantAdmin.getEmail(), ActionType.ADDED, new DataValidationException(msgError));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignUnassignDashboardToCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignUnassignDashboardToCustomer() throws Exception {
         Dashboard dashboard = new Dashboard();
         dashboard.setTitle("My dashboard");
@@ -345,17 +290,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertTrue(foundDashboard.getAssignedCustomers() == null || foundDashboard.getAssignedCustomers().isEmpty());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignUnassignDashboardToPublicCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignUnassignDashboardToPublicCustomer() throws Exception {
         Dashboard dashboard = new Dashboard();
         dashboard.setTitle("My dashboard");
@@ -366,9 +306,7 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Dashboard assignedDashboard = doPost("/api/customer/public/dashboard/" + savedDashboard.getId().getId().toString(), Dashboard.class);
 
         CustomerId publicCustomerId = null;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (ShortCustomerInfo assignedCustomer : assignedDashboard.getAssignedCustomers()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (assignedCustomer.isPublic()) {
                 publicCustomerId = assignedCustomer.getCustomerId();
             }
@@ -400,17 +338,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertTrue(foundDashboard.getAssignedCustomers() == null || foundDashboard.getAssignedCustomers().isEmpty());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignDashboardToNonExistentCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignDashboardToNonExistentCustomer() throws Exception {
         Dashboard dashboard = new Dashboard();
         dashboard.setTitle("My dashboard");
@@ -426,17 +359,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         testNotifyEntityNever(savedDashboard.getId(), savedDashboard);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignDashboardToCustomerFromDifferentTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignDashboardToCustomerFromDifferentTenant() throws Exception {
         loginSysAdmin();
 
@@ -484,17 +412,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantDashboards` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantDashboards() throws Exception {
         List<DashboardInfo> expectedDashboards = new ArrayList<>();
         PageLink pageLink = new PageLink(24);
@@ -504,7 +427,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
                     new TypeReference<PageData<DashboardInfo>>() {
                     }, pageLink);
             expectedDashboards.addAll(pageData.getData());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pageData.hasNext()) {
                 pageLink = pageLink.nextPageLink();
             }
@@ -513,7 +435,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Mockito.reset(tbClusterService, auditLogService);
 
         int cntEntity = 173;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < cntEntity; i++) {
             Dashboard dashboard = new Dashboard();
             dashboard.setTitle("Dashboard" + i);
@@ -530,7 +451,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
                     new TypeReference<PageData<DashboardInfo>>() {
                     }, pageLink);
             loadedDashboards.addAll(pageData.getData());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pageData.hasNext()) {
                 pageLink = pageLink.nextPageLink();
             }
@@ -542,22 +462,16 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertEquals(expectedDashboards, loadedDashboards);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindTenantDashboardsByTitle` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindTenantDashboardsByTitle() throws Exception {
         String title1 = "Dashboard title 1";
         List<DashboardInfo> dashboardsTitle1 = new ArrayList<>();
         int cntEntity = 134;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < cntEntity; i++) {
             Dashboard dashboard = new Dashboard();
             String suffix = StringUtils.randomAlphanumeric((int) (Math.random() * 15));
@@ -569,7 +483,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
         String title2 = "Dashboard title 2";
         List<DashboardInfo> dashboardsTitle2 = new ArrayList<>();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 112; i++) {
             Dashboard dashboard = new Dashboard();
             String suffix = StringUtils.randomAlphanumeric((int) (Math.random() * 15));
@@ -587,7 +500,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
                     new TypeReference<PageData<DashboardInfo>>() {
                     }, pageLink);
             loadedDashboardsTitle1.addAll(pageData.getData());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pageData.hasNext()) {
                 pageLink = pageLink.nextPageLink();
             }
@@ -605,7 +517,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
                     new TypeReference<PageData<DashboardInfo>>() {
                     }, pageLink);
             loadedDashboardsTitle2.addAll(pageData.getData());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pageData.hasNext()) {
                 pageLink = pageLink.nextPageLink();
             }
@@ -618,7 +529,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
 
         Mockito.reset(tbClusterService, auditLogService);
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (DashboardInfo dashboard : loadedDashboardsTitle1) {
             doDelete("/api/dashboard/" + dashboard.getId().getId().toString())
                     .andExpect(status().isOk());
@@ -635,7 +545,6 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertFalse(pageData.hasNext());
         Assert.assertEquals(0, pageData.getData().size());
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (DashboardInfo dashboard : loadedDashboardsTitle2) {
             doDelete("/api/dashboard/" + dashboard.getId().getId().toString())
                     .andExpect(status().isOk());
@@ -649,17 +558,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertEquals(0, pageData.getData().size());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFindCustomerDashboards` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证客户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFindCustomerDashboards() throws Exception {
         Customer customer = new Customer();
         customer.setTitle("Test customer");
@@ -701,17 +605,12 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertEquals(dashboards, loadedDashboards);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAssignDashboardToEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAssignDashboardToEdge() throws Exception {
         Edge edge = constructEdge("My edge", "default");
         Edge savedEdge = doPost("/api/edge", edge, Edge.class);
@@ -745,47 +644,33 @@ public class DashboardControllerTest extends AbstractControllerTest {
         Assert.assertEquals(0, pageData.getData().size());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteDashboardWithDeleteRelationsOk` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteDashboardWithDeleteRelationsOk() throws Exception {
         DashboardId dashboardId = createDashboard("Dashboard for Test WithRelationsOk").getId();
         testEntityDaoWithRelationsOk(savedTenant.getId(), dashboardId, "/api/dashboard/" + dashboardId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeleteDashboardExceptionWithRelationsTransactional` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证仪表盘相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeleteDashboardExceptionWithRelationsTransactional() throws Exception {
         DashboardId dashboardId = createDashboard("Dashboard for Test WithRelations Transactional Exception").getId();
         testEntityDaoWithRelationsTransactionalException(dashboardDao, savedTenant.getId(), dashboardId, "/api/dashboard/" + dashboardId);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDashboard` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建仪表盘。
+     * 参数：
+     * - `title`：`title` 参数。
+     * 返回：处理结果。
      */
     private Dashboard createDashboard(String title) {
         Dashboard dashboard = new Dashboard();

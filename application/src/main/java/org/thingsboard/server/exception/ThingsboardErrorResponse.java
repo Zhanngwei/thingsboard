@@ -22,7 +22,6 @@ import org.thingsboard.server.common.data.exception.ThingsboardErrorCode;
 
 import java.util.Date;
 
-@ApiModel
 /**
  * 中文说明：
  * 1. 类目的：`ThingsboardErrorResponse` 是ThingsBoard Application 模块中的异常与错误响应类型，用于统一表达 ThingsBoard Application 的异常状态和 HTTP 错误响应。
@@ -33,59 +32,38 @@ import java.util.Date;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Adapter。
  */
+@ApiModel
 public class ThingsboardErrorResponse {
     // HTTP Response Status Code
     /**
-     * 字段说明：
-     * 1. 保存 `status` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 状态，表示当前对象所处状态。
      */
     private final HttpStatus status;
 
     // General Error message
     /**
-     * 字段说明：
-     * 1. 保存 `message` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private final String message;
 
     // Error code
     /**
-     * 字段说明：
-     * 1. 保存 `errorCode` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 错误码，记录当前处理过程中的失败原因。
      */
     private final ThingsboardErrorCode errorCode;
 
     /**
-     * 字段说明：
-     * 1. 保存 `timestamp` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，用于标识当前数据或事件发生的时间。
      */
     private final long timestamp;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ThingsboardErrorResponse` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `ThingsboardErrorResponse` 实例，并初始化必要字段。
+     * 参数：
+     * - `message`：待处理消息。
+     * - `errorCode`：错误信息。
+     * - `status`：`status` 参数。
+     * 返回：新创建的对象实例。
      */
     protected ThingsboardErrorResponse(final String message, final ThingsboardErrorCode errorCode, HttpStatus status) {
         this.message = message;
@@ -95,49 +73,42 @@ public class ThingsboardErrorResponse {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `of` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `of` 对应的处理。
+     * 参数：
+     * - `message`：待处理消息。
+     * - `errorCode`：错误信息。
+     * - `status`：`status` 参数。
+     * 返回：处理结果。
      */
     public static ThingsboardErrorResponse of(final String message, final ThingsboardErrorCode errorCode, HttpStatus status) {
         return new ThingsboardErrorResponse(message, errorCode, status);
     }
 
-    @ApiModelProperty(position = 1, value = "HTTP Response Status Code", example = "401", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStatus` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取状态。
+     * 参数：无。
+     * 返回：数值结果。
      */
+    @ApiModelProperty(position = 1, value = "HTTP Response Status Code", example = "401", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     public Integer getStatus() {
         return status.value();
     }
 
-    @ApiModelProperty(position = 2, value = "Error message", example = "Authentication failed", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getMessage` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @ApiModelProperty(position = 2, value = "Error message", example = "Authentication failed", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     public String getMessage() {
         return message;
     }
 
+    /**
+     * 功能：获取错误码。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiModelProperty(position = 3, value = "Platform error code:" +
             "\n* `2` - General error (HTTP: 500 - Internal Server Error)" +
             "\n\n* `10` - Authentication failed (HTTP: 401 - Unauthorized)" +
@@ -152,31 +123,16 @@ public class ThingsboardErrorResponse {
             "\n\n* `40` - Subscription violation (HTTP: 403 - Forbidden)",
             example = "10", dataType = "integer",
             accessMode = ApiModelProperty.AccessMode.READ_ONLY)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getErrorCode` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ThingsboardErrorCode getErrorCode() {
         return errorCode;
     }
 
-    @ApiModelProperty(position = 4, value = "Timestamp", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimestamp` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取当前对象记录的时间戳。
+     * 参数：无。
+     * 返回：数值结果。
      */
+    @ApiModelProperty(position = 4, value = "Timestamp", accessMode = ApiModelProperty.AccessMode.READ_ONLY)
     public long getTimestamp() {
         return timestamp;
     }

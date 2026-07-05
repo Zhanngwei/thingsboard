@@ -37,54 +37,30 @@ import java.util.concurrent.locks.Lock;
  */
 public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
     /**
-     * 字段说明：
-     * 1. 保存 `SEC_EP` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `SEC_EP`常量，用于统一引用固定值。
      */
     private static final String SEC_EP = "SEC#EP#";
     private static final String LOCK_EP = "LOCK#EP#";
     /**
-     * 字段说明：
-     * 1. 保存 `PSKID_SEC` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `PSKID_SEC`常量，用于统一引用固定值。
      */
     private static final String PSKID_SEC = "PSKID#SEC";
 
     /**
-     * 字段说明：
-     * 1. 保存 `connectionFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
     private final RedisConnectionFactory connectionFactory;
     private final FSTConfiguration serializer;
     /**
-     * 字段说明：
-     * 1. 保存 `redisLock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 锁，用于保护并发读写的共享状态。
      */
     private final RedisLockRegistry redisLock;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbLwM2mRedisSecurityStore` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbLwM2mRedisSecurityStore` 实例，并初始化必要字段。
+     * 参数：
+     * - `connectionFactory`：`connectionFactory` 参数。
+     * 返回：新创建的对象实例。
      */
     public TbLwM2mRedisSecurityStore(RedisConnectionFactory connectionFactory) {
         this.connectionFactory = connectionFactory;
@@ -92,28 +68,22 @@ public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
         serializer = FSTConfiguration.createDefaultConfiguration();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getByEndpoint` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`By Endpoint`。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public SecurityInfo getByEndpoint(String endpoint) {
         Lock lock = null;
         try (var connection = connectionFactory.getConnection()) {
             lock = redisLock.obtain(toLockKey(endpoint));
             lock.lock();
             byte[] data = connection.get((SEC_EP + endpoint).getBytes());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (data == null || data.length == 0) {
                 return null;
             } else {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (SecurityMode.NO_SEC.equals(((TbLwM2MSecurityInfo) serializer.asObject(data)).getSecurityMode())) {
                     return SecurityInfo.newPreSharedKeyInfo(SecurityMode.NO_SEC.toString(), SecurityMode.NO_SEC.toString(),
                             SecurityMode.NO_SEC.toString().getBytes());
@@ -123,36 +93,29 @@ public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
                 }
             }
         } finally {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (lock != null) {
                 lock.unlock();
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getByIdentity` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`By Identity`。
+     * 参数：
+     * - `identity`：实体对象。
+     * 返回：处理结果。
      */
+    @Override
     public SecurityInfo getByIdentity(String identity) {
         Lock lock = null;
         try (var connection = connectionFactory.getConnection()) {
             lock = redisLock.obtain(toLockKey(identity));
             lock.lock();
             byte[] ep = connection.hGet(PSKID_SEC.getBytes(), identity.getBytes());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ep == null) {
                 return null;
             } else {
                 byte[] data = connection.get((SEC_EP + new String(ep)).getBytes());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (data == null || data.length == 0) {
                     return null;
                 } else {
@@ -160,24 +123,19 @@ public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
                 }
             }
         } finally {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (lock != null) {
                 lock.unlock();
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `put` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `put` 对应的处理。
+     * 参数：
+     * - `tbSecurityInfo`：`tbSecurityInfo` 参数。
+     * 返回：无。
      */
+    @Override
     public void put(TbLwM2MSecurityInfo tbSecurityInfo) throws NonUniqueSecurityInfoException {
         SecurityInfo info = tbSecurityInfo.getSecurityInfo();
         byte[] tbSecurityInfoSerialized = serializer.asByteArray(tbSecurityInfo);
@@ -185,13 +143,10 @@ public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
         try (var connection = connectionFactory.getConnection()) {
             lock = redisLock.obtain(tbSecurityInfo.getEndpoint());
             lock.lock();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (info != null && info.getIdentity() != null) {
                 byte[] oldEndpointBytes = connection.hGet(PSKID_SEC.getBytes(), info.getIdentity().getBytes());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (oldEndpointBytes != null) {
                     String oldEndpoint = new String(oldEndpointBytes);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!oldEndpoint.equals(info.getEndpoint())) {
                         throw new NonUniqueSecurityInfoException("PSK Identity " + info.getIdentity() + " is already used");
                     }
@@ -200,33 +155,26 @@ public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
             }
 
             byte[] previousData = connection.getSet((SEC_EP + tbSecurityInfo.getEndpoint()).getBytes(), tbSecurityInfoSerialized);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (previousData != null && info != null) {
                 String previousIdentity = ((TbLwM2MSecurityInfo) serializer.asObject(previousData)).getSecurityInfo().getIdentity();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (previousIdentity != null && !previousIdentity.equals(info.getIdentity())) {
                     connection.hDel(PSKID_SEC.getBytes(), previousIdentity.getBytes());
                 }
             }
         } finally {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (lock != null) {
                 lock.unlock();
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTbLwM2MSecurityInfoByEndpoint` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取信息对象。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public TbLwM2MSecurityInfo getTbLwM2MSecurityInfoByEndpoint(String endpoint) {
         Lock lock = null;
         try (var connection = connectionFactory.getConnection()) {
@@ -245,17 +193,13 @@ public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `remove` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `remove` 对应的处理。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：无。
      */
+    @Override
     public void remove(String endpoint) {
         Lock lock = null;
         try (var connection = connectionFactory.getConnection()) {
@@ -277,14 +221,10 @@ public class TbLwM2mRedisSecurityStore implements TbEditableSecurityStore {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toLockKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toLockKey` 对应的处理。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * 返回：文本结果。
      */
     private String toLockKey(String endpoint) {
         return LOCK_EP + endpoint;

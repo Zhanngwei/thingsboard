@@ -18,66 +18,66 @@ package org.thingsboard.rule.engine.util;
 import lombok.Getter;
 
 /**
- * 联系信息类实体字段在 Rule Engine 中使用的标准名称枚举。
- * 本枚举不直接读取数据库或缓存，也不直接参与消息处理，仅供字段名映射使用。
+ * `ContactBasedEntityDetails` 枚举，定义当前流程使用的固定取值。
  */
 public enum ContactBasedEntityDetails {
 
     /**
-     * 实体 ID 字段。
+     * `ID`常量，用于统一引用固定值。
      */
     ID("id"),
     /**
-     * 实体标题或名称字段。
+     * `TITLE`常量，用于统一引用固定值。
      */
     TITLE("title"),
     /**
-     * 国家字段。
+     * `COUNTRY`常量，用于统一引用固定值。
      */
     COUNTRY("country"),
     /**
-     * 城市字段。
+     * `CITY`常量，用于统一引用固定值。
      */
     CITY("city"),
     /**
-     * 州或省字段。
+     * 状态常量，用于统一引用固定值。
      */
     STATE("state"),
     /**
-     * 邮政编码字段。
+     * `ZIP`常量，用于统一引用固定值。
      */
     ZIP("zip"),
     /**
-     * 第一地址字段。
+     * `ADDRESS`常量，用于统一引用固定值。
      */
     ADDRESS("address"),
     /**
-     * 第二地址字段。
+     * `ADDRESS2`常量，用于统一引用固定值。
      */
     ADDRESS2("address2"),
     /**
-     * 电话字段。
+     * `PHONE`常量，用于统一引用固定值。
      */
     PHONE("phone"),
     /**
-     * 邮箱字段。
+     * 邮箱常量，用于统一引用固定值。
      */
     EMAIL("email"),
     /**
-     * 附加信息字段。
+     * 扩展信息常量，用于统一引用固定值。
      */
     ADDITIONAL_INFO("additionalInfo");
 
     /**
-     * Rule Engine 中引用该字段时使用的字段名。
+     * 规则引擎，用于标识或展示当前对象。
      */
     @Getter
     private final String ruleEngineName;
 
     /**
-     * 绑定枚举值与 Rule Engine 字段名。
-     *
-     * @param ruleEngineName Rule Engine 中使用的字段名
+     * 功能：创建 `ContactBasedEntityDetails` 实例，并初始化必要字段。
+     * 参数：
+     * - `ruleEngineName`：名称。
+     * 返回：新创建的对象实例。
      */
     ContactBasedEntityDetails(String ruleEngineName) {
         this.ruleEngineName = ruleEngineName;

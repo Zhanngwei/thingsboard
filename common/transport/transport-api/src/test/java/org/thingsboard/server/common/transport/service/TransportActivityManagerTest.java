@@ -50,7 +50,6 @@ import static org.mockito.Mockito.when;
 import static org.thingsboard.server.common.transport.service.DefaultTransportService.SESSION_EVENT_MSG_CLOSED;
 import static org.thingsboard.server.common.transport.service.DefaultTransportService.SESSION_EXPIRED_NOTIFICATION_PROTO;
 
-@ExtendWith(MockitoExtension.class)
 /**
  * 中文说明：
  * 1. 类目的：`TransportActivityManagerTest` 是ThingsBoard Common 测试模块中的传输协议契约或适配类型，用于抽象 MQTT、HTTP、CoAP、LwM2M、SNMP 与 ThingsBoard 核心消息之间的协议边界。
@@ -61,71 +60,51 @@ import static org.thingsboard.server.common.transport.service.DefaultTransportSe
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Adapter / Strategy / Command。
  */
+@ExtendWith(MockitoExtension.class)
 public class TransportActivityManagerTest {
 
     private final UUID SESSION_ID = UUID.fromString("1306648a-9b26-11ee-b9d1-0242ac120002");
 
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `transportServiceMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Mock
     private DefaultTransportService transportServiceMock;
     private ConcurrentMap<UUID, SessionMetaData> sessions;
 
-    @BeforeEach
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setup` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
+    @BeforeEach
     public void setup() {
         sessions = new ConcurrentHashMap<>();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         ReflectionTestUtils.setField(transportServiceMock, "sessions", sessions);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenFirstActivityForAlreadyRemovedSessionAndFirstEventReportingStrategy_whenOnActivity_thenShouldRecordActivityAndReport` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenFirstActivityForAlreadyRemovedSessionAndFirstEventReportingStrategy_whenOnActivity_thenShouldRecordActivityAndReport` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenFirstActivityForAlreadyRemovedSessionAndFirstEventReportingStrategy_whenOnActivity_thenShouldRecordActivityAndReport() {
         // GIVEN
         ConcurrentMap<UUID, Object> states = new ConcurrentHashMap<>();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         ReflectionTestUtils.setField(transportServiceMock, "states", states);
 
         var strategyMock = mock(ActivityStrategy.class);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         when(transportServiceMock.getStrategy()).thenReturn(strategyMock);
         when(strategyMock.onActivity()).thenReturn(true);
 
         long activityTime = 123L;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         var sessionInfo = TransportProtos.SessionInfoProto.newBuilder()
                 .setSessionIdMSB(SESSION_ID.getMostSignificantBits())
                 .setSessionIdLSB(SESSION_ID.getLeastSignificantBits())
                 .build();
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         doCallRealMethod().when(transportServiceMock).getLastRecordedTime(SESSION_ID);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         doCallRealMethod().when(transportServiceMock).onActivity(SESSION_ID, sessionInfo, activityTime);
 
         // WHEN
@@ -133,33 +112,24 @@ public class TransportActivityManagerTest {
 
         // THEN
         assertThat(states).containsKey(SESSION_ID);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         assertThat(transportServiceMock.getLastRecordedTime(SESSION_ID)).isEqualTo(activityTime);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         verify(transportServiceMock).reportActivity(eq(SESSION_ID), eq(sessionInfo), eq(activityTime), any(ActivityReportCallback.class));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenKeyAndTimeToReportAndSessionExists_whenReportingActivity_thenShouldReportActivityWithSubscriptionsAndSessionInfoFromSession` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenKeyAndTimeToReportAndSessionExists_whenReportingActivity_thenShouldReportActivityWithSubscriptionsAndSessionInfoFromSession` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenKeyAndTimeToReportAndSessionExists_whenReportingActivity_thenShouldReportActivityWithSubscriptionsAndSessionInfoFromSession() {
         // GIVEN
         long expectedTime = 123L;
         boolean expectedAttributesSubscription = true;
         boolean expectedRPCSubscription = true;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.SessionInfoProto expectedSessionInfo = TransportProtos.SessionInfoProto.getDefaultInstance();
 
         SessionMsgListener listenerMock = mock(SessionMsgListener.class);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         SessionMetaData session = new SessionMetaData(expectedSessionInfo, TransportProtos.SessionType.ASYNC, listenerMock);
         session.setSubscribedToAttributes(expectedAttributesSubscription);
         session.setSubscribedToRPC(expectedRPCSubscription);
@@ -167,13 +137,11 @@ public class TransportActivityManagerTest {
 
         ActivityReportCallback<UUID> callbackMock = mock(ActivityReportCallback.class);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.SessionInfoProto sessionInfo = TransportProtos.SessionInfoProto.newBuilder()
                 .setSessionIdMSB(SESSION_ID.getMostSignificantBits())
                 .setSessionIdLSB(SESSION_ID.getLeastSignificantBits())
                 .build();
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         doCallRealMethod().when(transportServiceMock).reportActivity(SESSION_ID, sessionInfo, expectedTime, callbackMock);
 
         // WHEN
@@ -205,17 +173,12 @@ public class TransportActivityManagerTest {
         verify(callbackMock).onFailure(SESSION_ID, throwable);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenKeyAndTimeToReportAndSessionDoesNotExist_whenReportingActivity_thenShouldReportActivityWithNoSubscriptionsAndPreviousSessionInfo` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenKeyAndTimeToReportAndSessionDoesNotExist_whenReportingActivity_thenShouldReportActivityWithNoSubscriptionsAndPreviousSessionInfo` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenKeyAndTimeToReportAndSessionDoesNotExist_whenReportingActivity_thenShouldReportActivityWithNoSubscriptionsAndPreviousSessionInfo() {
         // GIVEN
         long expectedTime = 123L;
@@ -259,17 +222,12 @@ public class TransportActivityManagerTest {
         verify(callbackMock).onFailure(SESSION_ID, throwable);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenActivityHappened_whenRecordActivity_thenShouldDelegateToOnActivity` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenActivityHappened_whenRecordActivity_thenShouldDelegateToOnActivity` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenActivityHappened_whenRecordActivity_thenShouldDelegateToOnActivity() {
         // GIVEN
         TransportProtos.SessionInfoProto sessionInfo = TransportProtos.SessionInfoProto.newBuilder()
@@ -288,18 +246,14 @@ public class TransportActivityManagerTest {
         verify(transportServiceMock).onActivity(SESSION_ID, sessionInfo, expectedTime);
     }
 
+    /**
+     * 功能：验证 `givenDifferentReportingStrategies_whenGettingStrategy_thenShouldReturnCorrectStrategy` 描述的测试场景。
+     * 参数：
+     * - `reportingStrategyType`：类型。
+     * 返回：无。
+     */
     @ParameterizedTest
     @EnumSource(ActivityStrategyType.class)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDifferentReportingStrategies_whenGettingStrategy_thenShouldReturnCorrectStrategy` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     void givenDifferentReportingStrategies_whenGettingStrategy_thenShouldReturnCorrectStrategy(ActivityStrategyType reportingStrategyType) {
         // GIVEN
         doCallRealMethod().when(transportServiceMock).getStrategy();
@@ -312,17 +266,12 @@ public class TransportActivityManagerTest {
         assertThat(actualStrategy).isEqualTo(reportingStrategyType.toStrategy());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenSessionDoesNotExist_whenUpdatingActivityState_thenShouldReturnNull` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenSessionDoesNotExist_whenUpdatingActivityState_thenShouldReturnNull` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenSessionDoesNotExist_whenUpdatingActivityState_thenShouldReturnNull() {
         // GIVEN
         TransportProtos.SessionInfoProto sessionInfo = TransportProtos.SessionInfoProto.newBuilder()
@@ -343,17 +292,12 @@ public class TransportActivityManagerTest {
         assertThat(updatedState).isNull();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNoGwSessionId_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenNoGwSessionId_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenNoGwSessionId_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo() {
         // GIVEN
         TransportProtos.SessionInfoProto sessionInfo = TransportProtos.SessionInfoProto.newBuilder()
@@ -380,17 +324,12 @@ public class TransportActivityManagerTest {
         assertThat(updatedState.getMetadata()).isEqualTo(sessionInfo);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenHasGwSessionIdButGwSessionIsNotNull_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenHasGwSessionIdButGwSessionIsNotNull_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenHasGwSessionIdButGwSessionIsNotNull_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo() {
         // GIVEN
         var gwSessionId = UUID.fromString("19864038-9b48-11ee-b9d1-0242ac120002");
@@ -422,17 +361,12 @@ public class TransportActivityManagerTest {
         verify(transportServiceMock, never()).getLastRecordedTime(gwSessionId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenHasGwSessionWithoutOverwriteEnabled_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenHasGwSessionWithoutOverwriteEnabled_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenHasGwSessionWithoutOverwriteEnabled_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfo() {
         // GIVEN
         var gwSessionId = UUID.fromString("19864038-9b48-11ee-b9d1-0242ac120002");
@@ -471,17 +405,12 @@ public class TransportActivityManagerTest {
         verify(transportServiceMock, never()).getLastRecordedTime(gwSessionId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenHasGwSessionWithOverwriteEnabledAndGwLastRecordedTimeIsGreater_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfoAndLastRecordedTime` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenHasGwSessionWithOverwriteEnabledAndGwLastRecordedTimeIsGreater_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfoAndLastRecordedTime` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenHasGwSessionWithOverwriteEnabledAndGwLastRecordedTimeIsGreater_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfoAndLastRecordedTime() {
         // GIVEN
         var gwSessionId = UUID.fromString("19864038-9b48-11ee-b9d1-0242ac120002");
@@ -523,17 +452,12 @@ public class TransportActivityManagerTest {
         assertThat(updatedState.getMetadata()).isEqualTo(sessionInfo);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenHasGwSessionWithOverwriteEnabledAndGwLastRecordedTimeIsLess_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfoOnly` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenHasGwSessionWithOverwriteEnabledAndGwLastRecordedTimeIsLess_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfoOnly` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenHasGwSessionWithOverwriteEnabledAndGwLastRecordedTimeIsLess_whenUpdatingActivityState_thenShouldReturnSameInstanceWithUpdatedSessionInfoOnly() {
         // GIVEN
         var gwSessionId = UUID.fromString("19864038-9b48-11ee-b9d1-0242ac120002");
@@ -575,18 +499,16 @@ public class TransportActivityManagerTest {
         assertThat(updatedState.getMetadata()).isEqualTo(sessionInfo);
     }
 
+    /**
+     * 功能：验证 `givenExpiredLastRecordedTime_whenCheckingForExpiry_thenShouldReturnTrue` 描述的测试场景。
+     * 参数：
+     * - `currentTimeMillis`：`currentTimeMillis` 参数。
+     * - `lastRecordedTime`：`lastRecordedTime` 参数。
+     * - `sessionInactivityTimeout`：会话对象。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideTestParamsForHasExpiredTrue")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenExpiredLastRecordedTime_whenCheckingForExpiry_thenShouldReturnTrue` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenExpiredLastRecordedTime_whenCheckingForExpiry_thenShouldReturnTrue(long currentTimeMillis, long lastRecordedTime, long sessionInactivityTimeout) {
         // GIVEN
         ReflectionTestUtils.setField(transportServiceMock, "sessionInactivityTimeout", sessionInactivityTimeout);
@@ -602,14 +524,9 @@ public class TransportActivityManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provideTestParamsForHasExpiredTrue` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provideTestParamsForHasExpiredTrue` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> provideTestParamsForHasExpiredTrue() {
         return Stream.of(
@@ -620,18 +537,16 @@ public class TransportActivityManagerTest {
         );
     }
 
+    /**
+     * 功能：验证 `givenNotExpiredLastRecordedTime_whenCheckingForExpiry_thenShouldReturnFalse` 描述的测试场景。
+     * 参数：
+     * - `currentTimeMillis`：`currentTimeMillis` 参数。
+     * - `lastRecordedTime`：`lastRecordedTime` 参数。
+     * - `sessionInactivityTimeout`：会话对象。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideTestParamsForHasExpiredFalse")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNotExpiredLastRecordedTime_whenCheckingForExpiry_thenShouldReturnFalse` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenNotExpiredLastRecordedTime_whenCheckingForExpiry_thenShouldReturnFalse(long currentTimeMillis, long lastRecordedTime, long sessionInactivityTimeout) {
         // GIVEN
         ReflectionTestUtils.setField(transportServiceMock, "sessionInactivityTimeout", sessionInactivityTimeout);
@@ -647,14 +562,9 @@ public class TransportActivityManagerTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provideTestParamsForHasExpiredFalse` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provideTestParamsForHasExpiredFalse` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> provideTestParamsForHasExpiredFalse() {
         return Stream.of(
@@ -665,17 +575,12 @@ public class TransportActivityManagerTest {
         );
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenSessionExists_whenOnStateExpiryCalled_thenShouldPerformExpirationActions` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenSessionExists_whenOnStateExpiryCalled_thenShouldPerformExpirationActions` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenSessionExists_whenOnStateExpiryCalled_thenShouldPerformExpirationActions() {
         // GIVEN
         TransportProtos.SessionInfoProto sessionInfo = TransportProtos.SessionInfoProto.newBuilder()
@@ -696,17 +601,12 @@ public class TransportActivityManagerTest {
         verify(listenerMock).onRemoteSessionCloseCommand(SESSION_ID, SESSION_EXPIRED_NOTIFICATION_PROTO);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenSessionDoesNotExist_whenOnStateExpiryCalled_thenShouldNotPerformExpirationActions` 对应的传输协议契约或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由传输层组件在连接建立、消息上报、RPC、属性读写或测试流程中创建和调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：解析协议输入，转换为核心消息或响应对象，再交给队列、Actor 或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenSessionDoesNotExist_whenOnStateExpiryCalled_thenShouldNotPerformExpirationActions` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenSessionDoesNotExist_whenOnStateExpiryCalled_thenShouldNotPerformExpirationActions() {
         // GIVEN
         TransportProtos.SessionInfoProto sessionInfo = TransportProtos.SessionInfoProto.newBuilder()

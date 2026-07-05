@@ -16,24 +16,23 @@
 package org.thingsboard.rule.engine.util;
 
 /**
- * GPS 地理围栏事件名称常量集合。
- * 本类仅定义字符串常量，不直接访问数据库、缓存、MQTT、Actor 或 Rule Engine 消息流。
+ * `GpsGeofencingEvents` 类，封装当前模块中的一组相关职责。
  */
 public class GpsGeofencingEvents {
     /**
-     * 进入围栏事件。
+     * `ENTERED`常量，用于统一引用固定值。
      */
     public static final String ENTERED = "Entered";
     /**
-     * 处于围栏内部事件。
+     * `INSIDE`常量，用于统一引用固定值。
      */
     public static final String INSIDE = "Inside";
     /**
-     * 离开围栏事件。
+     * `LEFT`常量，用于统一引用固定值。
      */
     public static final String LEFT = "Left";
     /**
-     * 处于围栏外部事件。
+     * `OUTSIDE`常量，用于统一引用固定值。
      */
     public static final String OUTSIDE = "Outside";
 }

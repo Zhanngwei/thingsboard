@@ -65,54 +65,78 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 测试目标：验证 {@code TbGetAttributesNodeTest} 覆盖的 元数据增强节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbGetAttributesNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbGetAttributesNodeTest` 测试类，用于验证 `TbGetAttributesNode` 相关行为。
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TbGetAttributesNodeTest {
 
-    /** 测试常量字段：{@code ORIGINATOR} 保存 {@code EntityId} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `ORIGINATOR`常量，用于统一引用固定值。
+     */
     private static final EntityId ORIGINATOR = new DeviceId(Uuids.timeBased());
-    /** 测试常量字段：{@code TENANT_ID} 保存 {@code TenantId} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 租户ID常量，用于统一引用固定值。
+     */
     private static final TenantId TENANT_ID = TenantId.fromUUID(Uuids.timeBased());
-    /** 可变 fixture 字段：{@code dbExecutor} 保存 {@code AbstractListeningExecutor} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 执行器列表，用于保存一组待处理对象。
+     */
     private AbstractListeningExecutor dbExecutor;
 
-    /** Mock 依赖字段：{@code ctxMock} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctxMock;
-    /** Mock 依赖字段：{@code attributesServiceMock} 保存 {@code AttributesService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 服务，提供当前类调用的业务操作。
+     */
     @Mock
     private AttributesService attributesServiceMock;
-    /** Mock 依赖字段：{@code timeseriesServiceMock} 保存 {@code TimeseriesService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 时序数据，提供当前类调用的业务操作。
+     */
     @Mock
     private TimeseriesService timeseriesServiceMock;
 
-    /** 可变 fixture 字段：{@code clientAttributes} 保存 {@code List<String>} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 客户端列表，用于保存一组待处理对象。
+     */
     private List<String> clientAttributes;
-    /** 可变 fixture 字段：{@code serverAttributes} 保存 {@code List<String>} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 服务端列表，用于保存一组待处理对象。
+     */
     private List<String> serverAttributes;
-    /** 可变 fixture 字段：{@code sharedAttributes} 保存 {@code List<String>} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * `sharedAttributes`列表，用于保存一组待处理对象。
+     */
     private List<String> sharedAttributes;
-    /** 可变 fixture 字段：{@code tsKeys} 保存 {@code List<String>} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 时间戳列表，用于保存一组待处理对象。
+     */
     private List<String> tsKeys;
-    /** 可变 fixture 字段：{@code ts} 保存 {@code long} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     private long ts;
-    /** 可变 fixture 字段：{@code node} 保存 {@code TbGetAttributesNode} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，表示当前对象的对应属性。
+     */
     private TbGetAttributesNode node;
 
     /**
-     * 生命周期方法：{@code before} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `before` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Before
     public void before() throws TbNodeException {
         dbExecutor = new AbstractListeningExecutor() {
-            /** 实现方法：{@code getThreadPollSize} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+            /**
+             * 功能：获取`Thread Poll Size`。
+             * 参数：无。
+             * 返回：数值结果。
+             */
             @Override
             protected int getThreadPollSize() {
                 return 3;
@@ -145,9 +169,9 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 生命周期方法：{@code after} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `after` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @After
     public void after() {
@@ -155,15 +179,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenFetchAttributesToMetadata_whenOnMsg_thenShouldTellSuccess} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenFetchAttributesToMetadata_whenOnMsg_thenShouldTellSuccess` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenFetchAttributesToMetadata_whenOnMsg_thenShouldTellSuccess() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node = initNode(TbMsgSource.METADATA, false, false);
         var msg = getTbMsg(ORIGINATOR);
@@ -182,15 +203,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenFetchLatestTimeseriesToMetadata_whenOnMsg_thenShouldTellSuccess} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenFetchLatestTimeseriesToMetadata_whenOnMsg_thenShouldTellSuccess` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenFetchLatestTimeseriesToMetadata_whenOnMsg_thenShouldTellSuccess() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node = initNode(TbMsgSource.METADATA, true, false);
         var msg = getTbMsg(ORIGINATOR);
@@ -209,15 +227,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenFetchAttributesToData_whenOnMsg_thenShouldTellSuccess} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenFetchAttributesToData_whenOnMsg_thenShouldTellSuccess` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenFetchAttributesToData_whenOnMsg_thenShouldTellSuccess() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node = initNode(TbMsgSource.DATA, false, false);
         var msg = getTbMsg(ORIGINATOR);
@@ -236,15 +251,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenFetchLatestTimeseriesToData_whenOnMsg_thenShouldTellSuccess} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenFetchLatestTimeseriesToData_whenOnMsg_thenShouldTellSuccess` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenFetchLatestTimeseriesToData_whenOnMsg_thenShouldTellSuccess() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node = initNode(TbMsgSource.DATA, true, false);
         var msg = getTbMsg(ORIGINATOR);
@@ -263,15 +275,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenFetchAttributesToMetadata_whenOnMsg_thenShouldTellFailure} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenFetchAttributesToMetadata_whenOnMsg_thenShouldTellFailure` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenFetchAttributesToMetadata_whenOnMsg_thenShouldTellFailure() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node = initNode(TbMsgSource.METADATA, false, true);
         var msg = getTbMsg(ORIGINATOR);
@@ -290,15 +299,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenFetchLatestTimeseriesToData_whenOnMsg_thenShouldTellFailure} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenFetchLatestTimeseriesToData_whenOnMsg_thenShouldTellFailure` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenFetchLatestTimeseriesToData_whenOnMsg_thenShouldTellFailure() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node = initNode(TbMsgSource.DATA, true, true);
         var msg = getTbMsg(ORIGINATOR);
@@ -317,15 +323,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenFetchLatestTimeseriesToDataAndDataIsNotJsonObject_whenOnMsg_thenException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenFetchLatestTimeseriesToDataAndDataIsNotJsonObject_whenOnMsg_thenException` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenFetchLatestTimeseriesToDataAndDataIsNotJsonObject_whenOnMsg_thenException() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         node = initNode(TbMsgSource.DATA, true, true);
         var msg = TbMsg.newMsg(TbMsgType.POST_TELEMETRY_REQUEST, ORIGINATOR, TbMsgMetaData.EMPTY, TbMsg.EMPTY_JSON_ARRAY);
@@ -339,15 +342,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOldConfig_whenUpgrade_thenShouldReturnTrueResultWithNewConfig() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var defaultConfig = new TbGetAttributesNodeConfiguration().defaultConfiguration();
         var node = new TbGetAttributesNode();
         String oldConfig = "{\"fetchToData\":false," +
@@ -364,15 +364,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenOldConfigWithNoFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOldConfigWithNoFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOldConfigWithNoFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var defaultConfig = new TbGetAttributesNodeConfiguration().defaultConfiguration();
         var node = new TbGetAttributesNode();
         String oldConfig = "{\"clientAttributeNames\":[]," +
@@ -388,15 +385,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenOldConfigWithNullFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenOldConfigWithNullFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenOldConfigWithNullFetchToDataProperty_whenUpgrade_thenShouldReturnTrueResultWithNewConfig() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var defaultConfig = new TbGetAttributesNodeConfiguration().defaultConfiguration();
         var node = new TbGetAttributesNode();
         String oldConfig = "{\"fetchToData\":null," +
@@ -413,9 +407,10 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 辅助方法：{@code checkMsg} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：校验消息。
+     * 参数：
+     * - `checkSuccess`：`checkSuccess` 参数。
+     * 返回：判断结果。
      */
     private TbMsg checkMsg(boolean checkSuccess) {
         var msgCaptor = ArgumentCaptor.forClass(TbMsg.class);
@@ -439,9 +434,13 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 辅助方法：{@code checkAttributes} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：校验`Attributes`。
+     * 参数：
+     * - `actualMsg`：待处理消息。
+     * - `fetchTo`：`fetchTo` 参数。
+     * - `prefix`：`prefix` 参数。
+     * - `attributes`：数据列表。
+     * 返回：无。
      */
     private void checkAttributes(TbMsg actualMsg, TbMsgSource fetchTo, String prefix, List<String> attributes) {
         var msgData = JacksonUtil.toJsonNode(actualMsg.getData());
@@ -460,9 +459,13 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 辅助方法：{@code checkTs} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：校验时间戳。
+     * 参数：
+     * - `actualMsg`：待处理消息。
+     * - `fetchTo`：`fetchTo` 参数。
+     * - `getLatestValueWithTs`：时间戳。
+     * - `tsKeys`：键。
+     * 返回：无。
      */
     private void checkTs(TbMsg actualMsg, TbMsgSource fetchTo, boolean getLatestValueWithTs, List<String> tsKeys) {
         var msgData = JacksonUtil.toJsonNode(actualMsg.getData());
@@ -490,9 +493,12 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 辅助方法：{@code initNode} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化或启动节点实例。
+     * 参数：
+     * - `fetchTo`：`fetchTo` 参数。
+     * - `getLatestValueWithTs`：时间戳。
+     * - `isTellFailureIfAbsent`：`isTellFailureIfAbsent` 参数。
+     * 返回：处理结果。
      */
     private TbGetAttributesNode initNode(TbMsgSource fetchTo, boolean getLatestValueWithTs, boolean isTellFailureIfAbsent) throws TbNodeException {
         var config = new TbGetAttributesNodeConfiguration();
@@ -511,9 +517,10 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 辅助方法：{@code getTbMsg} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取消息。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
     private TbMsg getTbMsg(EntityId entityId) {
         var msgData = JacksonUtil.newObjectNode();
@@ -527,18 +534,21 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 辅助方法：{@code getAttributeNames} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取属性。
+     * 参数：
+     * - `prefix`：`prefix` 参数。
+     * 返回：匹配的数据集合。
      */
     private List<String> getAttributeNames(String prefix) {
         return List.of(prefix + "_attr_1", prefix + "_attr_2", prefix + "_attr_3", "unknown");
     }
 
     /**
-     * 辅助方法：{@code getListAttributeKvEntry} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取属性。
+     * 参数：
+     * - `attributesList`：数据列表。
+     * - `ts`：时间戳。
+     * 返回：匹配的数据集合。
      */
     private List<AttributeKvEntry> getListAttributeKvEntry(List<String> attributesList, long ts) {
         return attributesList.stream()
@@ -548,18 +558,22 @@ public class TbGetAttributesNodeTest {
     }
 
     /**
-     * 辅助方法：{@code toAttributeKvEntry} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `toAttributeKvEntry` 对应的处理。
+     * 参数：
+     * - `ts`：时间戳。
+     * - `attribute`：`attribute` 参数。
+     * 返回：处理结果。
      */
     private BaseAttributeKvEntry toAttributeKvEntry(long ts, String attribute) {
         return new BaseAttributeKvEntry(ts, new StringDataEntry(attribute, attribute + "_value"));
     }
 
     /**
-     * 辅助方法：{@code getListTsKvEntry} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `keysList`：键。
+     * - `ts`：时间戳。
+     * 返回：匹配的数据集合。
      */
     private List<TsKvEntry> getListTsKvEntry(List<String> keysList, long ts) {
         long value = 1L;

@@ -26,19 +26,17 @@ import org.thingsboard.server.common.data.relation.EntitySearchDirection;
 import org.thingsboard.server.common.data.relation.RelationsSearchParameters;
 
 /**
- * 按通用关系条件异步查找关联实体 ID 的工具类。
- * 本类无共享状态；RelationService 负责实际关系读取，可能访问数据库或缓存，具体行为不在本类中实现。
+ * `EntitiesRelatedEntityIdAsyncLoader` 类，封装当前模块中的一组相关职责。
  */
 public class EntitiesRelatedEntityIdAsyncLoader {
 
     /**
-     * 从指定 originator 出发查找第一条匹配关系上的对端实体 ID。
-     * FROM 方向返回关系目标实体，TO 方向返回关系来源实体；转换回调在 ctx.getDbCallbackExecutor() 上执行，本方法不直接处理 Rule Engine 消息投递。
-     *
-     * @param ctx 规则节点上下文，提供租户、关系服务和回调执行器
-     * @param originator 查询起点实体
-     * @param relationsQuery 通用关系查询配置
-     * @return 第一个匹配对端实体 ID 的异步结果，未找到时为 null
+     * 功能：获取实体。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `originator`：`originator` 参数。
+     * - `relationsQuery`：`relationsQuery` 参数。
+     * 返回：匹配的数据集合。
      */
     public static ListenableFuture<EntityId> findEntityAsync(
             TbContext ctx,
@@ -63,12 +61,11 @@ public class EntitiesRelatedEntityIdAsyncLoader {
     }
 
     /**
-     * 根据配置构造 RelationService 查询对象。
-     * 本方法只创建内存查询对象，不进行数据库读取、缓存读取或消息流操作。
-     *
-     * @param originator 查询起点实体
-     * @param relationsQuery 通用关系查询配置
-     * @return RelationService 可消费的查询对象
+     * 功能：构建查询条件。
+     * 参数：
+     * - `originator`：`originator` 参数。
+     * - `relationsQuery`：`relationsQuery` 参数。
+     * 返回：处理结果。
      */
     private static EntityRelationsQuery buildQuery(EntityId originator, RelationsQuery relationsQuery) {
         var query = new EntityRelationsQuery();

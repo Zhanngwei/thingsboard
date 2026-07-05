@@ -22,15 +22,16 @@ import org.thingsboard.common.util.ListeningExecutor;
 import java.util.concurrent.Callable;
 
 /**
- * 测试目标：验证 {@code TestDbCallbackExecutor} 覆盖的 规则引擎组件 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TestDbCallbackExecutor}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：内存 fixture、参数化数据源，以及测试体按需创建的 Mockito mock/spy；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TestDbCallbackExecutor` 类，封装当前模块中的一组相关职责。
  */
 public class TestDbCallbackExecutor implements ListeningExecutor {
 
-    /** 实现方法：{@code executeAsync} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+    /**
+     * 功能：执行`Async`。
+     * 参数：
+     * - `task`：`task` 参数。
+     * 返回：匹配的数据集合。
+     */
     @Override
     public <T> ListenableFuture<T> executeAsync(Callable<T> task) {
         try {
@@ -40,7 +41,12 @@ public class TestDbCallbackExecutor implements ListeningExecutor {
         }
     }
 
-    /** 实现方法：{@code execute} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+    /**
+     * 功能：执行 `execute` 对应的处理。
+     * 参数：
+     * - `command`：`command` 参数。
+     * 返回：无。
+     */
     @Override
     public void execute(Runnable command) {
         command.run();

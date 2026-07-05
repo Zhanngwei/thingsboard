@@ -20,7 +20,6 @@ import lombok.Data;
 import java.util.HashMap;
 import java.util.Map;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`LwM2MBootstrapClientInstanceIds` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -31,6 +30,7 @@ import java.util.Map;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Data
 public class LwM2MBootstrapClientInstanceIds {
 
     /**

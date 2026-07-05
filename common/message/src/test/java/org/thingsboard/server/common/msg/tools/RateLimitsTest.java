@@ -35,17 +35,12 @@ import static org.awaitility.Awaitility.await;
  */
 public class RateLimitsTest {
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testRateLimits_greedyRefill` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证频率相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testRateLimits_greedyRefill() {
         testRateLimitWithGreedyRefill(3, 10);
         testRateLimitWithGreedyRefill(3, 3);
@@ -53,14 +48,11 @@ public class RateLimitsTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testRateLimitWithGreedyRefill` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证数量限制相关场景。
+     * 参数：
+     * - `capacity`：`capacity` 参数。
+     * - `period`：`period` 参数。
+     * 返回：无。
      */
     private void testRateLimitWithGreedyRefill(int capacity, int period) {
         String rateLimitConfig = capacity + ":" + period;
@@ -72,7 +64,6 @@ public class RateLimitsTest {
         int expectedRefillTime = (int) (((double) period / capacity) * 1000);
         int gap = 500;
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < capacity; i++) {
             await("token refill for rate limit " + rateLimitConfig)
                     .pollInterval(new FixedPollInterval(10, TimeUnit.MILLISECONDS))
@@ -85,17 +76,12 @@ public class RateLimitsTest {
         }
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testRateLimits_intervalRefill` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证时间间隔相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testRateLimits_intervalRefill() {
         testRateLimitWithIntervalRefill(10, 5);
         testRateLimitWithIntervalRefill(3, 3);
@@ -103,14 +89,11 @@ public class RateLimitsTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testRateLimitWithIntervalRefill` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证数量限制相关场景。
+     * 参数：
+     * - `capacity`：`capacity` 参数。
+     * - `period`：`period` 参数。
+     * 返回：无。
      */
     private void testRateLimitWithIntervalRefill(int capacity, int period) {
         String rateLimitConfig = capacity + ":" + period;
@@ -127,7 +110,6 @@ public class RateLimitsTest {
                 .atLeast(expectedRefillTime - gap, TimeUnit.MILLISECONDS)
                 .atMost(expectedRefillTime + gap, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
-                    // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                     for (int i = 0; i < capacity; i++) {
                         assertThat(rateLimits.tryConsume()).as("token is available").isTrue();
                     }

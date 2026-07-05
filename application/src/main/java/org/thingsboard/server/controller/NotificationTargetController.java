@@ -70,11 +70,6 @@ import static org.thingsboard.server.controller.ControllerConstants.SORT_PROPERT
 import static org.thingsboard.server.controller.ControllerConstants.SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH;
 import static org.thingsboard.server.service.security.permission.Resource.NOTIFICATION;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api/notification")
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`NotificationTargetController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -85,18 +80,25 @@ import static org.thingsboard.server.service.security.permission.Resource.NOTIFI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api/notification")
+@RequiredArgsConstructor
+@Slf4j
 public class NotificationTargetController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `notificationTargetService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务，提供当前类调用的业务操作。
      */
     private final NotificationTargetService notificationTargetService;
 
+    /**
+     * 功能：保存或创建目标对象。
+     * 参数：
+     * - `notificationTarget`：`notificationTarget` 参数。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Save notification target (saveNotificationTarget)",
             notes = "Creates or updates notification target." + NEW_LINE +
                     "Available `configuration` types are `PLATFORM_USERS` and `SLACK`.\n" +
@@ -123,23 +125,12 @@ public class NotificationTargetController extends BaseController {
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PostMapping("/target")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveNotificationTarget` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public NotificationTarget saveNotificationTarget(@RequestBody @Valid NotificationTarget notificationTarget,
                                                      @AuthenticationPrincipal SecurityUser user) throws Exception {
         notificationTarget.setTenantId(user.getTenantId());
         checkEntity(notificationTarget.getId(), notificationTarget, NOTIFICATION);
 
         NotificationTargetConfig targetConfig = notificationTarget.getConfiguration();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (targetConfig.getType() == NotificationTargetType.PLATFORM_USERS) {
             checkTargetUsers(user, targetConfig);
         }
@@ -147,41 +138,37 @@ public class NotificationTargetController extends BaseController {
         return doSaveAndLog(EntityType.NOTIFICATION_TARGET, notificationTarget, notificationTargetService::saveNotificationTarget);
     }
 
+    /**
+     * 功能：获取目标对象。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get notification target by id (getNotificationTargetById)",
             notes = "Fetches notification target by id." +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping("/target/{id}")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationTargetById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public NotificationTarget getNotificationTargetById(@PathVariable UUID id) throws ThingsboardException {
         NotificationTargetId notificationTargetId = new NotificationTargetId(id);
         return checkEntityId(notificationTargetId, notificationTargetService::findNotificationTargetById, Operation.READ);
     }
 
+    /**
+     * 功能：获取配置。
+     * 参数：
+     * - `notificationTarget`：`notificationTarget` 参数。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get recipients for notification target config (getRecipientsForNotificationTargetConfig)",
             notes = "Returns the page of recipients for such notification target configuration." +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PostMapping("/target/recipients")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getRecipientsForNotificationTargetConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<User> getRecipientsForNotificationTargetConfig(@RequestBody NotificationTarget notificationTarget,
                                                                    @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
                                                                    @RequestParam int pageSize,
@@ -190,7 +177,6 @@ public class NotificationTargetController extends BaseController {
                                                                    @AuthenticationPrincipal SecurityUser user) throws ThingsboardException {
         // PE: generic permission
         NotificationTargetConfig targetConfig = notificationTarget.getConfiguration();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (targetConfig.getType() == NotificationTargetType.PLATFORM_USERS) {
             checkTargetUsers(user, targetConfig);
         } else {
@@ -201,21 +187,19 @@ public class NotificationTargetController extends BaseController {
         return notificationTargetService.findRecipientsForNotificationTargetConfig(user.getTenantId(), (PlatformUsersNotificationTargetConfig) notificationTarget.getConfiguration(), pageLink);
     }
 
+    /**
+     * 功能：获取通知。
+     * 参数：
+     * - `ids`：数据列表。
+     * - `ids`：`ids` 参数。
+     * - `user`：`user` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get notification targets by ids (getNotificationTargetsByIds)",
             notes = "Returns the list of notification targets found by provided ids." +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/targets", params = {"ids"})
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationTargetsByIds` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<NotificationTarget> getNotificationTargetsByIds(@ApiParam(value = "Comma-separated list of uuids representing targets ids", required = true)
                                                                 @RequestParam("ids") UUID[] ids,
                                                                 @AuthenticationPrincipal SecurityUser user) {
@@ -224,22 +208,22 @@ public class NotificationTargetController extends BaseController {
         return notificationTargetService.findNotificationTargetsByTenantIdAndIds(user.getTenantId(), targetsIds);
     }
 
+    /**
+     * 功能：获取通知。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get notification targets (getNotificationTargets)",
             notes = "Returns the page of notification targets owned by sysadmin or tenant." + NEW_LINE +
                     PAGE_DATA_PARAMETERS +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping("/targets")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationTargets` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<NotificationTarget> getNotificationTargets(@ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
                                                                @RequestParam int pageSize,
                                                                @ApiParam(value = PAGE_NUMBER_DESCRIPTION, required = true)
@@ -256,22 +240,22 @@ public class NotificationTargetController extends BaseController {
         return notificationTargetService.findNotificationTargetsByTenantId(user.getTenantId(), pageLink);
     }
 
+    /**
+     * 功能：获取类型。
+     * 参数：
+     * - `pageSize`：`pageSize` 参数。
+     * - `page`：`page` 参数。
+     * - `textSearch`：`textSearch` 参数。
+     * - `sortProperty`：`sortProperty` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get notification targets by supported notification type (getNotificationTargetsBySupportedNotificationType)",
             notes = "Returns the page of notification targets filtered by notification type that they can be used for." + NEW_LINE +
                     PAGE_DATA_PARAMETERS +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping(value = "/targets", params = "notificationType")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationTargetsBySupportedNotificationType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<NotificationTarget> getNotificationTargetsBySupportedNotificationType(@RequestParam int pageSize,
                                                                                           @RequestParam int page,
                                                                                           @RequestParam(required = false) String textSearch,
@@ -284,22 +268,18 @@ public class NotificationTargetController extends BaseController {
         return notificationTargetService.findNotificationTargetsByTenantIdAndSupportedNotificationType(user.getTenantId(), notificationType, pageLink);
     }
 
+    /**
+     * 功能：删除或清理目标对象。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete notification target by id (deleteNotificationTargetById)",
             notes = "Deletes notification target by its id." + NEW_LINE +
                     "This target cannot be referenced by existing scheduled notification requests or any notification rules." +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @DeleteMapping("/target/{id}")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteNotificationTargetById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteNotificationTargetById(@PathVariable UUID id) throws Exception {
         NotificationTargetId notificationTargetId = new NotificationTargetId(id);
         NotificationTarget notificationTarget = checkEntityId(notificationTargetId, notificationTargetService::findNotificationTargetById, Operation.DELETE);
@@ -307,26 +287,20 @@ public class NotificationTargetController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkTargetUsers` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验目标对象。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `targetConfig`：配置对象。
+     * 返回：无。
      */
     private void checkTargetUsers(SecurityUser user, NotificationTargetConfig targetConfig) throws ThingsboardException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (user.isSystemAdmin()) {
             return;
         }
         // PE: generic permission for users
         UsersFilter usersFilter = ((PlatformUsersNotificationTargetConfig) targetConfig).getUsersFilter();
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (usersFilter.getType()) {
             case USER_LIST:
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 for (UUID recipientId : ((UserListFilter) usersFilter).getUsersIds()) {
                     checkUserId(new UserId(recipientId), Operation.READ);
                 }
@@ -336,7 +310,6 @@ public class NotificationTargetController extends BaseController {
                 checkEntityId(customerId, Operation.READ);
                 break;
             case TENANT_ADMINISTRATORS:
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (CollectionUtils.isNotEmpty(((TenantAdministratorsFilter) usersFilter).getTenantsIds()) ||
                         CollectionUtils.isNotEmpty(((TenantAdministratorsFilter) usersFilter).getTenantProfilesIds())) {
                     throw new AccessDeniedException("");

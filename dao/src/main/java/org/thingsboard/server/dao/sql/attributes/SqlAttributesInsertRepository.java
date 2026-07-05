@@ -19,9 +19,6 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import org.thingsboard.server.dao.util.SqlDao;
 
-@Repository
-@Transactional
-@SqlDao
 /**
  * 中文说明：
  * 1. 类目的：`SqlAttributesInsertRepository` 是 ThingsBoard DAO 模块 中的SQL/JPA 持久化实现类型，用于把 DAO API 的领域操作落到 PostgreSQL、TimescaleDB 或 JPA Repository 的具体 SQL 访问路径。
@@ -33,6 +30,9 @@ import org.thingsboard.server.dao.util.SqlDao;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / DAO / Adapter。
  */
+@Repository
+@Transactional
+@SqlDao
 public class SqlAttributesInsertRepository extends AttributeKvInsertRepository {
 
 

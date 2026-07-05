@@ -27,30 +27,21 @@ package org.thingsboard.rule.engine.api.sms.exception;
 public class SmsSendException extends SmsException {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：用发送失败消息创建异常。
-     * 2. 输入参数：msg 是供应商或发送器返回的失败原因。
-     * 3. 返回值：构造函数无返回值。
-     * 4. 调用时机：供应商返回失败状态但没有底层异常时调用。
-     * 5. 调用方：具体 SmsSender 实现。
-     * 6. 使用流程：属于短信外部发送失败流程。
-     * 7. 线程安全：异常对象随单次错误传播使用。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；可能触发 Rule Engine 失败路由。
+     * 功能：创建 `SmsSendException` 实例，并初始化必要字段。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：新创建的对象实例。
      */
     public SmsSendException(String msg) {
         super(msg);
     }
 
     /**
-     * 中文说明：
-     * 1. 方法职责：用发送失败消息和底层原因创建异常。
-     * 2. 输入参数：msg 是错误描述，cause 是供应商 SDK、HTTP 或网络异常。
-     * 3. 返回值：构造函数无返回值。
-     * 4. 调用时机：需要保留底层发送异常堆栈时调用。
-     * 5. 调用方：具体 SmsSender 实现。
-     * 6. 使用流程：属于短信发送失败包装流程。
-     * 7. 线程安全：异常对象随单次错误传播使用。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；服务 Rule Engine 外部调用失败处理。
+     * 功能：创建 `SmsSendException` 实例，并初始化必要字段。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `cause`：`cause` 参数。
+     * 返回：新创建的对象实例。
      */
     public SmsSendException(String msg, Throwable cause) {
         super(msg, cause);

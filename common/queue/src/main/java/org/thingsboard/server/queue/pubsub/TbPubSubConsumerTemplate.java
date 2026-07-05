@@ -48,7 +48,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbPubSubConsumerTemplate` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -59,61 +58,41 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class TbPubSubConsumerTemplate<T extends TbQueueMsg> extends AbstractParallelTbQueueConsumerTemplate<PubsubMessage, T> {
 
     private final Gson gson = new Gson();
     /**
-     * 字段说明：
-     * 1. 保存 `admin` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `admin` 字段，保存当前对象的对应属性。
      */
     private final TbQueueAdmin admin;
     private final String topic;
     /**
-     * 字段说明：
-     * 1. 保存 `decoder` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 解码器，表示当前对象的对应属性。
      */
     private final TbQueueMsgDecoder<T> decoder;
     private final TbPubSubSettings pubSubSettings;
 
     /**
-     * 字段说明：
-     * 1. 保存 `subscriptionNames` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 订阅集合，用于去重保存或快速判断对象是否存在。
      */
     private volatile Set<String> subscriptionNames;
     private final List<AcknowledgeRequest> acknowledgeRequests = new CopyOnWriteArrayList<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `subscriber` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `subscriber` 字段，保存当前对象的对应属性。
      */
     private final SubscriberStub subscriber;
     private volatile int messagesPerTopic;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbPubSubConsumerTemplate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbPubSubConsumerTemplate` 实例，并初始化必要字段。
+     * 参数：
+     * - `admin`：`admin` 参数。
+     * - `pubSubSettings`：配置对象。
+     * - `topic`：主题名称或主题对象。
+     * - `decoder`：`decoder` 参数。
+     * 返回：新创建的对象实例。
      */
     public TbPubSubConsumerTemplate(TbQueueAdmin admin, TbPubSubSettings pubSubSettings, String topic, TbQueueMsgDecoder<T> decoder) {
         super(topic);
@@ -125,43 +104,33 @@ public class TbPubSubConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
             SubscriberStubSettings subscriberStubSettings =
                     SubscriberStubSettings.newBuilder()
                             .setCredentialsProvider(pubSubSettings.getCredentialsProvider())
-                            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                             .setTransportChannelProvider(
-                                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                                     SubscriberStubSettings.defaultGrpcTransportProviderBuilder()
                                             .setMaxInboundMessageSize(pubSubSettings.getMaxMsgSize())
                                             .build())
                             .setExecutorProvider(pubSubSettings.getExecutorProvider())
                             .build();
             this.subscriber = GrpcSubscriberStub.create(subscriberStubSettings);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.error("Failed to create subscriber.", e);
             throw new RuntimeException("Failed to create subscriber.", e);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doPoll` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doPoll` 对应的处理。
+     * 参数：
+     * - `durationInMillis`：`durationInMillis` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected List<PubsubMessage> doPoll(long durationInMillis) {
         try {
             List<ReceivedMessage> messages = receiveMessages();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!messages.isEmpty()) {
                 return messages.stream().map(ReceivedMessage::getMessage).collect(Collectors.toList());
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (ExecutionException | InterruptedException e) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (stopped) {
                 log.info("[{}] Pub/Sub consumer is stopped.", topic);
             } else {
@@ -171,17 +140,13 @@ public class TbPubSubConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
         return Collections.emptyList();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doSubscribe` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doSubscribe` 对应的处理。
+     * 参数：
+     * - `topicNames`：主题名称或主题对象。
+     * 返回：无。
      */
+    @Override
     protected void doSubscribe(List<String> topicNames) {
         subscriptionNames = new LinkedHashSet<>(topicNames);
         subscriptionNames.forEach(admin::createTopicIfNotExists);
@@ -189,36 +154,24 @@ public class TbPubSubConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
         messagesPerTopic = pubSubSettings.getMaxMessages() / Math.max(subscriptionNames.size(), 1);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doCommit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doCommit` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     protected void doCommit() {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         acknowledgeRequests.forEach(subscriber.acknowledgeCallable()::futureCall);
         acknowledgeRequests.clear();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doUnsubscribe` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doUnsubscribe` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     protected void doUnsubscribe() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (subscriber != null) {
             subscriber.close();
         }
@@ -226,17 +179,11 @@ public class TbPubSubConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `receiveMessages` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `receiveMessages` 对应的处理。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     private List<ReceivedMessage> receiveMessages() throws ExecutionException, InterruptedException {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<ApiFuture<List<ReceivedMessage>>> result = subscriptionNames.stream().map(subscriptionId -> {
             String subscriptionName = ProjectSubscriptionName.format(pubSubSettings.getProjectId(), subscriptionId);
             PullRequest pullRequest =
@@ -246,12 +193,9 @@ public class TbPubSubConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
                             .setSubscription(subscriptionName)
                             .build();
 
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             ApiFuture<PullResponse> pullResponseApiFuture = subscriber.pullCallable().futureCall(pullRequest);
 
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return ApiFutures.transform(pullResponseApiFuture, pullResponse -> {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (pullResponse != null && !pullResponse.getReceivedMessagesList().isEmpty()) {
                     List<String> ackIds = new ArrayList<>();
                     for (ReceivedMessage message : pullResponse.getReceivedMessagesList()) {
@@ -281,17 +225,13 @@ public class TbPubSubConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
         return transform.get();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `decode` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `decode` 对应的处理。
+     * 参数：
+     * - `message`：待处理消息。
+     * 返回：处理结果。
      */
+    @Override
     public T decode(PubsubMessage message) throws InvalidProtocolBufferException {
         DefaultTbQueueMsg msg = gson.fromJson(message.getData().toStringUtf8(), DefaultTbQueueMsg.class);
         return decoder.decode(msg);

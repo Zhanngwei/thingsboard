@@ -31,55 +31,55 @@ import lombok.Data;
 public class NodeDefinition {
 
     /**
-     * 中文说明：节点详细说明，来源于 RuleNode 注解或节点定义构建流程；生命周期与节点定义缓存一致。
+     * `details` 字段，保存当前对象的对应属性。
      */
     private String details;
     /**
-     * 中文说明：节点简短描述，来源于 RuleNode 注解；用于规则链编辑器展示节点用途。
+     * 描述信息，用于展示或标识当前对象。
      */
     private String description;
     /**
-     * 中文说明：是否允许入边，来源于 RuleNode 注解；用于 UI 连接校验和规则链结构约束。
+     * 是否启用`in`。
      */
     private boolean inEnabled;
     /**
-     * 中文说明：是否允许出边，来源于 RuleNode 注解；用于 UI 连接校验和消息路由能力展示。
+     * 是否启用`out`。
      */
     private boolean outEnabled;
     /**
-     * 中文说明：节点支持的关系类型，来源于 RuleNode 注解；生命周期与节点定义一致，用于规则链连线。
+     * 关系列表，用于保存一组待处理对象。
      */
     String[] relationTypes;
     /**
-     * 中文说明：是否允许自定义关系，来源于 RuleNode 注解；用于决定 UI 是否允许用户输入任意关系名。
+     * 是否满足`customRelations`条件。
      */
     boolean customRelations;
     /**
-     * 中文说明：是否为规则链节点，来源于 RuleNode 注解；用于嵌套规则链输入/输出语义展示。
+     * 是否满足规则链条件。
      */
     boolean ruleChainNode;
     /**
-     * 中文说明：默认配置 JSON，来源于 NodeConfiguration.defaultConfiguration 转换结果；用于新建节点时填充配置。
+     * `defaultConfiguration`，保存当前对象的配置选项。
      */
     JsonNode defaultConfiguration;
     /**
-     * 中文说明：节点需要的前端资源，来源于 RuleNode 注解；用于加载自定义配置 UI。
+     * `uiResources`列表，用于保存一组待处理对象。
      */
     String[] uiResources;
     /**
-     * 中文说明：前端配置指令名称，来源于 RuleNode 注解；用于选择节点配置表单。
+     * 配置，保存当前对象的配置选项。
      */
     String configDirective;
     /**
-     * 中文说明：节点图标名称，来源于 RuleNode 注解；用于规则链 UI 展示。
+     * `icon` 字段，保存当前对象的对应属性。
      */
     String icon;
     /**
-     * 中文说明：节点图标 URL，来源于 RuleNode 注解；用于外部图标展示。
+     * URL 地址，用于定位外部资源或本地资源。
      */
     String iconUrl;
     /**
-     * 中文说明：节点文档地址，来源于 RuleNode 注解；用于 UI 帮助链接。
+     * URL 地址，用于定位外部资源或本地资源。
      */
     String docUrl;
 

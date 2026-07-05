@@ -24,8 +24,6 @@ import org.eclipse.paho.client.mqttv3.internal.wire.MqttWireMessage;
 
 import java.util.concurrent.CountDownLatch;
 
-@Slf4j
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`MqttTestCallback` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -36,47 +34,29 @@ import java.util.concurrent.CountDownLatch;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@Slf4j
+@Data
 public class MqttTestCallback implements MqttCallback {
 
     /**
-     * 字段说明：
-     * 1. 保存 `subscribeLatch` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 订阅等待器，用于在测试或异步流程中等待结果。
      */
     protected CountDownLatch subscribeLatch;
     protected final CountDownLatch deliveryLatch;
     /**
-     * 字段说明：
-     * 1. 保存 `messageArrivedQoS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * QoS 等级，承载当前步骤需要处理的内容。
      */
     protected int messageArrivedQoS;
     protected byte[] payloadBytes;
     /**
-     * 字段说明：
-     * 1. 保存 `pubAckReceived` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足`pubAckReceived`条件。
      */
     protected boolean pubAckReceived;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `MqttTestCallback` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `MqttTestCallback` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public MqttTestCallback() {
         this.subscribeLatch = new CountDownLatch(1);
@@ -84,71 +64,52 @@ public class MqttTestCallback implements MqttCallback {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `MqttTestCallback` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `MqttTestCallback` 实例，并初始化必要字段。
+     * 参数：
+     * - `subscribeCount`：`subscribeCount` 参数。
+     * 返回：新创建的对象实例。
      */
     public MqttTestCallback(int subscribeCount) {
         this.subscribeLatch = new CountDownLatch(subscribeCount);
         this.deliveryLatch = new CountDownLatch(1);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `connectionLost` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `connectionLost` 对应的处理。
+     * 参数：
+     * - `throwable`：`throwable` 参数。
+     * 返回：无。
      */
+    @Override
     public void connectionLost(Throwable throwable) {
         log.warn("connectionLost: ", throwable);
         deliveryLatch.countDown();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `messageArrived` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `messageArrived` 对应的处理。
+     * 参数：
+     * - `requestTopic`：请求对象。
+     * - `mqttMessage`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void messageArrived(String requestTopic, MqttMessage mqttMessage) {
         log.warn("messageArrived on topic: {}", requestTopic);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         messageArrivedQoS = mqttMessage.getQos();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         payloadBytes = mqttMessage.getPayload();
         subscribeLatch.countDown();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deliveryComplete` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `deliveryComplete` 对应的处理。
+     * 参数：
+     * - `iMqttDeliveryToken`：`iMqttDeliveryToken` 参数。
+     * 返回：无。
      */
+    @Override
     public void deliveryComplete(IMqttDeliveryToken iMqttDeliveryToken) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         log.warn("delivery complete: {}", iMqttDeliveryToken.getResponse());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         pubAckReceived = iMqttDeliveryToken.getResponse().getType() == MqttWireMessage.MESSAGE_TYPE_PUBACK;
         deliveryLatch.countDown();
     }

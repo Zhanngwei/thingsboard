@@ -22,7 +22,7 @@ package org.thingsboard.rule.engine.deduplication;
 public enum DeduplicationStrategy {
 
     /**
-     * 枚举项说明：本行枚举常量定义 `DeduplicationStrategy` 支持的取值，用于配置或处理流程中的分支判断。
+     * `ALL`常量，用于统一引用固定值。
      */
     FIRST, LAST, ALL
 

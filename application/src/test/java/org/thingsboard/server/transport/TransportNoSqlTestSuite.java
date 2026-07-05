@@ -19,10 +19,6 @@ import org.junit.extensions.cpsuite.ClasspathSuite;
 import org.junit.runner.RunWith;
 import org.thingsboard.server.dao.AbstractNoSqlContainer;
 
-@RunWith(ClasspathSuite.class)
-@ClasspathSuite.ClassnameFilters({
-        "org.thingsboard.server.transport.*.telemetry.timeseries.nosql.*Test",
-})
 /**
  * 中文说明：
  * 1. 类目的：`TransportNoSqlTestSuite` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -33,6 +29,10 @@ import org.thingsboard.server.dao.AbstractNoSqlContainer;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@RunWith(ClasspathSuite.class)
+@ClasspathSuite.ClassnameFilters({
+        "org.thingsboard.server.transport.*.telemetry.timeseries.nosql.*Test",
+})
 public class TransportNoSqlTestSuite extends AbstractNoSqlContainer {
 
 }

@@ -40,8 +40,6 @@ import java.util.concurrent.TimeUnit;
 import static org.thingsboard.server.common.data.device.profile.MqttTopics.DEVICE_PROVISION_REQUEST_TOPIC;
 import static org.thingsboard.server.common.data.device.profile.MqttTopics.DEVICE_PROVISION_RESPONSE_TOPIC;
 
-@Slf4j
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`MqttV5ProvisionDeviceTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -52,67 +50,46 @@ import static org.thingsboard.server.common.data.device.profile.MqttTopics.DEVIC
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@Slf4j
+@DaoSqlTest
 public class MqttV5ProvisionDeviceTest extends AbstractMqttV5Test {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceCredentialsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备凭据，提供当前类调用的业务操作。
      */
+    @Autowired
     DeviceCredentialsService deviceCredentialsService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
+    @Autowired
     DeviceService deviceService;
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testProvisioningCreateNewDeviceWithoutCredentials` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testProvisioningCreateNewDeviceWithoutCredentials() throws Exception {
         processTestProvisioningCreateNewDeviceWithoutCredentials();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processTestProvisioningCreateNewDeviceWithoutCredentials` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理设备凭据。
+     * 参数：无。
+     * 返回：无。
      */
     protected void processTestProvisioningCreateNewDeviceWithoutCredentials() throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestConfigProperties configProperties = MqttTestConfigProperties.builder()
                 .deviceName("Test Provision device3")
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 .transportPayloadType(TransportPayloadType.JSON)
                 .provisionType(DeviceProfileProvisionType.ALLOW_CREATE_NEW_DEVICES)
                 .provisionKey("testProvisionKey")
                 .provisionSecret("testProvisionSecret")
                 .build();
         super.processBeforeTest(configProperties);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         byte[] result = createMqttClientAndPublish();
         JsonNode response = JacksonUtil.fromBytes(result);
         Assert.assertTrue(response.hasNonNull("credentialsType"));
@@ -129,24 +106,16 @@ public class MqttV5ProvisionDeviceTest extends AbstractMqttV5Test {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createMqttClientAndPublish` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建客户端。
+     * 参数：无。
+     * 返回：处理结果。
      */
     protected byte[] createMqttClientAndPublish() throws Exception {
         String provisionRequestMsg = "{\"deviceName\":\"Test Provision device\",\"provisionDeviceKey\":\"testProvisionKey\", \"provisionDeviceSecret\":\"testProvisionSecret\"}";
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttV5TestClient client = new MqttV5TestClient();
         client.connectAndWait("provision");
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttV5TestCallback onProvisionCallback = new MqttV5TestCallback(DEVICE_PROVISION_RESPONSE_TOPIC);
         client.setCallback(onProvisionCallback);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         client.subscribe(DEVICE_PROVISION_RESPONSE_TOPIC, MqttQoS.AT_MOST_ONCE);
         client.publishAndWait(DEVICE_PROVISION_REQUEST_TOPIC, provisionRequestMsg.getBytes());
         onProvisionCallback.getSubscribeLatch().await(3, TimeUnit.SECONDS);

@@ -28,6 +28,9 @@ import org.thingsboard.server.common.msg.TbMsg;
 
 import java.util.UUID;
 
+/**
+ * `TbMsgPushToCloudNode` 类，封装当前模块中的一组相关职责。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.ACTION,
@@ -51,17 +54,19 @@ import java.util.UUID;
         icon = "cloud_upload",
         ruleChainTypes = RuleChainType.EDGE
 )
-/**
- * Edge 侧推送到 Cloud 的占位节点，核心实现由 Edge 运行环境提供。
- * 当前类中的方法不直接保存数据库、不访问缓存，也不直接推送到 Cloud。
- */
 public class TbMsgPushToCloudNode extends AbstractTbMsgPushNode<TbMsgPushToCloudNodeConfiguration, Object, Object> {
 
     // Implementation of this node is done on the Edge
 
     /**
-     * Edge 运行环境中的实现应构造 Cloud 事件。
-     * 当前占位实现不直接访问数据库、缓存或外部系统。
+     * 功能：构建事件。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `eventAction`：`eventAction` 参数。
+     * - `entityId`：实体IDID。
+     * - `eventType`：类型。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     @Override
     Object buildEvent(TenantId tenantId, EdgeEventActionType eventAction, UUID entityId, Object eventType, JsonNode entityBody) {
@@ -69,8 +74,10 @@ public class TbMsgPushToCloudNode extends AbstractTbMsgPushNode<TbMsgPushToCloud
     }
 
     /**
-     * Edge 运行环境中的实现应把实体类型映射为 Cloud 事件类型。
-     * 当前占位实现不直接涉及外部调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `entityType`：实体对象。
+     * 返回：处理结果。
      */
     @Override
     Object getEventTypeByEntityType(EntityType entityType) {
@@ -78,8 +85,9 @@ public class TbMsgPushToCloudNode extends AbstractTbMsgPushNode<TbMsgPushToCloud
     }
 
     /**
-     * Edge 运行环境中的实现应返回告警事件类型。
-     * 当前占位实现不直接涉及数据库或缓存。
+     * 功能：获取告警。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     Object getAlarmEventType() {
@@ -87,8 +95,9 @@ public class TbMsgPushToCloudNode extends AbstractTbMsgPushNode<TbMsgPushToCloud
     }
 
     /**
-     * Edge 运行环境中的实现应返回需要忽略的消息来源。
-     * 当前占位实现不直接处理消息确认之外的外部边界。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：文本结果。
      */
     @Override
     String getIgnoredMessageSource() {
@@ -96,8 +105,9 @@ public class TbMsgPushToCloudNode extends AbstractTbMsgPushNode<TbMsgPushToCloud
     }
 
     /**
-     * 返回 push to cloud 节点配置类。
-     * 本方法只用于配置转换，不直接访问数据库或缓存。
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     protected Class<TbMsgPushToCloudNodeConfiguration> getConfigClazz() {
@@ -105,8 +115,11 @@ public class TbMsgPushToCloudNode extends AbstractTbMsgPushNode<TbMsgPushToCloud
     }
 
     /**
-     * Edge 运行环境中的实现应保存 Cloud 事件并路由消息。
-     * 当前占位实现为空，不直接涉及外部调用、数据库或缓存。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     void processMsg(TbContext ctx, TbMsg msg) {

@@ -53,10 +53,6 @@ import java.util.stream.Collectors;
 
 import static org.thingsboard.server.common.data.notification.NotificationDeliveryMethod.WEB;
 
-@Service
-@TbCoreComponent
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultNotificationCommandsHandler` 是ThingsBoard Application 模块中的WebSocket 服务类型，用于维护仪表盘、遥测、属性或告警订阅的 WebSocket 会话。
@@ -67,50 +63,36 @@ import static org.thingsboard.server.common.data.notification.NotificationDelive
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Observer / Session。
  */
+@Service
+@TbCoreComponent
+@RequiredArgsConstructor
+@Slf4j
 public class DefaultNotificationCommandsHandler implements NotificationCommandsHandler {
 
     /**
-     * 字段说明：
-     * 1. 保存 `notificationService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务，提供当前类调用的业务操作。
      */
     private final NotificationService notificationService;
     private final TbLocalSubscriptionService localSubscriptionService;
     /**
-     * 字段说明：
-     * 1. 保存 `notificationCenter` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知，表示当前对象的对应属性。
      */
     private final NotificationCenter notificationCenter;
     private final TbServiceInfoProvider serviceInfoProvider;
-    @Autowired @Lazy
     /**
-     * 字段说明：
-     * 1. 保存 `wsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired @Lazy
     private WebSocketService wsService;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleUnreadNotificationsSubCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Unread Notifications Sub Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleUnreadNotificationsSubCmd(WebSocketSessionRef sessionRef, NotificationsSubCmd cmd) {
         log.debug("[{}] Handling unread notifications subscription cmd (cmdId: {})", sessionRef.getSessionId(), cmd.getCmdId());
         SecurityUser securityCtx = sessionRef.getSecurityCtx();
@@ -129,17 +111,14 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
         sendUpdate(sessionRef.getSessionId(), subscription.createFullUpdate());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleUnreadNotificationsCountSubCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理数量。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleUnreadNotificationsCountSubCmd(WebSocketSessionRef sessionRef, NotificationsCountSubCmd cmd) {
         log.debug("[{}] Handling unread notifications count subscription cmd (cmdId: {})", sessionRef.getSessionId(), cmd.getCmdId());
         SecurityUser securityCtx = sessionRef.getSecurityCtx();
@@ -158,14 +137,10 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fetchUnreadNotifications` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Unread Notifications`。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * 返回：无。
      */
     private void fetchUnreadNotifications(NotificationsSubscription subscription) {
         log.trace("[{}, subId: {}] Fetching unread notifications from DB", subscription.getSessionId(), subscription.getSubscriptionId());
@@ -179,14 +154,10 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fetchUnreadNotificationsCount` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取数量。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * 返回：无。
      */
     private void fetchUnreadNotificationsCount(NotificationsCountSubscription subscription) {
         log.trace("[{}, subId: {}] Fetching unread notifications count from DB", subscription.getSessionId(), subscription.getSubscriptionId());
@@ -197,61 +168,47 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
 
     /* Notifications subscription update handling */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleNotificationsSubscriptionUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理订阅。
+     * 参数：
+     * - `sub`：`sub` 参数。
+     * - `subscriptionUpdate`：`subscriptionUpdate` 参数。
+     * 返回：无。
      */
     private void handleNotificationsSubscriptionUpdate(TbSubscription<NotificationsSubscriptionUpdate> sub, NotificationsSubscriptionUpdate subscriptionUpdate) {
         NotificationsSubscription subscription = (NotificationsSubscription) sub;
         try {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (subscriptionUpdate.getNotificationUpdate() != null) {
                 handleNotificationUpdate(subscription, subscriptionUpdate.getNotificationUpdate());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (subscriptionUpdate.getNotificationRequestUpdate() != null) {
                 handleNotificationRequestUpdate(subscription, subscriptionUpdate.getNotificationRequestUpdate());
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("[{}, subId: {}] Failed to handle update for notifications subscription: {}", subscription.getSessionId(), subscription.getSubscriptionId(), subscriptionUpdate, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleNotificationUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理通知。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     private void handleNotificationUpdate(NotificationsSubscription subscription, NotificationUpdate update) {
         log.trace("[{}, subId: {}] Handling notification update: {}", subscription.getSessionId(), subscription.getSubscriptionId(), update);
         Notification notification = update.getNotification();
         UUID notificationId = notification != null ? notification.getUuidId() : update.getNotificationId();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (update.isCreated()) {
             subscription.getLatestUnreadNotifications().put(notificationId, notification);
             subscription.getTotalUnreadCounter().incrementAndGet();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (subscription.getLatestUnreadNotifications().size() > subscription.getLimit()) {
                 Set<UUID> beyondLimit = subscription.getSortedNotifications().stream().skip(subscription.getLimit())
                         .map(IdBased::getUuidId).collect(Collectors.toSet());
                 beyondLimit.forEach(id -> subscription.getLatestUnreadNotifications().remove(id));
             }
             sendUpdate(subscription.getSessionId(), subscription.createPartialUpdate(notification));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (update.isUpdated()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (update.getNewStatus() == NotificationStatus.READ) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (update.isAllNotifications() || subscription.getLatestUnreadNotifications().containsKey(notificationId)) {
                     fetchUnreadNotifications(subscription);
                     sendUpdate(subscription.getSessionId(), subscription.createFullUpdate());
@@ -259,17 +216,13 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
                     subscription.getTotalUnreadCounter().decrementAndGet();
                     sendUpdate(subscription.getSessionId(), subscription.createCountUpdate());
                 }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (notification.getStatus() != NotificationStatus.READ) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (subscription.getLatestUnreadNotifications().containsKey(notificationId)) {
                     subscription.getLatestUnreadNotifications().put(notificationId, notification);
                     sendUpdate(subscription.getSessionId(), subscription.createPartialUpdate(notification));
                 }
             }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (update.isDeleted()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (subscription.getLatestUnreadNotifications().containsKey(notificationId)) {
                 fetchUnreadNotifications(subscription);
                 sendUpdate(subscription.getSessionId(), subscription.createFullUpdate());
@@ -281,14 +234,11 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleNotificationRequestUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     private void handleNotificationRequestUpdate(NotificationsSubscription subscription, NotificationRequestUpdate update) {
         log.trace("[{}, subId: {}] Handling notification request update: {}", subscription.getSessionId(), subscription.getSubscriptionId(), update);
@@ -299,14 +249,11 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
 
     /* Notifications count subscription update handling */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleNotificationsCountSubscriptionUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理订阅。
+     * 参数：
+     * - `sub`：`sub` 参数。
+     * - `subscriptionUpdate`：`subscriptionUpdate` 参数。
+     * 返回：无。
      */
     private void handleNotificationsCountSubscriptionUpdate(TbSubscription<NotificationsSubscriptionUpdate> sub, NotificationsSubscriptionUpdate subscriptionUpdate) {
         NotificationsCountSubscription subscription = (NotificationsCountSubscription) sub;
@@ -322,14 +269,11 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleNotificationUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理通知。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     private void handleNotificationUpdate(NotificationsCountSubscription subscription, NotificationUpdate update) {
         log.trace("[{}, subId: {}] Handling notification update for count sub: {}", subscription.getSessionId(), subscription.getSubscriptionId(), update);
@@ -354,14 +298,11 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleNotificationRequestUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `subscription`：`subscription` 参数。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     private void handleNotificationRequestUpdate(NotificationsCountSubscription subscription, NotificationRequestUpdate update) {
         log.trace("[{}, subId: {}] Handling notification request update for count sub: {}", subscription.getSessionId(), subscription.getSubscriptionId(), update);
@@ -370,17 +311,14 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleMarkAsReadCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Mark As Read Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleMarkAsReadCmd(WebSocketSessionRef sessionRef, MarkNotificationsAsReadCmd cmd) {
         SecurityUser securityCtx = sessionRef.getSecurityCtx();
         cmd.getNotifications().stream()
@@ -390,46 +328,37 @@ public class DefaultNotificationCommandsHandler implements NotificationCommandsH
                 });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleMarkAllAsReadCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Mark All As Read Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleMarkAllAsReadCmd(WebSocketSessionRef sessionRef, MarkAllNotificationsAsReadCmd cmd) {
         SecurityUser securityCtx = sessionRef.getSecurityCtx();
         notificationCenter.markAllNotificationsAsRead(securityCtx.getTenantId(), WEB, securityCtx.getId());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleUnsubCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Unsub Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
+    @Override
     public void handleUnsubCmd(WebSocketSessionRef sessionRef, UnsubscribeCmd cmd) {
         localSubscriptionService.cancelSubscription(sessionRef.getSessionId(), cmd.getCmdId());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendUpdate` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Update`。
+     * 参数：
+     * - `sessionId`：会话ID。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     private void sendUpdate(String sessionId, CmdUpdate update) {
         log.trace("[{}, cmdId: {}] Sending WS update: {}", sessionId, update.getCmdId(), update);

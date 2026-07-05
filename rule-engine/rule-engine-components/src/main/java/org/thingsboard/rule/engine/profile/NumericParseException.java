@@ -21,8 +21,10 @@ package org.thingsboard.rule.engine.profile;
  */
 public class NumericParseException extends RuntimeException {
     /**
-     * 方法说明：构造 `NumericParseException` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `NumericParseException` 实例，并初始化必要字段。
+     * 参数：
+     * - `message`：待处理消息。
+     * 返回：新创建的对象实例。
      */
     public NumericParseException(String message) {
         super(message);

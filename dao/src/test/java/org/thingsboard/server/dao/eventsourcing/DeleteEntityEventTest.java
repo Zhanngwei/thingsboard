@@ -35,38 +35,25 @@ import static org.assertj.core.api.BDDAssertions.byLessThan;
  */
 class DeleteEntityEventTest {
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testBuilderDefaultTs` 对应的审计与事件持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由业务服务在关键操作后创建事件或审计记录，并由数据库写入、清理任务或测试流程消费时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：接收业务事件上下文后写入数据库或下沉目标，并按租户、实体和时间范围支持查询。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：验证时间戳相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void testBuilderDefaultTs() {
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         assertThat(DeleteEntityEvent.builder().build().getTs())
                 .isCloseTo(System.currentTimeMillis(), byLessThan(TimeUnit.MINUTES.toMillis(1)));
 
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         assertThat(DeleteEntityEvent.builder().ts(Long.MIN_VALUE).build().getTs())
                 .isEqualTo(Long.MIN_VALUE);
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         assertThat(DeleteEntityEvent.builder().ts(Long.MAX_VALUE).build().getTs())
                 .isEqualTo(Long.MAX_VALUE);
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         assertThat(DeleteEntityEvent.builder().ts(-1L).build().getTs())
                 .isEqualTo(-1L);
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         assertThat(DeleteEntityEvent.builder().ts(0L).build().getTs())
                 .isEqualTo(0L);
 
-        // 审计或事件记录用于保留业务变更轨迹，便于后续查询、告警或外部系统消费。
         assertThat(DeleteEntityEvent.builder().ts(1692175215000L).build().getTs())
                 .isEqualTo(1692175215000L);
     }

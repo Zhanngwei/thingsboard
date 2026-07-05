@@ -24,41 +24,41 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-@Data
 /**
- * Slack 发送节点配置，保存 bot token、系统设置开关、消息模板和目标会话。
- * 配置类本身不直接调用 Slack API、不访问数据库或缓存，也不涉及异步回调。
+ * `TbSlackNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbSlackNodeConfiguration implements NodeConfiguration<TbSlackNodeConfiguration> {
 
     /**
-     * 自定义 Slack bot token。
+     * 令牌，用于认证或安全校验。
      */
     private String botToken;
     /**
-     * 是否使用系统级 Slack 设置中的 token。
+     * 是否使用配置。
      */
     private boolean useSystemSettings;
     /**
-     * Slack 消息模板。
+     * 消息，承载当前步骤需要处理的内容。
      */
     @NotEmpty
     private String messageTemplate;
 
     /**
-     * Slack 会话类型。
+     * 类型，用于区分不同处理分支。
      */
     private SlackConversationType conversationType;
     /**
-     * Slack 目标会话。
+     * `conversation` 字段，保存当前对象的对应属性。
      */
     @NotNull
     @Valid
     private SlackConversation conversation;
 
     /**
-     * 构造 Slack 节点默认配置。
-     * 本方法只设置默认值，不直接读取系统 token 或调用 Slack API。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbSlackNodeConfiguration defaultConfiguration() {

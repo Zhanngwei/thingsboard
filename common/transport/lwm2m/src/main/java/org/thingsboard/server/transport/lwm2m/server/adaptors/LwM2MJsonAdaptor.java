@@ -27,9 +27,6 @@ import org.thingsboard.server.queue.util.TbLwM2mTransportComponent;
 import java.util.Collection;
 import java.util.Random;
 
-@Slf4j
-@Component("LwM2MJsonAdaptor")
-@TbLwM2mTransportComponent
 /**
  * 中文说明：
  * 1. 类目的：`LwM2MJsonAdaptor` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -40,75 +37,61 @@ import java.util.Random;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Component("LwM2MJsonAdaptor")
+@TbLwM2mTransportComponent
 public class LwM2MJsonAdaptor implements LwM2MTransportAdaptor  {
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertToPostTelemetry` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换遥测。
+     * 参数：
+     * - `jsonElement`：`jsonElement` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public TransportProtos.PostTelemetryMsg convertToPostTelemetry(JsonElement jsonElement) throws AdaptorException {
         try {
             return JsonConverter.convertToTelemetryProto(jsonElement);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IllegalStateException | JsonSyntaxException ex) {
             throw new AdaptorException(ex);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertToPostAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换`To Post Attributes`。
+     * 参数：
+     * - `jsonElement`：`jsonElement` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public TransportProtos.PostAttributeMsg convertToPostAttributes(JsonElement jsonElement) throws AdaptorException {
         try {
             return JsonConverter.convertToAttributesProto(jsonElement);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IllegalStateException | JsonSyntaxException ex) {
             throw new AdaptorException(ex);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertToGetAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换`To Get Attributes`。
+     * 参数：
+     * - `clientKeys`：客户端对象。
+     * - `sharedKeys`：键。
+     * 返回：处理结果。
      */
+    @Override
     public TransportProtos.GetAttributeRequestMsg convertToGetAttributes(Collection<String> clientKeys, Collection<String> sharedKeys) throws AdaptorException {
         try {
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             TransportProtos.GetAttributeRequestMsg.Builder result = TransportProtos.GetAttributeRequestMsg.newBuilder();
             Random random = new Random();
             result.setRequestId(random.nextInt());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (clientKeys != null) {
                 result.addAllClientAttributeNames(clientKeys);
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sharedKeys != null) {
                 result.addAllSharedAttributeNames(sharedKeys);
             }
             return result.build();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (RuntimeException e) {
             throw new AdaptorException(e);
         }

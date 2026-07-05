@@ -83,10 +83,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@TestPropertySource(properties = {
-        "transport.mqtt.enabled=true"
-})
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`DeviceEdgeTest` 是ThingsBoard Application 测试模块中的测试支撑类型，用于验证 Application 模块的控制器、服务、Actor 或集成流程。
@@ -97,40 +93,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Test Fixture。
  */
+@TestPropertySource(properties = {
+        "transport.mqtt.enabled=true"
+})
+@DaoSqlTest
 public class DeviceEdgeTest extends AbstractEdgeTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEFAULT_DEVICE_TYPE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备常量，用于统一引用固定值。
      */
     private static final String DEFAULT_DEVICE_TYPE = "default";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `edgeService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 边缘节点，提供当前类调用的业务操作。
      */
+    @Autowired
     protected EdgeService edgeService;
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDevices` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Devices`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDevices() throws Exception {
         // create device and assign to edge; update device
         Device savedDevice = saveDeviceOnCloudAndVerifyDeliveryToEdge();
@@ -226,17 +211,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
 
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testUpdateDeviceCredentials` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testUpdateDeviceCredentials() throws Exception {
         // create device and assign to edge; update device
         Device savedDevice = saveDeviceOnCloudAndVerifyDeliveryToEdge();
@@ -279,14 +259,10 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyUpdateFirmwareIdSoftwareIdAndDeviceData` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验设备ID。
+     * 参数：
+     * - `savedDevice`：设备信息或设备标识。
+     * 返回：无。
      */
     private void verifyUpdateFirmwareIdSoftwareIdAndDeviceData(Device savedDevice) throws InterruptedException {
         // create ota packages
@@ -305,11 +281,8 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
 
         DeviceData deviceData = new DeviceData();
         deviceData.setConfiguration(new DefaultDeviceConfiguration());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttDeviceTransportConfiguration transportConfiguration = new MqttDeviceTransportConfiguration();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportConfiguration.getProperties().put("topic", "tb_rule_engine.thermostat");
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         deviceData.setTransportConfiguration(transportConfiguration);
         savedDevice.setDeviceData(deviceData);
 
@@ -325,27 +298,18 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals(firmwareOtaPackageInfo.getId(), deviceMsg.getFirmwareId());
         Assert.assertEquals(softwareOtaPackageInfo.getId(), deviceMsg.getSoftwareId());
         deviceData = deviceMsg.getDeviceData();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertTrue(deviceData.getTransportConfiguration() instanceof MqttDeviceTransportConfiguration);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttDeviceTransportConfiguration mqttDeviceTransportConfiguration =
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 (MqttDeviceTransportConfiguration) deviceData.getTransportConfiguration();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals("tb_rule_engine.thermostat", mqttDeviceTransportConfiguration.getProperties().get("topic"));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeviceReachedMaximumAllowedOnCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeviceReachedMaximumAllowedOnCloud() throws Exception {
         // update tenant profile configuration
         loginSysAdmin();
@@ -378,17 +342,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertTrue(latestResponseMsg.getSuccess());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeviceRpcResponseToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeviceRpcResponseToCloud() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
 
@@ -414,17 +373,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertTrue(edgeImitator.waitForResponses());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeviceCredentialsUpdateToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeviceCredentialsUpdateToCloud() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
 
@@ -443,17 +397,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertTrue(edgeImitator.waitForResponses());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeviceCredentialsRequestToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备凭据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeviceCredentialsRequestToCloud() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
 
@@ -483,17 +432,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals(deviceCredentials, deviceCredentialsMsg);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendAttributesRequestToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证请求相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendAttributesRequestToCloud() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
         sendAttributesRequestAndVerify(device, DataConstants.SERVER_SCOPE, "{\"key1\":\"value1\"}",
@@ -509,17 +453,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         doDelete("/api/plugins/telemetry/DEVICE/" + device.getUuidId() + "/" + DataConstants.SHARED_SCOPE, "keys", "key2");
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeleteDeviceOnEdgeToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeleteDeviceOnEdgeToCloud() throws Exception {
         Device savedDevice = saveDeviceOnCloudAndVerifyDeliveryToEdge();
         UplinkMsg.Builder upLinkMsgBuilder = UplinkMsg.newBuilder();
@@ -543,17 +482,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertFalse(edgeDevices.contains(deviceInfo));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendTelemetryToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证遥测相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendTelemetryToCloud() throws Exception {
         Device device = saveDeviceOnCloudAndVerifyDeliveryToEdge();
 
@@ -620,17 +554,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         doDelete("/api/plugins/telemetry/DEVICE/" + device.getId().getId() + "/SERVER_SCOPE?keys=" + attributesKey, String.class);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeviceToCloudWithNameThatAlreadyExistsOnCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeviceToCloudWithNameThatAlreadyExistsOnCloud() throws Exception {
         String deviceOnCloudName = StringUtils.randomAlphanumeric(15);
         Device deviceOnCloud = saveDevice(deviceOnCloudName, DEFAULT_DEVICE_TYPE);
@@ -683,17 +612,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertNotEquals(deviceOnCloudName, device.getName());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeviceToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeviceToCloud() throws Exception {
         Device deviceMsg = buildDeviceForUplinkMsg("Edge Device 2", "test");
 
@@ -726,17 +650,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals("Edge Device 2", device.getName());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testRpcCall` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证RPC相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testRpcCall() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
 
@@ -766,14 +685,14 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendAttributesRequestAndVerify` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交请求。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `scope`：`scope` 参数。
+     * - `attributesDataStr`：待处理数据。
+     * - `expectedKey`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void sendAttributesRequestAndVerify(Device device, String scope, String attributesDataStr, String expectedKey,
                                                 String expectedValue) throws Exception {
@@ -817,16 +736,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals(scope, latestEntityDataMsg.getPostAttributeScope());
         Assert.assertTrue(latestEntityDataMsg.hasAttributesUpdatedMsg());
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.PostAttributeMsg attributesUpdatedMsg = latestEntityDataMsg.getAttributesUpdatedMsg();
 
         boolean found = false;
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         for (TransportProtos.KeyValueProto keyValueProto : attributesUpdatedMsg.getKvList()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (keyValueProto.getKey().equals(expectedKey)) {
                 Assert.assertEquals(expectedKey, keyValueProto.getKey());
-                // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
                 switch (keyValueProto.getType()) {
                     case STRING_V:
                         Assert.assertEquals(expectedValue, keyValueProto.getStringV());
@@ -847,28 +762,22 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeByKey` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `key`：键。
+     * - `attributes`：数据列表。
+     * 返回：处理结果。
      */
     private Optional<Map<String, String>> getAttributeByKey(String key, List<Map<String, String>> attributes) {
         return attributes.stream().filter(kv -> kv.get("key").equals(key)).findFirst();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadDeviceTimeseries` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取设备。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `timeseriesKey`：键。
+     * 返回：处理结果。
      */
     private Map<String, List<Map<String, String>>> loadDeviceTimeseries(Device device, String timeseriesKey) throws Exception {
         return doGetAsyncTyped("/api/plugins/telemetry/DEVICE/" + device.getUuidId() + "/values/timeseries?keys=" + timeseriesKey,
@@ -876,23 +785,17 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
                 });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendUpdateSharedAttributeToCloudAndValidateDeviceSubscription` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交设备。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void sendUpdateSharedAttributeToCloudAndValidateDeviceSubscription() throws Exception {
         Device device = saveDeviceOnCloudAndVerifyDeliveryToEdge();
 
         DeviceCredentials deviceCredentials = doGet("/api/device/" + device.getUuidId() + "/credentials", DeviceCredentials.class);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestClient client = new MqttTestClient();
         client.connectAndWait(deviceCredentials.getCredentialsId());
         MqttTestCallback onUpdateCallback = new MqttTestCallback();
@@ -927,17 +830,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         client.disconnect();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testVerifyDeliveryOfLatestTimeseriesOnAttributesRequest` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证时序数据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testVerifyDeliveryOfLatestTimeseriesOnAttributesRequest() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
 
@@ -995,17 +893,12 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
         }
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testVerifyProcessCorrectEdgeUpdateToDeviceActorOnUnassignFromDifferentEdge` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testVerifyProcessCorrectEdgeUpdateToDeviceActorOnUnassignFromDifferentEdge() throws Exception {
         Device device = saveDeviceOnCloudAndVerifyDeliveryToEdge();
 
@@ -1068,14 +961,11 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildDeviceForUplinkMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建设备。
+     * 参数：
+     * - `name`：名称。
+     * - `type`：类型。
+     * 返回：处理结果。
      */
     private Device buildDeviceForUplinkMsg(String name, String type) {
         Device device = new Device();
@@ -1087,14 +977,10 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildDeviceCredentialsForUplinkMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建设备凭据。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
     private DeviceCredentials buildDeviceCredentialsForUplinkMsg(DeviceId deviceId) {
         DeviceCredentials deviceCredentials = new DeviceCredentials();
@@ -1105,14 +991,9 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDefaultRpc` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建RPC。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private ObjectNode createDefaultRpc() {
         ObjectNode rpc = JacksonUtil.newObjectNode();
@@ -1131,14 +1012,10 @@ public class DeviceEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `simulateEdgeActivation` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `simulateEdgeActivation` 对应的处理。
+     * 参数：
+     * - `edge`：`edge` 参数。
+     * 返回：无。
      */
     private void simulateEdgeActivation(Edge edge) throws Exception {
         ObjectNode attributes = JacksonUtil.newObjectNode();

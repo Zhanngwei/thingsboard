@@ -30,14 +30,11 @@ import org.thingsboard.server.common.data.id.UserId;
 public interface TokenOutdatingService {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isOutdated` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Outdated`。
+     * 参数：
+     * - `token`：`token` 参数。
+     * - `userId`：用户ID。
+     * 返回：判断结果。
      */
     boolean isOutdated(String token, UserId userId);
 

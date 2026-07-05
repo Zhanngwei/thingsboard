@@ -19,16 +19,16 @@ import lombok.Data;
 import org.thingsboard.server.common.data.script.ScriptLanguage;
 import org.thingsboard.server.common.data.validation.NoXss;
 
-@Data
 /**
  * 中文说明：`TbAbstractAlarmNodeConfiguration` 是抽象告警节点配置对象，用于承载规则节点 JSON 中的配置项和默认值。
  * 配置来源：实例字段通常由前端规则节点配置 JSON 反序列化得到，`defaultConfiguration` 提供缺省配置。
  * 调用边界：本类本身不直接涉及数据库、缓存、MQTT、Actor 或事务；具体实现和调用链可能在使用这些配置的节点中涉及。
  */
+@Data
 public abstract class TbAbstractAlarmNodeConfiguration {
 
     /**
-     * 配置辅助常量：`ALARM_DETAILS_BUILD_JS_TEMPLATE` 不从规则节点 JSON 直接读取，用于为相关配置提供默认值、模板或兼容字段名。
+     * 告警常量，用于统一引用固定值。
      */
     static final String ALARM_DETAILS_BUILD_JS_TEMPLATE = "" +
             "var details = {};\n" +
@@ -43,7 +43,7 @@ public abstract class TbAbstractAlarmNodeConfiguration {
             "return details;";
 
     /**
-     * 配置辅助常量：`ALARM_DETAILS_BUILD_TBEL_TEMPLATE` 不从规则节点 JSON 直接读取，用于为相关配置提供默认值、模板或兼容字段名。
+     * 告警常量，用于统一引用固定值。
      */
     static final String ALARM_DETAILS_BUILD_TBEL_TEMPLATE = "" +
             "var details = {};\n" +
@@ -58,21 +58,21 @@ public abstract class TbAbstractAlarmNodeConfiguration {
             "return details;";
 
 
-    @NoXss
     /**
-     * 配置字段：来自规则节点 JSON 的 `alarmType` 配置项，控制告警类型、严重级别或详情。
+     * 告警，用于区分不同处理分支。
      */
+    @NoXss
     private String alarmType;
     /**
-     * 配置字段：来自规则节点 JSON 的 `scriptLang` 配置项，控制脚本语言或脚本文本。
+     * `scriptLang` 字段，保存当前对象的对应属性。
      */
     private ScriptLanguage scriptLang;
     /**
-     * 配置字段：来自规则节点 JSON 的 `alarmDetailsBuildJs` 配置项，控制JavaScript 脚本文本。
+     * 告警对象，用于描述当前业务场景。
      */
     private String alarmDetailsBuildJs;
     /**
-     * 配置字段：来自规则节点 JSON 的 `alarmDetailsBuildTbel` 配置项，控制TBEL 脚本文本。
+     * 告警对象，用于描述当前业务场景。
      */
     private String alarmDetailsBuildTbel;
 

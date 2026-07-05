@@ -32,7 +32,6 @@ import org.thingsboard.server.common.msg.rpc.RemoveRpcActorMsg;
 import org.thingsboard.server.common.msg.rpc.ToDeviceRpcRequestActorMsg;
 import org.thingsboard.server.service.transport.msg.TransportToDeviceActorMsgWrapper;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DeviceActor` 是ThingsBoard Application 模块中的Actor 通信与消息处理类型，用于管理租户、设备、规则链或规则节点的异步消息路由。
@@ -43,89 +42,65 @@ import org.thingsboard.server.service.transport.msg.TransportToDeviceActorMsgWra
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Actor / Command。
  */
+@Slf4j
 public class DeviceActor extends ContextAwareActor {
 
     /**
-     * 字段说明：
-     * 1. 保存 `processor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 处理器，负责处理对应任务或消息。
      */
     private final DeviceActorMessageProcessor processor;
 
     DeviceActor(ActorSystemContext systemContext, TenantId tenantId, DeviceId deviceId) {
         super(systemContext);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         this.processor = new DeviceActorMessageProcessor(systemContext, tenantId, deviceId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
+    @Override
     public void init(TbActorCtx ctx) throws TbActorException {
         super.init(ctx);
         log.debug("[{}][{}] Starting device actor.", processor.tenantId, processor.deviceId);
         try {
             processor.init(ctx);
             log.debug("[{}][{}] Device actor started.", processor.tenantId, processor.deviceId);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.warn("[{}][{}] Unknown failure", processor.tenantId, processor.deviceId, e);
             throw new TbActorException("Failed to initialize device actor", e);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doProcess` 对应的Actor 通信与消息处理类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 ActorService 创建，随组件初始化、消息投递和停止流程变化时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doProcess` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
+    @Override
     protected boolean doProcess(TbActorMsg msg) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (msg.getMsgType()) {
-            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
             case TRANSPORT_TO_DEVICE_ACTOR_MSG:
-                // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
                 processor.process((TransportToDeviceActorMsgWrapper) msg);
                 break;
-            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
             case DEVICE_ATTRIBUTES_UPDATE_TO_DEVICE_ACTOR_MSG:
                 processor.processAttributesUpdate((DeviceAttributesEventNotificationMsg) msg);
                 break;
-            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
             case DEVICE_DELETE_TO_DEVICE_ACTOR_MSG:
                 ctx.stop(ctx.getSelf());
                 break;
-            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
             case DEVICE_CREDENTIALS_UPDATE_TO_DEVICE_ACTOR_MSG:
                 processor.processCredentialsUpdate(msg);
                 break;
-            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
             case DEVICE_NAME_OR_TYPE_UPDATE_TO_DEVICE_ACTOR_MSG:
                 processor.processNameOrTypeUpdate((DeviceNameOrTypeUpdateMsg) msg);
                 break;
-            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
             case DEVICE_RPC_REQUEST_TO_DEVICE_ACTOR_MSG:
-                // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
                 processor.processRpcRequest(ctx, (ToDeviceRpcRequestActorMsg) msg);
                 break;
-            // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
             case DEVICE_RPC_RESPONSE_TO_DEVICE_ACTOR_MSG:
                 processor.processRpcResponsesFromEdge((FromDeviceRpcResponseActorMsg) msg);
                 break;

@@ -37,16 +37,11 @@ import java.util.List;
 public class AttributeUtils {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validate` 对应的属性持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由属性 API、设备传输层或规则链流程触发，并随单次属性读写事务完成时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验实体和属性键空间后读写数据库，必要时更新缓存并通知上层属性变更流程。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `validate` 对应的处理。
+     * 参数：
+     * - `id`：`id`ID。
+     * - `scope`：`scope` 参数。
+     * 返回：无。
      */
     public static void validate(EntityId id, String scope) {
         Validator.validateId(id.getId(), "Incorrect id " + id);
@@ -54,36 +49,25 @@ public class AttributeUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validate` 对应的属性持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由属性 API、设备传输层或规则链流程触发，并随单次属性读写事务完成时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验实体和属性键空间后读写数据库，必要时更新缓存并通知上层属性变更流程。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `validate` 对应的处理。
+     * 参数：
+     * - `kvEntries`：数据列表。
+     * - `valueNoXssValidation`：值。
+     * 返回：无。
      */
     public static void validate(List<AttributeKvEntry> kvEntries,  boolean valueNoXssValidation) {
         kvEntries.forEach(tsKvEntry -> validate(tsKvEntry, valueNoXssValidation));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validate` 对应的属性持久化服务类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由属性 API、设备传输层或规则链流程触发，并随单次属性读写事务完成时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：校验实体和属性键空间后读写数据库，必要时更新缓存并通知上层属性变更流程。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `validate` 对应的处理。
+     * 参数：
+     * - `kvEntry`：`kvEntry` 参数。
+     * - `valueNoXssValidation`：值。
+     * 返回：无。
      */
     public static void validate(AttributeKvEntry kvEntry, boolean valueNoXssValidation) {
         KvUtils.validate(kvEntry, valueNoXssValidation);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (kvEntry.getDataType() == null) {
             throw new IncorrectParameterException("Incorrect kvEntry. Data type can't be null");
         } else {

@@ -18,16 +18,16 @@ package org.thingsboard.rule.engine.metadata;
 import lombok.Data;
 import org.thingsboard.rule.engine.util.TbMsgSource;
 
-@Data
 /**
  * 中文说明：`TbAbstractFetchToNodeConfiguration` 是抽象获取到节点配置对象，用于承载规则节点 JSON 中的配置项和默认值。
  * 配置来源：实例字段通常由前端规则节点配置 JSON 反序列化得到，`defaultConfiguration` 提供缺省配置。
  * 调用边界：本类本身不直接涉及数据库、缓存、MQTT、Actor 或事务；具体实现和调用链可能在使用这些配置的节点中涉及。
  */
+@Data
 public abstract class TbAbstractFetchToNodeConfiguration {
 
     /**
-     * 配置字段：来自规则节点 JSON 的 `fetchTo` 配置项，控制与本类处理流程相关的运行时值。
+     * `fetchTo` 字段，保存当前对象的对应属性。
      */
     private TbMsgSource fetchTo;
 

@@ -36,10 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Slf4j
-@Service
-@TbCoreComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbQueueService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -50,43 +46,32 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Slf4j
+@Service
+@TbCoreComponent
+@RequiredArgsConstructor
 public class DefaultTbQueueService extends AbstractTbEntityService implements TbQueueService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `queueService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，提供当前类调用的业务操作。
      */
     private final QueueService queueService;
     private final TbClusterService tbClusterService;
     /**
-     * 字段说明：
-     * 1. 保存 `tbQueueAdmin` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，用于标识消息投递或消费的队列。
      */
     private final TbQueueAdmin tbQueueAdmin;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveQueue` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建队列。
+     * 参数：
+     * - `queue`：队列名称或队列对象。
+     * 返回：处理结果。
      */
+    @Override
     public Queue saveQueue(Queue queue) {
         boolean create = queue.getId() == null;
         Queue oldQueue;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (create) {
             oldQueue = null;
         } else {
@@ -99,62 +84,52 @@ public class DefaultTbQueueService extends AbstractTbEntityService implements Tb
         return savedQueue;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteQueue` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理队列。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `queueId`：队列ID。
+     * 返回：无。
      */
+    @Override
     public void deleteQueue(TenantId tenantId, QueueId queueId) {
         Queue queue = queueService.findQueueById(tenantId, queueId);
         queueService.deleteQueue(tenantId, queueId);
         tbClusterService.onQueuesDelete(List.of(queue));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteQueueByQueueName` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理队列名称。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `queueName`：队列名称或队列对象。
+     * 返回：无。
      */
+    @Override
     public void deleteQueueByQueueName(TenantId tenantId, String queueName) {
         Queue queue = queueService.findQueueByTenantIdAndNameInternal(tenantId, queueName);
         queueService.deleteQueue(tenantId, queue.getId());
         tbClusterService.onQueuesDelete(List.of(queue));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateQueuesByTenants` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Queues By Tenants`。
+     * 参数：
+     * - `tenantIds`：租户信息或租户标识。
+     * - `newTenantProfile`：租户信息或租户标识。
+     * - `oldTenantProfile`：租户信息或租户标识。
+     * 返回：无。
      */
+    @Override
     public void updateQueuesByTenants(List<TenantId> tenantIds, TenantProfile newTenantProfile, TenantProfile
             oldTenantProfile) {
         boolean oldIsolated = oldTenantProfile != null && oldTenantProfile.isIsolatedTbRuleEngine();
         boolean newIsolated = newTenantProfile.isIsolatedTbRuleEngine();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!oldIsolated && !newIsolated) {
             return;
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (newTenantProfile.equals(oldTenantProfile)) {
             return;
         }
@@ -162,7 +137,6 @@ public class DefaultTbQueueService extends AbstractTbEntityService implements Tb
         Map<String, TenantProfileQueueConfiguration> oldQueues;
         Map<String, TenantProfileQueueConfiguration> newQueues;
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (oldIsolated) {
             oldQueues = oldTenantProfile.getProfileData().getQueueConfiguration().stream()
                     .collect(Collectors.toMap(TenantProfileQueueConfiguration::getName, q -> q));
@@ -170,7 +144,6 @@ public class DefaultTbQueueService extends AbstractTbEntityService implements Tb
             oldQueues = Collections.emptyMap();
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (newIsolated) {
             newQueues = newTenantProfile.getProfileData().getQueueConfiguration().stream()
                     .collect(Collectors.toMap(TenantProfileQueueConfiguration::getName, q -> q));
@@ -182,17 +155,13 @@ public class DefaultTbQueueService extends AbstractTbEntityService implements Tb
         List<String> toCreate = new ArrayList<>();
         List<String> toUpdate = new ArrayList<>();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (String oldQueue : oldQueues.keySet()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!newQueues.containsKey(oldQueue)) {
                 toRemove.add(oldQueue);
             }
         }
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (String newQueue : newQueues.keySet()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (oldQueues.containsKey(newQueue)) {
                 toUpdate.add(newQueue);
             } else {
@@ -200,7 +169,6 @@ public class DefaultTbQueueService extends AbstractTbEntityService implements Tb
             }
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (log.isDebugEnabled()) {
             log.debug("[{}] Handling profile queue config update: creating queues {}, updating {}, deleting {}. Affected tenants: {}",
                     newTenantProfile.getUuidId(), toCreate, toUpdate, toRemove, tenantIds);
@@ -208,9 +176,7 @@ public class DefaultTbQueueService extends AbstractTbEntityService implements Tb
 
         List<Queue> updated = new ArrayList<>();
         List<Queue> deleted = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (TenantId tenantId : tenantIds) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (String name : toCreate) {
                 updated.add(new Queue(tenantId, newQueues.get(name)));
             }
@@ -249,14 +215,11 @@ public class DefaultTbQueueService extends AbstractTbEntityService implements Tb
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createTopicsIfNeeded` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Topics If Needed`。
+     * 参数：
+     * - `queue`：队列名称或队列对象。
+     * - `oldQueue`：队列名称或队列对象。
+     * 返回：无。
      */
     private void createTopicsIfNeeded(Queue queue, Queue oldQueue) {
         int newPartitions = queue.getPartitions();

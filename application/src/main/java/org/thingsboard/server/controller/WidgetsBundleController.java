@@ -62,10 +62,6 @@ import static org.thingsboard.server.controller.ControllerConstants.WIDGET_BUNDL
 import static org.thingsboard.server.controller.ControllerConstants.WIDGET_BUNDLE_SORT_PROPERTY_ALLOWABLE_VALUES;
 import static org.thingsboard.server.controller.ControllerConstants.WIDGET_BUNDLE_TEXT_SEARCH_DESCRIPTION;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`WidgetsBundleController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -76,54 +72,42 @@ import static org.thingsboard.server.controller.ControllerConstants.WIDGET_BUNDL
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
+@RequiredArgsConstructor
 public class WidgetsBundleController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbWidgetsBundleService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 部件包，提供当前类调用的业务操作。
      */
     private final TbWidgetsBundleService tbWidgetsBundleService;
     private final ImageService imageService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `WIDGET_BUNDLE_DESCRIPTION` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 部件常量，用于统一引用固定值。
      */
     private static final String WIDGET_BUNDLE_DESCRIPTION = "Widget Bundle represents a group(bundle) of widgets. Widgets are grouped into bundle by type or use case. ";
     private static final String FULL_SEARCH_PARAM_DESCRIPTION = "Optional boolean parameter indicating extended search of widget bundles by description and by name / description of related widget types";
     /**
-     * 字段说明：
-     * 1. 保存 `TENANT_BUNDLES_ONLY_DESCRIPTION` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户常量，用于统一引用固定值。
      */
     private static final String TENANT_BUNDLES_ONLY_DESCRIPTION = "Optional boolean parameter to include only tenant-level bundles without system";
 
+    /**
+     * 功能：获取部件包。
+     * 参数：
+     * - `WIDGET_BUNDLE_ID_PARAM_DESCRIPTION`：`WIDGET_BUNDLE_ID_PARAM_DESCRIPTION` 参数。
+     * - `strWidgetsBundleId`：部件包ID。
+     * - `INLINE_IMAGES`：`INLINE_IMAGES` 参数。
+     * - `inlineImages`：`inlineImages` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Widget Bundle (getWidgetsBundleById)",
             notes = "Get the Widget Bundle based on the provided Widget Bundle Id. " + WIDGET_BUNDLE_DESCRIPTION + AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/widgetsBundle/{widgetsBundleId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getWidgetsBundleById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public WidgetsBundle getWidgetsBundleById(
             @ApiParam(value = WIDGET_BUNDLE_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable("widgetsBundleId") String strWidgetsBundleId,
@@ -132,13 +116,19 @@ public class WidgetsBundleController extends BaseController {
         checkParameter("widgetsBundleId", strWidgetsBundleId);
         WidgetsBundleId widgetsBundleId = new WidgetsBundleId(toUUID(strWidgetsBundleId));
         var result = checkWidgetsBundleId(widgetsBundleId, Operation.READ);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (inlineImages) {
             imageService.inlineImage(result);
         }
         return result;
     }
 
+    /**
+     * 功能：保存或创建部件包。
+     * 参数：
+     * - `Bundle`：`Bundle` 参数。
+     * - `widgetsBundle`：`widgetsBundle` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create Or Update Widget Bundle (saveWidgetsBundle)",
             notes = "Create or update the Widget Bundle. " + WIDGET_BUNDLE_DESCRIPTION + " " +
                     "When creating the bundle, platform generates Widget Bundle Id as " + UUID_WIKI_LINK +
@@ -152,21 +142,10 @@ public class WidgetsBundleController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
     @RequestMapping(value = "/widgetsBundle", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveWidgetsBundle` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public WidgetsBundle saveWidgetsBundle(
             @ApiParam(value = "A JSON value representing the Widget Bundle.", required = true)
             @RequestBody WidgetsBundle widgetsBundle) throws Exception {
         var currentUser = getCurrentUser();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (Authority.SYS_ADMIN.equals(currentUser.getAuthority())) {
             widgetsBundle.setTenantId(TenantId.SYS_TENANT_ID);
         } else {
@@ -178,21 +157,19 @@ public class WidgetsBundleController extends BaseController {
         return tbWidgetsBundleService.save(widgetsBundle, currentUser);
     }
 
+    /**
+     * 功能：更新部件包。
+     * 参数：
+     * - `WIDGET_BUNDLE_ID_PARAM_DESCRIPTION`：`WIDGET_BUNDLE_ID_PARAM_DESCRIPTION` 参数。
+     * - `strWidgetsBundleId`：部件包ID。
+     * - `strWidgetTypeIds`：类型。
+     * 返回：无。
+     */
     @ApiOperation(value = "Update widgets bundle widgets types list (updateWidgetsBundleWidgetTypes)",
             notes = "Updates widgets bundle widgets list." + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
     @RequestMapping(value = "/widgetsBundle/{widgetsBundleId}/widgetTypes", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `updateWidgetsBundleWidgetTypes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void updateWidgetsBundleWidgetTypes(
             @ApiParam(value = WIDGET_BUNDLE_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable("widgetsBundleId") String strWidgetsBundleId,
@@ -204,10 +181,8 @@ public class WidgetsBundleController extends BaseController {
         Set<WidgetTypeId> widgetTypeIds = new LinkedHashSet<>();
         var currentUser = getCurrentUser();
         TenantId tenantId = currentUser.getTenantId();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (String strWidgetTypeId : strWidgetTypeIds) {
             WidgetTypeId widgetTypeId = new WidgetTypeId(toUUID(strWidgetTypeId));
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!widgetTypeIds.contains(widgetTypeId) &&
                     widgetTypeService.widgetTypeExistsByTenantIdAndWidgetTypeId(tenantId, widgetTypeId)) {
                 widgetTypeIds.add(widgetTypeId);
@@ -216,21 +191,19 @@ public class WidgetsBundleController extends BaseController {
         tbWidgetsBundleService.updateWidgetsBundleWidgetTypes(widgetsBundleId, new ArrayList<>(widgetTypeIds), currentUser);
     }
 
+    /**
+     * 功能：更新部件包。
+     * 参数：
+     * - `WIDGET_BUNDLE_ID_PARAM_DESCRIPTION`：`WIDGET_BUNDLE_ID_PARAM_DESCRIPTION` 参数。
+     * - `strWidgetsBundleId`：部件包ID。
+     * - `widgetTypeFqns`：类型。
+     * 返回：无。
+     */
     @ApiOperation(value = "Update widgets bundle widgets list from widget type FQNs list (updateWidgetsBundleWidgetFqns)",
             notes = "Updates widgets bundle widgets list from widget type FQNs list." + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
     @RequestMapping(value = "/widgetsBundle/{widgetsBundleId}/widgetTypeFqns", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `updateWidgetsBundleWidgetFqns` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void updateWidgetsBundleWidgetFqns(
             @ApiParam(value = WIDGET_BUNDLE_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable("widgetsBundleId") String strWidgetsBundleId,
@@ -243,21 +216,18 @@ public class WidgetsBundleController extends BaseController {
         tbWidgetsBundleService.updateWidgetsBundleWidgetFqns(widgetsBundleId, widgetTypeFqns, currentUser);
     }
 
+    /**
+     * 功能：删除或清理部件包。
+     * 参数：
+     * - `WIDGET_BUNDLE_ID_PARAM_DESCRIPTION`：`WIDGET_BUNDLE_ID_PARAM_DESCRIPTION` 参数。
+     * - `strWidgetsBundleId`：部件包ID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete widgets bundle (deleteWidgetsBundle)",
             notes = "Deletes the widget bundle. Referencing non-existing Widget Bundle Id will cause an error." + SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
     @RequestMapping(value = "/widgetsBundle/{widgetsBundleId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteWidgetsBundle` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteWidgetsBundle(
             @ApiParam(value = WIDGET_BUNDLE_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable("widgetsBundleId") String strWidgetsBundleId) throws ThingsboardException {
@@ -267,22 +237,22 @@ public class WidgetsBundleController extends BaseController {
         tbWidgetsBundleService.delete(widgetsBundle, getCurrentUser());
     }
 
+    /**
+     * 功能：获取部件。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Widget Bundles (getWidgetsBundles)",
             notes = "Returns a page of Widget Bundle objects available for current user. " + WIDGET_BUNDLE_DESCRIPTION + " " +
                     PAGE_DATA_PARAMETERS + AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/widgetsBundles", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getWidgetsBundles` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<WidgetsBundle> getWidgetsBundles(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -299,12 +269,10 @@ public class WidgetsBundleController extends BaseController {
             @ApiParam(value = FULL_SEARCH_PARAM_DESCRIPTION)
             @RequestParam(required = false) Boolean fullSearch) throws ThingsboardException {
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (Authority.SYS_ADMIN.equals(getCurrentUser().getAuthority())) {
             return checkNotNull(widgetsBundleService.findSystemWidgetsBundlesByPageLink(getTenantId(), fullSearch != null && fullSearch, pageLink));
         } else {
             TenantId tenantId = getCurrentUser().getTenantId();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (tenantOnly != null && tenantOnly) {
                 return checkNotNull(widgetsBundleService.findTenantWidgetsBundlesByTenantIdAndPageLink(tenantId, fullSearch != null && fullSearch, pageLink));
             } else {
@@ -313,23 +281,17 @@ public class WidgetsBundleController extends BaseController {
         }
     }
 
+    /**
+     * 功能：获取部件。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get all Widget Bundles (getWidgetsBundles)",
             notes = "Returns an array of Widget Bundle objects that are available for current user." + WIDGET_BUNDLE_DESCRIPTION + " " + AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/widgetsBundles", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getWidgetsBundles` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<WidgetsBundle> getWidgetsBundles() throws ThingsboardException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (Authority.SYS_ADMIN.equals(getCurrentUser().getAuthority())) {
             return checkNotNull(widgetsBundleService.findSystemWidgetsBundles(getTenantId()));
         } else {

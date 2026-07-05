@@ -70,7 +70,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`EdgeImitator` 是ThingsBoard Application 测试模块中的测试支撑类型，用于验证 Application 模块的控制器、服务、Actor 或集成流程。
@@ -81,113 +80,68 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Test Fixture。
  */
+@Slf4j
 public class EdgeImitator {
 
     /**
-     * 字段说明：
-     * 1. 保存 `routingKey` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 键，用于定位映射、配置或数据项。
      */
     private String routingKey;
     private String routingSecret;
 
     /**
-     * 字段说明：
-     * 1. 保存 `edgeRpcClient` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 边缘节点，用于发起外部调用或协议交互。
      */
     private EdgeRpcClient edgeRpcClient;
 
     private final Lock lock = new ReentrantLock();
 
     /**
-     * 字段说明：
-     * 1. 保存 `messagesLatch` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 等待器，用于在测试或异步流程中等待结果。
      */
     private CountDownLatch messagesLatch;
     private CountDownLatch responsesLatch;
     /**
-     * 字段说明：
-     * 1. 保存 `ignoredTypes` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `ignoredTypes`列表，用于保存一组待处理对象。
      */
     private List<Class<? extends AbstractMessage>> ignoredTypes;
 
-    @Setter
     /**
-     * 字段说明：
-     * 1. 保存 `randomFailuresOnTimeseriesDownlink` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足时序数据条件。
      */
+    @Setter
     private boolean randomFailuresOnTimeseriesDownlink = false;
-    @Setter
     /**
-     * 字段说明：
-     * 1. 保存 `failureProbability` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 失败信息，表示当前对象的对应属性。
      */
+    @Setter
     private double failureProbability = 0.0;
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `configuration` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `configuration`，保存当前对象的配置选项。
      */
+    @Getter
     private EdgeConfiguration configuration;
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `downlinkMsgs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `downlinkMsgs`列表，用于保存一组待处理对象。
      */
+    @Getter
     private List<AbstractMessage> downlinkMsgs;
 
-    @Getter
     /**
-     * 字段说明：
-     * 1. 保存 `latestResponseMsg` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前响应对象，封装处理完成后的返回信息。
      */
+    @Getter
     private UplinkResponseMsg latestResponseMsg;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `EdgeImitator` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `EdgeImitator` 实例，并初始化必要字段。
+     * 参数：
+     * - `host`：`host` 参数。
+     * - `port`：`port` 参数。
+     * - `routingKey`：键。
+     * - `routingSecret`：`routingSecret` 参数。
+     * 返回：新创建的对象实例。
      */
     public EdgeImitator(String host, int port, String routingKey, String routingSecret) throws NoSuchFieldException, IllegalAccessException {
         edgeRpcClient = new EdgeGrpcClient();
@@ -206,14 +160,11 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateEdgeClientFields` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新边缘节点。
+     * 参数：
+     * - `fieldName`：名称。
+     * - `value`：值。
+     * 返回：无。
      */
     private void updateEdgeClientFields(String fieldName, Object value) throws NoSuchFieldException, IllegalAccessException {
         Field fieldToSet = edgeRpcClient.getClass().getDeclaredField(fieldName);
@@ -223,14 +174,9 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `connect` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `connect` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void connect() {
         edgeRpcClient.connect(routingKey, routingSecret,
@@ -243,42 +189,29 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `disconnect` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `disconnect` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void disconnect() throws InterruptedException {
         edgeRpcClient.disconnect(false);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendUplinkMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `uplinkMsg`：待处理消息。
+     * 返回：无。
      */
     public void sendUplinkMsg(UplinkMsg uplinkMsg) {
         edgeRpcClient.sendUplinkMsg(uplinkMsg);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onUplinkResponse` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     private void onUplinkResponse(UplinkResponseMsg msg) {
         log.info("onUplinkResponse: {}", msg);
@@ -287,33 +220,23 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onEdgeUpdate` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理边缘节点。
+     * 参数：
+     * - `edgeConfiguration`：配置对象。
+     * 返回：无。
      */
     private void onEdgeUpdate(EdgeConfiguration edgeConfiguration) {
         this.configuration = edgeConfiguration;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onDownlink` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Downlink`。
+     * 参数：
+     * - `downlinkMsg`：待处理消息。
+     * 返回：无。
      */
     private void onDownlink(DownlinkMsg downlinkMsg) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         ListenableFuture<List<Void>> future = processDownlinkMsg(downlinkMsg);
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         Futures.addCallback(future, new FutureCallback<>() {
             @Override
             public void onSuccess(@Nullable List<Void> result) {
@@ -334,62 +257,44 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onClose` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Close`。
+     * 参数：
+     * - `e`：`e` 参数。
+     * 返回：无。
      */
     private void onClose(Exception e) {
         log.info("onClose: {}", e.getMessage());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processDownlinkMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `downlinkMsg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<List<Void>> processDownlinkMsg(DownlinkMsg downlinkMsg) {
         log.trace("processDownlinkMsg: {}", downlinkMsg);
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<ListenableFuture<Void>> result = new ArrayList<>();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (downlinkMsg.getAdminSettingsUpdateMsgCount() > 0) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (AdminSettingsUpdateMsg adminSettingsUpdateMsg : downlinkMsg.getAdminSettingsUpdateMsgList()) {
                 result.add(saveDownlinkMsg(adminSettingsUpdateMsg));
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (downlinkMsg.getDeviceProfileUpdateMsgCount() > 0) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (DeviceProfileUpdateMsg deviceProfileUpdateMsg : downlinkMsg.getDeviceProfileUpdateMsgList()) {
                 result.add(saveDownlinkMsg(deviceProfileUpdateMsg));
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (downlinkMsg.getDeviceUpdateMsgCount() > 0) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (DeviceUpdateMsg deviceUpdateMsg : downlinkMsg.getDeviceUpdateMsgList()) {
                 result.add(saveDownlinkMsg(deviceUpdateMsg));
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (downlinkMsg.getDeviceCredentialsUpdateMsgCount() > 0) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (DeviceCredentialsUpdateMsg deviceCredentialsUpdateMsg : downlinkMsg.getDeviceCredentialsUpdateMsgList()) {
                 result.add(saveDownlinkMsg(deviceCredentialsUpdateMsg));
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (downlinkMsg.getAssetProfileUpdateMsgCount() > 0) {
             for (AssetProfileUpdateMsg assetProfileUpdateMsg : downlinkMsg.getAssetProfileUpdateMsgList()) {
                 result.add(saveDownlinkMsg(assetProfileUpdateMsg));
@@ -519,14 +424,9 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRandomBoolean` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Random Boolean`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean getRandomBoolean() {
         double randomValue = ThreadLocalRandom.current().nextDouble() * 100;
@@ -534,14 +434,10 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDownlinkMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建消息。
+     * 参数：
+     * - `message`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Void> saveDownlinkMsg(AbstractMessage message) {
         if (!ignoredTypes.contains(message.getClass())) {
@@ -557,42 +453,29 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `waitForMessages` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `waitForMessages` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean waitForMessages() throws InterruptedException {
         return waitForMessages(AbstractWebTest.TIMEOUT);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `waitForMessages` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `waitForMessages` 对应的处理。
+     * 参数：
+     * - `timeoutInSeconds`：`timeoutInSeconds` 参数。
+     * 返回：判断结果。
      */
     public boolean waitForMessages(int timeoutInSeconds) throws InterruptedException {
         return messagesLatch.await(timeoutInSeconds, TimeUnit.SECONDS);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `expectMessageAmount` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `expectMessageAmount` 对应的处理。
+     * 参数：
+     * - `messageAmount`：待处理消息。
+     * 返回：无。
      */
     public void expectMessageAmount(int messageAmount) {
         // clear downlinks
@@ -602,44 +485,31 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `waitForResponses` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `waitForResponses` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean waitForResponses() throws InterruptedException {
         return responsesLatch.await(AbstractWebTest.TIMEOUT, TimeUnit.SECONDS);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `expectResponsesAmount` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `expectResponsesAmount` 对应的处理。
+     * 参数：
+     * - `messageAmount`：待处理消息。
+     * 返回：无。
      */
     public void expectResponsesAmount(int messageAmount) {
         responsesLatch = new CountDownLatch(messageAmount);
     }
 
-    @SuppressWarnings("unchecked")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findMessageByType` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息。
+     * 参数：
+     * - `tClass`：`tClass` 参数。
+     * 返回：可能存在的结果。
      */
+    @SuppressWarnings("unchecked")
     public <T extends AbstractMessage> Optional<T> findMessageByType(Class<T> tClass) {
         Optional<T> result;
         lock.lock();
@@ -651,17 +521,13 @@ public class EdgeImitator {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAllMessagesByType` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取类型。
+     * 参数：
+     * - `tClass`：`tClass` 参数。
+     * 返回：匹配的数据集合。
      */
+    @SuppressWarnings("unchecked")
     public <T extends AbstractMessage> List<T> findAllMessagesByType(Class<T> tClass) {
         List<T> result;
         lock.lock();
@@ -674,42 +540,28 @@ public class EdgeImitator {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLatestMessage` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public AbstractMessage getLatestMessage() {
         return downlinkMsgs.get(downlinkMsgs.size() - 1);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ignoreType` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `ignoreType` 对应的处理。
+     * 参数：
+     * - `type`：类型。
+     * 返回：无。
      */
     public void ignoreType(Class<? extends AbstractMessage> type) {
         ignoredTypes.add(type);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `allowIgnoredTypes` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `allowIgnoredTypes` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void allowIgnoredTypes() {
         ignoredTypes.clear();

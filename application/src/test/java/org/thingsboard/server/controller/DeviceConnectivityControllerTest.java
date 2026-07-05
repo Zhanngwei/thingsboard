@@ -58,10 +58,6 @@ import static org.thingsboard.server.dao.util.DeviceConnectivityUtil.HTTPS;
 import static org.thingsboard.server.dao.util.DeviceConnectivityUtil.MQTT;
 import static org.thingsboard.server.dao.util.DeviceConnectivityUtil.MQTTS;
 
-@TestPropertySource(properties = {
-        "device.connectivity.mqtts.pem_cert_file=/tmp/" + CA_ROOT_CERT_PEM
-})
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`DeviceConnectivityControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -72,15 +68,14 @@ import static org.thingsboard.server.dao.util.DeviceConnectivityUtil.MQTTS;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@TestPropertySource(properties = {
+        "device.connectivity.mqtts.pem_cert_file=/tmp/" + CA_ROOT_CERT_PEM
+})
+@DaoSqlTest
 public class DeviceConnectivityControllerTest extends AbstractControllerTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEVICE_TELEMETRY_TOPIC` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备常量，用于统一引用固定值。
      */
     private static final String DEVICE_TELEMETRY_TOPIC = "v1/devices/customTopic";
     private static final String CHECK_DOCUMENTATION = "Check documentation";
@@ -108,37 +103,22 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
             "-----END PRIVATE KEY-----\n";
 
     /**
-     * 字段说明：
-     * 1. 保存 `savedTenant` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
     private Tenant savedTenant;
     private User tenantAdmin;
     /**
-     * 字段说明：
-     * 1. 保存 `mqttDeviceProfileId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备配置ID，用于定位对应业务对象。
      */
     private DeviceProfileId mqttDeviceProfileId;
     private DeviceProfileId coapDeviceProfileId;
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeTest() throws Exception {
         loginSysAdmin();
 
@@ -156,26 +136,16 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
         https.put("port", 444);
         config.set("https", https);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         ObjectNode mqtt = JacksonUtil.newObjectNode();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         mqtt.put("enabled", true);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         mqtt.put("host", "");
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         mqtt.put("port", 1883);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         config.set("mqtt", mqtt);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         ObjectNode mqtts = JacksonUtil.newObjectNode();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         mqtts.put("enabled", true);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         mqtts.put("host", "");
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         mqtts.put("port", 8883);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         config.set("mqtts", mqtts);
 
         ObjectNode coap = JacksonUtil.newObjectNode();
@@ -208,9 +178,7 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
 
         tenantAdmin = createUserAndLogin(tenantAdmin, "testPassword1");
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         DeviceProfile mqttProfile = new DeviceProfile();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         mqttProfile.setName("Mqtt device profile");
         mqttProfile.setType(DeviceProfileType.DEFAULT);
         mqttProfile.setTransportType(DeviceTransportType.MQTT);
@@ -239,17 +207,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
         coapDeviceProfileId = doPost("/api/deviceProfile", coapProfile, DeviceProfile.class).getId();
     }
 
-    @After
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterTest` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @After
     public void afterTest() throws Exception {
         loginSysAdmin();
 
@@ -257,17 +220,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDefaultDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDefaultDevice() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -320,17 +278,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 " thingsboard/coap-clients coap-client-openssl -v 6 -m POST coaps://host.docker.internal:5684/api/v1/%s/telemetry -t json -e \"{temperature:25}\"", credentials.getCredentialsId()));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForMqttDeviceWithAccessToken` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForMqttDeviceWithAccessToken() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -362,17 +315,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 DEVICE_TELEMETRY_TOPIC, credentials.getCredentialsId()));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchGatewayDockerComposeFile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证文件相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchGatewayDockerComposeFile() throws Exception {
         String deviceName = "My device";
         Device device = new Device();
@@ -431,17 +379,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 "    name: tb-gw-extensions\n"));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDeviceWithIpV6LocalhostAddress` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDeviceWithIpV6LocalhostAddress() throws Exception {
         loginSysAdmin();
         setConnectivityHost("::1");
@@ -495,17 +438,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 " thingsboard/coap-clients coap-client-openssl -v 6 -m POST coaps://host.docker.internal:5684/api/v1/%s/telemetry -t json -e \"{temperature:25}\"", credentials.getCredentialsId()));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDeviceWithIpV6Address` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDeviceWithIpV6Address() throws Exception {
 
         loginSysAdmin();
@@ -560,17 +498,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
 
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDeviceWithMqttBasicCreds` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDeviceWithMqttBasicCreds() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -614,17 +547,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 DEVICE_TELEMETRY_TOPIC, clientId, userName, password));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDeviceWithX509Creds` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDeviceWithX509Creds() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -647,17 +575,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
         assertThat(commands.get(MQTT).get(DOCKER)).isNull();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForCoapDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForCoapDevice() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -679,17 +602,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 credentials.getCredentialsId()));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForCoapDeviceWithX509Creds` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForCoapDeviceWithX509Creds() throws Exception {
         Device device = new Device();
         device.setName("My device");
@@ -711,18 +629,13 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
         assertThat(commands.get(COAP).get(COAPS).asText()).isEqualTo(CHECK_DOCUMENTATION);
     }
 
+    /**
+     * 功能：验证`Download Mqtt Cert`相关场景。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test
     @DirtiesContext
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testDownloadMqttCert` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void testDownloadMqttCert() throws Exception {
         Path path = Files.createFile(Path.of("/tmp/" + CA_ROOT_CERT_PEM));
         Files.writeString(path, CERT);
@@ -735,18 +648,13 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
         }
     }
 
+    /**
+     * 功能：验证私钥相关场景。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test
     @DirtiesContext
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testDownloadMqttCertFromFileWithPrivateKey` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void testDownloadMqttCertFromFileWithPrivateKey() throws Exception {
         Path path = Files.createFile(Path.of("/tmp/" + CA_ROOT_CERT_PEM));
         Files.writeString(path, CERT + P_KEY);
@@ -759,49 +667,34 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
         }
     }
 
+    /**
+     * 功能：验证文件相关场景。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test
     @DirtiesContext
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testDownloadMqttCertWithoutCertFile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void testDownloadMqttCertWithoutCertFile() throws Exception {
         doGet("/api/device-connectivity/mqtts/certificate/download").andExpect(status().isNotFound());
     }
 
+    /**
+     * 功能：验证`Download Cert With Unknown Protocol`相关场景。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test
     @DirtiesContext
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testDownloadCertWithUnknownProtocol` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void testDownloadCertWithUnknownProtocol() throws Exception {
         doGet("/api/device-connectivity/unknownProtocol/certificate/download").andExpect(status().isNotFound());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDefaultDeviceIfPortsSetToDefault` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDefaultDeviceIfPortsSetToDefault() throws Exception {
         loginSysAdmin();
 
@@ -870,17 +763,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 credentials.getCredentialsId()));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDefaultDeviceIfPortsAndHostsNull` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDefaultDeviceIfPortsAndHostsNull() throws Exception {
         loginSysAdmin();
 
@@ -975,17 +863,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 " thingsboard/coap-clients coap-client-openssl -v 6 -m POST coaps://host.docker.internal/api/v1/%s/telemetry -t json -e \"{temperature:25}\"", credentials.getCredentialsId()));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDefaultDeviceIfHostIsNotLocalhost` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证主机地址相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDefaultDeviceIfHostIsNotLocalhost() throws Exception {
         loginSysAdmin();
 
@@ -1044,17 +927,12 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
                 "thingsboard/coap-clients coap-client-openssl -v 6 -m POST coaps://test.domain:5684/api/v1/%s/telemetry -t json -e \"{temperature:25}\"", credentials.getCredentialsId()));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testFetchPublishTelemetryCommandsForDeviceWhenHostSetToNullInSettings` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证主机地址相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testFetchPublishTelemetryCommandsForDeviceWhenHostSetToNullInSettings() throws Exception {
         loginSysAdmin();
         ObjectNode config = JacksonUtil.newObjectNode();
@@ -1138,14 +1016,10 @@ public class DeviceConnectivityControllerTest extends AbstractControllerTest {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setConnectivityHost` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新主机地址。
+     * 参数：
+     * - `host`：`host` 参数。
+     * 返回：无。
      */
     private void setConnectivityHost(String host) throws Exception {
         ObjectNode config = JacksonUtil.newObjectNode();

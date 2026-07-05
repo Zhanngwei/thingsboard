@@ -69,21 +69,15 @@ import static org.mockito.Mockito.when;
  */
 public class LwM2MClientSerDesTest {
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `serializeDeserialize` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `serializeDeserialize` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void serializeDeserialize() throws Exception {
         LwM2mClient client = new LwM2mClient("nodeId", "testEndpoint");
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportDeviceInfo tdi = new TransportDeviceInfo();
         tdi.setPowerMode(PowerMode.PSM);
         tdi.setPsmActivityTimer(10000L);
@@ -111,18 +105,13 @@ public class LwM2MClientSerDesTest {
 
         client.setRegistration(registration);
         client.setState(LwM2MClientState.REGISTERED);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         client.getSharedAttributes().put("key1", TransportProtos.TsKvProto.newBuilder().setTs(0).setKv(TransportProtos.KeyValueProto.newBuilder().setStringV("test").build()).build());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         client.getSharedAttributes().put("key2", TransportProtos.TsKvProto.newBuilder().setTs(1).setKv(TransportProtos.KeyValueProto.newBuilder().setDoubleV(1.02).build()).build());
 
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         TransportResourceCache resourceCache = mock(TransportResourceCache.class);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         LwM2mTransportContext context = mock(LwM2mTransportContext.class);
         LwM2mClientContext clientContext = mock(LwM2mClientContext.class);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         var provider = new LwM2mVersionedModelProvider(clientContext, new LwM2mTransportServerHelper(context), context);
 
         TbResource resource15 = new TbResource();
@@ -130,11 +119,8 @@ public class LwM2MClientSerDesTest {
         TbResource resource17 = new TbResource();
         resource17.setData(Files.readAllBytes(Path.of(this.getClass().getClassLoader().getResource("17.xml").toURI())));
 
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         when(resourceCache.get(any(), any(), eq("15_1.0"))).thenReturn(Optional.of(resource15));
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         when(resourceCache.get(any(), any(), eq("17_1.0"))).thenReturn(Optional.of(resource17));
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         when(context.getTransportResourceCache()).thenReturn(resourceCache);
         when(clientContext.getClientByEndpoint(any())).thenReturn(client);
 

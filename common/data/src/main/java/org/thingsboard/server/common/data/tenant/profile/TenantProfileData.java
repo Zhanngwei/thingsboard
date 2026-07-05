@@ -22,8 +22,6 @@ import lombok.Data;
 import java.io.Serializable;
 import java.util.List;
 
-@ApiModel
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`TenantProfileData` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -34,38 +32,25 @@ import java.util.List;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@ApiModel
+@Data
 public class TenantProfileData implements Serializable {
 
     /**
-     * 字段说明：
-     * 1. 保存 `serialVersionUID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 版本号常量，用于统一引用固定值。
      */
     private static final long serialVersionUID = -3642550257035920976L;
 
-    @ApiModelProperty(position = 1, value = "Complex JSON object that contains profile settings: max devices, max assets, rate limits, etc.")
     /**
-     * 字段说明：
-     * 1. 保存 `configuration` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `configuration`，保存当前对象的配置选项。
      */
+    @ApiModelProperty(position = 1, value = "Complex JSON object that contains profile settings: max devices, max assets, rate limits, etc.")
     private TenantProfileConfiguration configuration;
 
-    @ApiModelProperty(position = 2, value = "JSON array of queue configuration per tenant profile")
     /**
-     * 字段说明：
-     * 1. 保存 `queueConfiguration` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列列表，用于保存一组待处理对象。
      */
+    @ApiModelProperty(position = 2, value = "JSON array of queue configuration per tenant profile")
     private List<TenantProfileQueueConfiguration> queueConfiguration;
 
 }

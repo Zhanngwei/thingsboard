@@ -19,7 +19,6 @@ import lombok.Data;
 
 import java.util.List;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`CmdsWrapper` 是 ThingsBoard Monitoring 模块 中的健康探测与通知类型，用于对 ThingsBoard 服务、传输协议和 WebSocket/REST 链路执行健康检查、延迟采集与告警通知。
@@ -31,15 +30,11 @@ import java.util.List;
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 Template Method / Strategy / Observer。
  */
+@Data
 public class CmdsWrapper {
 
     /**
-     * 字段说明：
-     * 1. 保存 `entityDataCmds` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 实体列表，用于保存一组待处理对象。
      */
     private List<EntityDataCmd> entityDataCmds;
 

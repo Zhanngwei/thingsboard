@@ -40,55 +40,55 @@ import java.util.UUID;
 public final class RuleEngineDeviceRpcRequest {
 
     /**
-     * 中文说明：租户标识，来源于规则消息或 REST 调用上下文；生命周期与单次 RPC 请求一致，用于租户隔离。
+     * 租户ID，用于定位对应业务对象。
      */
     private final TenantId tenantId;
     /**
-     * 中文说明：目标设备标识，来源于消息发起者、节点配置或 REST 参数；生命周期与单次 RPC 请求一致。
+     * 设备ID，用于定位对应业务对象。
      */
     private final DeviceId deviceId;
     /**
-     * 中文说明：RPC 请求数字 ID，来源于调用方生成的会话内请求编号；生命周期用于匹配设备响应。
+     * 请求ID，用于定位对应业务对象。
      */
     private final int requestId;
     /**
-     * 中文说明：RPC 请求 UUID，来源于调用方生成的全局请求标识；生命周期用于跨服务追踪和持久化关联。
+     * 请求ID，用于定位对应业务对象。
      */
     private final UUID requestUUID;
     /**
-     * 中文说明：发起请求的服务实例 ID，来源于当前 ThingsBoard 服务节点；生命周期用于响应路由回原服务。
+     * 服务ID，用于定位对应业务对象。
      */
     private final String originServiceId;
     /**
-     * 中文说明：是否单向 RPC，来源于节点配置或调用参数；生命周期决定是否等待设备响应。
+     * 是否满足`oneway`条件。
      */
     private final boolean oneway;
     /**
-     * 中文说明：是否持久化 RPC，来源于调用参数；生命周期决定实现层是否写入 RPC 存储。
+     * 是否满足`persisted`条件。
      */
     private final boolean persisted;
     /**
-     * 中文说明：设备端方法名，来源于节点配置、消息数据或 REST 参数；生命周期与单次 RPC 请求一致。
+     * `method` 字段，保存当前对象的对应属性。
      */
     private final String method;
     /**
-     * 中文说明：RPC 请求体，来源于消息数据、节点模板或 REST 参数；生命周期与单次请求一致。
+     * `body` 字段，保存当前对象的对应属性。
      */
     private final String body;
     /**
-     * 中文说明：请求过期时间戳，来源于超时配置计算结果；生命周期用于传输层和持久化层判断请求是否超时。
+     * 过期时间，用于判断当前对象是否仍然有效。
      */
     private final long expirationTime;
     /**
-     * 中文说明：标记请求是否来自 REST API 调用，来源于调用入口；生命周期用于区分回调和审计语义。
+     * 是否满足`restApiCall`条件。
      */
     private final boolean restApiCall;
     /**
-     * 中文说明：附加信息 JSON 字符串，来源于调用方扩展参数；生命周期用于持久化或响应处理时保留额外上下文。
+     * 扩展信息，表示当前对象的对应属性。
      */
     private final String additionalInfo;
     /**
-     * 中文说明：重试次数配置，来源于节点或 RPC 调用参数；生命周期用于实现层决定失败后的重试策略。
+     * `retries` 字段，保存当前对象的对应属性。
      */
     private final Integer retries;
 }

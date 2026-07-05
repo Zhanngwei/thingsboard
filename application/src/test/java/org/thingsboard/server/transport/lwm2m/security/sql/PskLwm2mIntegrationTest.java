@@ -49,17 +49,12 @@ import static org.thingsboard.server.transport.lwm2m.Lwm2mTestHelper.LwM2MProfil
 public class PskLwm2mIntegrationTest extends AbstractSecurityLwM2MIntegrationTest {
 
     //Lwm2m only
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testWithPskConnectLwm2mSuccess` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`With Psk Connect Lwm2m Success`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testWithPskConnectLwm2mSuccess() throws Exception {
         String clientEndpoint = CLIENT_ENDPOINT_PSK;
         String identity = CLIENT_PSK_IDENTITY;
@@ -72,14 +67,12 @@ public class PskLwm2mIntegrationTest extends AbstractSecurityLwM2MIntegrationTes
                 shortServerId,
                 identity.getBytes(StandardCharsets.UTF_8),
                 Hex.decodeHex(keyPsk.toCharArray()));
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Lwm2mDeviceProfileTransportConfiguration transportConfiguration = getTransportConfiguration(OBSERVE_ATTRIBUTES_WITHOUT_PARAMS, getBootstrapServerCredentialsSecure(PSK, NONE));
         LwM2MDeviceCredentials deviceCredentials = getDeviceCredentialsSecure(clientCredentials, null, null, PSK, false);
         this.basicTestConnection(security,
                 deviceCredentials,
                 COAP_CONFIG,
                 clientEndpoint,
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 transportConfiguration,
                 "await on client state (Psk_Lwm2m)",
                 expectedStatusesRegistrationLwm2mSuccess,
@@ -88,17 +81,12 @@ public class PskLwm2mIntegrationTest extends AbstractSecurityLwM2MIntegrationTes
                 true);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testWithPskConnectLwm2mBadPskKeyByLength_BAD_REQUEST` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证请求相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testWithPskConnectLwm2mBadPskKeyByLength_BAD_REQUEST() throws Exception {
         String clientEndpoint = CLIENT_ENDPOINT_PSK;
         String identity = CLIENT_PSK_IDENTITY + "_BadLength";
@@ -107,9 +95,7 @@ public class PskLwm2mIntegrationTest extends AbstractSecurityLwM2MIntegrationTes
         clientCredentials.setEndpoint(clientEndpoint);
         clientCredentials.setIdentity(identity);
         clientCredentials.setKey(keyPsk);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Lwm2mDeviceProfileTransportConfiguration transportConfiguration = getTransportConfiguration(OBSERVE_ATTRIBUTES_WITHOUT_PARAMS, getBootstrapServerCredentialsSecure(PSK, NONE));
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         createDeviceProfile(transportConfiguration);
         LwM2MDeviceCredentials deviceCredentials = getDeviceCredentialsSecure(clientCredentials, null, null, PSK, false);
         MvcResult result = createDeviceWithMvcResult(deviceCredentials, clientEndpoint);
@@ -120,17 +106,12 @@ public class PskLwm2mIntegrationTest extends AbstractSecurityLwM2MIntegrationTes
 
 
     // Bootstrap + Lwm2m
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testWithPskConnectBsSuccess_UpdateTwoSectionsBootstrapAndLm2m_ConnectLwm2mSuccess` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`With Psk Connect Bs Success Update Two Sections Bootstrap And Lm2m Connect Lwm2m Success`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testWithPskConnectBsSuccess_UpdateTwoSectionsBootstrapAndLm2m_ConnectLwm2mSuccess() throws Exception {
         String clientEndpoint = CLIENT_ENDPOINT_PSK_BS;
         String identity = CLIENT_PSK_IDENTITY_BS;
@@ -142,14 +123,12 @@ public class PskLwm2mIntegrationTest extends AbstractSecurityLwM2MIntegrationTes
         Security securityBs = pskBootstrap(SECURE_URI_BS,
                 identity.getBytes(StandardCharsets.UTF_8),
                 Hex.decodeHex(keyPsk.toCharArray()));
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Lwm2mDeviceProfileTransportConfiguration transportConfiguration = getTransportConfiguration(OBSERVE_ATTRIBUTES_WITHOUT_PARAMS, getBootstrapServerCredentialsSecure(PSK, BOTH));
         LwM2MDeviceCredentials deviceCredentials = getDeviceCredentialsSecure(clientCredentials, null, null, PSK, false);
         this.basicTestConnection(securityBs,
                 deviceCredentials,
                 COAP_CONFIG_BS,
                 clientEndpoint,
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 transportConfiguration,
                 "await on client state (PskBS two section)",
                 expectedStatusesRegistrationBsSuccess,

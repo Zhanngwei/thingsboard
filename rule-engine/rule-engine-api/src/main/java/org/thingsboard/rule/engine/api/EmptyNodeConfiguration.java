@@ -30,21 +30,14 @@ import lombok.Data;
 public class EmptyNodeConfiguration implements NodeConfiguration<EmptyNodeConfiguration> {
 
     /**
-     * 中文说明：保存该空配置的版本号，数据来源于节点配置 JSON 或默认对象；生命周期与配置对象一致。
-     * 设计为字段是为了兼容 Rule Engine 配置升级机制，而不是把版本散落在节点实现中。
+     * 版本号，表示当前对象的对应属性。
      */
     private int version;
 
     /**
-     * 中文说明：
-     * 1. 方法职责：创建一个新的空配置实例作为规则节点默认配置。
-     * 2. 输入参数：无。
-     * 3. 返回值：新的 {@link EmptyNodeConfiguration}，供节点定义或 UI 默认配置使用。
-     * 4. 调用时机：Rule Engine 加载节点定义、生成默认配置或反序列化失败回退时调用。
-     * 5. 调用方：节点配置解析流程、规则节点元数据构建流程。
-     * 6. 使用流程：属于 Rule Engine 节点配置初始化流程。
-     * 7. 线程安全：方法无共享可变状态，线程安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不涉及事务、缓存、MQTT、Actor 通信和数据库；直接服务 Rule Engine 配置流程。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public EmptyNodeConfiguration defaultConfiguration() {

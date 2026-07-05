@@ -23,13 +23,12 @@ import org.thingsboard.server.common.data.id.EntityId;
 import java.util.List;
 
 /**
- * 按实体类型和名称同步查找实体 ID 的工具类。
- * 本类不保存运行态状态；底层服务可能读取数据库或命中缓存，具体由服务实现决定，本类不直接参与 Rule Engine 消息投递。
+ * `EntitiesByNameAndTypeLoader` 类，封装当前模块中的一组相关职责。
  */
 public class EntitiesByNameAndTypeLoader {
 
     /**
-     * 支持按名称查找的实体类型集合。
+     * 实体常量，用于统一引用固定值。
      */
     private static final List<EntityType> AVAILABLE_ENTITY_TYPES = List.of(
             EntityType.DEVICE,
@@ -39,13 +38,12 @@ public class EntitiesByNameAndTypeLoader {
             EntityType.USER);
 
     /**
-     * 根据实体类型和名称查找实体 ID。
-     * 本方法是同步封装，会直接调用对应服务；数据库读取、缓存读取和租户隔离由服务层处理，本方法不发送或确认 Rule Engine 消息。
-     *
-     * @param ctx 规则节点上下文，提供租户和实体服务
-     * @param entityType 目标实体类型
-     * @param entityName 目标实体名称或用户邮箱
-     * @return 查找到的实体 ID
+     * 功能：获取实体ID。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityType`：实体对象。
+     * - `entityName`：实体对象。
+     * 返回：处理结果。
      */
     public static EntityId findEntityId(TbContext ctx, EntityType entityType, String entityName) {
         BaseData<? extends EntityId> targetEntity;
@@ -75,10 +73,10 @@ public class EntitiesByNameAndTypeLoader {
     }
 
     /**
-     * 校验实体类型是否支持按名称查找。
-     * 本方法只检查内存常量列表，不访问数据库或缓存。
-     *
-     * @param entityType 待校验实体类型
+     * 功能：校验实体。
+     * 参数：
+     * - `entityType`：实体对象。
+     * 返回：无。
      */
     public static void checkEntityType(EntityType entityType) {
         if (!AVAILABLE_ENTITY_TYPES.contains(entityType)) {

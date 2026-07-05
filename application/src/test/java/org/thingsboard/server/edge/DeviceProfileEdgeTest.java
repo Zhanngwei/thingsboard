@@ -64,7 +64,6 @@ import java.util.UUID;
 
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`DeviceProfileEdgeTest` 是ThingsBoard Application 测试模块中的测试支撑类型，用于验证 Application 模块的控制器、服务、Actor 或集成流程。
@@ -75,19 +74,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Test Fixture。
  */
+@DaoSqlTest
 public class DeviceProfileEdgeTest extends AbstractEdgeTest {
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeviceProfiles` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeviceProfiles() throws Exception {
         RuleChainId thermostatsRuleChainId = createEdgeRuleChainAndAssignToEdge("Thermostats Rule Chain");
 
@@ -146,19 +141,13 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
         unAssignFromEdgeAndDeleteDashboard(thermostatsDashboardId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeviceProfiles_snmp` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeviceProfiles_snmp() throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         DeviceProfile deviceProfile = createDeviceProfileAndDoBasicAssert("SNMP", createSnmpDeviceProfileTransportConfiguration());
 
         AbstractMessage latestMessage = edgeImitator.getLatestMessage();
@@ -168,25 +157,17 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
         Assert.assertNotNull(deviceProfileMsg);
         Assert.assertEquals(deviceProfile, deviceProfileMsg);
         Assert.assertEquals(UpdateMsgType.ENTITY_CREATED_RPC_MESSAGE, deviceProfileUpdateMsg.getMsgType());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals(DeviceTransportType.SNMP, deviceProfileMsg.getTransportType());
 
         DeviceProfileData deviceProfileData = deviceProfileMsg.getProfileData();
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertTrue(deviceProfileData.getTransportConfiguration() instanceof SnmpDeviceProfileTransportConfiguration);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         SnmpDeviceProfileTransportConfiguration transportConfiguration =
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 (SnmpDeviceProfileTransportConfiguration) deviceProfileData.getTransportConfiguration();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals(Integer.valueOf(1000), transportConfiguration.getTimeoutMs());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals(Integer.valueOf(3), transportConfiguration.getRetries());
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertFalse(transportConfiguration.getCommunicationConfigs().isEmpty());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         SnmpCommunicationConfig communicationConfig = transportConfiguration.getCommunicationConfigs().get(0);
         Assert.assertTrue(communicationConfig instanceof TelemetryQueryingSnmpCommunicationConfig);
         TelemetryQueryingSnmpCommunicationConfig snmpCommunicationConfig =
@@ -203,19 +184,13 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
         removeDeviceProfileAndDoBasicAssert(deviceProfile);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeviceProfiles_lwm2m` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeviceProfiles_lwm2m() throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         DeviceProfile deviceProfile = createDeviceProfileAndDoBasicAssert("LWM2M", createLwm2mDeviceProfileTransportConfiguration());
 
         AbstractMessage latestMessage = edgeImitator.getLatestMessage();
@@ -225,12 +200,10 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
         Assert.assertNotNull(deviceProfileMsg);
         Assert.assertEquals(deviceProfile, deviceProfileMsg);
         Assert.assertEquals(UpdateMsgType.ENTITY_CREATED_RPC_MESSAGE, deviceProfileUpdateMsg.getMsgType());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertEquals(DeviceTransportType.LWM2M, deviceProfileMsg.getTransportType());
 
         DeviceProfileData deviceProfileData = deviceProfileMsg.getProfileData();
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         Assert.assertTrue(deviceProfileData.getTransportConfiguration() instanceof Lwm2mDeviceProfileTransportConfiguration);
         Lwm2mDeviceProfileTransportConfiguration transportConfiguration =
                 (Lwm2mDeviceProfileTransportConfiguration) deviceProfileData.getTransportConfiguration();
@@ -265,17 +238,12 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
         removeDeviceProfileAndDoBasicAssert(deviceProfile);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDeviceProfiles_coap` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDeviceProfiles_coap() throws Exception {
         DeviceProfile deviceProfile = createDeviceProfileAndDoBasicAssert("COAP", createCoapDeviceProfileTransportConfiguration());
 
@@ -318,17 +286,12 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
         removeDeviceProfileAndDoBasicAssert(deviceProfile);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeviceProfileToCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备配置相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeviceProfileToCloud() throws Exception {
         RuleChainId ruleChainId = createEdgeRuleChainAndAssignToEdge("Device Profile Rule Chain");
         DashboardId dashboardId = createDashboardAndAssignToEdge("Device Profile Dashboard");
@@ -378,14 +341,9 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createProfileData` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private DeviceProfileData createProfileData() {
         DeviceProfileData deviceProfileData = new DeviceProfileData();
@@ -396,14 +354,11 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDeviceProfileAndDoBasicAssert` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备配置。
+     * 参数：
+     * - `deviceProfileName`：设备信息或设备标识。
+     * - `deviceProfileTransportConfiguration`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     private DeviceProfile createDeviceProfileAndDoBasicAssert(String deviceProfileName, DeviceProfileTransportConfiguration deviceProfileTransportConfiguration) throws Exception {
         DeviceProfile deviceProfile = this.createDeviceProfile(deviceProfileName, deviceProfileTransportConfiguration);
@@ -415,14 +370,10 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeDeviceProfileAndDoBasicAssert` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理设备配置。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：无。
      */
     private void removeDeviceProfileAndDoBasicAssert(DeviceProfile deviceProfile) throws Exception {
         edgeImitator.expectMessageAmount(1);
@@ -438,14 +389,9 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSnmpDeviceProfileTransportConfiguration` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private SnmpDeviceProfileTransportConfiguration createSnmpDeviceProfileTransportConfiguration() {
         SnmpDeviceProfileTransportConfiguration transportConfiguration = new SnmpDeviceProfileTransportConfiguration();
@@ -463,14 +409,9 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createLwm2mDeviceProfileTransportConfiguration` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private Lwm2mDeviceProfileTransportConfiguration createLwm2mDeviceProfileTransportConfiguration() {
         Lwm2mDeviceProfileTransportConfiguration transportConfiguration = new Lwm2mDeviceProfileTransportConfiguration();
@@ -498,14 +439,9 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createCoapDeviceProfileTransportConfiguration` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private CoapDeviceProfileTransportConfiguration createCoapDeviceProfileTransportConfiguration() {
         CoapDeviceProfileTransportConfiguration transportConfiguration = new CoapDeviceProfileTransportConfiguration();
@@ -526,17 +462,12 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
         return transportConfiguration;
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendDeviceProfileToCloudWithNameThatAlreadyExistsOnCloud` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备配置相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendDeviceProfileToCloudWithNameThatAlreadyExistsOnCloud() throws Exception {
         String deviceProfileOnCloudName = StringUtils.randomAlphanumeric(15);
 
@@ -581,14 +512,10 @@ public class DeviceProfileEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildDeviceProfileForUplinkMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建设备配置。
+     * 参数：
+     * - `name`：名称。
+     * 返回：处理结果。
      */
     private DeviceProfile buildDeviceProfileForUplinkMsg(String name) {
         DeviceProfile deviceProfile = new DeviceProfile();

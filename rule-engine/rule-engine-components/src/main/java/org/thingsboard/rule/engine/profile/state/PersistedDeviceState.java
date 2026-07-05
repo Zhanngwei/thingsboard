@@ -19,7 +19,6 @@ import lombok.Data;
 
 import java.util.Map;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：保存单个设备在设备画像节点中的可持久化告警状态集合。
@@ -31,14 +30,11 @@ import java.util.Map;
  * 7. 显式方法：本类没有手写方法，访问器由 Lombok 生成；线程安全由外层 `DeviceState` 和设备画像节点的状态更新流程保证。
  * 8. 设计模式：可视为 Memento/DTO，是设备画像告警状态持久化的根快照。
  */
+@Data
 public class PersistedDeviceState {
 
     /**
-     * 字段说明：
-     * 1. 保存设备下每个告警类型对应的持久化告警状态。
-     * 2. Map 的键通常来源于设备画像告警配置中的告警类型名称，值来自该告警类型的运行期评估状态。
-     * 3. 生命周期覆盖设备状态恢复、消息处理、告警评估和规则节点状态写回全过程。
-     * 4. 使用 Map 是为了按告警类型快速定位状态，并支持一个设备画像配置多个告警定义。
+     * 告警映射关系，用于按键查找对应值。
      */
     Map<String, PersistedAlarmState> alarmStates;
 

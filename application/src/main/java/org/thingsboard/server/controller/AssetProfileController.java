@@ -64,11 +64,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHO
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH;
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AssetProfileController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -79,19 +74,27 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
+@RequiredArgsConstructor
+@Slf4j
 public class AssetProfileController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbAssetProfileService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 资产配置集合，用于去重保存或快速判断对象是否存在。
      */
     private final TbAssetProfileService tbAssetProfileService;
     private final ImageService imageService;
 
+    /**
+     * 功能：获取资产配置。
+     * 参数：
+     * - `strAssetProfileId`：资产配置ID。
+     * - `INLINE_IMAGES`：`INLINE_IMAGES` 参数。
+     * - `inlineImages`：`inlineImages` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Asset Profile (getAssetProfileById)",
             notes = "Fetch the Asset Profile object based on the provided Asset Profile Id. " +
                     "The server checks that the asset profile is owned by the same tenant. " + TENANT_AUTHORITY_PARAGRAPH,
@@ -99,16 +102,6 @@ public class AssetProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/assetProfile/{assetProfileId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAssetProfileById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AssetProfile getAssetProfileById(
             @ApiParam(value = ASSET_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(ASSET_PROFILE_ID) String strAssetProfileId,
@@ -117,13 +110,18 @@ public class AssetProfileController extends BaseController {
         checkParameter(ASSET_PROFILE_ID, strAssetProfileId);
         AssetProfileId assetProfileId = new AssetProfileId(toUUID(strAssetProfileId));
         var result = checkAssetProfileId(assetProfileId, Operation.READ);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (inlineImages) {
             imageService.inlineImage(result);
         }
         return result;
     }
 
+    /**
+     * 功能：获取资产配置。
+     * 参数：
+     * - `strAssetProfileId`：资产配置ID。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Asset Profile Info (getAssetProfileInfoById)",
             notes = "Fetch the Asset Profile Info object based on the provided Asset Profile Id. "
                     + ASSET_PROFILE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -131,16 +129,6 @@ public class AssetProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/assetProfileInfo/{assetProfileId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAssetProfileInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AssetProfileInfo getAssetProfileInfoById(
             @ApiParam(value = ASSET_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(ASSET_PROFILE_ID) String strAssetProfileId) throws ThingsboardException {
@@ -149,6 +137,11 @@ public class AssetProfileController extends BaseController {
         return new AssetProfileInfo(checkAssetProfileId(assetProfileId, Operation.READ));
     }
 
+    /**
+     * 功能：获取资产配置。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Default Asset Profile (getDefaultAssetProfileInfo)",
             notes = "Fetch the Default Asset Profile Info object. " +
                     ASSET_PROFILE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -156,20 +149,16 @@ public class AssetProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/assetProfileInfo/default", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDefaultAssetProfileInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AssetProfileInfo getDefaultAssetProfileInfo() throws ThingsboardException {
         return checkNotNull(assetProfileService.findDefaultAssetProfileInfo(getTenantId()));
     }
 
+    /**
+     * 功能：保存或创建资产配置。
+     * 参数：
+     * - `assetProfile`：`assetProfile` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Create Or Update Asset Profile (saveAssetProfile)",
             notes = "Create or update the Asset Profile. When creating asset profile, platform generates asset profile id as " + UUID_WIKI_LINK +
                     "The newly created asset profile id will be present in the response. " +
@@ -183,16 +172,6 @@ public class AssetProfileController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/assetProfile", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveAssetProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AssetProfile saveAssetProfile(
             @ApiParam(value = "A JSON value representing the asset profile.")
             @RequestBody AssetProfile assetProfile) throws Exception {
@@ -201,6 +180,12 @@ public class AssetProfileController extends BaseController {
         return tbAssetProfileService.save(assetProfile, getCurrentUser());
     }
 
+    /**
+     * 功能：删除或清理资产配置。
+     * 参数：
+     * - `strAssetProfileId`：资产配置ID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete asset profile (deleteAssetProfile)",
             notes = "Deletes the asset profile. Referencing non-existing asset profile Id will cause an error. " +
                     "Can't delete the asset profile if it is referenced by existing assets." + TENANT_AUTHORITY_PARAGRAPH,
@@ -208,16 +193,6 @@ public class AssetProfileController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/assetProfile/{assetProfileId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteAssetProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteAssetProfile(
             @ApiParam(value = ASSET_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(ASSET_PROFILE_ID) String strAssetProfileId) throws ThingsboardException {
@@ -227,22 +202,18 @@ public class AssetProfileController extends BaseController {
         tbAssetProfileService.delete(assetProfile, getCurrentUser());
     }
 
+    /**
+     * 功能：更新资产配置。
+     * 参数：
+     * - `strAssetProfileId`：资产配置ID。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Make Asset Profile Default (setDefaultAssetProfile)",
             notes = "Marks asset profile as default within a tenant scope." + TENANT_AUTHORITY_PARAGRAPH,
             produces = "application/json")
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/assetProfile/{assetProfileId}/default", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `setDefaultAssetProfile` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AssetProfile setDefaultAssetProfile(
             @ApiParam(value = ASSET_PROFILE_ID_PARAM_DESCRIPTION)
             @PathVariable(ASSET_PROFILE_ID) String strAssetProfileId) throws ThingsboardException {
@@ -253,6 +224,16 @@ public class AssetProfileController extends BaseController {
         return tbAssetProfileService.setDefaultAssetProfile(assetProfile, previousDefaultAssetProfile, getCurrentUser());
     }
 
+    /**
+     * 功能：获取资产。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Asset Profiles (getAssetProfiles)",
             notes = "Returns a page of asset profile objects owned by tenant. " +
                     PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH,
@@ -260,16 +241,6 @@ public class AssetProfileController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/assetProfiles", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAssetProfiles` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<AssetProfile> getAssetProfiles(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -285,6 +256,16 @@ public class AssetProfileController extends BaseController {
         return checkNotNull(assetProfileService.findAssetProfiles(getTenantId(), pageLink));
     }
 
+    /**
+     * 功能：获取资产配置。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Asset Profile infos (getAssetProfileInfos)",
             notes = "Returns a page of asset profile info objects owned by tenant. " +
                     PAGE_DATA_PARAMETERS + ASSET_PROFILE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -292,16 +273,6 @@ public class AssetProfileController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/assetProfileInfos", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAssetProfileInfos` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<AssetProfileInfo> getAssetProfileInfos(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -317,22 +288,20 @@ public class AssetProfileController extends BaseController {
         return checkNotNull(assetProfileService.findAssetProfileInfos(getTenantId(), pageLink));
     }
 
+    /**
+     * 功能：获取资产配置。
+     * 参数：
+     * - `activeOnly`：`activeOnly` 参数。
+     * - `false`：`false` 参数。
+     * - `activeOnly`：`activeOnly` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Asset Profile names (getAssetProfileNames)",
             notes = "Returns a set of unique asset profile names owned by the tenant."
                     + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/assetProfile/names", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAssetProfileNames` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<EntityInfo> getAssetProfileNames(
             @ApiParam(value = "Flag indicating whether to retrieve exclusively the names of asset profiles that are referenced by tenant's assets.")
             @RequestParam(value = "activeOnly", required = false, defaultValue = "false") boolean activeOnly) throws ThingsboardException {

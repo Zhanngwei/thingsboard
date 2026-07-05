@@ -18,7 +18,6 @@ package org.thingsboard.server.common.data.sms.config;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`SmppSmsProviderConfiguration` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -29,101 +28,60 @@ import lombok.Data;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@Data
 public class SmppSmsProviderConfiguration implements SmsProviderConfiguration {
-    @ApiModelProperty(value = "SMPP version", allowableValues = "3.3, 3.4", required = true)
     /**
-     * 字段说明：
-     * 1. 保存 `protocolVersion` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 版本号，表示当前对象的对应属性。
      */
+    @ApiModelProperty(value = "SMPP version", allowableValues = "3.3, 3.4", required = true)
     private String protocolVersion;
 
+    /**
+     * 主机地址，用于描述服务监听或访问地址。
+     */
     @ApiModelProperty(value = "SMPP host", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `host` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String host;
-    @ApiModelProperty(value = "SMPP port", required = true)
     /**
-     * 字段说明：
-     * 1. 保存 `port` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 端口号，用于描述服务监听或访问地址。
      */
+    @ApiModelProperty(value = "SMPP port", required = true)
     private Integer port;
 
+    /**
+     * Actor 系统ID，用于定位对应业务对象。
+     */
     @ApiModelProperty(value = "System ID", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `systemId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String systemId;
-    @ApiModelProperty(value = "Password", required = true)
     /**
-     * 字段说明：
-     * 1. 保存 `password` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @ApiModelProperty(value = "Password", required = true)
     private String password;
 
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @ApiModelProperty(value = "System type", required = false)
-    /**
-     * 字段说明：
-     * 1. 保存 `systemType` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String systemType;
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @ApiModelProperty(value = "TX - Transmitter, RX - Receiver, TRX - Transciever. By default TX is used", required = false)
-    /**
-     * 字段说明：
-     * 1. 保存 `bindType` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private SmppBindType bindType;
-    @ApiModelProperty(value = "Service type", required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `serviceType` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 类型，提供当前类调用的业务操作。
      */
+    @ApiModelProperty(value = "Service type", required = false)
     private String serviceType;
 
-    @ApiModelProperty(value = "Source address", required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `sourceAddress` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `sourceAddress` 字段，保存当前对象的对应属性。
      */
+    @ApiModelProperty(value = "Source address", required = false)
     private String sourceAddress;
+    /**
+     * `sourceTon` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(value = "Source TON (Type of Number). Needed is source address is set. 5 by default.\n" +
             "0 - Unknown\n" +
             "1 - International\n" +
@@ -132,15 +90,10 @@ public class SmppSmsProviderConfiguration implements SmsProviderConfiguration {
             "4 - Subscriber Number\n" +
             "5 - Alphanumeric\n" +
             "6 - Abbreviated", required = false)
-    /**
-     * 字段说明：
-     * 1. 保存 `sourceTon` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Byte sourceTon;
+    /**
+     * `sourceNpi` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(value = "Source NPI (Numbering Plan Identification). Needed is source address is set. 0 by default.\n" +
             "0 - Unknown\n" +
             "1 - ISDN/telephone numbering plan (E163/E164)\n" +
@@ -152,16 +105,11 @@ public class SmppSmsProviderConfiguration implements SmsProviderConfiguration {
             "10 - ERMES numbering plan (ETSI DE/PS 3 01-3)\n" +
             "13 - Internet (IP)\n" +
             "18 - WAP Client Id (to be defined by WAP Forum)", required = false)
-    /**
-     * 字段说明：
-     * 1. 保存 `sourceNpi` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Byte sourceNpi;
 
+    /**
+     * `destinationTon` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(value = "Destination TON (Type of Number). 5 by default.\n" +
             "0 - Unknown\n" +
             "1 - International\n" +
@@ -170,15 +118,10 @@ public class SmppSmsProviderConfiguration implements SmsProviderConfiguration {
             "4 - Subscriber Number\n" +
             "5 - Alphanumeric\n" +
             "6 - Abbreviated", required = false)
-    /**
-     * 字段说明：
-     * 1. 保存 `destinationTon` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Byte destinationTon;
+    /**
+     * `destinationNpi` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(value = "Destination NPI (Numbering Plan Identification). 0 by default.\n" +
             "0 - Unknown\n" +
             "1 - ISDN/telephone numbering plan (E163/E164)\n" +
@@ -190,27 +133,17 @@ public class SmppSmsProviderConfiguration implements SmsProviderConfiguration {
             "10 - ERMES numbering plan (ETSI DE/PS 3 01-3)\n" +
             "13 - Internet (IP)\n" +
             "18 - WAP Client Id (to be defined by WAP Forum)", required = false)
-    /**
-     * 字段说明：
-     * 1. 保存 `destinationNpi` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Byte destinationNpi;
 
-    @ApiModelProperty(value = "Address range", required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `addressRange` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `addressRange` 字段，保存当前对象的对应属性。
      */
+    @ApiModelProperty(value = "Address range", required = false)
     private String addressRange;
 
+    /**
+     * `codingScheme` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(allowableValues = "0-10,13-14",
             value = "0 - SMSC Default Alphabet (ASCII for short and long code and to GSM for toll-free, used as default)\n" +
                     "1 - IA5 (ASCII for short and long code, Latin 9 for toll-free (ISO-8859-9))\n" +
@@ -225,27 +158,14 @@ public class SmppSmsProviderConfiguration implements SmsProviderConfiguration {
                     "10 - Music Codes (ISO-2022-JP)\n" +
                     "13 - Extended Kanji JIS (X 0212-1990)\n" +
                     "14 - Korean Graphic Character Set (KS C 5601/KS X 1001)", required = false)
-    /**
-     * 字段说明：
-     * 1. 保存 `codingScheme` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Byte codingScheme;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getType` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取类型。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public SmsProviderType getType() {
         return SmsProviderType.SMPP;
     }

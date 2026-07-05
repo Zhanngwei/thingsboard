@@ -35,6 +35,9 @@ import java.util.Properties;
 
 import static org.thingsboard.common.util.DonAsynchron.withCallback;
 
+/**
+ * `TbSendEmailNode` 类，封装当前模块中的一组相关职责。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.EXTERNAL,
@@ -48,28 +51,27 @@ import static org.thingsboard.common.util.DonAsynchron.withCallback;
         configDirective = "tbExternalNodeSendEmailConfig",
         icon = "send"
 )
-/**
- * SMTP 邮件发送外部节点，接收 SEND_EMAIL 消息并通过 MailService/JavaMailSender 发送。
- * 本类不直接访问数据库或缓存；外部调用边界在 sendEmail 中，异步执行和回调由 mailExecutor/withCallback 处理。
- */
 public class TbSendEmailNode extends TbAbstractExternalNode {
 
     /**
-     * JavaMail 属性名前缀。
+     * `MAIL_PROP`常量，用于统一引用固定值。
      */
     private static final String MAIL_PROP = "mail.";
     /**
-     * 邮件发送节点配置，包含系统 SMTP 开关、自定义 SMTP、TLS 和代理参数。
+     * 配置，保存当前对象的配置选项。
      */
     private TbSendEmailNodeConfiguration config;
     /**
-     * 自定义 SMTP 模式下使用的 JavaMailSender。
+     * `mailSender` 字段，保存当前对象的对应属性。
      */
     private JavaMailSenderImpl mailSender;
 
     /**
-     * 初始化邮件发送配置和可选的自定义 JavaMailSender。
-     * 本方法不直接发送邮件；系统 SMTP 设置可能由 MailService 调用链间接依赖数据库/缓存或全局配置。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
@@ -85,8 +87,11 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 校验消息类型、解析 TbEmail，并在 mailExecutor 中异步发送邮件。
-     * 消息先经 ackIfNeeded 处理确认关系；发送成功走 Success，异常走 Failure。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
@@ -95,7 +100,6 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
             TbEmail email = getEmail(msg);
             var tbMsg = ackIfNeeded(ctx, msg);
             withCallback(ctx.getMailExecutor().executeAsync(() -> {
-                        // 邮件发送可能阻塞外部 SMTP 或系统 MailService，因此放入专用 mailExecutor。
                         sendEmail(ctx, tbMsg, email);
                         return null;
                     }),
@@ -107,8 +111,12 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 执行实际邮件发送外部调用。
-     * 系统模式委托 ctx.getMailService(true)，自定义模式使用本节点创建的 JavaMailSender；数据库/缓存可能在 MailService 调用链中间接涉及。
+     * 功能：发送或提交邮箱。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `email`：`email` 参数。
+     * 返回：无。
      */
     private void sendEmail(TbContext ctx, TbMsg msg, TbEmail email) throws Exception {
         if (this.config.isUseSystemSmtpSettings()) {
@@ -119,8 +127,10 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 从消息体解析 TbEmail 并校验收件人。
-     * 本方法不直接访问 SMTP、数据库或缓存。
+     * 功能：获取邮箱。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private TbEmail getEmail(TbMsg msg) throws IOException {
         TbEmail email = JacksonUtil.fromString(msg.getData(), TbEmail.class);
@@ -131,8 +141,10 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 校验输入消息必须是 SEND_EMAIL 类型。
-     * 本方法只做本地校验，失败时由 onMsg 路由到 Failure。
+     * 功能：校验类型。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     private void validateType(TbMsg msg) {
         if (!msg.isTypeOf(TbMsgType.SEND_EMAIL)) {
@@ -143,8 +155,9 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 创建自定义 JavaMailSender。
-     * 本方法只配置客户端对象，不直接建立 SMTP 会话或发送邮件。
+     * 功能：保存或创建`Mail Sender`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private JavaMailSenderImpl createMailSender() {
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
@@ -157,8 +170,9 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
     }
 
     /**
-     * 构造 JavaMail 属性集合。
-     * TLS、认证、超时和代理参数来自节点配置；本方法不直接访问外部 SMTP 服务。
+     * 功能：保存或创建`Java Mail Properties`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private Properties createJavaMailProperties() {
         Properties javaMailProperties = new Properties();

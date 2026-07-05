@@ -38,42 +38,33 @@ import java.util.Optional;
 public abstract class RpcLwM2MDownlinkCallback<R extends LwM2mRequest<T>, T extends LwM2mResponse> extends RpcDownlinkRequestCallbackProxy<R, T> {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `RpcLwM2MDownlinkCallback` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `RpcLwM2MDownlinkCallback` 实例，并初始化必要字段。
+     * 参数：
+     * - `transportService`：服务对象。
+     * - `client`：客户端对象。
+     * - `requestMsg`：请求对象。
+     * - `callback`：处理完成后的回调。
+     * 返回：新创建的对象实例。
      */
     public RpcLwM2MDownlinkCallback(TransportService transportService, LwM2mClient client, TransportProtos.ToDeviceRpcRequestMsg requestMsg, DownlinkRequestCallback<R, T> callback) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         super(transportService, client, requestMsg, callback);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendRpcReplyOnSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交RPC。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：无。
      */
+    @Override
     protected void sendRpcReplyOnSuccess(T response) {
         LwM2MRpcResponseBody.LwM2MRpcResponseBodyBuilder builder = LwM2MRpcResponseBody.builder().result(response.getCode().getName());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (response.isSuccess()) {
             Optional<String> responseValue = serializeSuccessfulResponse(response);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (responseValue.isPresent() && StringUtils.isNotEmpty(responseValue.get())) {
                 builder.value(responseValue.get());
             }
         } else {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (StringUtils.isNotEmpty(response.getErrorMessage())) {
                 builder.error(response.getErrorMessage());
             }
@@ -82,14 +73,10 @@ public abstract class RpcLwM2MDownlinkCallback<R extends LwM2mRequest<T>, T exte
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `serializeSuccessfulResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `serializeSuccessfulResponse` 对应的处理。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：可能存在的结果。
      */
     protected abstract Optional<String> serializeSuccessfulResponse(T response);
 }

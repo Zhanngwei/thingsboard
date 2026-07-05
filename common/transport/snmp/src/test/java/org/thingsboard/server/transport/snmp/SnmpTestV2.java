@@ -41,18 +41,13 @@ public class SnmpTestV2 {
     private static final Scanner scanner = new Scanner(System.in);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `main` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：作为当前类的入口方法，完成参数处理并触发主要逻辑。
+     * 参数：
+     * - `args`：传入程序的参数。
+     * 返回：无。
      */
     public static void main(String[] args) throws IOException {
         Map<String, String> mappings = new LinkedHashMap<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 1; i <= 50; i++) {
             String oid = String.format("1.3.6.1.2.1.%s.1.52", i);
             mappings.put(oid, "value_" + i);
@@ -69,20 +64,14 @@ public class SnmpTestV2 {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `inputTraps` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `inputTraps` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     private static void inputTraps(SnmpDeviceSimulatorV2 client) throws IOException {
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while (true) {
             String data = scanner.nextLine();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!data.isEmpty()) {
                 client.sendTrap("127.0.0.1", 1620, Map.of(
                         "1.3.6.1.2.1.266.1.52", data + " (266)",
@@ -93,20 +82,15 @@ public class SnmpTestV2 {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateDeviceProfile` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新设备配置。
+     * 参数：
+     * - `file`：`file` 参数。
+     * 返回：无。
      */
     private static void updateDeviceProfile(String file) throws Exception {
         File profileFile = new File(file);
         JsonNode deviceProfile = JacksonUtil.OBJECT_MAPPER.readTree(profileFile);
         ArrayNode mappingsJson = (ArrayNode) deviceProfile.at("/profileData/transportConfiguration/communicationConfigs/0/mappings");
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 1; i <= 50; i++) {
             String oid = String.format(".1.3.6.1.2.1.%s.1.52", i);
             mappingsJson.add(JacksonUtil.newObjectNode()

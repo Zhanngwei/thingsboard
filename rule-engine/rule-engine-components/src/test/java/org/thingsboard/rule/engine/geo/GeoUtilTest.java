@@ -21,66 +21,97 @@ import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
 
 /**
- * 测试目标：验证 {@code GeoUtilTest} 覆盖的 地理围栏组件 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code GeoUtil}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：内存 fixture、参数化数据源，以及测试体按需创建的 Mockito mock/spy；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `GeoUtilTest` 测试类，用于验证 `GeoUtil` 相关行为。
  */
 @RunWith(MockitoJUnitRunner.class)
 public class GeoUtilTest {
 
-    /** 测试常量字段：{@code SIMPLE_RECT} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `SIMPLE_RECT`常量，用于统一引用固定值。
+     */
     public static final String SIMPLE_RECT = "[[51.903762928405555,23.642220786948297],[44.669801219635644,41.83345155830211]]";
-    /** 测试常量字段：{@code SIMPLE_RECT_WITH_HOLE_IN_CENTER} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `SIMPLE_RECT_WITH_HOLE_IN_CENTER`常量，用于统一引用固定值。
+     */
     public static final String SIMPLE_RECT_WITH_HOLE_IN_CENTER = "[[[44.66980121963565,23.642220786948297],[44.66980121963565,41.83345155830211],[51.903762928405555,41.83345155830211],[51.903762928405555,23.642220786948297]],[[46.10464044504632,26.234282119122227],[50.8755868028522,26.25625220459488],[51.04164771375101,38.5595000692786],[45.99790855491869,38.75723083853248]]]";
-    /** 测试常量字段：{@code SAND_CLOCK} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `SAND_CLOCK`常量，用于统一引用固定值。
+     */
     public static final String SAND_CLOCK = "[[47.45865912532852,25.531200822337155],[49.76760268310416,29.353995694578202],[51.42691963936519,25.355440138555966],[51.413219087617655,39.41629484105169],[49.78179072754938,33.37452133607305],[47.81395478511215,38.867042704235466]]";
-    /** 测试常量字段：{@code SAND_CLOCK_WITH_HOLE_IN_CENTER} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `SAND_CLOCK_WITH_HOLE_IN_CENTER`常量，用于统一引用固定值。
+     */
     public static final String SAND_CLOCK_WITH_HOLE_IN_CENTER = "[[[51.426919639365195,25.355440138555966],[49.76760268310416,29.353995694578202],[47.45865912532852,25.531200822337155],[47.81395478511215,38.867042704235466],[49.78179072754938,33.37452133607305],[51.413219087617655,39.41629484105169]],[[49.8243299406579,30.210829028011513],[50.34591034217041,31.04569227597222],[49.56853374046142,32.53965808811239],[49.02409241675058,31.57297432731579]]]";
-    /** 测试常量字段：{@code SELF_INTERSECTING} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `SELF_INTERSECTING`常量，用于统一引用固定值。
+     */
     public static final String SELF_INTERSECTING = "[[47.42893833699058,27.178954662008522],[51.71367987390804,37.46095466320854],[51.659197648757306,27.947907653551276],[47.41407351681856,37.46095466320854]]";
-    /** 测试常量字段：{@code SELF_INTERSECTING_WITH_HOLES} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `SELF_INTERSECTING_WITH_HOLES`常量，用于统一引用固定值。
+     */
     public static final String SELF_INTERSECTING_WITH_HOLES = "[[[[47.42893833699058,27.17895466200852],[47.41407351681856,37.46095466320853],[49.63741575793274,32.47858934221699]],[[47.84342032696093,29.20045703244998],[49.124803688667576,32.38611942598416],[47.858163521459254,34.714948486085035]]],[[[51.659197648757306,27.947907653551276],[49.63741575793274,32.47858934221699],[51.71367987390804,37.46095466320853]],[[51.20718653775245,30.738363015535448],[51.317169097567344,34.58312797324915],[50.1351109330126,32.51793993882006]]]]";
 
-    /** 测试常量字段：{@code POINT_INSIDE_SIMPLE_RECT_CENTER} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_INSIDE_SIMPLE_RECT_CENTER`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_INSIDE_SIMPLE_RECT_CENTER = new Coordinates(48.37082198780869, 32.673342414527355);
-    /** 测试常量字段：{@code POINT_INSIDE_SIMPLE_RECT_NEAR_BORDER} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_INSIDE_SIMPLE_RECT_NEAR_BORDER`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_INSIDE_SIMPLE_RECT_NEAR_BORDER = new Coordinates(48.42916753187315,40.956064637716224);
-    /** 测试常量字段：{@code POINT_OUTSIDE_SIMPLE_RECT} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_OUTSIDE_SIMPLE_RECT`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_OUTSIDE_SIMPLE_RECT = new Coordinates(52.94806646045028,32.91501335472649);
-    /** 测试常量字段：{@code POINT_INSIDE_SAND_CLOCK_CENTER} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_INSIDE_SAND_CLOCK_CENTER`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_INSIDE_SAND_CLOCK_CENTER = new Coordinates(49.993588800145105,31.289062500000004);
-    /** 测试常量字段：{@code POINT_INSIDE_SAND_CLOCK_NEAR_BORDER} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_INSIDE_SAND_CLOCK_NEAR_BORDER`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_INSIDE_SAND_CLOCK_NEAR_BORDER = new Coordinates(47.798651123976306,26.895045405470082);
-    /** 测试常量字段：{@code POINT_OUTSIDE_SAND_CLOCK_1} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_OUTSIDE_SAND_CLOCK_1`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_OUTSIDE_SAND_CLOCK_1 = new Coordinates(49.553754212665936,28.03748985004787);
-    /** 测试常量字段：{@code POINT_OUTSIDE_SAND_CLOCK_2} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_OUTSIDE_SAND_CLOCK_2`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_OUTSIDE_SAND_CLOCK_2 = new Coordinates(46.9802466961145,32.321728498980335);
-    /** 测试常量字段：{@code POINT_INSIDE_SELF_INTERSECTING_UPPER_CENTER} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_INSIDE_SELF_INTERSECTING_UPPER_CENTER`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_INSIDE_SELF_INTERSECTING_UPPER_CENTER = new Coordinates(50.750366308834884,32.51952867922265);
-    /** 测试常量字段：{@code POINT_INSIDE_SELF_INTERSECTING_LOWER_CENTER} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_INSIDE_SELF_INTERSECTING_LOWER_CENTER`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_INSIDE_SELF_INTERSECTING_LOWER_CENTER = new Coordinates(48.1371117277312,32.40967825185941);
-    /** 测试常量字段：{@code POINT_INSIDE_SELF_INTERSECTING_NEAR_BORDER} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_INSIDE_SELF_INTERSECTING_NEAR_BORDER`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_INSIDE_SELF_INTERSECTING_NEAR_BORDER = new Coordinates(51.16552151942722,35.66125090181154);
-    /** 测试常量字段：{@code POINT_OUTSIDE_SELF_INTERSECTING_1} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_OUTSIDE_SELF_INTERSECTING_1`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_OUTSIDE_SELF_INTERSECTING_1= new Coordinates(49.66777277299077,33.26651158529272);
-    /** 测试常量字段：{@code POINT_OUTSIDE_SELF_INTERSECTING_2} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_OUTSIDE_SELF_INTERSECTING_2`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_OUTSIDE_SELF_INTERSECTING_2 = new Coordinates(47.10052840114779,32.16800731166027);
-    /** 测试常量字段：{@code POINT_OUTSIDE_SELF_INTERSECTING_3} 保存 {@code Coordinates} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `POINT_OUTSIDE_SELF_INTERSECTING_3`常量，用于统一引用固定值。
+     */
     public static final Coordinates POINT_OUTSIDE_SELF_INTERSECTING_3 = new Coordinates(78.76578380252519,15.646485040786361);
 
 
     /**
-     * 测试方法：覆盖 {@code testPointsInSimplePolygons} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证`Points In Simple Polygons`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testPointsInSimplePolygons() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Assert.assertTrue("Polygon " + SIMPLE_RECT + " must contain the dot " + POINT_INSIDE_SIMPLE_RECT_CENTER,
                 GeoUtil.contains(SIMPLE_RECT, POINT_INSIDE_SIMPLE_RECT_CENTER)
         );
@@ -107,15 +138,12 @@ public class GeoUtilTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testPointsInComplexPolygons} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证`Points In Complex Polygons`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testPointsInComplexPolygons() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Assert.assertTrue("Polygon " + SAND_CLOCK + " must contain the dot " + POINT_INSIDE_SAND_CLOCK_CENTER,
                 GeoUtil.contains(SAND_CLOCK, POINT_INSIDE_SAND_CLOCK_CENTER)
         );
@@ -150,15 +178,12 @@ public class GeoUtilTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testPointsInSelfIntersectingPolygons} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证`Points In Self Intersecting Polygons`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testPointsInSelfIntersectingPolygons() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         Assert.assertTrue("Polygon " + SELF_INTERSECTING + " must contain the dot "
                         + POINT_INSIDE_SELF_INTERSECTING_UPPER_CENTER,
                 GeoUtil.contains(SELF_INTERSECTING, POINT_INSIDE_SELF_INTERSECTING_UPPER_CENTER)

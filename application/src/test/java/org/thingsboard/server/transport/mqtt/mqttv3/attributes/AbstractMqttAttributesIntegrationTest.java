@@ -67,7 +67,6 @@ import static org.thingsboard.server.common.data.device.profile.MqttTopics.GATEW
 import static org.thingsboard.server.common.data.query.EntityKeyType.CLIENT_ATTRIBUTE;
 import static org.thingsboard.server.common.data.query.EntityKeyType.SHARED_ATTRIBUTE;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractMqttAttributesIntegrationTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -78,6 +77,7 @@ import static org.thingsboard.server.common.data.query.EntityKeyType.SHARED_ATTR
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@Slf4j
 public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqttIntegrationTest {
 
     public static final String ATTRIBUTES_SCHEMA_STR = "syntax =\"proto3\";\n" +
@@ -108,37 +108,22 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
             "\"sharedJson\":{\"someNumber\":42,\"someArray\":[1,2,3],\"someNestedObject\":{\"key\":\"value\"}}}";
 
     /**
-     * 字段说明：
-     * 1. 保存 `SHARED_ATTRIBUTES_DELETED_RESPONSE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 响应常量，用于统一引用固定值。
      */
     private static final String SHARED_ATTRIBUTES_DELETED_RESPONSE = "{\"deleted\":[\"sharedJson\"]}";
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTsKvProtoList` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `attributePrefix`：`attributePrefix` 参数。
+     * 返回：匹配的数据集合。
      */
     private List<TransportProtos.TsKvProto> getTsKvProtoList(String attributePrefix) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvProto tsKvProtoAttribute1 = getTsKvProto(attributePrefix + "Str", "value1", TransportProtos.KeyValueType.STRING_V);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvProto tsKvProtoAttribute2 = getTsKvProto(attributePrefix + "Bool", "true", TransportProtos.KeyValueType.BOOLEAN_V);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvProto tsKvProtoAttribute3 = getTsKvProto(attributePrefix + "Dbl", "42.0", TransportProtos.KeyValueType.DOUBLE_V);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvProto tsKvProtoAttribute4 = getTsKvProto(attributePrefix + "Long", "73", TransportProtos.KeyValueType.LONG_V);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvProto tsKvProtoAttribute5 = getTsKvProto(attributePrefix + "Json", "{\"someNumber\":42,\"someArray\":[1,2,3],\"someNestedObject\":{\"key\":\"value\"}}", TransportProtos.KeyValueType.JSON_V);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         List<TransportProtos.TsKvProto> tsKvProtoList = new ArrayList<>();
         tsKvProtoList.add(tsKvProtoAttribute1);
         tsKvProtoList.add(tsKvProtoAttribute2);
@@ -149,19 +134,15 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTsKvProto` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * - `keyValueType`：类型。
+     * 返回：处理结果。
      */
     protected TransportProtos.TsKvProto getTsKvProto(String key, String value, TransportProtos.KeyValueType keyValueType) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvProto.Builder tsKvProtoBuilder = TransportProtos.TsKvProto.newBuilder();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.KeyValueProto keyValueProto = getKeyValueProto(key, value, keyValueType);
         tsKvProtoBuilder.setKv(keyValueProto);
         return tsKvProtoBuilder.build();
@@ -170,22 +151,16 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     // subscribe to attributes updates from server methods
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processJsonTestSubscribeToAttributesUpdates` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理JSON。
+     * 参数：
+     * - `attrSubTopic`：主题名称或主题对象。
+     * 返回：无。
      */
     protected void processJsonTestSubscribeToAttributesUpdates(String attrSubTopic) throws Exception {
         DeviceId deviceId = savedDevice.getId();
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestClient client = new MqttTestClient();
         client.connectAndWait(accessToken);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestCallback onUpdateCallback = new MqttTestCallback();
         client.setCallback(onUpdateCallback);
 
@@ -197,7 +172,6 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
 
         validateUpdateAttributesJsonResponse(onUpdateCallback, SHARED_ATTRIBUTES_PAYLOAD);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestCallback onDeleteCallback = new MqttTestCallback();
         client.setCallback(onDeleteCallback);
         doDelete("/api/plugins/telemetry/DEVICE/" + deviceId.getId() + "/SHARED_SCOPE?keys=sharedJson", String.class);
@@ -208,17 +182,12 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processProtoTestSubscribeToAttributesUpdates` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理Protobuf。
+     * 参数：
+     * - `attrSubTopic`：主题名称或主题对象。
+     * 返回：无。
      */
     protected void processProtoTestSubscribeToAttributesUpdates(String attrSubTopic) throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestClient client = new MqttTestClient();
         client.connectAndWait(accessToken);
         MqttTestCallback onUpdateCallback = new MqttTestCallback();
@@ -240,14 +209,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateUpdateAttributesJsonResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `expectedResponse`：响应对象。
+     * 返回：无。
      */
     protected void validateUpdateAttributesJsonResponse(MqttTestCallback callback, String expectedResponse) {
         assertNotNull(callback.getPayloadBytes());
@@ -255,14 +221,10 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateUpdateAttributesProtoResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     protected void validateUpdateAttributesProtoResponse(MqttTestCallback callback) throws InvalidProtocolBufferException {
         assertThat(callback.getPayloadBytes()).as("callback payload non-null").isNotNull();
@@ -281,14 +243,10 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateDeleteAttributesProtoResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     protected void validateDeleteAttributesProtoResponse(MqttTestCallback callback) throws InvalidProtocolBufferException {
         assertThat(callback.getPayloadBytes()).as("callback payload non-null").isNotNull();
@@ -303,14 +261,9 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processJsonGatewayTestSubscribeToAttributesUpdates` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理JSON。
+     * 参数：无。
+     * 返回：无。
      */
     protected void processJsonGatewayTestSubscribeToAttributesUpdates() throws Exception {
         MqttTestClient client = new MqttTestClient();
@@ -349,14 +302,9 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processProtoGatewayTestSubscribeToAttributesUpdates` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理Protobuf。
+     * 参数：无。
+     * 返回：无。
      */
     protected void processProtoGatewayTestSubscribeToAttributesUpdates() throws Exception {
         MqttTestClient client = new MqttTestClient();
@@ -382,14 +330,12 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateJsonGatewayUpdateAttributesResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `deviceName`：设备信息或设备标识。
+     * - `expectResultData`：待处理数据。
+     * 返回：无。
      */
     protected void validateJsonGatewayUpdateAttributesResponse(MqttTestCallback callback, String deviceName, String expectResultData) {
         assertThat(callback.getPayloadBytes()).as("callback payload non-null").isNotNull();
@@ -397,14 +343,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getJsonConnectPayloadBytes` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息载荷。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * - `deviceType`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     protected byte[] getJsonConnectPayloadBytes(String deviceName, String deviceType) {
         String connectPayload = "{\"device\":\"" + deviceName + "\", \"type\": \"" + deviceType + "\"}";
@@ -412,28 +355,22 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getGatewayAttributesResponseJson` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取响应。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * - `expectResultData`：待处理数据。
+     * 返回：文本结果。
      */
     private static String getGatewayAttributesResponseJson(String deviceName, String expectResultData) {
         return "{\"device\":\"" + deviceName + "\"," + "\"data\":" + expectResultData + "}";
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateProtoGatewayUpdateAttributesResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `deviceName`：设备信息或设备标识。
+     * 返回：无。
      */
     protected void validateProtoGatewayUpdateAttributesResponse(MqttTestCallback callback, String deviceName) throws InvalidProtocolBufferException, InterruptedException {
         assertThat(callback.getSubscribeLatch().await(DEFAULT_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -462,14 +399,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateProtoGatewayDeleteAttributesResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `deviceName`：设备信息或设备标识。
+     * 返回：无。
      */
     protected void validateProtoGatewayDeleteAttributesResponse(MqttTestCallback callback, String deviceName) throws InvalidProtocolBufferException, InterruptedException {
         assertThat(callback.getSubscribeLatch().await(DEFAULT_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -496,14 +430,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getProtoConnectPayloadBytes` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息载荷。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * - `deviceType`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     private byte[] getProtoConnectPayloadBytes(String deviceName, String deviceType) {
         TransportApiProtos.ConnectMsg connectMsg = TransportApiProtos.ConnectMsg.newBuilder()
@@ -516,14 +447,12 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     // request attributes from server methods
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processJsonTestRequestAttributesValuesFromTheServer` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `attrPubTopic`：主题名称或主题对象。
+     * - `attrSubTopic`：主题名称或主题对象。
+     * - `attrReqTopicPrefix`：主题名称或主题对象。
+     * 返回：无。
      */
     protected void processJsonTestRequestAttributesValuesFromTheServer(String attrPubTopic, String attrSubTopic, String attrReqTopicPrefix) throws Exception {
         MqttTestClient client = new MqttTestClient();
@@ -559,14 +488,12 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processProtoTestRequestAttributesValuesFromTheServer` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `attrPubTopic`：主题名称或主题对象。
+     * - `attrSubTopic`：主题名称或主题对象。
+     * - `attrReqTopicPrefix`：主题名称或主题对象。
+     * 返回：无。
      */
     protected void processProtoTestRequestAttributesValuesFromTheServer(String attrPubTopic, String attrSubTopic, String attrReqTopicPrefix) throws Exception {
         MqttTestClient client = new MqttTestClient();
@@ -602,14 +529,9 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processJsonTestGatewayRequestAttributesValuesFromTheServer` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：无。
+     * 返回：无。
      */
     protected void processJsonTestGatewayRequestAttributesValuesFromTheServer() throws Exception {
         MqttTestClient client = new MqttTestClient();
@@ -677,14 +599,9 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processProtoTestGatewayRequestAttributesValuesFromTheServer` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：无。
+     * 返回：无。
      */
     protected void processProtoTestGatewayRequestAttributesValuesFromTheServer() throws Exception {
         MqttTestClient client = new MqttTestClient();
@@ -739,28 +656,20 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityKeys` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `keys`：键。
+     * - `scope`：`scope` 参数。
+     * 返回：匹配的数据集合。
      */
     private List<EntityKey> getEntityKeys(List<String> keys, EntityKeyType scope) {
         return keys.stream().map(key -> new EntityKey(scope, key)).collect(Collectors.toList());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributesProtoPayloadBytes` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息载荷。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private byte[] getAttributesProtoPayloadBytes() {
         DeviceProfileTransportConfiguration transportConfiguration = deviceProfile.getProfileData().getTransportConfiguration();
@@ -802,14 +711,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getProtoGatewayDeviceClientAttributesPayload` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息载荷。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * - `clientKeysList`：客户端对象。
+     * 返回：处理结果。
      */
     protected byte[] getProtoGatewayDeviceClientAttributesPayload(String deviceName, List<String> clientKeysList) {
         TransportProtos.PostAttributeMsg postAttributeMsg = getPostAttributeMsg(clientKeysList);
@@ -823,14 +729,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateJsonResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `expectedResponse`：响应对象。
+     * 返回：无。
      */
     protected void validateJsonResponse(MqttTestCallback callback, String expectedResponse) throws InterruptedException {
         assertThat(callback.getSubscribeLatch().await(DEFAULT_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -840,14 +743,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateProtoResponse` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `expectedResponse`：响应对象。
+     * 返回：无。
      */
     protected void validateProtoResponse(MqttTestCallback callback, TransportProtos.GetAttributeResponseMsg expectedResponse) throws InterruptedException, InvalidProtocolBufferException {
         assertThat(callback.getSubscribeLatch().await(DEFAULT_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -864,14 +764,9 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getExpectedAttributeResponseMsg` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private TransportProtos.GetAttributeResponseMsg getExpectedAttributeResponseMsg() {
         TransportProtos.GetAttributeResponseMsg.Builder result = TransportProtos.GetAttributeResponseMsg.newBuilder();
@@ -884,14 +779,12 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateJsonResponseGateway` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `deviceName`：设备信息或设备标识。
+     * - `expectedValues`：值。
+     * 返回：无。
      */
     protected void validateJsonResponseGateway(MqttTestCallback callback, String deviceName, String expectedValues) throws InterruptedException {
         assertThat(callback.getSubscribeLatch().await(DEFAULT_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -902,14 +795,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateProtoClientResponseGateway` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `deviceName`：设备信息或设备标识。
+     * 返回：无。
      */
     protected void validateProtoClientResponseGateway(MqttTestCallback callback, String deviceName) throws InterruptedException, InvalidProtocolBufferException {
         assertThat(callback.getSubscribeLatch().await(DEFAULT_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -929,14 +819,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateProtoSharedResponseGateway` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验响应。
+     * 参数：
+     * - `callback`：处理完成后的回调。
+     * - `deviceName`：设备信息或设备标识。
+     * 返回：无。
      */
     protected void validateProtoSharedResponseGateway(MqttTestCallback callback, String deviceName) throws InterruptedException, InvalidProtocolBufferException {
         assertThat(callback.getSubscribeLatch().await(DEFAULT_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
@@ -957,14 +844,11 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getExpectedGatewayAttributeResponseMsg` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * - `client`：客户端对象。
+     * 返回：处理结果。
      */
     private TransportApiProtos.GatewayAttributeResponseMsg getExpectedGatewayAttributeResponseMsg(String deviceName, boolean client) {
         TransportApiProtos.GatewayAttributeResponseMsg.Builder gatewayAttributeResponseMsg = TransportApiProtos.GatewayAttributeResponseMsg.newBuilder();
@@ -982,14 +866,12 @@ public abstract class AbstractMqttAttributesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getGatewayAttributesRequestMsg` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * - `keysList`：键。
+     * - `client`：客户端对象。
+     * 返回：处理结果。
      */
     private TransportApiProtos.GatewayAttributesRequestMsg getGatewayAttributesRequestMsg(String deviceName, List<String> keysList, boolean client) {
         return TransportApiProtos.GatewayAttributesRequestMsg.newBuilder()

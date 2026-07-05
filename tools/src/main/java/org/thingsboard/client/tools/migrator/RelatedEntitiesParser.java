@@ -63,129 +63,68 @@ public class RelatedEntitiesParser {
     );
 
     /**
-     * 方法说明：
-     * 1. 职责：`RelatedEntitiesParser` 执行 PostgreSQL dump 解析器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：由命令行 main 或迁移流程按需创建，处理完输入文件、SSTable writer 或 MQTT 会话后结束；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取命令行参数或 dump 文件，解析字典和实体类型，构造 Cassandra SSTable 行，或建立 MQTT SSL 连接发送测试遥测。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不参与在线事务；迁移工具生成离线 SSTable 文件，由 Cassandra 导入流程承担最终写入。
-     * 9. 缓存：使用内存 Map/Set 缓存 dump 中的字典、实体类型和分区键，生命周期限定在单次迁移命令内。
-     * 10. MQTT：只有 MqttSslClient 直接创建 MQTT SSL 连接并发布测试遥测，迁移工具不涉及 MQTT。
-     * 11. Actor 通信：工具不直接发送 Actor 消息，导入后的数据被服务端读取时才可能进入后续运行时流程。
-     * 12. 数据库：迁移工具面向 PostgreSQL dump 和 Cassandra SSTable 文件，属于离线数据库迁移辅助逻辑。
-     * 13. Rule Engine：不执行 Rule Engine，迁移数据导入后才可能被服务端规则或查询流程消费。
+     * 功能：创建 `RelatedEntitiesParser` 实例，并初始化必要字段。
+     * 参数：
+     * - `source`：`source` 参数。
+     * 返回：新创建的对象实例。
      */
     public RelatedEntitiesParser(File source) throws IOException {
-        // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
         processAllTables(FileUtils.lineIterator(source));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：`getEntityType` 执行 PostgreSQL dump 解析器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：由命令行 main 或迁移流程按需创建，处理完输入文件、SSTable writer 或 MQTT 会话后结束；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取命令行参数或 dump 文件，解析字典和实体类型，构造 Cassandra SSTable 行，或建立 MQTT SSL 连接发送测试遥测。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不参与在线事务；迁移工具生成离线 SSTable 文件，由 Cassandra 导入流程承担最终写入。
-     * 9. 缓存：使用内存 Map/Set 缓存 dump 中的字典、实体类型和分区键，生命周期限定在单次迁移命令内。
-     * 10. MQTT：只有 MqttSslClient 直接创建 MQTT SSL 连接并发布测试遥测，迁移工具不涉及 MQTT。
-     * 11. Actor 通信：工具不直接发送 Actor 消息，导入后的数据被服务端读取时才可能进入后续运行时流程。
-     * 12. 数据库：迁移工具面向 PostgreSQL dump 和 Cassandra SSTable 文件，属于离线数据库迁移辅助逻辑。
-     * 13. Rule Engine：不执行 Rule Engine，迁移数据导入后才可能被服务端规则或查询流程消费。
+     * 功能：获取实体。
+     * 参数：
+     * - `uuid`：`uuid`ID。
+     * 返回：文本结果。
      */
     public String getEntityType(String uuid) {
         return this.allEntityIdsAndTypes.get(uuid);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：`isBlockFinished` 执行 PostgreSQL dump 解析器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：由命令行 main 或迁移流程按需创建，处理完输入文件、SSTable writer 或 MQTT 会话后结束；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取命令行参数或 dump 文件，解析字典和实体类型，构造 Cassandra SSTable 行，或建立 MQTT SSL 连接发送测试遥测。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不参与在线事务；迁移工具生成离线 SSTable 文件，由 Cassandra 导入流程承担最终写入。
-     * 9. 缓存：使用内存 Map/Set 缓存 dump 中的字典、实体类型和分区键，生命周期限定在单次迁移命令内。
-     * 10. MQTT：只有 MqttSslClient 直接创建 MQTT SSL 连接并发布测试遥测，迁移工具不涉及 MQTT。
-     * 11. Actor 通信：工具不直接发送 Actor 消息，导入后的数据被服务端读取时才可能进入后续运行时流程。
-     * 12. 数据库：迁移工具面向 PostgreSQL dump 和 Cassandra SSTable 文件，属于离线数据库迁移辅助逻辑。
-     * 13. Rule Engine：不执行 Rule Engine，迁移数据导入后才可能被服务端规则或查询流程消费。
+     * 功能：判断`Block Finished`。
+     * 参数：
+     * - `line`：`line` 参数。
+     * 返回：判断结果。
      */
-    // PostgreSQL dump 使用空行或反斜杠点号结束 COPY 块，这里统一封装块结束判断。
     private boolean isBlockFinished(String line) {
         return StringUtils.isBlank(line) || line.equals("\\.");
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：`processAllTables` 执行 PostgreSQL dump 解析器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：由命令行 main 或迁移流程按需创建，处理完输入文件、SSTable writer 或 MQTT 会话后结束；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取命令行参数或 dump 文件，解析字典和实体类型，构造 Cassandra SSTable 行，或建立 MQTT SSL 连接发送测试遥测。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不参与在线事务；迁移工具生成离线 SSTable 文件，由 Cassandra 导入流程承担最终写入。
-     * 9. 缓存：使用内存 Map/Set 缓存 dump 中的字典、实体类型和分区键，生命周期限定在单次迁移命令内。
-     * 10. MQTT：只有 MqttSslClient 直接创建 MQTT SSL 连接并发布测试遥测，迁移工具不涉及 MQTT。
-     * 11. Actor 通信：工具不直接发送 Actor 消息，导入后的数据被服务端读取时才可能进入后续运行时流程。
-     * 12. 数据库：迁移工具面向 PostgreSQL dump 和 Cassandra SSTable 文件，属于离线数据库迁移辅助逻辑。
-     * 13. Rule Engine：不执行 Rule Engine，迁移数据导入后才可能被服务端规则或查询流程消费。
+     * 功能：处理`All Tables`。
+     * 参数：
+     * - `lineIterator`：`lineIterator` 参数。
+     * 返回：无。
      */
-    // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
     private void processAllTables(LineIterator lineIterator) throws IOException {
         String currentLine;
         try {
-            // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
             while (lineIterator.hasNext()) {
-                // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
                 currentLine = lineIterator.nextLine();
                 for(Map.Entry<String, EntityType> entry : tableNameAndEntityType.entrySet()) {
-                    // 条件分支用于区分配置是否存在、dump 块边界、类型选择、token 生命周期或协议启动参数覆盖场景。
                     if(currentLine.startsWith(entry.getKey())) {
-                        // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
                         processBlock(lineIterator, entry.getValue());
                     }
                 }
             }
         } finally {
-            // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
             lineIterator.close();
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：`processBlock` 执行 PostgreSQL dump 解析器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：由命令行 main 或迁移流程按需创建，处理完输入文件、SSTable writer 或 MQTT 会话后结束；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取命令行参数或 dump 文件，解析字典和实体类型，构造 Cassandra SSTable 行，或建立 MQTT SSL 连接发送测试遥测。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不参与在线事务；迁移工具生成离线 SSTable 文件，由 Cassandra 导入流程承担最终写入。
-     * 9. 缓存：使用内存 Map/Set 缓存 dump 中的字典、实体类型和分区键，生命周期限定在单次迁移命令内。
-     * 10. MQTT：只有 MqttSslClient 直接创建 MQTT SSL 连接并发布测试遥测，迁移工具不涉及 MQTT。
-     * 11. Actor 通信：工具不直接发送 Actor 消息，导入后的数据被服务端读取时才可能进入后续运行时流程。
-     * 12. 数据库：迁移工具面向 PostgreSQL dump 和 Cassandra SSTable 文件，属于离线数据库迁移辅助逻辑。
-     * 13. Rule Engine：不执行 Rule Engine，迁移数据导入后才可能被服务端规则或查询流程消费。
+     * 功能：处理`Block`。
+     * 参数：
+     * - `lineIterator`：`lineIterator` 参数。
+     * - `entityType`：实体对象。
+     * 返回：无。
      */
-    // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
     private void processBlock(LineIterator lineIterator, EntityType entityType) {
         String currentLine;
-        // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
         while(lineIterator.hasNext()) {
-            // 使用流式逐行读取处理大 dump 文件，避免一次性加载全部遥测数据造成内存压力。
             currentLine = lineIterator.nextLine();
-            // PostgreSQL dump 使用空行或反斜杠点号结束 COPY 块，这里统一封装块结束判断。
             if(isBlockFinished(currentLine)) {
                 return;
             }

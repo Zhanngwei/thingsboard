@@ -66,8 +66,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@Slf4j
-@RunWith(MockitoJUnitRunner.class)
 /**
  * 中文说明：
  * 1. 类目的：`HashPartitionServiceTest` 是ThingsBoard Application 测试模块中的测试支撑类型，用于验证 Application 模块的控制器、服务、Actor 或集成流程。
@@ -78,79 +76,46 @@ import static org.mockito.Mockito.when;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Test Fixture。
  */
+@Slf4j
+@RunWith(MockitoJUnitRunner.class)
 public class HashPartitionServiceTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `ITERATIONS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `ITERATIONS`常量，用于统一引用固定值。
      */
     public static final int ITERATIONS = 1000000;
     public static final int SERVER_COUNT = 3;
     /**
-     * 字段说明：
-     * 1. 保存 `partitionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
     private HashPartitionService partitionService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `serviceInfoProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private TbServiceInfoProvider serviceInfoProvider;
     private TenantRoutingInfoService routingInfoService;
     /**
-     * 字段说明：
-     * 1. 保存 `applicationEventPublisher` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 事件，表示当前对象的对应属性。
      */
     private ApplicationEventPublisher applicationEventPublisher;
     private QueueRoutingInfoService queueRoutingInfoService;
     /**
-     * 字段说明：
-     * 1. 保存 `topicService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主题，提供当前类调用的业务操作。
      */
     private TopicService topicService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `hashFunctionName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 名称，用于标识或展示当前对象。
      */
     private String hashFunctionName = "murmur3_128";
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setup` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void setup() throws Exception {
         serviceInfoProvider = mock(TbServiceInfoProvider.class);
         applicationEventPublisher = mock(ApplicationEventPublisher.class);
@@ -164,7 +129,6 @@ public class HashPartitionServiceTest {
                 .addAllServiceTypes(Collections.singletonList(ServiceType.TB_CORE.name()))
                 .build();
         List<ServiceInfo> otherServers = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 1; i < SERVER_COUNT; i++) {
             otherServers.add(ServiceInfo.newBuilder()
                     .setServiceId("tb-rule-" + i)
@@ -175,20 +139,14 @@ public class HashPartitionServiceTest {
         partitionService.recalculatePartitions(currentServer, otherServers);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDispersionOnMillionDevices` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Dispersion On Million Devices`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testDispersionOnMillionDevices() {
         List<DeviceId> devices = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < ITERATIONS; i++) {
             devices.add(new DeviceId(Uuids.timeBased()));
         }
@@ -196,19 +154,14 @@ public class HashPartitionServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testDevicesDispersion` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Devices Dispersion`相关场景。
+     * 参数：
+     * - `devices`：设备信息或设备标识。
+     * 返回：无。
      */
     private void testDevicesDispersion(List<DeviceId> devices) {
         long start = System.currentTimeMillis();
         Map<Integer, Integer> map = new HashMap<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (DeviceId deviceId : devices) {
             TopicPartitionInfo address = partitionService.resolve(ServiceType.TB_CORE, TenantId.SYS_TENANT_ID, deviceId);
             Integer partition = address.getPartition().get();
@@ -218,18 +171,13 @@ public class HashPartitionServiceTest {
         checkDispersion(start, map, ITERATIONS, 5.0);
     }
 
+    /**
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
+     */
     @SneakyThrows
     @Test
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testDispersionOnResolveByPartitionIdx` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void testDispersionOnResolveByPartitionIdx() {
         int serverCount = 5;
         int tenantCount = 1000;
@@ -238,7 +186,6 @@ public class HashPartitionServiceTest {
 
         List<ServiceInfo> services = new ArrayList<>();
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < serverCount; i++) {
             services.add(ServiceInfo.newBuilder().setServiceId("RE-" + i).build());
         }
@@ -249,14 +196,11 @@ public class HashPartitionServiceTest {
 
         Random random = new Random();
         long ts = new SimpleDateFormat("dd-MM-yyyy").parse("06-12-2016").getTime() - TimeUnit.DAYS.toMillis(tenantCount);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int tenantIndex = 0; tenantIndex < tenantCount; tenantIndex++) {
             TenantId tenantId = new TenantId(Uuids.startOf(ts));
             ts += TimeUnit.DAYS.toMillis(1) + random.nextInt(1000);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (int queueIndex = 0; queueIndex < queueCount; queueIndex++) {
                 QueueKey queueKey = new QueueKey(ServiceType.TB_RULE_ENGINE, "queue" + queueIndex, tenantId);
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 for (int partition = 0; partition < partitionCount; partition++) {
                     ServiceInfo serviceInfo = partitionService.resolveByPartitionIdx(services, queueKey, partition, Collections.emptyMap());
                     String serviceId = serviceInfo.getServiceId();
@@ -269,14 +213,13 @@ public class HashPartitionServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkDispersion` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Dispersion`。
+     * 参数：
+     * - `start`：`start` 参数。
+     * - `map`：键值映射。
+     * - `iterations`：`iterations` 参数。
+     * - `maxDiffPercent`：`maxDiffPercent` 参数。
+     * 返回：无。
      */
     private <T> void checkDispersion(long start, Map<T, Integer> map, int iterations, double maxDiffPercent) {
         List<Map.Entry<T, Integer>> data = map.entrySet().stream().sorted(Comparator.comparingInt(Map.Entry::getValue)).collect(Collectors.toList());
@@ -285,24 +228,18 @@ public class HashPartitionServiceTest {
         double diff = Math.max(data.get(data.size() - 1).getValue() - ideal, ideal - data.get(0).getValue());
         double diffPercent = (diff / ideal) * 100.0;
         System.out.println("Time: " + (end - start) + " Diff: " + diff + "(" + String.format("%f", diffPercent) + "%)");
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Map.Entry<T, Integer> entry : data) {
             System.out.println(entry.getKey() + ": " + entry.getValue());
         }
         Assert.assertTrue(diffPercent < maxDiffPercent);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPartitionsAssignmentWithDedicatedServers` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Partitions Assignment With Dedicated Servers`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPartitionsAssignmentWithDedicatedServers() {
         int isolatedProfilesCount = 5;
         int tenantsCountPerProfile = 100;
@@ -313,9 +250,7 @@ public class HashPartitionServiceTest {
         List<TenantProfileId> isolatedTenantProfiles = Stream.generate(() -> new TenantProfileId(UUID.randomUUID()))
                 .limit(isolatedProfilesCount).collect(Collectors.toList());
         Map<TenantId, TenantProfileId> tenants = new HashMap<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (TenantProfileId tenantProfileId : isolatedTenantProfiles) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (int i = 0; i < tenantsCountPerProfile; i++) {
                 tenants.put(new TenantId(UUID.randomUUID()), tenantProfileId);
             }
@@ -332,7 +267,6 @@ public class HashPartitionServiceTest {
         List<ServiceInfo> ruleEngines = new ArrayList<>();
         Map<TenantProfileId, List<ServiceInfo>> dedicatedServers = new HashMap<>();
         int serviceId = 0;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < serversCountPerSet; i++) {
             ServiceInfo commonServer = ServiceInfo.newBuilder()
                     .setServiceId("tb-rule-engine-" + serviceId)
@@ -341,7 +275,6 @@ public class HashPartitionServiceTest {
             ruleEngines.add(commonServer);
             serviceId++;
         }
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < dedicatedServerSetsCount; i++) {
             List<TenantProfileId> assignedProfiles = ListUtils.partition(isolatedTenantProfiles, profilesPerSet).get(i);
             for (int j = 0; j < serversCountPerSet; j++) {
@@ -411,17 +344,12 @@ public class HashPartitionServiceTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPartitionChangeEvents_isolatedProfile_oneCommonServer_oneDedicated` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证分区相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPartitionChangeEvents_isolatedProfile_oneCommonServer_oneDedicated() {
         ServiceInfo commonRuleEngine = ServiceInfo.newBuilder()
                 .setServiceId("tb-rule-engine-1")
@@ -505,17 +433,12 @@ public class HashPartitionServiceTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPartitionsDistribution_sameTenantDifferentQueues` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证租户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPartitionsDistribution_sameTenantDifferentQueues() {
         List<ServiceInfo> ruleEngines = new ArrayList<>();
         int serviceId = 0;
@@ -545,28 +468,22 @@ public class HashPartitionServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyPartitionChangeEvent` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验分区。
+     * 参数：
+     * - `predicate`：`predicate` 参数。
+     * 返回：无。
      */
     private void verifyPartitionChangeEvent(Predicate<PartitionChangeEvent> predicate) {
         verify(applicationEventPublisher).publishEvent(argThat(event -> event instanceof PartitionChangeEvent && predicate.test((PartitionChangeEvent) event)));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `mockRoutingInfo` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `mockRoutingInfo` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `tenantProfileId`：租户IDID。
+     * - `isolated`：`isolated` 参数。
+     * 返回：无。
      */
     private void mockRoutingInfo(TenantId tenantId, TenantProfileId tenantProfileId, boolean isolated) {
         when(routingInfoService.getRoutingInfo(eq(tenantId)))
@@ -574,14 +491,10 @@ public class HashPartitionServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `mockQueues` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `mockQueues` 对应的处理。
+     * 参数：
+     * - `queues`：队列名称或队列对象。
+     * 返回：无。
      */
     private void mockQueues(List<Queue> queues) {
         when(queueRoutingInfoService.getAllQueuesRoutingInfo()).thenReturn(queues.stream()
@@ -589,14 +502,11 @@ public class HashPartitionServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createQueue` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建队列。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `partitions`：分区标识或分区信息。
+     * 返回：处理结果。
      */
     private Queue createQueue(TenantId tenantId, int partitions) {
         Queue systemQueue = new Queue();
@@ -609,14 +519,9 @@ public class HashPartitionServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createPartitionService` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建分区。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private HashPartitionService createPartitionService() {
         HashPartitionService partitionService = new HashPartitionService(serviceInfoProvider,

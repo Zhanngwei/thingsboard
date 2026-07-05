@@ -28,8 +28,6 @@ import org.thingsboard.monitoring.util.TbStopWatch;
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
 
-@Component
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`WsClientFactory` 是 ThingsBoard Monitoring 模块 中的监控客户端适配类型，用于封装 REST、WebSocket 或 LwM2M 客户端连接、认证、订阅和消息收发边界。
@@ -41,71 +39,46 @@ import java.util.concurrent.TimeUnit;
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 Adapter / Client。
  */
+@Component
+@RequiredArgsConstructor
 public class WsClientFactory {
 
     /**
-     * 字段说明：
-     * 1. 保存 `monitoringReporter` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 监控报告器，表示当前对象的对应属性。
      */
     private final MonitoringReporter monitoringReporter;
     private final TbStopWatch stopWatch;
+    /**
+     * 基础访问地址，用于定位外部资源或本地资源。
+     */
     @Value("${monitoring.ws.base_url}")
-    /**
-     * 字段说明：
-     * 1. 保存 `baseUrl` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
-     */
     private String baseUrl;
-    @Value("${monitoring.ws.request_timeout_ms}")
     /**
-     * 字段说明：
-     * 1. 保存 `requestTimeoutMs` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
+    @Value("${monitoring.ws.request_timeout_ms}")
     private int requestTimeoutMs;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createClient` 对应的监控客户端适配类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：保存或创建客户端。
+     * 参数：
+     * - `accessToken`：`accessToken` 参数。
+     * 返回：处理结果。
      */
     public WsClient createClient(String accessToken) throws Exception {
         URI uri = new URI(baseUrl + "/api/ws/plugins/telemetry?token=" + accessToken);
         stopWatch.start();
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         WsClient wsClient = new WsClient(uri, requestTimeoutMs);
-        // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
         if (baseUrl.startsWith("wss")) {
             SSLContextBuilder builder = SSLContexts.custom();
             builder.loadTrustMaterial(null, (TrustStrategy) (chain, authType) -> true);
-            // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
             wsClient.setSocketFactory(builder.build().getSocketFactory());
         }
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         boolean connected = wsClient.connectBlocking(requestTimeoutMs, TimeUnit.MILLISECONDS);
-        // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
         if (!connected) {
             throw new IllegalStateException("Failed to establish WS session");
         }
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         monitoringReporter.reportLatency(Latencies.WS_CONNECT, stopWatch.getTime());
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         return wsClient;
     }
 

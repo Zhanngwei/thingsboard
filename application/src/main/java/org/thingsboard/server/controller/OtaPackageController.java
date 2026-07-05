@@ -68,11 +68,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHO
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH;
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 
-@Slf4j
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`OtaPackageController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -83,50 +78,40 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@Slf4j
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
+@RequiredArgsConstructor
 public class OtaPackageController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbOtaPackageService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TbOtaPackageService tbOtaPackageService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `OTA_PACKAGE_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `OTA_PACKAGE_ID`常量，用于统一引用固定值。
      */
     public static final String OTA_PACKAGE_ID = "otaPackageId";
     public static final String CHECKSUM_ALGORITHM = "checksumAlgorithm";
 
+    /**
+     * 功能：执行 `downloadOtaPackage` 对应的处理。
+     * 参数：
+     * - `strOtaPackageId`：`strOtaPackageId`ID。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Download OTA Package (downloadOtaPackage)", notes = "Download OTA Package based on the provided OTA Package Id." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority( 'TENANT_ADMIN')")
     @RequestMapping(value = "/otaPackage/{otaPackageId}/download", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `downloadOtaPackage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ResponseEntity<org.springframework.core.io.Resource> downloadOtaPackage(@ApiParam(value = OTA_PACKAGE_ID_PARAM_DESCRIPTION)
                                                                                    @PathVariable(OTA_PACKAGE_ID) String strOtaPackageId) throws ThingsboardException {
         checkParameter(OTA_PACKAGE_ID, strOtaPackageId);
         OtaPackageId otaPackageId = new OtaPackageId(toUUID(strOtaPackageId));
         OtaPackage otaPackage = checkOtaPackageId(otaPackageId, Operation.READ);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (otaPackage.hasUrl()) {
             return ResponseEntity.badRequest().build();
         }
@@ -140,6 +125,12 @@ public class OtaPackageController extends BaseController {
                 .body(resource);
     }
 
+    /**
+     * 功能：获取信息对象。
+     * 参数：
+     * - `strOtaPackageId`：`strOtaPackageId`ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get OTA Package Info (getOtaPackageInfoById)",
             notes = "Fetch the OTA Package Info object based on the provided OTA Package Id. " +
                     OTA_PACKAGE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -147,16 +138,6 @@ public class OtaPackageController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/otaPackage/info/{otaPackageId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getOtaPackageInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public OtaPackageInfo getOtaPackageInfoById(@ApiParam(value = OTA_PACKAGE_ID_PARAM_DESCRIPTION)
                                                 @PathVariable(OTA_PACKAGE_ID) String strOtaPackageId) throws ThingsboardException {
         checkParameter(OTA_PACKAGE_ID, strOtaPackageId);
@@ -164,6 +145,12 @@ public class OtaPackageController extends BaseController {
         return checkNotNull(otaPackageService.findOtaPackageInfoById(getTenantId(), otaPackageId));
     }
 
+    /**
+     * 功能：获取`Ota Package By Id`。
+     * 参数：
+     * - `strOtaPackageId`：`strOtaPackageId`ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get OTA Package (getOtaPackageById)",
             notes = "Fetch the OTA Package object based on the provided OTA Package Id. " +
                     "The server checks that the OTA Package is owned by the same tenant. " + OTA_PACKAGE_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH,
@@ -171,16 +158,6 @@ public class OtaPackageController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/otaPackage/{otaPackageId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getOtaPackageById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public OtaPackage getOtaPackageById(@ApiParam(value = OTA_PACKAGE_ID_PARAM_DESCRIPTION)
                                         @PathVariable(OTA_PACKAGE_ID) String strOtaPackageId) throws ThingsboardException {
         checkParameter(OTA_PACKAGE_ID, strOtaPackageId);
@@ -188,6 +165,12 @@ public class OtaPackageController extends BaseController {
         return checkOtaPackageId(otaPackageId, Operation.READ);
     }
 
+    /**
+     * 功能：保存或创建信息对象。
+     * 参数：
+     * - `otaPackageInfo`：`otaPackageInfo` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create Or Update OTA Package Info (saveOtaPackageInfo)",
             notes = "Create or update the OTA Package Info. When creating OTA Package Info, platform generates OTA Package id as " + UUID_WIKI_LINK +
                     "The newly created OTA Package id will be present in the response. " +
@@ -199,16 +182,6 @@ public class OtaPackageController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/otaPackage", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveOtaPackageInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public OtaPackageInfo saveOtaPackageInfo(@ApiParam(value = "A JSON value representing the OTA Package.")
                                              @RequestBody SaveOtaPackageInfoRequest otaPackageInfo) throws ThingsboardException {
         otaPackageInfo.setTenantId(getTenantId());
@@ -217,6 +190,16 @@ public class OtaPackageController extends BaseController {
         return tbOtaPackageService.save(otaPackageInfo, getCurrentUser());
     }
 
+    /**
+     * 功能：保存或创建数据。
+     * 参数：
+     * - `strOtaPackageId`：`strOtaPackageId`ID。
+     * - `example`：`example` 参数。
+     * - `checksum`：`checksum` 参数。
+     * - `algorithm`：`algorithm` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Save OTA Package data (saveOtaPackageData)",
             notes = "Update the OTA Package. Adds the date to the existing OTA Package Info" + TENANT_AUTHORITY_PARAGRAPH,
             produces = APPLICATION_JSON_VALUE,
@@ -224,16 +207,6 @@ public class OtaPackageController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/otaPackage/{otaPackageId}", method = RequestMethod.POST, consumes = MULTIPART_FORM_DATA_VALUE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveOtaPackageData` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public OtaPackageInfo saveOtaPackageData(@ApiParam(value = OTA_PACKAGE_ID_PARAM_DESCRIPTION)
                                              @PathVariable(OTA_PACKAGE_ID) String strOtaPackageId,
                                              @ApiParam(value = "OTA Package checksum. For example, '0xd87f7e0c'")
@@ -252,6 +225,16 @@ public class OtaPackageController extends BaseController {
                 data, file.getOriginalFilename(), file.getContentType(), getCurrentUser());
     }
 
+    /**
+     * 功能：获取`Ota Packages`。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get OTA Package Infos (getOtaPackages)",
             notes = "Returns a page of OTA Package Info objects owned by tenant. " +
                     PAGE_DATA_PARAMETERS + OTA_PACKAGE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -259,16 +242,6 @@ public class OtaPackageController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/otaPackages", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getOtaPackages` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<OtaPackageInfo> getOtaPackages(@ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
                                                    @RequestParam int pageSize,
                                                    @ApiParam(value = PAGE_NUMBER_DESCRIPTION, required = true)
@@ -283,6 +256,16 @@ public class OtaPackageController extends BaseController {
         return checkNotNull(otaPackageService.findTenantOtaPackagesByTenantId(getTenantId(), pageLink));
     }
 
+    /**
+     * 功能：获取`Ota Packages`。
+     * 参数：
+     * - `strDeviceProfileId`：设备配置ID。
+     * - `type`：类型。
+     * - `FIRMWARE`：`FIRMWARE` 参数。
+     * - `strType`：类型。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get OTA Package Infos (getOtaPackages)",
             notes = "Returns a page of OTA Package Info objects owned by tenant. " +
                     PAGE_DATA_PARAMETERS + OTA_PACKAGE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -290,16 +273,6 @@ public class OtaPackageController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/otaPackages/{deviceProfileId}/{type}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getOtaPackages` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<OtaPackageInfo> getOtaPackages(@ApiParam(value = DEVICE_PROFILE_ID_PARAM_DESCRIPTION)
                                                    @PathVariable("deviceProfileId") String strDeviceProfileId,
                                                    @ApiParam(value = "OTA Package type.", allowableValues = "FIRMWARE, SOFTWARE")
@@ -321,6 +294,12 @@ public class OtaPackageController extends BaseController {
                 new DeviceProfileId(toUUID(strDeviceProfileId)), OtaPackageType.valueOf(strType), pageLink));
     }
 
+    /**
+     * 功能：删除或清理`Ota Package`。
+     * 参数：
+     * - `strOtaPackageId`：`strOtaPackageId`ID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete OTA Package (deleteOtaPackage)",
             notes = "Deletes the OTA Package. Referencing non-existing OTA Package Id will cause an error. " +
                     "Can't delete the OTA Package if it is referenced by existing devices or device profile." + TENANT_AUTHORITY_PARAGRAPH,
@@ -328,16 +307,6 @@ public class OtaPackageController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/otaPackage/{otaPackageId}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteOtaPackage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteOtaPackage(@ApiParam(value = OTA_PACKAGE_ID_PARAM_DESCRIPTION)
                                  @PathVariable("otaPackageId") String strOtaPackageId) throws ThingsboardException {
         checkParameter(OTA_PACKAGE_ID, strOtaPackageId);

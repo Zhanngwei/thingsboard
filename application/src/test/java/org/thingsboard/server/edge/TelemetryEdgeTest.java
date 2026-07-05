@@ -40,7 +40,6 @@ import org.thingsboard.server.gen.transport.TransportProtos;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`TelemetryEdgeTest` 是ThingsBoard Application 测试模块中的测试支撑类型，用于验证 Application 模块的控制器、服务、Actor 或集成流程。
@@ -51,19 +50,15 @@ import java.util.concurrent.TimeUnit;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Test Fixture。
  */
+@DaoSqlTest
 public class TelemetryEdgeTest extends AbstractEdgeTest {
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTimeseriesWithFailures` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证时序数据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testTimeseriesWithFailures() throws Exception {
         int numberOfTimeseriesToSend = 333;
 
@@ -73,7 +68,6 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         // imitator will generate failure in 5% of cases
         edgeImitator.setFailureProbability(5.0);
         edgeImitator.expectMessageAmount(numberOfTimeseriesToSend);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int idx = 1; idx <= numberOfTimeseriesToSend; idx++) {
             String timeseriesData = "{\"data\":{\"idx\":" + idx + "},\"ts\":" + System.currentTimeMillis() + "}";
             JsonNode timeseriesEntityData = JacksonUtil.toJsonNode(timeseriesData);
@@ -88,7 +82,6 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         List<EntityDataProto> allTelemetryMsgs = edgeImitator.findAllMessagesByType(EntityDataProto.class);
         Assert.assertEquals(numberOfTimeseriesToSend, allTelemetryMsgs.size());
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int idx = 1; idx <= numberOfTimeseriesToSend; idx++) {
             Assert.assertTrue(isIdxExistsInTheDownlinkList(idx, allTelemetryMsgs));
         }
@@ -96,17 +89,12 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         edgeImitator.setRandomFailuresOnTimeseriesDownlink(false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAttributes` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Attributes`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAttributes() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
 
@@ -116,14 +104,10 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPostAttributesMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证消息相关场景。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：无。
      */
     private void testPostAttributesMsg(Device device) throws Exception {
         String postAttributesData = "{\"scope\":\"SERVER_SCOPE\",\"kv\":{\"key2\":\"value2\"}}";
@@ -143,24 +127,18 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals("SERVER_SCOPE", latestEntityDataMsg.getPostAttributeScope());
         Assert.assertTrue(latestEntityDataMsg.hasPostAttributesMsg());
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.PostAttributeMsg postAttributesMsg = latestEntityDataMsg.getPostAttributesMsg();
         Assert.assertEquals(1, postAttributesMsg.getKvCount());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.KeyValueProto keyValueProto = postAttributesMsg.getKv(0);
         Assert.assertEquals("key2", keyValueProto.getKey());
         Assert.assertEquals("value2", keyValueProto.getStringV());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAttributesDeleteMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证消息相关场景。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：无。
      */
     private void testAttributesDeleteMsg(Device device) throws Exception {
         String deleteAttributesData = "{\"scope\":\"SERVER_SCOPE\",\"keys\":[\"key1\",\"key2\"]}";
@@ -188,17 +166,12 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals("key2", attributeDeleteMsg.getAttributeNames(1));
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTimeseries` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证时序数据相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testTimeseries() throws Exception {
         Device device = findDeviceByName("Edge Device 1");
         String timeseriesData = "{\"data\":{\"temperature\":25},\"ts\":" + System.currentTimeMillis() + "}";
@@ -217,42 +190,31 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals(latestEntityDataMsg.getEntityType(), device.getId().getEntityType().name());
         Assert.assertTrue(latestEntityDataMsg.hasPostTelemetryMsg());
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.PostTelemetryMsg postTelemetryMsg = latestEntityDataMsg.getPostTelemetryMsg();
         Assert.assertEquals(1, postTelemetryMsg.getTsKvListCount());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvListProto tsKvListProto = postTelemetryMsg.getTsKvList(0);
         Assert.assertEquals(timeseriesEntityData.get("ts").asLong(), tsKvListProto.getTs());
         Assert.assertEquals(1, tsKvListProto.getKvCount());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.KeyValueProto keyValueProto = tsKvListProto.getKv(0);
         Assert.assertEquals("temperature", keyValueProto.getKey());
         Assert.assertEquals(25, keyValueProto.getLongV());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isIdxExistsInTheDownlinkList` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Idx Exists In The Downlink List`。
+     * 参数：
+     * - `idx`：`idx` 参数。
+     * - `allTelemetryMsgs`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean isIdxExistsInTheDownlinkList(int idx, List<EntityDataProto> allTelemetryMsgs) {
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (EntityDataProto proto : allTelemetryMsgs) {
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             TransportProtos.PostTelemetryMsg postTelemetryMsg = proto.getPostTelemetryMsg();
             Assert.assertEquals(1, postTelemetryMsg.getTsKvListCount());
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             TransportProtos.TsKvListProto tsKvListProto = postTelemetryMsg.getTsKvList(0);
             Assert.assertEquals(1, tsKvListProto.getKvCount());
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             TransportProtos.KeyValueProto keyValueProto = tsKvListProto.getKv(0);
             Assert.assertEquals("idx", keyValueProto.getKey());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (keyValueProto.getLongV() == idx) {
                 return true;
             }
@@ -260,17 +222,12 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         return false;
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testTimeseriesDeliveryFailuresForever_deliverOnlyDeviceUpdateMsgs` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testTimeseriesDeliveryFailuresForever_deliverOnlyDeviceUpdateMsgs() throws Exception {
         int numberOfMsgsToSend = 100;
 
@@ -305,30 +262,21 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         edgeImitator.setRandomFailuresOnTimeseriesDownlink(false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAttributesUpdatedMsg_userEntity` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证用户相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testAttributesUpdatedMsg_userEntity() throws Exception {
         testAttributesUpdatedMsg(tenantAdminUserId);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testAttributesUpdatedMsg` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证消息相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：无。
      */
     private void testAttributesUpdatedMsg(EntityId entityId) throws Exception {
         String attributesData = "{\"scope\":\"SERVER_SCOPE\",\"kv\":{\"key1\":\"value1\"}}";
@@ -355,17 +303,12 @@ public class TelemetryEdgeTest extends AbstractEdgeTest {
         Assert.assertEquals("value1", keyValueProto.getStringV());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendAttributesDeleteRequestToCloud_nonDeviceEntity` 对应的测试支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由测试框架按测试类和测试方法管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：准备输入和依赖，调用被测对象并断言结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testSendAttributesDeleteRequestToCloud_nonDeviceEntity() throws Exception {
         edgeImitator.expectMessageAmount(2);
         Asset savedAsset = saveAsset("Delete Attribute Test");

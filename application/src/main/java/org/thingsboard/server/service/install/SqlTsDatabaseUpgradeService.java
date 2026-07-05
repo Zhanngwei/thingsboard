@@ -24,10 +24,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 
-@Service
-@Profile("install")
-@Slf4j
-@SqlTsDao
 /**
  * 中文说明：
  * 1. 类目的：`SqlTsDatabaseUpgradeService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -38,44 +34,40 @@ import java.sql.Connection;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Profile("install")
+@Slf4j
+@SqlTsDao
 public class SqlTsDatabaseUpgradeService extends AbstractSqlTsDatabaseUpgradeService implements DatabaseTsUpgradeService {
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `upgradeDatabase` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `upgradeDatabase` 对应的处理。
+     * 参数：
+     * - `fromVersion`：`fromVersion` 参数。
+     * 返回：无。
      */
+    @Override
     public void upgradeDatabase(String fromVersion) throws Exception {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (fromVersion) {
             default:
                 throw new RuntimeException("Unable to upgrade SQL database, unsupported fromVersion: " + fromVersion);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadSql` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取SQL。
+     * 参数：
+     * - `conn`：`conn` 参数。
+     * - `fileName`：名称。
+     * - `version`：`version` 参数。
+     * 返回：无。
      */
+    @Override
     protected void loadSql(Connection conn, String fileName, String version) {
         Path schemaUpdateFile = Paths.get(installScripts.getDataDir(), "upgrade", version, fileName);
         try {
             loadFunctions(schemaUpdateFile, conn);
             log.info("Functions successfully loaded!");
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.info("Failed to load PostgreSQL upgrade functions due to: {}", e.getMessage());
         }

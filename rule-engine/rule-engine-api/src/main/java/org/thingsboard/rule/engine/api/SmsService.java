@@ -32,54 +32,36 @@ import org.thingsboard.server.common.data.sms.config.TestSmsRequest;
 public interface SmsService {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：刷新短信发送配置。
-     * 2. 输入参数：无。
-     * 3. 返回值：无，刷新后的配置由实现类内部维护。
-     * 4. 调用时机：短信配置变更后调用。
-     * 5. 调用方：配置管理流程或系统服务。
-     * 6. 使用流程：属于短信配置生命周期，不处理单条规则消息。
-     * 7. 线程安全：具体实现需保证配置刷新与发送并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务、MQTT、Actor、数据库；实现可能更新配置缓存并服务 Rule Engine。
+     * 功能：更新`Sms Configuration`。
+     * 参数：无。
+     * 返回：无。
      */
     void updateSmsConfiguration();
 
     /**
-     * 中文说明：
-     * 1. 方法职责：向一个或多个号码发送短信。
-     * 2. 输入参数：tenantId/customerId 表示租户和客户上下文，numbersTo 是目标号码数组，message 是短信内容。
-     * 3. 返回值：无；失败通过 ThingsboardException 抛出。
-     * 4. 调用时机：短信规则节点或通知流程完成模板渲染后调用。
-     * 5. 调用方：短信规则节点、通知中心。
-     * 6. 使用流程：直接服务 Rule Engine 外部短信发送流程。
-     * 7. 线程安全：接口无状态，具体实现需保证供应商客户端和配置并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及 MQTT、Actor；实现可能读取配置缓存并调用外部短信 API。
+     * 功能：发送或提交`Sms`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `numbersTo`：`numbersTo` 参数。
+     * - `message`：待处理消息。
+     * 返回：无。
      */
     void sendSms(TenantId tenantId, CustomerId customerId, String[] numbersTo, String message) throws ThingsboardException;;
 
     /**
-     * 中文说明：
-     * 1. 方法职责：使用测试请求验证短信配置并发送测试短信。
-     * 2. 输入参数：testSmsRequest 包含测试短信供应商配置、号码和消息内容。
-     * 3. 返回值：无；配置或发送失败通过 ThingsboardException 抛出。
-     * 4. 调用时机：管理员测试短信配置时调用。
-     * 5. 调用方：短信配置管理 API。
-     * 6. 使用流程：属于配置验证流程，不属于规则链消息路由。
-     * 7. 线程安全：由实现隔离测试客户端和共享配置。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务、缓存、MQTT、Actor、数据库；执行外部短信服务调用。
+     * 功能：发送或提交`Test Sms`。
+     * 参数：
+     * - `testSmsRequest`：请求对象。
+     * 返回：无。
      */
     void sendTestSms(TestSmsRequest testSmsRequest) throws ThingsboardException;
 
     /**
-     * 中文说明：
-     * 1. 方法职责：判断租户短信服务是否已配置。
-     * 2. 输入参数：tenantId 表示租户边界。
-     * 3. 返回值：true 表示可发送短信，false 表示未配置或不可用。
-     * 4. 调用时机：发送前校验或 UI 展示配置状态时调用。
-     * 5. 调用方：短信规则节点、通知中心、配置管理流程。
-     * 6. 使用流程：属于 Rule Engine/通知发送前置校验。
-     * 7. 线程安全：实现需保证配置读取并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务、MQTT、Actor、数据库；实现可能读取配置缓存。
+     * 功能：判断`Configured`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：判断结果。
      */
     boolean isConfigured(TenantId tenantId);
 

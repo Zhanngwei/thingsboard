@@ -44,7 +44,6 @@ import static org.thingsboard.server.common.data.device.profile.MqttTopics.DEVIC
 import static org.thingsboard.server.common.data.device.profile.MqttTopics.GATEWAY_CONNECT_TOPIC;
 import static org.thingsboard.server.common.data.device.profile.MqttTopics.GATEWAY_TELEMETRY_TOPIC;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractMqttTimeseriesIntegrationTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -55,6 +54,7 @@ import static org.thingsboard.server.common.data.device.profile.MqttTopics.GATEW
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@Slf4j
 public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqttIntegrationTest {
 
     protected static final String PAYLOAD_VALUES_STR = "{\"key1\":\"value1\", \"key2\":true, \"key3\": 3.0, \"key4\": 4," +
@@ -63,19 +63,13 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     protected static final String MALFORMED_JSON_PAYLOAD = "{\"key1\":, \"key2\":true, \"key3\": 3.0, \"key4\": 4," +
             " \"key5\": {\"someNumber\": 42, \"someArray\": [1,2,3], \"someNestedObject\": {\"key\": \"value\"}}}";
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeTest() throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestConfigProperties configProperties = MqttTestConfigProperties.builder()
                 .deviceName("Test Post Telemetry device")
                 .gatewayName("Test Post Telemetry gateway")
@@ -83,82 +77,57 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
         processBeforeTest(configProperties);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushTelemetry` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证遥测相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPushTelemetry() throws Exception {
         List<String> expectedKeys = Arrays.asList("key1", "key2", "key3", "key4", "key5");
         processJsonPayloadTelemetryTest(DEVICE_TELEMETRY_TOPIC, expectedKeys, PAYLOAD_VALUES_STR.getBytes(), false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushTelemetryWithTs` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证遥测相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPushTelemetryWithTs() throws Exception {
         String payloadStr = "{\"ts\": 10000, \"values\": " + PAYLOAD_VALUES_STR + "}";
         List<String> expectedKeys = Arrays.asList("key1", "key2", "key3", "key4", "key5");
         processJsonPayloadTelemetryTest(DEVICE_TELEMETRY_TOPIC, expectedKeys, payloadStr.getBytes(), true);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushTelemetryOnShortTopic` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证主题相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPushTelemetryOnShortTopic() throws Exception {
         List<String> expectedKeys = Arrays.asList("key1", "key2", "key3", "key4", "key5");
         processJsonPayloadTelemetryTest(DEVICE_TELEMETRY_SHORT_TOPIC, expectedKeys, PAYLOAD_VALUES_STR.getBytes(), false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushTelemetryOnShortJsonTopic` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证主题相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPushTelemetryOnShortJsonTopic() throws Exception {
         List<String> expectedKeys = Arrays.asList("key1", "key2", "key3", "key4", "key5");
         processJsonPayloadTelemetryTest(DEVICE_TELEMETRY_SHORT_JSON_TOPIC, expectedKeys, PAYLOAD_VALUES_STR.getBytes(), false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushTelemetryGateway` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证遥测相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testPushTelemetryGateway() throws Exception {
         List<String> expectedKeys = Arrays.asList("key1", "key2", "key3", "key4", "key5");
         String deviceName1 = "Device A";
@@ -167,20 +136,14 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
         processGatewayTelemetryTest(GATEWAY_TELEMETRY_TOPIC, expectedKeys, payload.getBytes(), deviceName1, deviceName2);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testGatewayConnect` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Gateway Connect`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testGatewayConnect() throws Exception {
         String payload = "{\"device\":\"Device A\"}";
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestClient client = new MqttTestClient();
         client.connectAndWait(gatewayAccessToken);
         client.publish(GATEWAY_CONNECT_TOPIC, payload.getBytes());
@@ -196,31 +159,29 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processJsonPayloadTelemetryTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息载荷。
+     * 参数：
+     * - `topic`：主题名称或主题对象。
+     * - `expectedKeys`：键。
+     * - `payload`：`payload` 参数。
+     * - `withTs`：时间戳。
+     * 返回：无。
      */
     protected void processJsonPayloadTelemetryTest(String topic, List<String> expectedKeys, byte[] payload, boolean withTs) throws Exception {
         processTelemetryTest(topic, expectedKeys, payload, withTs, false);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processTelemetryTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理遥测。
+     * 参数：
+     * - `topic`：主题名称或主题对象。
+     * - `expectedKeys`：键。
+     * - `payload`：`payload` 参数。
+     * - `withTs`：时间戳。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void processTelemetryTest(String topic, List<String> expectedKeys, byte[] payload, boolean withTs, boolean presenceFieldsTest) throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         MqttTestClient client = new MqttTestClient();
         client.connectAndWait(accessToken);
         client.publishAndWait(topic, payload);
@@ -237,7 +198,6 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
         assertEquals(expectedKeySet, actualKeySet);
 
         String getTelemetryValuesUrl;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (withTs) {
             getTelemetryValuesUrl = "/api/plugins/telemetry/DEVICE/" + deviceId + "/values/timeseries?startTs=0&endTs=15000&keys=" + String.join(",", actualKeySet);
         } else {
@@ -246,19 +206,14 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
         long start = System.currentTimeMillis();
         long end = System.currentTimeMillis() + 5000;
         Map<String, List<Map<String, Object>>> values = null;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while (start <= end) {
             values = doGetAsyncTyped(getTelemetryValuesUrl, new TypeReference<>() {});
             boolean valid = values.size() == expectedKeys.size();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (valid) {
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 for (String key : expectedKeys) {
                     List<Map<String, Object>> tsValues = values.get(key);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (tsValues != null && tsValues.size() > 0) {
                         Object ts = tsValues.get(0).get("ts");
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (ts == null) {
                             valid = false;
                             break;
@@ -269,7 +224,6 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
                     }
                 }
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (valid) {
                 break;
             }
@@ -278,11 +232,9 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
         }
         assertNotNull(values);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (withTs) {
             assertTs(values, expectedKeys, 10000, 0);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (presenceFieldsTest) {
             assertExplicitProtoFieldValues(values);
         } else {
@@ -291,14 +243,14 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processGatewayTelemetryTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理遥测。
+     * 参数：
+     * - `topic`：主题名称或主题对象。
+     * - `expectedKeys`：键。
+     * - `payload`：`payload` 参数。
+     * - `firstDeviceName`：设备信息或设备标识。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void processGatewayTelemetryTest(String topic, List<String> expectedKeys, byte[] payload, String firstDeviceName, String secondDeviceName) throws Exception {
         MqttTestClient client = new MqttTestClient();
@@ -340,14 +292,11 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getActualKeysList` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Actual Keys List`。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * - `expectedKeys`：键。
+     * 返回：匹配的数据集合。
      */
     private List<String> getActualKeysList(DeviceId deviceId, List<String> expectedKeys) throws Exception {
         long start = System.currentTimeMillis();
@@ -366,14 +315,13 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getGatewayTelemetryJsonPayload` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取消息载荷。
+     * 参数：
+     * - `deviceA`：设备信息或设备标识。
+     * - `deviceB`：设备信息或设备标识。
+     * - `firstTsValue`：值。
+     * - `secondTsValue`：值。
+     * 返回：文本结果。
      */
     protected String getGatewayTelemetryJsonPayload(String deviceA, String deviceB, String firstTsValue, String secondTsValue) {
         String payload = "[{\"ts\": " + firstTsValue + ", \"values\": " + PAYLOAD_VALUES_STR + "}, " +
@@ -382,28 +330,22 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTelemetryValuesUrl` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取遥测。
+     * 参数：
+     * - `deviceId`：设备IDID。
+     * - `actualKeySet`：键。
+     * 返回：文本结果。
      */
     private String getTelemetryValuesUrl(DeviceId deviceId, Set<String> actualKeySet) {
         return "/api/plugins/telemetry/DEVICE/" + deviceId + "/values/timeseries?startTs=0&endTs=25000&keys=" + String.join(",", actualKeySet);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assertGatewayDeviceData` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `assertGatewayDeviceData` 对应的处理。
+     * 参数：
+     * - `deviceValues`：设备信息或设备标识。
+     * - `expectedKeys`：键。
+     * 返回：无。
      */
     private void assertGatewayDeviceData(Map<String, List<Map<String, Object>>> deviceValues, List<String> expectedKeys) {
 
@@ -422,14 +364,11 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assertValues` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `assertValues` 对应的处理。
+     * 参数：
+     * - `deviceValues`：设备信息或设备标识。
+     * - `arrayIndex`：`arrayIndex` 参数。
+     * 返回：无。
      */
     private void assertValues(Map<String, List<Map<String, Object>>> deviceValues, int arrayIndex) {
         for (Map.Entry<String, List<Map<String, Object>>> entry : deviceValues.entrySet()) {
@@ -457,14 +396,10 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assertExplicitProtoFieldValues` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `assertExplicitProtoFieldValues` 对应的处理。
+     * 参数：
+     * - `deviceValues`：设备信息或设备标识。
+     * 返回：无。
      */
     private void assertExplicitProtoFieldValues(Map<String, List<Map<String, Object>>> deviceValues) {
         for (Map.Entry<String, List<Map<String, Object>>> entry : deviceValues.entrySet()) {
@@ -492,14 +427,13 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assertTs` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `assertTs` 对应的处理。
+     * 参数：
+     * - `deviceValues`：设备信息或设备标识。
+     * - `expectedKeys`：键。
+     * - `ts`：时间戳。
+     * - `arrayIndex`：`arrayIndex` 参数。
+     * 返回：无。
      */
     private void assertTs(Map<String, List<Map<String, Object>>> deviceValues, List<String> expectedKeys, int ts, int arrayIndex) {
         assertEquals(ts, deviceValues.get(expectedKeys.get(0)).get(arrayIndex).get("ts"));
@@ -511,14 +445,9 @@ public abstract class AbstractMqttTimeseriesIntegrationTest extends AbstractMqtt
 
     //    @Test - Unstable
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testMqttQoSLevel` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证QoS 等级相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     public void testMqttQoSLevel() throws Exception {
         MqttTestClient client = new MqttTestClient();

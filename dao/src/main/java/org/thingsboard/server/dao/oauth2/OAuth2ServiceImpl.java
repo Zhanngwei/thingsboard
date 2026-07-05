@@ -55,8 +55,6 @@ import java.util.stream.Collectors;
 import static org.thingsboard.server.dao.service.Validator.validateId;
 import static org.thingsboard.server.dao.service.Validator.validateString;
 
-@Slf4j
-@Service
 /**
  * 中文说明：
  * 1. 类目的：`OAuth2ServiceImpl` 是 ThingsBoard DAO 模块 中的OAuth2 配置持久化类型，用于维护 OAuth2 客户端、域名映射、登录配置模板和外部用户信息的数据库状态。
@@ -68,97 +66,63 @@ import static org.thingsboard.server.dao.service.Validator.validateString;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Service / Repository / Adapter。
  */
+@Slf4j
+@Service
 public class OAuth2ServiceImpl extends AbstractEntityService implements OAuth2Service {
     /**
-     * 字段说明：
-     * 1. 保存 `INCORRECT_TENANT_ID` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户ID常量，用于统一引用固定值。
      */
     public static final String INCORRECT_TENANT_ID = "Incorrect tenantId ";
     public static final String INCORRECT_CLIENT_REGISTRATION_ID = "Incorrect clientRegistrationId ";
     /**
-     * 字段说明：
-     * 1. 保存 `INCORRECT_DOMAIN_NAME` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 名称常量，用于统一引用固定值。
      */
     public static final String INCORRECT_DOMAIN_NAME = "Incorrect domainName ";
     public static final String INCORRECT_DOMAIN_SCHEME = "Incorrect domainScheme ";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `oauth2ParamsDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 存取组件，用于读取或保存对应领域对象。
      */
+    @Autowired
     private OAuth2ParamsDao oauth2ParamsDao;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `oauth2RegistrationDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 存取组件，用于读取或保存对应领域对象。
      */
+    @Autowired
     private OAuth2RegistrationDao oauth2RegistrationDao;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `oauth2DomainDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 存取组件，用于读取或保存对应领域对象。
      */
+    @Autowired
     private OAuth2DomainDao oauth2DomainDao;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `oauth2MobileDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 存取组件，用于读取或保存对应领域对象。
      */
+    @Autowired
     private OAuth2MobileDao oauth2MobileDao;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOAuth2Clients` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`O Auth2 Clients`。
+     * 参数：
+     * - `domainSchemeStr`：`domainSchemeStr` 参数。
+     * - `domainName`：名称。
+     * - `pkgName`：名称。
+     * - `platformType`：类型。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<OAuth2ClientInfo> getOAuth2Clients(String domainSchemeStr, String domainName, String pkgName, PlatformType platformType) {
         log.trace("Executing getOAuth2Clients [{}://{}] pkgName=[{}] platformType=[{}]", domainSchemeStr, domainName, pkgName, platformType);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (domainSchemeStr == null) {
             throw new IncorrectParameterException(INCORRECT_DOMAIN_SCHEME);
         }
         SchemeType domainScheme;
         try {
             domainScheme = SchemeType.valueOf(domainSchemeStr.toUpperCase());
-        // 异常在这里被转换为 DAO 层统一失败路径，避免数据库或底层驱动异常直接泄漏给上层调用方。
         } catch (IllegalArgumentException e){
             throw new IncorrectParameterException(INCORRECT_DOMAIN_SCHEME);
         }
         validateString(domainName, INCORRECT_DOMAIN_NAME + domainName);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return oauth2RegistrationDao.findEnabledByDomainSchemesDomainNameAndPkgNameAndPlatformType(
                 Arrays.asList(domainScheme, SchemeType.MIXED), domainName, pkgName, platformType)
                 .stream()
@@ -166,116 +130,81 @@ public class OAuth2ServiceImpl extends AbstractEntityService implements OAuth2Se
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 功能：保存或创建信息对象。
+     * 参数：
+     * - `oauth2Info`：`oauth2Info` 参数。
+     * 返回：无。
+     */
     @Override
     @Transactional
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveOAuth2Info` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void saveOAuth2Info(OAuth2Info oauth2Info) {
         log.trace("Executing saveOAuth2Info [{}]", oauth2Info);
         oauth2InfoValidator.accept(oauth2Info);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         oauth2ParamsDao.deleteAll();
         oauth2Info.getOauth2ParamsInfos().forEach(oauth2ParamsInfo -> {
             OAuth2Params oauth2Params = OAuth2Utils.infoToOAuth2Params(oauth2Info);
-            // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
             OAuth2Params savedOauth2Params = oauth2ParamsDao.save(TenantId.SYS_TENANT_ID, oauth2Params);
             oauth2ParamsInfo.getClientRegistrations().forEach(registrationInfo -> {
                 OAuth2Registration registration = OAuth2Utils.toOAuth2Registration(savedOauth2Params.getId(), registrationInfo);
-                // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
                 oauth2RegistrationDao.save(TenantId.SYS_TENANT_ID, registration);
             });
             oauth2ParamsInfo.getDomainInfos().forEach(domainInfo -> {
                 OAuth2Domain domain = OAuth2Utils.toOAuth2Domain(savedOauth2Params.getId(), domainInfo);
-                // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
                 oauth2DomainDao.save(TenantId.SYS_TENANT_ID, domain);
             });
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (oauth2ParamsInfo.getMobileInfos() != null) {
                 oauth2ParamsInfo.getMobileInfos().forEach(mobileInfo -> {
                     OAuth2Mobile mobile = OAuth2Utils.toOAuth2Mobile(savedOauth2Params.getId(), mobileInfo);
-                    // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
                     oauth2MobileDao.save(TenantId.SYS_TENANT_ID, mobile);
                 });
             }
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findOAuth2Info` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取信息对象。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public OAuth2Info findOAuth2Info() {
         log.trace("Executing findOAuth2Info");
         OAuth2Info oauth2Info = new OAuth2Info();
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         List<OAuth2Params> oauth2ParamsList = oauth2ParamsDao.find(TenantId.SYS_TENANT_ID);
         oauth2Info.setEnabled(oauth2ParamsList.stream().anyMatch(param -> param.isEnabled()));
         List<OAuth2ParamsInfo> oauth2ParamsInfos = new ArrayList<>();
         oauth2Info.setOauth2ParamsInfos(oauth2ParamsInfos);
         oauth2ParamsList.stream().sorted(Comparator.comparing(BaseData::getUuidId)).forEach(oauth2Params -> {
-            // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
             List<OAuth2Registration> registrations = oauth2RegistrationDao.findByOAuth2ParamsId(oauth2Params.getId().getId());
-            // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
             List<OAuth2Domain> domains = oauth2DomainDao.findByOAuth2ParamsId(oauth2Params.getId().getId());
-            // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
             List<OAuth2Mobile> mobiles = oauth2MobileDao.findByOAuth2ParamsId(oauth2Params.getId().getId());
             oauth2ParamsInfos.add(OAuth2Utils.toOAuth2ParamsInfo(registrations, domains, mobiles));
         });
         return oauth2Info;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findRegistration` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`Registration`。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：处理结果。
      */
+    @Override
     public OAuth2Registration findRegistration(UUID id) {
         log.trace("Executing findRegistration [{}]", id);
         validateId(id, INCORRECT_CLIENT_REGISTRATION_ID + id);
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         return oauth2RegistrationDao.findById(null, id);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAppSecret` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取密钥。
+     * 参数：
+     * - `id`：`id`ID。
+     * - `pkgName`：名称。
+     * 返回：文本结果。
      */
+    @Override
     public String findAppSecret(UUID id, String pkgName) {
         log.trace("Executing findAppSecret [{}][{}]", id, pkgName);
         validateId(id, INCORRECT_CLIENT_REGISTRATION_ID + id);
@@ -284,19 +213,12 @@ public class OAuth2ServiceImpl extends AbstractEntityService implements OAuth2Se
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAllRegistrations` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`All Registrations`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<OAuth2Registration> findAllRegistrations() {
         log.trace("Executing findAllRegistrations");
         return oauth2RegistrationDao.find(TenantId.SYS_TENANT_ID);

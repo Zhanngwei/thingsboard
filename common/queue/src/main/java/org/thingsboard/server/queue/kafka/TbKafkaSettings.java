@@ -42,10 +42,6 @@ import java.util.Properties;
 /**
  * Created by ashvayka on 25.09.18.
  */
-@Slf4j
-@ConditionalOnProperty(prefix = "queue", value = "type", havingValue = "kafka")
-@ConfigurationProperties(prefix = "queue.kafka")
-@Component
 /**
  * 中文说明：
  * 1. 类目的：`TbKafkaSettings` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -56,352 +52,201 @@ import java.util.Properties;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@ConditionalOnProperty(prefix = "queue", value = "type", havingValue = "kafka")
+@ConfigurationProperties(prefix = "queue.kafka")
+@Component
 public class TbKafkaSettings {
 
-    @Value("${queue.kafka.bootstrap.servers}")
     /**
-     * 字段说明：
-     * 1. 保存 `servers` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `servers` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.bootstrap.servers}")
     private String servers;
 
-    @Value("${queue.kafka.ssl.enabled:false}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否启用 SSL。
      */
+    @Value("${queue.kafka.ssl.enabled:false}")
     private boolean sslEnabled;
 
-    @Value("${queue.kafka.ssl.truststore.location:}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslTruststoreLocation` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * SSL，表示当前对象的对应属性。
      */
+    @Value("${queue.kafka.ssl.truststore.location:}")
     private String sslTruststoreLocation;
 
-    @Value("${queue.kafka.ssl.truststore.password:}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslTruststorePassword` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @Value("${queue.kafka.ssl.truststore.password:}")
     private String sslTruststorePassword;
 
-    @Value("${queue.kafka.ssl.keystore.location:}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslKeystoreLocation` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * SSL，表示当前对象的对应属性。
      */
+    @Value("${queue.kafka.ssl.keystore.location:}")
     private String sslKeystoreLocation;
 
-    @Value("${queue.kafka.ssl.keystore.password:}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslKeystorePassword` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @Value("${queue.kafka.ssl.keystore.password:}")
     private String sslKeystorePassword;
 
-    @Value("${queue.kafka.ssl.key.password:}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslKeyPassword` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于定位映射、配置或数据项。
      */
+    @Value("${queue.kafka.ssl.key.password:}")
     private String sslKeyPassword;
 
-    @Value("${queue.kafka.acks:all}")
     /**
-     * 字段说明：
-     * 1. 保存 `acks` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `acks` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.acks:all}")
     private String acks;
 
-    @Value("${queue.kafka.retries:1}")
     /**
-     * 字段说明：
-     * 1. 保存 `retries` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `retries` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.retries:1}")
     private int retries;
 
-    @Value("${queue.kafka.compression.type:none}")
     /**
-     * 字段说明：
-     * 1. 保存 `compressionType` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 类型，用于区分不同处理分支。
      */
+    @Value("${queue.kafka.compression.type:none}")
     private String compressionType;
 
-    @Value("${queue.kafka.batch.size:16384}")
     /**
-     * 字段说明：
-     * 1. 保存 `batchSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 批量大小，用于控制处理规模或位置。
      */
+    @Value("${queue.kafka.batch.size:16384}")
     private int batchSize;
 
-    @Value("${queue.kafka.linger.ms:1}")
     /**
-     * 字段说明：
-     * 1. 保存 `lingerMs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `lingerMs` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.linger.ms:1}")
     private long lingerMs;
 
-    @Value("${queue.kafka.max.request.size:1048576}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxRequestSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
+    @Value("${queue.kafka.max.request.size:1048576}")
     private int maxRequestSize;
 
-    @Value("${queue.kafka.max.in.flight.requests.per.connection:5}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxInFlightRequestsPerConnection` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
+    @Value("${queue.kafka.max.in.flight.requests.per.connection:5}")
     private int maxInFlightRequestsPerConnection;
 
-    @Value("${queue.kafka.buffer.memory:33554432}")
     /**
-     * 字段说明：
-     * 1. 保存 `bufferMemory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `bufferMemory` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.buffer.memory:33554432}")
     private long bufferMemory;
 
+    /**
+     * `replicationFactor` 字段，保存当前对象的对应属性。
+     */
     @Value("${queue.kafka.replication_factor:1}")
     @Getter
-    /**
-     * 字段说明：
-     * 1. 保存 `replicationFactor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private short replicationFactor;
 
-    @Value("${queue.kafka.max_poll_records:8192}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxPollRecords` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `maxPollRecords` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.max_poll_records:8192}")
     private int maxPollRecords;
 
-    @Value("${queue.kafka.max_poll_interval_ms:300000}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxPollIntervalMs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间间隔，用于控制时间范围或等待时长。
      */
+    @Value("${queue.kafka.max_poll_interval_ms:300000}")
     private int maxPollIntervalMs;
 
-    @Value("${queue.kafka.max_partition_fetch_bytes:16777216}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxPartitionFetchBytes` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，用于定位消息或数据所属分区。
      */
+    @Value("${queue.kafka.max_partition_fetch_bytes:16777216}")
     private int maxPartitionFetchBytes;
 
-    @Value("${queue.kafka.fetch_max_bytes:134217728}")
     /**
-     * 字段说明：
-     * 1. 保存 `fetchMaxBytes` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `fetchMaxBytes` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.fetch_max_bytes:134217728}")
     private int fetchMaxBytes;
 
-    @Value("${queue.kafka.request.timeout.ms:30000}")
     /**
-     * 字段说明：
-     * 1. 保存 `requestTimeoutMs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
+    @Value("${queue.kafka.request.timeout.ms:30000}")
     private int requestTimeoutMs;
 
-    @Value("${queue.kafka.session.timeout.ms:10000}")
     /**
-     * 字段说明：
-     * 1. 保存 `sessionTimeoutMs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 会话，保存当前连接或交互过程的会话信息。
      */
+    @Value("${queue.kafka.session.timeout.ms:10000}")
     private int sessionTimeoutMs;
 
-    @Value("${queue.kafka.auto_offset_reset:earliest}")
     /**
-     * 字段说明：
-     * 1. 保存 `autoOffsetReset` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 偏移量，用于控制数量、位置或分页范围。
      */
+    @Value("${queue.kafka.auto_offset_reset:earliest}")
     private String autoOffsetReset;
 
-    @Value("${queue.kafka.use_confluent_cloud:false}")
     /**
-     * 字段说明：
-     * 1. 保存 `useConfluent` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否使用`confluent`。
      */
+    @Value("${queue.kafka.use_confluent_cloud:false}")
     private boolean useConfluent;
 
-    @Value("${queue.kafka.confluent.ssl.algorithm:}")
     /**
-     * 字段说明：
-     * 1. 保存 `sslAlgorithm` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * SSL，表示当前对象的对应属性。
      */
+    @Value("${queue.kafka.confluent.ssl.algorithm:}")
     private String sslAlgorithm;
 
-    @Value("${queue.kafka.confluent.sasl.mechanism:}")
     /**
-     * 字段说明：
-     * 1. 保存 `saslMechanism` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `saslMechanism` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.confluent.sasl.mechanism:}")
     private String saslMechanism;
 
-    @Value("${queue.kafka.confluent.sasl.config:}")
     /**
-     * 字段说明：
-     * 1. 保存 `saslConfig` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置，保存当前对象的配置选项。
      */
+    @Value("${queue.kafka.confluent.sasl.config:}")
     private String saslConfig;
 
-    @Value("${queue.kafka.confluent.security.protocol:}")
     /**
-     * 字段说明：
-     * 1. 保存 `securityProtocol` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `securityProtocol` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.confluent.security.protocol:}")
     private String securityProtocol;
 
-    @Value("${queue.kafka.other-inline:}")
     /**
-     * 字段说明：
-     * 1. 保存 `otherInline` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `otherInline` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.kafka.other-inline:}")
     private String otherInline;
 
+    /**
+     * `other`列表，用于保存一组待处理对象。
+     */
     @Deprecated
     @Setter
-    /**
-     * 字段说明：
-     * 1. 保存 `other` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private List<TbProperty> other;
 
     @Setter
     private Map<String, List<TbProperty>> consumerPropertiesPerTopic = Collections.emptyMap();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toAdminProps` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toAdminProps` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public Properties toAdminProps() {
         Properties props = toProps();
@@ -412,14 +257,10 @@ public class TbKafkaSettings {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toConsumerProps` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toConsumerProps` 对应的处理。
+     * 参数：
+     * - `topic`：主题名称或主题对象。
+     * 返回：处理结果。
      */
     public Properties toConsumerProps(String topic) {
         Properties props = toProps();
@@ -441,14 +282,9 @@ public class TbKafkaSettings {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProducerProps` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProducerProps` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public Properties toProducerProps() {
         Properties props = toProps();
@@ -467,19 +303,13 @@ public class TbKafkaSettings {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toProps` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toProps` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     Properties toProps() {
         Properties props = new Properties();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (useConfluent) {
             props.put("ssl.endpoint.identification.algorithm", sslAlgorithm);
             props.put("sasl.mechanism", saslMechanism);
@@ -492,7 +322,6 @@ public class TbKafkaSettings {
 
         props.putAll(PropertyUtils.getProps(otherInline));
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (other != null) {
             other.forEach(kv -> props.put(kv.getKey(), kv.getValue()));
         }
@@ -503,17 +332,12 @@ public class TbKafkaSettings {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `configureSSL` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `configureSSL` 对应的处理。
+     * 参数：
+     * - `props`：`props` 参数。
+     * 返回：无。
      */
     void configureSSL(Properties props) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sslEnabled) {
             props.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SSL");
             props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, sslTruststoreLocation);

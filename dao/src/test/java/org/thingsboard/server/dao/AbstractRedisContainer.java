@@ -22,7 +22,6 @@ import org.testcontainers.containers.GenericContainer;
 
 import java.util.List;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractRedisContainer` 是 ThingsBoard DAO 测试模块 中的持久化实现层类型，用于承载服务端实体、关系、属性、遥测、事件和配置数据的持久化访问实现。
@@ -34,6 +33,7 @@ import java.util.List;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Service / Template。
  */
+@Slf4j
 public class AbstractRedisContainer {
 
     @ClassRule(order = 0)

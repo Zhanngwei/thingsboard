@@ -27,20 +27,23 @@ import java.util.Set;
  */
 class SnapshotUpdate {
 
-    @Getter
     /**
-     * 字段说明：保存 `type`，表示类型匹配条件，供本类方法在规则节点处理流程中使用。
+     * 类型，用于区分不同处理分支。
      */
+    @Getter
     private final AlarmConditionKeyType type;
-    @Getter
     /**
-     * 字段说明：保存 `keys`，表示消息体、元数据、属性或遥测中的键名，供本类方法在规则节点处理流程中使用。
+     * `keys`集合，用于去重保存或快速判断对象是否存在。
      */
+    @Getter
     private final Set<AlarmConditionFilterKey> keys;
 
     /**
-     * 方法说明：构造 `SnapshotUpdate` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `SnapshotUpdate` 实例，并初始化必要字段。
+     * 参数：
+     * - `type`：类型。
+     * - `keys`：键。
+     * 返回：新创建的对象实例。
      */
     SnapshotUpdate(AlarmConditionKeyType type, Set<AlarmConditionFilterKey> keys) {
         this.type = type;
@@ -48,8 +51,9 @@ class SnapshotUpdate {
     }
 
     /**
-     * 方法说明：执行 `hasUpdate` 对应的辅助逻辑，供 `SnapshotUpdate` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：判断`Update`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean hasUpdate(){
         return !keys.isEmpty();

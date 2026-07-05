@@ -24,66 +24,73 @@ import lombok.Getter;
 public enum TbRuleNodeMathFunctionType {
 
     /**
-     * 枚举项说明：本行枚举常量定义 `TbRuleNodeMathFunctionType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `ADD`常量，用于统一引用固定值。
      */
     ADD(2), SUB(2), MULT(2), DIV(2),
     /**
-     * 枚举项说明：本行枚举常量定义 `TbRuleNodeMathFunctionType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `ATAN2`常量，用于统一引用固定值。
      */
     SIN, SINH, COS, COSH, TAN, TANH, ACOS, ASIN, ATAN, ATAN2(2),
     /**
-     * 枚举项说明：本行枚举常量定义 `TbRuleNodeMathFunctionType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `GET_EXP`常量，用于统一引用固定值。
      */
     EXP, EXPM1, SQRT, CBRT, GET_EXP(1, 1, true), HYPOT(2), LOG, LOG10, LOG1P,
     /**
-     * 枚举项说明：本行枚举常量定义 `TbRuleNodeMathFunctionType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `CEIL`常量，用于统一引用固定值。
      */
     CEIL(1, 1, true), FLOOR(1, 1, true), FLOOR_DIV(2), FLOOR_MOD(2),
     /**
-     * 枚举项说明：本行枚举常量定义 `TbRuleNodeMathFunctionType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `MIN`常量，用于统一引用固定值。
      */
     ABS, MIN(2), MAX(2), POW(2), SIGNUM, RAD, DEG,
 
     /**
-     * 枚举项说明：本行枚举常量定义 `TbRuleNodeMathFunctionType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `CUSTOM`常量，用于统一引用固定值。
      */
     CUSTOM(0, 16, false); //Custom function based on exp4j
 
-    @Getter
     /**
-     * 字段说明：保存 `minArgs`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 参数，表示当前对象的对应属性。
      */
+    @Getter
     private final int minArgs;
-    @Getter
     /**
-     * 字段说明：保存 `maxArgs`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 参数，表示当前对象的对应属性。
      */
+    @Getter
     private final int maxArgs;
-    @Getter
     /**
-     * 字段说明：保存 `integerResult`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 是否满足`integerResult`条件。
      */
+    @Getter
     private final boolean integerResult;
 
     /**
-     * 方法说明：构造 `TbRuleNodeMathFunctionType` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `TbRuleNodeMathFunctionType` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     TbRuleNodeMathFunctionType() {
         this(1, 1, false);
     }
 
     /**
-     * 方法说明：构造 `TbRuleNodeMathFunctionType` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `TbRuleNodeMathFunctionType` 实例，并初始化必要字段。
+     * 参数：
+     * - `args`：传入程序的参数。
+     * 返回：新创建的对象实例。
      */
     TbRuleNodeMathFunctionType(int args) {
         this(args, args, false);
     }
 
     /**
-     * 方法说明：构造 `TbRuleNodeMathFunctionType` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `TbRuleNodeMathFunctionType` 实例，并初始化必要字段。
+     * 参数：
+     * - `minArgs`：`minArgs` 参数。
+     * - `maxArgs`：`maxArgs` 参数。
+     * - `integerResult`：`integerResult` 参数。
+     * 返回：新创建的对象实例。
      */
     TbRuleNodeMathFunctionType(int minArgs, int maxArgs, boolean integerResult) {
         this.minArgs = minArgs;

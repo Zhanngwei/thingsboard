@@ -87,103 +87,157 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 /**
- * 测试目标：验证 {@code TenantIdLoaderTest} 覆盖的 规则引擎工具组件 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TenantIdLoader}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TenantIdLoaderTest` 测试类，用于验证 `TenantIdLoader` 相关行为。
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TenantIdLoaderTest {
 
-    /** Mock 依赖字段：{@code ctx} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctx;
-    /** Mock 依赖字段：{@code customerService} 保存 {@code CustomerService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 客户，提供当前类调用的业务操作。
+     */
     @Mock
     private CustomerService customerService;
-    /** Mock 依赖字段：{@code userService} 保存 {@code UserService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 用户，提供当前类调用的业务操作。
+     */
     @Mock
     private UserService userService;
-    /** Mock 依赖字段：{@code assetService} 保存 {@code AssetService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 资产集合，用于去重保存或快速判断对象是否存在。
+     */
     @Mock
     private AssetService assetService;
-    /** Mock 依赖字段：{@code deviceService} 保存 {@code DeviceService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 设备，提供当前类调用的业务操作。
+     */
     @Mock
     private DeviceService deviceService;
-    /** Mock 依赖字段：{@code alarmService} 保存 {@code RuleEngineAlarmService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 告警，提供当前类调用的业务操作。
+     */
     @Mock
     private RuleEngineAlarmService alarmService;
-    /** Mock 依赖字段：{@code ruleChainService} 保存 {@code RuleChainService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 规则链，提供当前类调用的业务操作。
+     */
     @Mock
     private RuleChainService ruleChainService;
-    /** Mock 依赖字段：{@code entityViewService} 保存 {@code EntityViewService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 实体视图，提供当前类调用的业务操作。
+     */
     @Mock
     private EntityViewService entityViewService;
-    /** Mock 依赖字段：{@code dashboardService} 保存 {@code DashboardService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 仪表盘，提供当前类调用的业务操作。
+     */
     @Mock
     private DashboardService dashboardService;
-    /** Mock 依赖字段：{@code edgeService} 保存 {@code EdgeService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 边缘节点，提供当前类调用的业务操作。
+     */
     @Mock
     private EdgeService edgeService;
-    /** Mock 依赖字段：{@code otaPackageService} 保存 {@code OtaPackageService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 服务，提供当前类调用的业务操作。
+     */
     @Mock
     private OtaPackageService otaPackageService;
-    /** Mock 依赖字段：{@code assetProfileCache} 保存 {@code RuleEngineAssetProfileCache} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 资产配置集合，用于去重保存或快速判断对象是否存在。
+     */
     @Mock
     private RuleEngineAssetProfileCache assetProfileCache;
-    /** Mock 依赖字段：{@code deviceProfileCache} 保存 {@code RuleEngineDeviceProfileCache} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 设备配置，保存当前对象的配置选项。
+     */
     @Mock
     private RuleEngineDeviceProfileCache deviceProfileCache;
-    /** Mock 依赖字段：{@code widgetTypeService} 保存 {@code WidgetTypeService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 部件类型，提供当前类调用的业务操作。
+     */
     @Mock
     private WidgetTypeService widgetTypeService;
-    /** Mock 依赖字段：{@code widgetsBundleService} 保存 {@code WidgetsBundleService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 部件包，提供当前类调用的业务操作。
+     */
     @Mock
     private WidgetsBundleService widgetsBundleService;
-    /** Mock 依赖字段：{@code queueService} 保存 {@code QueueService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 队列，提供当前类调用的业务操作。
+     */
     @Mock
     private QueueService queueService;
-    /** Mock 依赖字段：{@code resourceService} 保存 {@code ResourceService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 服务，提供当前类调用的业务操作。
+     */
     @Mock
     private ResourceService resourceService;
-    /** Mock 依赖字段：{@code rpcService} 保存 {@code RuleEngineRpcService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * RPC，提供当前类调用的业务操作。
+     */
     @Mock
     private RuleEngineRpcService rpcService;
-    /** Mock 依赖字段：{@code ruleEngineApiUsageStateService} 保存 {@code RuleEngineApiUsageStateService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 规则引擎，提供当前类调用的业务操作。
+     */
     @Mock
     private RuleEngineApiUsageStateService ruleEngineApiUsageStateService;
-    /** Mock 依赖字段：{@code notificationTargetService} 保存 {@code NotificationTargetService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 通知服务，提供当前类调用的业务操作。
+     */
     @Mock
     private NotificationTargetService notificationTargetService;
-    /** Mock 依赖字段：{@code notificationTemplateService} 保存 {@code NotificationTemplateService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 通知服务，提供当前类调用的业务操作。
+     */
     @Mock
     private NotificationTemplateService notificationTemplateService;
-    /** Mock 依赖字段：{@code notificationRequestService} 保存 {@code NotificationRequestService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 通知服务，提供当前类调用的业务操作。
+     */
     @Mock
     private NotificationRequestService notificationRequestService;
-    /** Mock 依赖字段：{@code notificationRuleService} 保存 {@code NotificationRuleService} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 通知服务，提供当前类调用的业务操作。
+     */
     @Mock
     private NotificationRuleService notificationRuleService;
 
-    /** 可变 fixture 字段：{@code tenantId} 保存 {@code TenantId} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 租户ID，用于定位对应业务对象。
+     */
     private TenantId tenantId;
-    /** 可变 fixture 字段：{@code tenantProfileId} 保存 {@code TenantProfileId} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 租户ID，用于定位对应业务对象。
+     */
     private TenantProfileId tenantProfileId;
-    /** 可变 fixture 字段：{@code notificationId} 保存 {@code NotificationId} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 通知ID，用于定位对应业务对象。
+     */
     private NotificationId notificationId;
-    /** 可变 fixture 字段：{@code dbExecutor} 保存 {@code AbstractListeningExecutor} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 执行器列表，用于保存一组待处理对象。
+     */
     private AbstractListeningExecutor dbExecutor;
 
     /**
-     * 生命周期方法：{@code before} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `before` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @Before
     public void before() {
         dbExecutor = new AbstractListeningExecutor() {
-            /** 实现方法：{@code getThreadPollSize} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+            /**
+             * 功能：获取`Thread Poll Size`。
+             * 参数：无。
+             * 返回：数值结果。
+             */
             @Override
             protected int getThreadPollSize() {
                 return 3;
@@ -202,9 +256,9 @@ public class TenantIdLoaderTest {
     }
 
     /**
-     * 生命周期方法：{@code after} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `after` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     @After
     public void after() {
@@ -212,9 +266,11 @@ public class TenantIdLoaderTest {
     }
 
     /**
-     * 辅助方法：{@code initMocks} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化或启动`Mocks`。
+     * 参数：
+     * - `entityType`：实体对象。
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
     private void initMocks(EntityType entityType, TenantId tenantId) {
         switch (entityType) {
@@ -408,18 +464,21 @@ public class TenantIdLoaderTest {
     }
 
     /**
-     * 辅助方法：{@code getEntityId} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：获取实体ID。
+     * 参数：
+     * - `entityType`：实体对象。
+     * 返回：处理结果。
      */
     private EntityId getEntityId(EntityType entityType) {
         return EntityIdFactory.getByTypeAndUuid(entityType, UUID.randomUUID());
     }
 
     /**
-     * 辅助方法：{@code checkTenant} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：校验租户。
+     * 参数：
+     * - `checkTenantId`：租户IDID。
+     * - `equals`：`equals` 参数。
+     * 返回：无。
      */
     private void checkTenant(TenantId checkTenantId, boolean equals) {
         for (EntityType entityType : EntityType.values()) {
@@ -442,28 +501,22 @@ public class TenantIdLoaderTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code test_findEntityIdAsync_current_tenant} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证租户ID相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void test_findEntityIdAsync_current_tenant() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         checkTenant(tenantId, true);
     }
 
     /**
-     * 测试方法：覆盖 {@code test_findEntityIdAsync_other_tenant} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及完整规则链，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证租户ID相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void test_findEntityIdAsync_other_tenant() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         checkTenant(new TenantId(UUID.randomUUID()), false);
     }
 

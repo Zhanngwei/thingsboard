@@ -84,10 +84,6 @@ import java.util.stream.Collectors;
 
 import static org.thingsboard.server.common.data.notification.NotificationDeliveryMethod.WEB;
 
-@Service
-@Slf4j
-@RequiredArgsConstructor
-@SuppressWarnings({"rawtypes"})
 /**
  * 中文说明：
  * 1. 类目的：`DefaultNotificationCenter` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -98,96 +94,64 @@ import static org.thingsboard.server.common.data.notification.NotificationDelive
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+@SuppressWarnings({"rawtypes"})
 public class DefaultNotificationCenter extends AbstractSubscriptionService implements NotificationCenter, NotificationChannel<User, WebDeliveryMethodNotificationTemplate> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `notificationTargetService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务，提供当前类调用的业务操作。
      */
     private final NotificationTargetService notificationTargetService;
     private final NotificationRequestService notificationRequestService;
     /**
-     * 字段说明：
-     * 1. 保存 `notificationService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务，提供当前类调用的业务操作。
      */
     private final NotificationService notificationService;
     private final NotificationTemplateService notificationTemplateService;
     /**
-     * 字段说明：
-     * 1. 保存 `notificationSettingsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务集合，用于去重保存或快速判断对象是否存在。
      */
     private final NotificationSettingsService notificationSettingsService;
     private final NotificationExecutorService notificationExecutor;
     /**
-     * 字段说明：
-     * 1. 保存 `topicService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主题，提供当前类调用的业务操作。
      */
     private final TopicService topicService;
     private final TbQueueProducerProvider producerProvider;
     /**
-     * 字段说明：
-     * 1. 保存 `rateLimitService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final RateLimitService rateLimitService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `channels` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `channels`映射关系，用于按键查找对应值。
      */
     private Map<NotificationDeliveryMethod, NotificationChannel> channels;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processNotificationRequest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `request`：请求对象。
+     * - `callback`：处理完成后的回调。
+     * 返回：处理结果。
      */
+    @Override
     public NotificationRequest processNotificationRequest(TenantId tenantId, NotificationRequest request, FutureCallback<NotificationRequestStats> callback) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (request.getRuleId() == null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!rateLimitService.checkRateLimit(LimitedApi.NOTIFICATION_REQUESTS, tenantId)) {
                 throw new TbRateLimitsException(EntityType.TENANT);
             }
         }
 
         NotificationTemplate notificationTemplate;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (request.getTemplateId() != null) {
             notificationTemplate = notificationTemplateService.findNotificationTemplateById(tenantId, request.getTemplateId());
         } else {
             notificationTemplate = request.getTemplate();
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (notificationTemplate == null) throw new IllegalArgumentException("Template is missing");
 
         Set<NotificationDeliveryMethod> deliveryMethods = new HashSet<>();
@@ -197,37 +161,29 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
 
         NotificationRuleId ruleId = request.getRuleId();
         notificationTemplate.getConfiguration().getDeliveryMethodsTemplates().forEach((deliveryMethod, template) -> {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!template.isEnabled()) return;
             try {
                 channels.get(deliveryMethod).check(tenantId);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (ruleId == null) {
                     throw new IllegalArgumentException(e.getMessage());
                 } else {
                     return; // if originated by rule - just ignore delivery method
                 }
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ruleId == null) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (targets.stream().noneMatch(target -> target.getConfiguration().getType().getSupportedDeliveryMethods().contains(deliveryMethod))) {
                     throw new IllegalArgumentException("Recipients for " + deliveryMethod.getName() + " delivery method not chosen");
                 }
             }
             deliveryMethods.add(deliveryMethod);
         });
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (deliveryMethods.isEmpty()) {
             throw new IllegalArgumentException("No delivery methods to send notification with");
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (request.getAdditionalConfig() != null) {
             NotificationRequestConfig config = request.getAdditionalConfig();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (config.getSendingDelayInSec() > 0 && request.getId() == null) {
                 request.setStatus(NotificationRequestStatus.SCHEDULED);
                 request = notificationRequestService.saveNotificationRequest(tenantId, request);
@@ -255,17 +211,15 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
         return request;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendGeneralWebNotification` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交通知。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `recipients`：`recipients` 参数。
+     * - `template`：`template` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendGeneralWebNotification(TenantId tenantId, UsersFilter recipients, NotificationTemplate template) {
         NotificationTarget target = new NotificationTarget();
         target.setTenantId(tenantId);
@@ -295,14 +249,12 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processNotificationRequestAsync` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `targets`：数据列表。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     private void processNotificationRequestAsync(NotificationProcessingContext ctx, List<NotificationTarget> targets, FutureCallback<NotificationRequestStats> callback) {
         notificationExecutor.submit(() -> {
@@ -340,14 +292,12 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateRequestStats` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新请求。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `requestId`：请求ID。
+     * - `stats`：`stats` 参数。
+     * 返回：无。
      */
     private void updateRequestStats(NotificationProcessingContext ctx, NotificationRequestId requestId, NotificationRequestStats stats) {
         try {
@@ -358,14 +308,11 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processForTarget` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理目标对象。
+     * 参数：
+     * - `target`：`target` 参数。
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
     private void processForTarget(NotificationTarget target, NotificationProcessingContext ctx) {
         Iterable<? extends NotificationRecipient> recipients;
@@ -418,14 +365,12 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processForRecipient` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`For Recipient`。
+     * 参数：
+     * - `deliveryMethod`：`deliveryMethod` 参数。
+     * - `recipient`：`recipient` 参数。
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
     private void processForRecipient(NotificationDeliveryMethod deliveryMethod, NotificationRecipient recipient, NotificationProcessingContext ctx) throws Exception {
         if (ctx.getStats().contains(deliveryMethod, recipient.getId())) {
@@ -448,17 +393,15 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
         notificationChannel.sendNotification(recipient, processedTemplate, ctx);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendNotification` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交通知。
+     * 参数：
+     * - `recipient`：`recipient` 参数。
+     * - `processedTemplate`：`processedTemplate` 参数。
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
+    @Override
     public void sendNotification(User recipient, WebDeliveryMethodNotificationTemplate processedTemplate, NotificationProcessingContext ctx) throws Exception {
         NotificationRequest request = ctx.getRequest();
         Notification notification = Notification.builder()
@@ -486,17 +429,15 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
         onNotificationUpdate(recipient.getTenantId(), recipient.getId(), update);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `markNotificationAsRead` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `markNotificationAsRead` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `recipientId`：`recipientId`ID。
+     * - `notificationId`：通知ID。
+     * 返回：无。
      */
+    @Override
     public void markNotificationAsRead(TenantId tenantId, UserId recipientId, NotificationId notificationId) {
         boolean updated = notificationService.markNotificationAsRead(tenantId, recipientId, notificationId);
         if (updated) {
@@ -513,17 +454,15 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `markAllNotificationsAsRead` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `markAllNotificationsAsRead` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deliveryMethod`：`deliveryMethod` 参数。
+     * - `recipientId`：`recipientId`ID。
+     * 返回：无。
      */
+    @Override
     public void markAllNotificationsAsRead(TenantId tenantId, NotificationDeliveryMethod deliveryMethod, UserId recipientId) {
         int updatedCount = notificationService.markAllNotificationsAsRead(tenantId, deliveryMethod, recipientId);
         if (updatedCount > 0 && deliveryMethod == WEB) {
@@ -537,17 +476,15 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteNotification` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理通知。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `recipientId`：`recipientId`ID。
+     * - `notificationId`：通知ID。
+     * 返回：无。
      */
+    @Override
     public void deleteNotification(TenantId tenantId, UserId recipientId, NotificationId notificationId) {
         Notification notification = notificationService.findNotificationById(tenantId, notificationId);
         boolean deleted = notificationService.deleteNotification(tenantId, recipientId, notificationId);
@@ -560,17 +497,13 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAvailableDeliveryMethods` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Available Delivery Methods`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Set<NotificationDeliveryMethod> getAvailableDeliveryMethods(TenantId tenantId) {
         return channels.values().stream()
                 .filter(channel -> {
@@ -585,31 +518,24 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
                 .collect(Collectors.toSet());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `check` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `check` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
+    @Override
     public void check(TenantId tenantId) throws Exception {
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteNotificationRequest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理请求。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `notificationRequestId`：请求ID。
+     * 返回：无。
      */
+    @Override
     public void deleteNotificationRequest(TenantId tenantId, NotificationRequestId notificationRequestId) {
         log.debug("Deleting notification request {}", notificationRequestId);
         NotificationRequest notificationRequest = notificationRequestService.findNotificationRequestById(tenantId, notificationRequestId);
@@ -628,14 +554,11 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `forwardToNotificationSchedulerService` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `forwardToNotificationSchedulerService` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `notificationRequestId`：请求ID。
+     * 返回：无。
      */
     private void forwardToNotificationSchedulerService(TenantId tenantId, NotificationRequestId notificationRequestId) {
         TransportProtos.NotificationSchedulerServiceMsg.Builder msg = TransportProtos.NotificationSchedulerServiceMsg.newBuilder()
@@ -651,14 +574,12 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onNotificationUpdate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理通知。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `recipientId`：`recipientId`ID。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     private void onNotificationUpdate(TenantId tenantId, UserId recipientId, NotificationUpdate update) {
         log.trace("Submitting notification update for recipient {}: {}", recipientId, update);
@@ -668,14 +589,11 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onNotificationRequestUpdate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `update`：`update` 参数。
+     * 返回：无。
      */
     private void onNotificationRequestUpdate(TenantId tenantId, NotificationRequestUpdate update) {
         log.trace("Submitting notification request update: {}", update);
@@ -689,47 +607,34 @@ public class DefaultNotificationCenter extends AbstractSubscriptionService imple
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeliveryMethod` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Delivery Method`。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     public NotificationDeliveryMethod getDeliveryMethod() {
         return WEB;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getExecutorPrefix` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取执行器。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     protected String getExecutorPrefix() {
         return "notification";
     }
 
-    @Autowired
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setChannels` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Channels`。
+     * 参数：
+     * - `channels`：网络通道。
+     * - `webNotificationChannel`：网络通道。
+     * 返回：无。
      */
+    @Autowired
     public void setChannels(List<NotificationChannel> channels, NotificationCenter webNotificationChannel) {
         this.channels = channels.stream().collect(Collectors.toMap(NotificationChannel::getDeliveryMethod, c -> c));
         this.channels.put(WEB, (NotificationChannel) webNotificationChannel);

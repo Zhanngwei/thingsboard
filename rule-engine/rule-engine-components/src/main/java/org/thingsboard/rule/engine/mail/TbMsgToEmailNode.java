@@ -34,6 +34,9 @@ import org.thingsboard.server.common.msg.TbMsg;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * `TbMsgToEmailNode` 类，封装当前模块中的一组相关职责。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.TRANSFORMATION,
@@ -46,33 +49,32 @@ import java.util.Map;
         configDirective = "tbTransformationNodeToEmailConfig",
         icon = "email"
 )
-/**
- * 将普通 Rule Engine 消息转换为 SEND_EMAIL 消息的转换节点。
- * 本类本身不直接调用 SMTP 或外部服务，也不直接访问数据库/缓存；后续真正发送由 send email 节点完成。
- */
 public class TbMsgToEmailNode implements TbNode {
 
     /**
-     * 邮件内嵌图片元数据键名。
+     * `IMAGES`常量，用于统一引用固定值。
      */
     private static final String IMAGES = "images";
     /**
-     * 表示邮件正文类型需要从模板动态解析的配置值。
+     * `DYNAMIC`常量，用于统一引用固定值。
      */
     private static final String DYNAMIC = "dynamic";
 
     /**
-     * 邮件转换配置，包含发件人、收件人、主题、正文和 HTML 标志模板。
+     * 配置，保存当前对象的配置选项。
      */
     private TbMsgToEmailNodeConfiguration config;
     /**
-     * 是否从 isHtmlTemplate 动态解析 HTML 标志。
+     * 是否满足类型条件。
      */
     private boolean dynamicMailBodyType;
 
     /**
-     * 初始化邮件转换配置。
-     * 本方法不直接涉及外部调用、事务、数据库、缓存、MQTT 或 Actor；仅保存本节点配置。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
     @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
@@ -81,8 +83,11 @@ public class TbMsgToEmailNode implements TbNode {
      }
 
     /**
-     * 将输入消息转换为 SEND_EMAIL 类型并路由到 Success。
-     * 转换失败时走 Failure；本方法不直接发送邮件，也不直接处理 SMTP 连接生命周期。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
@@ -97,8 +102,12 @@ public class TbMsgToEmailNode implements TbNode {
     }
 
     /**
-     * 构造新的 SEND_EMAIL 类型 TbMsg。
-     * 本方法只转换本地消息内容，不直接访问外部系统、数据库或缓存。
+     * 功能：构建消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `email`：`email` 参数。
+     * 返回：处理结果。
      */
     private TbMsg buildEmailMsg(TbContext ctx, TbMsg msg, TbEmail email) {
         String emailJson = JacksonUtil.toString(email);
@@ -106,8 +115,10 @@ public class TbMsgToEmailNode implements TbNode {
     }
 
     /**
-     * 根据模板和消息元数据/数据构造 TbEmail 对象。
-     * 图片映射来自消息元数据 images；本方法不直接调用邮件服务。
+     * 功能：执行 `convert` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private TbEmail convert(TbMsg msg) {
         TbEmail.TbEmailBuilder builder = TbEmail.builder();
@@ -122,7 +133,6 @@ public class TbMsgToEmailNode implements TbNode {
         builder.body(fromTemplate(config.getBodyTemplate(), msg));
         String imagesStr = msg.getMetaData().getValue(IMAGES);
         if (!StringUtils.isEmpty(imagesStr)) {
-            // images 元数据保存为 JSON map，转换时解析为 TbEmail 的内嵌图片映射。
             Map<String, String> imgMap = JacksonUtil.fromString(imagesStr, new TypeReference<HashMap<String, String>>() {});
             builder.images(imgMap);
         }
@@ -130,8 +140,11 @@ public class TbMsgToEmailNode implements TbNode {
     }
 
     /**
-     * 对单个模板执行 Rule Engine 模板解析。
-     * 本方法只读取当前 TbMsg，不直接访问数据库、缓存或外部系统。
+     * 功能：执行 `fromTemplate` 对应的处理。
+     * 参数：
+     * - `template`：`template` 参数。
+     * - `msg`：待处理消息。
+     * 返回：文本结果。
      */
     private String fromTemplate(String template, TbMsg msg) {
         return StringUtils.isNotEmpty(template) ? TbNodeUtils.processPattern(template, msg) : null;

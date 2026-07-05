@@ -83,7 +83,6 @@ import static org.thingsboard.server.transport.lwm2m.server.ota.DefaultLwM2MOtaU
 import static org.thingsboard.server.transport.lwm2m.server.ota.DefaultLwM2MOtaUpdateService.SW_RESULT_ID;
 import static org.thingsboard.server.transport.lwm2m.server.ota.DefaultLwM2MOtaUpdateService.SW_STATE_ID;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`LwM2MTransportUtil` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -94,45 +93,26 @@ import static org.thingsboard.server.transport.lwm2m.server.ota.DefaultLwM2MOtaU
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class LwM2MTransportUtil {
 
     /**
-     * 字段说明：
-     * 1. 保存 `LWM2M_OBJECT_VERSION_DEFAULT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 版本号常量，用于统一引用固定值。
      */
     public static final String LWM2M_OBJECT_VERSION_DEFAULT = "1.0";
 
     /**
-     * 字段说明：
-     * 1. 保存 `LOG_LWM2M_TELEMETRY` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 遥测常量，用于统一引用固定值。
      */
     public static final String LOG_LWM2M_TELEMETRY = "transportLog";
     public static final String LOG_LWM2M_INFO = "info";
     /**
-     * 字段说明：
-     * 1. 保存 `LOG_LWM2M_ERROR` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 错误信息常量，用于统一引用固定值。
      */
     public static final String LOG_LWM2M_ERROR = "error";
     public static final String LOG_LWM2M_WARN = "warn";
     /**
-     * 字段说明：
-     * 1. 保存 `BOOTSTRAP_DEFAULT_SHORT_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `BOOTSTRAP_DEFAULT_SHORT_ID`常量，用于统一引用固定值。
      */
     public static final int BOOTSTRAP_DEFAULT_SHORT_ID = 0;
 
@@ -151,12 +131,7 @@ public class LwM2MTransportUtil {
         CLIENT_STRATEGY_2(2, "Read all client resources");
 
         /**
-         * 字段说明：
-         * 1. 保存 `code` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 编码，表示当前对象的对应属性。
          */
         public int code;
         public String type;
@@ -167,19 +142,13 @@ public class LwM2MTransportUtil {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `fromStrategyClientByType` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `fromStrategyClientByType` 对应的处理。
+         * 参数：
+         * - `type`：类型。
+         * 返回：处理结果。
          */
         public static LwM2MClientStrategy fromStrategyClientByType(String type) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (LwM2MClientStrategy to : LwM2MClientStrategy.values()) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (to.type.equals(type)) {
                     return to;
                 }
@@ -188,19 +157,13 @@ public class LwM2MTransportUtil {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `fromStrategyClientByCode` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `fromStrategyClientByCode` 对应的处理。
+         * 参数：
+         * - `code`：`code` 参数。
+         * 返回：处理结果。
          */
         public static LwM2MClientStrategy fromStrategyClientByCode(int code) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (LwM2MClientStrategy to : LwM2MClientStrategy.values()) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (to.code == code) {
                     return to;
                 }
@@ -210,18 +173,16 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `equalsResourceValue` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `equalsResourceValue` 对应的处理。
+     * 参数：
+     * - `valueOld`：值。
+     * - `valueNew`：值。
+     * - `type`：类型。
+     * - `resourcePath`：文件或资源路径。
+     * 返回：判断结果。
      */
     public static boolean equalsResourceValue(Object valueOld, Object valueNew, ResourceModel.Type type, LwM2mPath
             resourcePath) throws CodecException {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (type) {
             case BOOLEAN:
             case INTEGER:
@@ -240,36 +201,29 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertOtaUpdateValueToString` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换值。
+     * 参数：
+     * - `pathIdVer`：文件或资源路径。
+     * - `value`：值。
+     * - `currentType`：类型。
+     * 返回：处理结果。
      */
     public static LwM2mOtaConvert convertOtaUpdateValueToString(String pathIdVer, Object value, ResourceModel.Type currentType) {
         String path = fromVersionedIdToObjectId(pathIdVer);
         LwM2mOtaConvert lwM2mOtaConvert = new LwM2mOtaConvert();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (path != null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (FW_STATE_ID.equals(path)) {
                 lwM2mOtaConvert.setCurrentType(STRING);
                 lwM2mOtaConvert.setValue(FirmwareUpdateState.fromStateFwByCode(((Long) value).intValue()).getType());
                 return lwM2mOtaConvert;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (FW_RESULT_ID.equals(path)) {
                 lwM2mOtaConvert.setCurrentType(STRING);
                 lwM2mOtaConvert.setValue(FirmwareUpdateResult.fromUpdateResultFwByCode(((Long) value).intValue()).getType());
                 return lwM2mOtaConvert;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (SW_STATE_ID.equals(path)) {
                 lwM2mOtaConvert.setCurrentType(STRING);
                 lwM2mOtaConvert.setValue(SoftwareUpdateState.fromUpdateStateSwByCode(((Long) value).intValue()).getType());
                 return lwM2mOtaConvert;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (SW_RESULT_ID.equals(path)) {
                 lwM2mOtaConvert.setCurrentType(STRING);
                 lwM2mOtaConvert.setValue(SoftwareUpdateResult.fromUpdateResultSwByCode(((Long) value).intValue()).getType());
@@ -282,19 +236,13 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toLwM2MClientProfile` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toLwM2MClientProfile` 对应的处理。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     public static Lwm2mDeviceProfileTransportConfiguration toLwM2MClientProfile(DeviceProfile deviceProfile) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         DeviceProfileTransportConfiguration transportConfiguration = deviceProfile.getProfileData().getTransportConfiguration();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         if (transportConfiguration.getType().equals(DeviceTransportType.LWM2M)) {
             return (Lwm2mDeviceProfileTransportConfiguration) transportConfiguration;
         } else {
@@ -304,28 +252,20 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getBootstrapParametersFromThingsboard` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取参数集合。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
      */
     public static List<LwM2MBootstrapServerCredential> getBootstrapParametersFromThingsboard(DeviceProfile deviceProfile) {
         return toLwM2MClientProfile(deviceProfile).getBootstrap();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromVersionedIdToObjectId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromVersionedIdToObjectId` 对应的处理。
+     * 参数：
+     * - `pathIdVer`：文件或资源路径。
+     * 返回：文本结果。
      */
     public static String fromVersionedIdToObjectId(String pathIdVer) {
         try {
@@ -350,14 +290,10 @@ public class LwM2MTransportUtil {
      * @return
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getVerFromPathIdVerOrId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取路径。
+     * 参数：
+     * - `path`：文件或资源路径。
+     * 返回：文本结果。
      */
     public static String getVerFromPathIdVerOrId(String path) {
         try {
@@ -373,14 +309,11 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validPathIdVer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `validPathIdVer` 对应的处理。
+     * 参数：
+     * - `pathIdVer`：文件或资源路径。
+     * - `registration`：`registration` 参数。
+     * 返回：文本结果。
      */
     public static String validPathIdVer(String pathIdVer, Registration registration) throws
             IllegalArgumentException {
@@ -397,14 +330,11 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertObjectIdToVersionedId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换`Object Id To Versioned Id`。
+     * 参数：
+     * - `path`：文件或资源路径。
+     * - `registration`：`registration` 参数。
+     * 返回：文本结果。
      */
     public static String convertObjectIdToVersionedId(String path, Registration registration) {
         String ver = registration.getSupportedObject().get(new LwM2mPath(path).getObjectId());
@@ -423,14 +353,10 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateObjectVerFromKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验键。
+     * 参数：
+     * - `key`：键。
+     * 返回：判断结果。
      */
     public static String validateObjectVerFromKey(String key) {
         try {
@@ -472,14 +398,12 @@ public class LwM2MTransportUtil {
      * Attribute [] attrs = {gt, st};
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createWriteAttributeRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建属性。
+     * 参数：
+     * - `target`：`target` 参数。
+     * - `params`：`params` 参数。
+     * - `serviceImpl`：服务对象。
+     * 返回：处理结果。
      */
     public static SimpleDownlinkRequest createWriteAttributeRequest(String target, Object params, LwM2mUplinkMsgHandler serviceImpl) {
         AttributeSet attrSet = new AttributeSet(createWriteAttributes(params, serviceImpl, target));
@@ -487,14 +411,12 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createWriteAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Write Attributes`。
+     * 参数：
+     * - `params`：`params` 参数。
+     * - `serviceImpl`：服务对象。
+     * - `target`：`target` 参数。
+     * 返回：处理结果。
      */
     private static Attribute[] createWriteAttributes(Object params, LwM2mUplinkMsgHandler serviceImpl, String target) {
         List<Attribute> attributeLists = new ArrayList<>();
@@ -521,14 +443,10 @@ public class LwM2MTransportUtil {
      * "CORELINK": // String used in Attribute
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `equalsResourceTypeGetSimpleName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `equalsResourceTypeGetSimpleName` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static ResourceModel.Type equalsResourceTypeGetSimpleName(Object value) {
         switch (value.getClass().getSimpleName()) {
@@ -552,14 +470,11 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateVersionedId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Versioned Id`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `request`：请求对象。
+     * 返回：无。
      */
     public static void validateVersionedId(LwM2mClient client, HasVersionedId request) {
         String msgExceptionStr = "";
@@ -574,14 +489,12 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertMultiResourceValuesFromRpcBody` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换RPC。
+     * 参数：
+     * - `value`：值。
+     * - `type`：类型。
+     * - `versionedId`：`versionedId`ID。
+     * 返回：处理结果。
      */
     public static Map<Integer, Object> convertMultiResourceValuesFromRpcBody(Object value, ResourceModel.Type type, String versionedId) throws Exception {
             String valueJsonStr = JacksonUtil.toString(value);
@@ -590,14 +503,12 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertMultiResourceValuesFromJson` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换JSON。
+     * 参数：
+     * - `newValProto`：`newValProto` 参数。
+     * - `type`：类型。
+     * - `versionedId`：`versionedId`ID。
+     * 返回：处理结果。
      */
     public static Map<Integer, Object> convertMultiResourceValuesFromJson(JsonElement newValProto, ResourceModel.Type type, String versionedId) {
         Map<Integer, Object> newValues = new HashMap<>();
@@ -609,14 +520,13 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertWriteAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换`Write Attributes`。
+     * 参数：
+     * - `type`：类型。
+     * - `value`：值。
+     * - `serviceImpl`：服务对象。
+     * - `target`：`target` 参数。
+     * 返回：处理结果。
      */
     public static Object convertWriteAttributes(String type, Object value, LwM2mUplinkMsgHandler serviceImpl, String target) {
         switch (type) {
@@ -645,14 +555,11 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createAttribute` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建属性。
+     * 参数：
+     * - `key`：键。
+     * - `attrValue`：值。
+     * 返回：处理结果。
      */
     private static Attribute createAttribute(String key, Object attrValue) {
         try {
@@ -669,14 +576,11 @@ public class LwM2MTransportUtil {
      * @return - return value of Resource by idPath
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getResourceValueFromLwM2MClient` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `lwM2MClient`：客户端对象。
+     * - `path`：文件或资源路径。
+     * 返回：处理结果。
      */
     public static LwM2mResource getResourceValueFromLwM2MClient(LwM2mClient lwM2MClient, String path) {
         LwM2mResource lwm2mResourceValue = null;
@@ -689,17 +593,13 @@ public class LwM2MTransportUtil {
         return lwm2mResourceValue;
     }
 
-    @SuppressWarnings("unchecked")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `contentToString` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `contentToString` 对应的处理。
+     * 参数：
+     * - `content`：`content` 参数。
+     * 返回：可能存在的结果。
      */
+    @SuppressWarnings("unchecked")
     public static Optional<String> contentToString(Object content) {
         try {
             String value = null;
@@ -730,14 +630,11 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `opaqueResourceToString` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `opaqueResourceToString` 对应的处理。
+     * 参数：
+     * - `resource`：`resource` 参数。
+     * - `key`：键。
+     * 返回：文本结果。
      */
     private static String opaqueResourceToString(LwM2mResource resource, String key) {
         String value = null;
@@ -771,14 +668,10 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `multiInstanceOpaqueToString` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `multiInstanceOpaqueToString` 对应的处理。
+     * 参数：
+     * - `resource`：`resource` 参数。
+     * 返回：文本结果。
      */
     private static String multiInstanceOpaqueToString(LwM2mMultipleResource resource) {
         StringBuilder builder = new StringBuilder();
@@ -792,14 +685,10 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `opaqueToString` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `opaqueToString` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：文本结果。
      */
     private static String opaqueToString(byte[] value) {
         String opaque = Hex.encodeHexString(value);
@@ -807,28 +696,19 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createModelsDefault` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Models Default`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public static LwM2mModel createModelsDefault() {
         return new StaticModel(ObjectLoader.loadDefault());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `compareAttNameKeyOta` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `compareAttNameKeyOta` 对应的处理。
+     * 参数：
+     * - `attrName`：名称。
+     * 返回：判断结果。
      */
     public static boolean compareAttNameKeyOta(String attrName) {
         for (OtaPackageKey value : OtaPackageKey.values()) {
@@ -838,14 +718,11 @@ public class LwM2MTransportUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `valueEquals` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `valueEquals` 对应的处理。
+     * 参数：
+     * - `newValue`：值。
+     * - `oldValue`：值。
+     * 返回：判断结果。
      */
     public static boolean valueEquals(Object newValue, Object oldValue) {
         String newValueStr;

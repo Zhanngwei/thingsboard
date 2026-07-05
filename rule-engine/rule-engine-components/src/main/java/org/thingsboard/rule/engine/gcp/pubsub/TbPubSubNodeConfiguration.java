@@ -21,11 +21,10 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 import java.util.Collections;
 import java.util.Map;
 
-@Data
 /**
- * GCP Pub/Sub 节点配置模型，保存项目、Topic、消息属性和服务账号密钥。
- * 配置类本身不直接创建 Publisher、不发布消息，也不涉及异步回调、数据库或缓存。
+ * `TbPubSubNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbPubSubNodeConfiguration implements NodeConfiguration<TbPubSubNodeConfiguration> {
 
     /**
@@ -37,21 +36,22 @@ public class TbPubSubNodeConfiguration implements NodeConfiguration<TbPubSubNode
      */
     private String topicName;
     /**
-     * Pub/Sub 消息属性模板集合，键和值都可基于 TbMsg 解析。
+     * 消息映射关系，用于按键查找对应值。
      */
     private Map<String, String> messageAttributes;
     /**
-     * 服务账号 JSON 密钥内容。
+     * 键，提供当前类调用的业务操作。
      */
     private String serviceAccountKey;
     /**
-     * 服务账号密钥文件名，供 UI/配置来源标识使用。
+     * 键，提供当前类调用的业务操作。
      */
     private String serviceAccountKeyFileName;
 
     /**
-     * 构造 GCP Pub/Sub 节点默认配置。
-     * 本方法只设置默认值，不直接创建 Publisher 或处理 Rule Engine 消息确认。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbPubSubNodeConfiguration defaultConfiguration() {

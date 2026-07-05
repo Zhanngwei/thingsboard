@@ -23,7 +23,6 @@ import org.thingsboard.server.dao.oauth2.OAuth2User;
 
 import java.util.Map;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`BasicMapperUtils` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
@@ -34,50 +33,40 @@ import java.util.Map;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Strategy。
  */
+@Slf4j
 public class BasicMapperUtils {
     /**
-     * 字段说明：
-     * 1. 保存 `START_PLACEHOLDER_PREFIX` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `START_PLACEHOLDER_PREFIX`常量，用于统一引用固定值。
      */
     private static final String START_PLACEHOLDER_PREFIX = "%{";
     private static final String END_PLACEHOLDER_PREFIX = "}";
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOAuth2User` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取用户。
+     * 参数：
+     * - `email`：`email` 参数。
+     * - `attributes`：键值映射。
+     * - `config`：配置对象。
+     * 返回：处理结果。
      */
     public static OAuth2User getOAuth2User(String email, Map<String, Object> attributes, OAuth2MapperConfig config) {
         OAuth2User oauth2User = new OAuth2User();
         oauth2User.setEmail(email);
         oauth2User.setTenantName(getTenantName(email, attributes, config));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!StringUtils.isEmpty(config.getBasic().getLastNameAttributeKey())) {
             String lastName = getStringAttributeByKey(attributes, config.getBasic().getLastNameAttributeKey());
             oauth2User.setLastName(lastName);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!StringUtils.isEmpty(config.getBasic().getFirstNameAttributeKey())) {
             String firstName = getStringAttributeByKey(attributes, config.getBasic().getFirstNameAttributeKey());
             oauth2User.setFirstName(firstName);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!StringUtils.isEmpty(config.getBasic().getCustomerNamePattern())) {
             StrSubstitutor sub = new StrSubstitutor(attributes, START_PLACEHOLDER_PREFIX, END_PLACEHOLDER_PREFIX);
             String customerName = sub.replace(config.getBasic().getCustomerNamePattern());
             oauth2User.setCustomerName(customerName);
         }
         oauth2User.setAlwaysFullScreen(config.getBasic().isAlwaysFullScreen());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!StringUtils.isEmpty(config.getBasic().getDefaultDashboardName())) {
             oauth2User.setDefaultDashboardName(config.getBasic().getDefaultDashboardName());
         }
@@ -85,17 +74,14 @@ public class BasicMapperUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantName` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户。
+     * 参数：
+     * - `email`：`email` 参数。
+     * - `attributes`：键值映射。
+     * - `config`：配置对象。
+     * 返回：文本结果。
      */
     public static String getTenantName(String email, Map<String, Object> attributes, OAuth2MapperConfig config) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (config.getBasic().getTenantNameStrategy()) {
             case EMAIL:
                 return email;
@@ -110,20 +96,16 @@ public class BasicMapperUtils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStringAttributeByKey` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `attributes`：键值映射。
+     * - `key`：键。
+     * 返回：文本结果。
      */
     public static String getStringAttributeByKey(Map<String, Object> attributes, String key) {
         String result = null;
         try {
             result = (String) attributes.get(key);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.warn("Can't convert attribute to String by key " + key);
         }

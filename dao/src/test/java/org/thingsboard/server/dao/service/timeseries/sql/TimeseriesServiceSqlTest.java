@@ -18,7 +18,6 @@ package org.thingsboard.server.dao.service.timeseries.sql;
 import org.thingsboard.server.dao.service.DaoSqlTest;
 import org.thingsboard.server.dao.service.timeseries.BaseTimeseriesServiceTest;
 
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`TimeseriesServiceSqlTest` 是 ThingsBoard DAO 测试模块 中的DAO 服务测试或服务支撑类型，用于组织 DAO 层测试、共享服务夹具或持久化服务的公共执行流程。
@@ -30,6 +29,7 @@ import org.thingsboard.server.dao.service.timeseries.BaseTimeseriesServiceTest;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Template Method / Service。
  */
+@DaoSqlTest
 public class TimeseriesServiceSqlTest extends BaseTimeseriesServiceTest {
 }
 

@@ -22,7 +22,7 @@ package org.thingsboard.rule.engine.profile;
 enum AlarmStateUpdateResult {
 
     /**
-     * 枚举项说明：本行枚举常量定义 `AlarmStateUpdateResult` 支持的取值，用于配置或处理流程中的分支判断。
+     * `CLEARED`常量，用于统一引用固定值。
      */
     NONE, CREATED, UPDATED, SEVERITY_UPDATED, CLEARED;
 

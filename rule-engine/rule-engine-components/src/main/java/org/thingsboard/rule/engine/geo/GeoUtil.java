@@ -47,11 +47,11 @@ import java.util.stream.Collectors;
 public class GeoUtil {
 
     /**
-     * 常量字段：定义 `distCtx`，用于规则引擎上下文，本身不触发外部系统调用。
+     * 上下文常量，用于统一引用固定值。
      */
     private static final SpatialContext distCtx = SpatialContext.GEO;
     /**
-     * 常量字段：定义 `jtsCtx`，用于规则引擎上下文，本身不触发外部系统调用。
+     * 上下文常量，用于统一引用固定值。
      */
     private static final JtsSpatialContext jtsCtx;
 
@@ -62,8 +62,12 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `distance` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `distance` 对应的处理。
+     * 参数：
+     * - `x`：`x` 参数。
+     * - `y`：`y` 参数。
+     * - `unit`：`unit` 参数。
+     * 返回：数值结果。
      */
     public static synchronized double distance(Coordinates x, Coordinates y, RangeUnit unit) {
         Point xLL = distCtx.getShapeFactory().pointXY(x.getLongitude(), x.getLatitude());
@@ -72,8 +76,11 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `contains` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `contains` 对应的处理。
+     * 参数：
+     * - `polygonInString`：`polygonInString` 参数。
+     * - `coordinates`：`coordinates` 参数。
+     * 返回：判断结果。
      */
     public static synchronized boolean contains(@NonNull String polygonInString, @NonNull Coordinates coordinates) {
         if (polygonInString.isEmpty() || polygonInString.isBlank()) {
@@ -93,8 +100,11 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `unionToGlobalGeometry` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `unionToGlobalGeometry` 对应的处理。
+     * 参数：
+     * - `polygons`：数据列表。
+     * - `holes`：`holes` 参数。
+     * 返回：处理结果。
      */
     private static Geometry unionToGlobalGeometry(List<Geometry> polygons, Set<Geometry> holes) {
         Geometry globalPolygon = polygons.stream().reduce(Geometry::union).orElseThrow(() ->
@@ -108,8 +118,10 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `normalizePolygonsJson` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `normalizePolygonsJson` 对应的处理。
+     * 参数：
+     * - `polygonsJsonArray`：`polygonsJsonArray` 参数。
+     * 返回：处理结果。
      */
     private static JsonArray normalizePolygonsJson(JsonArray polygonsJsonArray) {
         JsonArray result = new JsonArray();
@@ -118,8 +130,11 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `normalizePolygonsJson` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `normalizePolygonsJson` 对应的处理。
+     * 参数：
+     * - `polygonsJsonArray`：`polygonsJsonArray` 参数。
+     * - `result`：`result` 参数。
+     * 返回：无。
      */
     private static void normalizePolygonsJson(JsonArray polygonsJsonArray, JsonArray result) {
         if (containsArrayWithPrimitives(polygonsJsonArray)) {
@@ -136,8 +151,10 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `extractHolesFrom` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `extractHolesFrom` 对应的处理。
+     * 参数：
+     * - `polygons`：数据列表。
+     * 返回：匹配的数据集合。
      */
     private static Set<Geometry> extractHolesFrom(List<Geometry> polygons) {
         Map<Geometry, List<Geometry>> polygonsHoles = new HashMap<>();
@@ -170,8 +187,10 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：构造告警详情、SSL 上下文或输出对象，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：构建JSON。
+     * 参数：
+     * - `polygonsJsonArray`：`polygonsJsonArray` 参数。
+     * 返回：匹配的数据集合。
      */
     private static List<Geometry> buildPolygonsFromJson(JsonArray polygonsJsonArray) {
         List<Geometry> polygons = new LinkedList<>();
@@ -186,8 +205,10 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：构造告警详情、SSL 上下文或输出对象，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：构建`Polygon From Coordinates`。
+     * 参数：
+     * - `coordinates`：数据列表。
+     * 返回：处理结果。
      */
     private static Geometry buildPolygonFromCoordinates(List<Coordinate> coordinates) {
         if (coordinates.size() == 2) {
@@ -210,8 +231,10 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `parseCoordinates` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：解析`Coordinates`。
+     * 参数：
+     * - `coordinatesJson`：`coordinatesJson` 参数。
+     * 返回：匹配的数据集合。
      */
     private static List<Coordinate> parseCoordinates(JsonArray coordinatesJson) {
         List<Coordinate> result = new LinkedList<>();
@@ -230,8 +253,10 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `containsPrimitives` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `containsPrimitives` 对应的处理。
+     * 参数：
+     * - `array`：`array` 参数。
+     * 返回：判断结果。
      */
     private static boolean containsPrimitives(JsonArray array) {
         for (JsonElement element : array) {
@@ -242,8 +267,10 @@ public class GeoUtil {
     }
 
     /**
-     * 方法说明：执行 `containsArrayWithPrimitives` 对应的辅助逻辑，供 `GeoUtil` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `containsArrayWithPrimitives` 对应的处理。
+     * 参数：
+     * - `array`：`array` 参数。
+     * 返回：判断结果。
      */
     private static boolean containsArrayWithPrimitives(JsonArray array) {
         for (JsonElement element : array) {

@@ -57,7 +57,6 @@ import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractOAuth2ClientMapper` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
@@ -68,150 +67,88 @@ import java.util.concurrent.locks.ReentrantLock;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Strategy。
  */
+@Slf4j
 public abstract class AbstractOAuth2ClientMapper {
     /**
-     * 字段说明：
-     * 1. 保存 `DASHBOARDS_REQUEST_LIMIT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 请求常量，用于统一引用固定值。
      */
     private static final int DASHBOARDS_REQUEST_LIMIT = 10;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `userService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，提供当前类调用的业务操作。
      */
+    @Autowired
     private UserService userService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `passwordEncoder` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户，提供当前类调用的业务操作。
      */
+    @Autowired
     private TenantService tenantService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tbTenantService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户，提供当前类调用的业务操作。
      */
+    @Autowired
     private TbTenantService tbTenantService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `customerService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户，提供当前类调用的业务操作。
      */
+    @Autowired
     private CustomerService customerService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `dashboardService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 仪表盘，提供当前类调用的业务操作。
      */
+    @Autowired
     private DashboardService dashboardService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `installScripts` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `installScripts` 字段，保存当前对象的对应属性。
      */
+    @Autowired
     private InstallScripts installScripts;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tbUserService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，提供当前类调用的业务操作。
      */
+    @Autowired
     private TbUserService tbUserService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
+    @Autowired
     protected TbTenantProfileCache tenantProfileCache;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tbClusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     protected TbClusterService tbClusterService;
 
+    /**
+     * 是否启用`edges`。
+     */
     @Value("${edges.enabled}")
     @Getter
-    /**
-     * 字段说明：
-     * 1. 保存 `edgesEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean edgesEnabled;
 
     private final Lock userCreationLock = new ReentrantLock();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrCreateSecurityUserFromOAuth2User` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取用户。
+     * 参数：
+     * - `oauth2User`：`oauth2User` 参数。
+     * - `registration`：`registration` 参数。
+     * 返回：处理结果。
      */
     protected SecurityUser getOrCreateSecurityUserFromOAuth2User(OAuth2User oauth2User, OAuth2Registration registration) {
 
@@ -221,20 +158,16 @@ public abstract class AbstractOAuth2ClientMapper {
 
         User user = userService.findUserByEmail(TenantId.SYS_TENANT_ID, oauth2User.getEmail());
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (user == null && !config.isAllowUserCreation()) {
             throw new UsernameNotFoundException("User not found: " + oauth2User.getEmail());
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (user == null) {
             userCreationLock.lock();
             try {
                 user = userService.findUserByEmail(TenantId.SYS_TENANT_ID, oauth2User.getEmail());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (user == null) {
                     user = new User();
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (oauth2User.getCustomerId() == null && StringUtils.isEmpty(oauth2User.getCustomerName())) {
                         user.setAuthority(Authority.TENANT_ADMIN);
                     } else {
@@ -252,20 +185,17 @@ public abstract class AbstractOAuth2ClientMapper {
 
                     ObjectNode additionalInfo = JacksonUtil.newObjectNode();
 
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!StringUtils.isEmpty(oauth2User.getDefaultDashboardName())) {
                         Optional<DashboardId> dashboardIdOpt =
                                 user.getAuthority() == Authority.TENANT_ADMIN ?
                                         getDashboardId(tenantId, oauth2User.getDefaultDashboardName())
                                         : getDashboardId(tenantId, customerId, oauth2User.getDefaultDashboardName());
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (dashboardIdOpt.isPresent()) {
                             additionalInfo.put("defaultDashboardFullscreen", oauth2User.isAlwaysFullScreen());
                             additionalInfo.put("defaultDashboardId", dashboardIdOpt.get().getId().toString());
                         }
                     }
 
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (registration.getAdditionalInfo() != null &&
                             registration.getAdditionalInfo().has("providerName")) {
                         additionalInfo.put("authProviderName", registration.getAdditionalInfo().get("providerName").asText());
@@ -274,13 +204,11 @@ public abstract class AbstractOAuth2ClientMapper {
                     user.setAdditionalInfo(additionalInfo);
 
                     user = tbUserService.save(tenantId, customerId, user, false, null, null);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (config.isActivateUser()) {
                         UserCredentials userCredentials = userService.findUserCredentialsByUserId(user.getTenantId(), user.getId());
                         userService.activateUserCredentials(user.getTenantId(), userCredentials.getActivateToken(), passwordEncoder.encode(""));
                     }
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.error("Can't get or create security user from oauth2 user", e);
                 throw new RuntimeException("Can't get or create security user from oauth2 user", e);
@@ -292,7 +220,6 @@ public abstract class AbstractOAuth2ClientMapper {
         try {
             SecurityUser securityUser = new SecurityUser(user, true, principal);
             return (SecurityUser) new UsernamePasswordAuthenticationToken(securityUser, null, securityUser.getAuthorities()).getPrincipal();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("Can't get or create security user from oauth2 user", e);
             throw new RuntimeException("Can't get or create security user from oauth2 user", e);
@@ -300,19 +227,14 @@ public abstract class AbstractOAuth2ClientMapper {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantId` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantName`：租户信息或租户标识。
+     * 返回：处理结果。
      */
     private TenantId getTenantId(String tenantName) throws Exception {
         List<Tenant> tenants = tenantService.findTenants(new PageLink(1, 0, tenantName)).getData();
         Tenant tenant;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tenants == null || tenants.isEmpty()) {
             tenant = new Tenant();
             tenant.setTitle(tenantName);
@@ -324,17 +246,13 @@ public abstract class AbstractOAuth2ClientMapper {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomerId` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取客户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerName`：名称。
+     * 返回：处理结果。
      */
     private CustomerId getCustomerId(TenantId tenantId, String customerName) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isEmpty(customerName)) {
             return null;
         }
@@ -350,28 +268,23 @@ public abstract class AbstractOAuth2ClientMapper {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDashboardId` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `dashboardName`：名称。
+     * 返回：可能存在的结果。
      */
     private Optional<DashboardId> getDashboardId(TenantId tenantId, String dashboardName) {
         return Optional.ofNullable(dashboardService.findFirstDashboardInfoByTenantIdAndName(tenantId, dashboardName)).map(IdBased::getId);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDashboardId` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `dashboardName`：名称。
+     * 返回：可能存在的结果。
      */
     private Optional<DashboardId> getDashboardId(TenantId tenantId, CustomerId customerId, String dashboardName) {
         PageData<DashboardInfo> dashboardsPage;

@@ -44,10 +44,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-@TbCoreComponent
-@Service
-@Slf4j
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`AlarmsCleanUpService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -58,77 +54,49 @@ import java.util.concurrent.TimeUnit;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@TbCoreComponent
+@Service
+@Slf4j
+@RequiredArgsConstructor
 public class AlarmsCleanUpService {
 
-    @Value("${sql.ttl.alarms.removal_batch_size}")
     /**
-     * 字段说明：
-     * 1. 保存 `removalBatchSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 批量大小，用于控制处理规模或位置。
      */
+    @Value("${sql.ttl.alarms.removal_batch_size}")
     private Integer removalBatchSize;
 
     /**
-     * 字段说明：
-     * 1. 保存 `tenantService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户，提供当前类调用的业务操作。
      */
     private final TenantService tenantService;
     private final AlarmDao alarmDao;
     /**
-     * 字段说明：
-     * 1. 保存 `alarmService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 告警，提供当前类调用的业务操作。
      */
     private final AlarmService alarmService;
     private final RelationService relationService;
     /**
-     * 字段说明：
-     * 1. 保存 `entityActionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 实体，提供当前类调用的业务操作。
      */
     private final EntityActionService entityActionService;
     private final PartitionService partitionService;
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
     private final TbTenantProfileCache tenantProfileCache;
 
-    @Scheduled(initialDelayString = "#{T(org.apache.commons.lang3.RandomUtils).nextLong(0, ${sql.ttl.alarms.checking_interval})}", fixedDelayString = "${sql.ttl.alarms.checking_interval}")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanUp` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Up`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Scheduled(initialDelayString = "#{T(org.apache.commons.lang3.RandomUtils).nextLong(0, ${sql.ttl.alarms.checking_interval})}", fixedDelayString = "${sql.ttl.alarms.checking_interval}")
     public void cleanUp() {
         PageDataIterable<TenantId> tenants = new PageDataIterable<>(tenantService::findTenantsIds, 10_000);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (TenantId tenantId : tenants) {
             try {
                 cleanUp(tenantId);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.warn("Failed to clean up alarms by ttl for tenant {}", tenantId, e);
             }
@@ -136,24 +104,17 @@ public class AlarmsCleanUpService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanUp` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Up`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
     private void cleanUp(TenantId tenantId) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!partitionService.resolve(ServiceType.TB_CORE, tenantId, tenantId).isMyPartition()) {
             return;
         }
 
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         Optional<DefaultTenantProfileConfiguration> tenantProfileConfiguration = tenantProfileCache.get(tenantId).getProfileConfiguration();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tenantProfileConfiguration.isEmpty() || tenantProfileConfiguration.get().getAlarmsTtlDays() == 0) {
             return;
         }
@@ -164,21 +125,16 @@ public class AlarmsCleanUpService {
         PageLink removalBatchRequest = new PageLink(removalBatchSize, 0);
         long totalRemoved = 0;
         Set<String> typesToRemove = new HashSet<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while (true) {
-            // DAO 调用是数据库访问边界，事务和缓存一致性由上层服务约定控制。
             PageData<AlarmId> toRemove = alarmDao.findAlarmsIdsByEndTsBeforeAndTenantId(expirationTime, tenantId, removalBatchRequest);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (AlarmId alarmId : toRemove.getData()) {
                 Alarm alarm = alarmService.delAlarm(tenantId, alarmId, false).getAlarm();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (alarm != null) {
                     entityActionService.pushEntityActionToRuleEngine(alarm.getOriginator(), alarm, tenantId, null, ActionType.ALARM_DELETE, null);
                     totalRemoved++;
                     typesToRemove.add(alarm.getType());
                 }
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!toRemove.hasNext()) {
                 break;
             }
@@ -186,7 +142,6 @@ public class AlarmsCleanUpService {
 
         alarmService.delAlarmTypes(tenantId, typesToRemove);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (totalRemoved > 0) {
             log.info("Removed {} outdated alarm(s) for tenant {} older than {}", totalRemoved, tenantId, new Date(expirationTime));
         }

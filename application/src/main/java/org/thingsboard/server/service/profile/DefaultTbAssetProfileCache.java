@@ -33,8 +33,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-@Service
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbAssetProfileCache` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -45,16 +43,13 @@ import java.util.function.Consumer;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Slf4j
 public class DefaultTbAssetProfileCache implements TbAssetProfileCache {
 
     private final Lock assetProfileFetchLock = new ReentrantLock();
     /**
-     * 字段说明：
-     * 1. 保存 `assetProfileService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 资产配置集合，用于去重保存或快速判断对象是否存在。
      */
     private final AssetProfileService assetProfileService;
     private final AssetService assetService;
@@ -65,42 +60,33 @@ public class DefaultTbAssetProfileCache implements TbAssetProfileCache {
     private final ConcurrentMap<TenantId, ConcurrentMap<EntityId, BiConsumer<AssetId, AssetProfile>>> assetProfileListeners = new ConcurrentHashMap<>();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultTbAssetProfileCache` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultTbAssetProfileCache` 实例，并初始化必要字段。
+     * 参数：
+     * - `assetProfileService`：服务对象。
+     * - `assetService`：服务对象。
+     * 返回：新创建的对象实例。
      */
     public DefaultTbAssetProfileCache(AssetProfileService assetProfileService, AssetService assetService) {
         this.assetProfileService = assetProfileService;
         this.assetService = assetService;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `get` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `assetProfileId`：资产配置ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public AssetProfile get(TenantId tenantId, AssetProfileId assetProfileId) {
         AssetProfile profile = assetProfilesMap.get(assetProfileId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (profile == null) {
             assetProfileFetchLock.lock();
             try {
                 profile = assetProfilesMap.get(assetProfileId);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (profile == null) {
                     profile = assetProfileService.findAssetProfileById(tenantId, assetProfileId);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (profile != null) {
                         assetProfilesMap.put(assetProfileId, profile);
                         log.debug("[{}] Fetch asset profile into cache: {}", profile.getId(), profile);
@@ -114,23 +100,18 @@ public class DefaultTbAssetProfileCache implements TbAssetProfileCache {
         return profile;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `get` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `assetId`：资产IDID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public AssetProfile get(TenantId tenantId, AssetId assetId) {
         AssetProfileId profileId = assetsMap.get(assetId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (profileId == null) {
             Asset asset = assetService.findAssetById(tenantId, assetId);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (asset != null) {
                 profileId = asset.getAssetProfileId();
                 assetsMap.put(assetId, profileId);
@@ -141,137 +122,109 @@ public class DefaultTbAssetProfileCache implements TbAssetProfileCache {
         return get(tenantId, profileId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `profileId`：配置ID。
+     * 返回：无。
      */
+    @Override
     public void evict(TenantId tenantId, AssetProfileId profileId) {
         AssetProfile oldProfile = assetProfilesMap.remove(profileId);
         log.debug("[{}] evict asset profile from cache: {}", profileId, oldProfile);
         AssetProfile newProfile = get(tenantId, profileId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (newProfile != null) {
             notifyProfileListeners(newProfile);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `assetId`：资产IDID。
+     * 返回：无。
      */
+    @Override
     public void evict(TenantId tenantId, AssetId assetId) {
         AssetProfileId old = assetsMap.remove(assetId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (old != null) {
             AssetProfile newProfile = get(tenantId, assetId);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (newProfile == null || !old.equals(newProfile.getId())) {
                 notifyAssetListeners(tenantId, assetId, newProfile);
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addListener` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建监听器。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `listenerId`：监听器ID。
+     * - `profileListener`：`profileListener` 参数。
+     * - `assetListener`：`assetListener` 参数。
+     * 返回：无。
      */
+    @Override
     public void addListener(TenantId tenantId, EntityId listenerId,
                             Consumer<AssetProfile> profileListener,
                             BiConsumer<AssetId, AssetProfile> assetListener) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (profileListener != null) {
             profileListeners.computeIfAbsent(tenantId, id -> new ConcurrentHashMap<>()).put(listenerId, profileListener);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (assetListener != null) {
             assetProfileListeners.computeIfAbsent(tenantId, id -> new ConcurrentHashMap<>()).put(listenerId, assetListener);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `find` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `find` 对应的处理。
+     * 参数：
+     * - `assetProfileId`：资产配置ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public AssetProfile find(AssetProfileId assetProfileId) {
         return assetProfileService.findAssetProfileById(TenantId.SYS_TENANT_ID, assetProfileId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findOrCreateAssetProfile` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取资产配置。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `profileName`：名称。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public AssetProfile findOrCreateAssetProfile(TenantId tenantId, String profileName) {
         return assetProfileService.findOrCreateAssetProfile(tenantId, profileName);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeListener` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理监听器。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `listenerId`：监听器ID。
+     * 返回：无。
      */
+    @Override
     public void removeListener(TenantId tenantId, EntityId listenerId) {
         ConcurrentMap<EntityId, Consumer<AssetProfile>> tenantListeners = profileListeners.get(tenantId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tenantListeners != null) {
             tenantListeners.remove(listenerId);
         }
         ConcurrentMap<EntityId, BiConsumer<AssetId, AssetProfile>> assetListeners = assetProfileListeners.get(tenantId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (assetListeners != null) {
             assetListeners.remove(listenerId);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `notifyProfileListeners` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：通知配置。
+     * 参数：
+     * - `profile`：`profile` 参数。
+     * 返回：无。
      */
     private void notifyProfileListeners(AssetProfile profile) {
         ConcurrentMap<EntityId, Consumer<AssetProfile>> tenantListeners = profileListeners.get(profile.getTenantId());
@@ -281,14 +234,12 @@ public class DefaultTbAssetProfileCache implements TbAssetProfileCache {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `notifyAssetListeners` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：通知资产。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `assetId`：资产IDID。
+     * - `profile`：`profile` 参数。
+     * 返回：无。
      */
     private void notifyAssetListeners(TenantId tenantId, AssetId assetId, AssetProfile profile) {
         if (profile != null) {

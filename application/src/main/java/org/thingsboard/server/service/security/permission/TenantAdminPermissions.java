@@ -23,7 +23,6 @@ import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
-@Component(value="tenantAdminPermissions")
 /**
  * 中文说明：
  * 1. 类目的：`TenantAdminPermissions` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
@@ -34,17 +33,13 @@ import org.thingsboard.server.service.security.model.SecurityUser;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Strategy。
  */
+@Component(value="tenantAdminPermissions")
 public class TenantAdminPermissions extends AbstractPermissions {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TenantAdminPermissions` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TenantAdminPermissions` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public TenantAdminPermissions() {
         super();
@@ -77,7 +72,6 @@ public class TenantAdminPermissions extends AbstractPermissions {
         @Override
         public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
 
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!user.getTenantId().equals(entity.getTenantId())) {
                 return false;
             }
@@ -91,11 +85,9 @@ public class TenantAdminPermissions extends AbstractPermissions {
                 @Override
                 @SuppressWarnings("unchecked")
                 public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!super.hasPermission(user, operation, entityId, entity)) {
                         return false;
                     }
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (!user.getTenantId().equals(entityId)) {
                         return false;
                     }
@@ -108,11 +100,9 @@ public class TenantAdminPermissions extends AbstractPermissions {
 
         @Override
         public boolean hasPermission(SecurityUser user, Operation operation, UserId userId, User userEntity) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (Authority.SYS_ADMIN.equals(userEntity.getAuthority())) {
                 return false;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!user.getTenantId().equals(userEntity.getTenantId())) {
                 return false;
             }
@@ -125,11 +115,9 @@ public class TenantAdminPermissions extends AbstractPermissions {
 
         @Override
         public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (entity.getTenantId() == null || entity.getTenantId().isNullUid()) {
                 return operation == Operation.READ;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!user.getTenantId().equals(entity.getTenantId())) {
                 return false;
             }
@@ -142,11 +130,9 @@ public class TenantAdminPermissions extends AbstractPermissions {
 
         @Override
         public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (entity.getTenantId() == null || entity.getTenantId().isNullUid()) {
                 return operation == Operation.READ;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!user.getTenantId().equals(entity.getTenantId())) {
                 return false;
             }
@@ -159,11 +145,9 @@ public class TenantAdminPermissions extends AbstractPermissions {
 
         @Override
         public boolean hasPermission(SecurityUser user, Operation operation, EntityId entityId, HasTenantId entity) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (entity.getTenantId() == null || entity.getTenantId().isNullUid()) {
                 return operation == Operation.READ;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!user.getTenantId().equals(entity.getTenantId())) {
                 return false;
             }

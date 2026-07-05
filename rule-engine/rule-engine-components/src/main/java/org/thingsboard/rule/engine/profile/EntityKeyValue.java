@@ -19,46 +19,49 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.thingsboard.server.common.data.kv.DataType;
 
-@EqualsAndHashCode
 /**
  * 中文说明：`EntityKeyValue` 是实体键值辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@EqualsAndHashCode
 class EntityKeyValue {
 
-    @Getter
     /**
-     * 字段说明：保存 `dataType`，表示消息体数据，供本类方法在规则节点处理流程中使用。
+     * 数据，用于区分不同处理分支。
      */
+    @Getter
     private DataType dataType;
     /**
-     * 字段说明：保存 `lngValue`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
     private Long lngValue;
     /**
-     * 字段说明：保存 `dblValue`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
     private Double dblValue;
     /**
-     * 字段说明：保存 `boolValue`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * 是否满足值条件。
      */
     private Boolean boolValue;
     /**
-     * 字段说明：保存 `strValue`，表示计算值或最近值，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
     private String strValue;
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：无。
+     * 返回：数值结果。
      */
     public Long getLngValue() {
         return dataType == DataType.LONG ? lngValue : null;
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新值。
+     * 参数：
+     * - `lngValue`：值。
+     * 返回：无。
      */
     public void setLngValue(Long lngValue) {
         this.dataType = DataType.LONG;
@@ -66,16 +69,19 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：无。
+     * 返回：数值结果。
      */
     public Double getDblValue() {
         return dataType == DataType.DOUBLE ? dblValue : null;
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新值。
+     * 参数：
+     * - `dblValue`：值。
+     * 返回：无。
      */
     public void setDblValue(Double dblValue) {
         this.dataType = DataType.DOUBLE;
@@ -83,16 +89,19 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public Boolean getBoolValue() {
         return dataType == DataType.BOOLEAN ? boolValue : null;
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新值。
+     * 参数：
+     * - `boolValue`：值。
+     * 返回：无。
      */
     public void setBoolValue(Boolean boolValue) {
         this.dataType = DataType.BOOLEAN;
@@ -100,16 +109,19 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getStrValue() {
         return dataType == DataType.STRING ? strValue : null;
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新值。
+     * 参数：
+     * - `strValue`：值。
+     * 返回：无。
      */
     public void setStrValue(String strValue) {
         this.dataType = DataType.STRING;
@@ -117,8 +129,10 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新值。
+     * 参数：
+     * - `jsonValue`：值。
+     * 返回：无。
      */
     public void setJsonValue(String jsonValue) {
         this.dataType = DataType.JSON;
@@ -126,24 +140,28 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getJsonValue() {
         return dataType == DataType.JSON ? strValue : null;
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：判断`Set`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean isSet() {
         return dataType != null;
     }
 
     /**
-     * 方法说明：执行 `fromString` 对应的辅助逻辑，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromString` 对应的处理。
+     * 参数：
+     * - `s`：`s` 参数。
+     * 返回：处理结果。
      */
     static EntityKeyValue fromString(String s) {
         EntityKeyValue result = new EntityKeyValue();
@@ -152,8 +170,10 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：执行 `fromBool` 对应的辅助逻辑，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromBool` 对应的处理。
+     * 参数：
+     * - `b`：`b` 参数。
+     * 返回：处理结果。
      */
     static EntityKeyValue fromBool(boolean b) {
         EntityKeyValue result = new EntityKeyValue();
@@ -162,8 +182,10 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：执行 `fromLong` 对应的辅助逻辑，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromLong` 对应的处理。
+     * 参数：
+     * - `l`：`l` 参数。
+     * 返回：处理结果。
      */
     static EntityKeyValue fromLong(long l) {
         EntityKeyValue result = new EntityKeyValue();
@@ -172,8 +194,10 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：执行 `fromDouble` 对应的辅助逻辑，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromDouble` 对应的处理。
+     * 参数：
+     * - `d`：`d` 参数。
+     * 返回：处理结果。
      */
     static EntityKeyValue fromDouble(double d) {
         EntityKeyValue result = new EntityKeyValue();
@@ -182,8 +206,10 @@ class EntityKeyValue {
     }
 
     /**
-     * 方法说明：执行 `fromJson` 对应的辅助逻辑，供 `EntityKeyValue` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `fromJson` 对应的处理。
+     * 参数：
+     * - `s`：`s` 参数。
+     * 返回：处理结果。
      */
     static EntityKeyValue fromJson(String s) {
         EntityKeyValue result = new EntityKeyValue();

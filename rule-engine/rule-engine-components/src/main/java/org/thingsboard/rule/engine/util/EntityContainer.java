@@ -20,18 +20,17 @@ import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.id.EntityId;
 
 /**
- * 同时携带实体 ID 和实体类型的简单容器。
- * 本类不直接访问数据库、缓存或 Rule Engine 消息流，线程安全性取决于实例是否被调用方跨线程共享修改。
+ * `EntityContainer` 类，封装当前模块中的一组相关职责。
  */
 @Data
 public class EntityContainer {
 
     /**
-     * 具体实体标识。
+     * 实体ID，用于定位对应业务对象。
      */
     private EntityId entityId;
     /**
-     * 实体类型，通常与 entityId 中的类型保持一致或用于配置展示。
+     * 实体，用于区分不同处理分支。
      */
     private EntityType entityType;
 

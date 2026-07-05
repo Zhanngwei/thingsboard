@@ -51,11 +51,6 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-@TestPropertySource(properties = {
-        "service.integrations.supported=ALL",
-        "transport.mqtt.enabled=true",
-})
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractMqttIntegrationTest` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
@@ -66,35 +61,29 @@ import static org.junit.Assert.assertNotNull;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Integration Test / Fixture。
  */
+@TestPropertySource(properties = {
+        "service.integrations.supported=ALL",
+        "transport.mqtt.enabled=true",
+})
+@Slf4j
 public abstract class AbstractMqttIntegrationTest extends AbstractTransportIntegrationTest {
 
     /**
-     * 字段说明：
-     * 1. 保存 `savedGateway` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `savedGateway` 字段，保存当前对象的对应属性。
      */
     protected Device savedGateway;
     protected String gatewayAccessToken;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processBeforeTest` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Before Test`。
+     * 参数：
+     * - `config`：配置对象。
+     * 返回：无。
      */
     protected void processBeforeTest(MqttTestConfigProperties config) throws Exception {
         loginTenantAdmin();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         deviceProfile = createMqttDeviceProfile(config);
         assertNotNull(deviceProfile);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (config.getDeviceName() != null) {
             savedDevice = createDevice(config.getDeviceName(), deviceProfile.getName(), false);
             DeviceCredentials deviceCredentials =
@@ -104,7 +93,6 @@ public abstract class AbstractMqttIntegrationTest extends AbstractTransportInteg
             accessToken = deviceCredentials.getCredentialsId();
             assertNotNull(accessToken);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (config.getGatewayName() != null) {
             savedGateway = createDevice(config.getGatewayName(), deviceProfile.getName(), true);
             DeviceCredentials gatewayCredentials =
@@ -117,45 +105,32 @@ public abstract class AbstractMqttIntegrationTest extends AbstractTransportInteg
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createMqttDeviceProfile` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备配置。
+     * 参数：
+     * - `config`：配置对象。
+     * 返回：处理结果。
      */
     protected DeviceProfile createMqttDeviceProfile(MqttTestConfigProperties config) throws Exception {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportPayloadType transportPayloadType = config.getTransportPayloadType();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         if (transportPayloadType == null) {
             DeviceProfileInfo defaultDeviceProfileInfo = doGet("/api/deviceProfileInfo/default", DeviceProfileInfo.class);
             return doGet("/api/deviceProfile/" + defaultDeviceProfileInfo.getId().getId(), DeviceProfile.class);
         } else {
             DeviceProfile deviceProfile = new DeviceProfile();
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             deviceProfile.setName(transportPayloadType.name());
             deviceProfile.setType(DeviceProfileType.DEFAULT);
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             deviceProfile.setTransportType(DeviceTransportType.MQTT);
             DeviceProfileProvisionType provisionType = config.getProvisionType() != null ?
                     config.getProvisionType() : DeviceProfileProvisionType.DISABLED;
             deviceProfile.setProvisionType(provisionType);
             deviceProfile.setProvisionDeviceKey(config.getProvisionKey());
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             deviceProfile.setDescription(transportPayloadType.name() + " Test");
             DeviceProfileData deviceProfileData = new DeviceProfileData();
             DefaultDeviceProfileConfiguration configuration = new DefaultDeviceProfileConfiguration();
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             MqttDeviceProfileTransportConfiguration mqttDeviceProfileTransportConfiguration = new MqttDeviceProfileTransportConfiguration();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (StringUtils.hasLength(config.getTelemetryTopicFilter())) {
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 mqttDeviceProfileTransportConfiguration.setDeviceTelemetryTopic(config.getTelemetryTopicFilter());
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (StringUtils.hasLength(config.getAttributesTopicFilter())) {
                 mqttDeviceProfileTransportConfiguration.setDeviceAttributesTopic(config.getAttributesTopicFilter());
             }
@@ -217,14 +192,12 @@ public abstract class AbstractMqttIntegrationTest extends AbstractTransportInteg
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDevice` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `name`：名称。
+     * - `type`：类型。
+     * - `gateway`：`gateway` 参数。
+     * 返回：处理结果。
      */
     protected Device createDevice(String name, String type, boolean gateway) throws Exception {
         Device device = new Device();
@@ -239,14 +212,10 @@ public abstract class AbstractMqttIntegrationTest extends AbstractTransportInteg
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getPostAttributeMsg` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `expectedKeys`：键。
+     * 返回：处理结果。
      */
     protected TransportProtos.PostAttributeMsg getPostAttributeMsg(List<String> expectedKeys) {
         List<TransportProtos.KeyValueProto> kvProtos = getKvProtos(expectedKeys);
@@ -256,28 +225,27 @@ public abstract class AbstractMqttIntegrationTest extends AbstractTransportInteg
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `subscribeAndWait` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：订阅`And Wait`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `attrSubTopic`：主题名称或主题对象。
+     * - `deviceId`：设备IDID。
+     * - `featureType`：类型。
+     * 返回：无。
      */
     protected void subscribeAndWait(MqttTestClient client, String attrSubTopic, DeviceId deviceId, FeatureType featureType) throws MqttException {
         subscribeAndWait(client, attrSubTopic, deviceId, featureType, MqttQoS.AT_MOST_ONCE);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `subscribeAndWait` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：订阅`And Wait`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `attrSubTopic`：主题名称或主题对象。
+     * - `deviceId`：设备IDID。
+     * - `featureType`：类型。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void subscribeAndWait(MqttTestClient client, String attrSubTopic, DeviceId deviceId, FeatureType featureType, MqttQoS mqttQoS) throws MqttException {
         int subscriptionCount = getDeviceActorSubscriptionCount(deviceId, featureType);
@@ -291,14 +259,13 @@ public abstract class AbstractMqttIntegrationTest extends AbstractTransportInteg
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `subscribeAndCheckSubscription` 对应的传输层测试或适配类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 JUnit 测试生命周期创建，随单个测试方法准备和清理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：订阅订阅。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `attrSubTopic`：主题名称或主题对象。
+     * - `deviceId`：设备IDID。
+     * - `featureType`：类型。
+     * 返回：无。
      */
     protected void subscribeAndCheckSubscription(MqttTestClient client, String attrSubTopic, DeviceId deviceId, FeatureType featureType) throws MqttException {
         client.subscribeAndWait(attrSubTopic, MqttQoS.AT_MOST_ONCE);

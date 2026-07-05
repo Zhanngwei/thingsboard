@@ -35,93 +35,57 @@ import java.util.Set;
 public interface ScriptEngine {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步执行更新类脚本，返回一组新的消息。
-     * 2. 输入参数：msg 是当前规则链正在处理的消息。
-     * 3. 返回值：ListenableFuture 包装的 TbMsg 列表，用于后续消息路由。
-     * 4. 调用时机：转换或脚本节点需要生成多条输出消息时调用。
-     * 5. 调用方：脚本转换节点、消息生成节点。
-     * 6. 使用流程：属于 Rule Engine 消息转换流程。
-     * 7. 线程安全：取决于具体脚本引擎实现；异步执行需保护脚本上下文并发访问。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；直接涉及 Rule Engine。
+     * 功能：执行`Update Async`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<List<TbMsg>> executeUpdateAsync(TbMsg msg);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步执行生成类脚本，基于上一条消息生成一条新消息。
-     * 2. 输入参数：prevMsg 是生成逻辑的上下文消息。
-     * 3. 返回值：ListenableFuture 包装的新 TbMsg。
-     * 4. 调用时机：脚本生成节点处理消息时调用。
-     * 5. 调用方：消息生成类规则节点。
-     * 6. 使用流程：属于 Rule Engine 消息生成流程。
-     * 7. 线程安全：由具体脚本引擎保证。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；直接驱动 Rule Engine 后续路由。
+     * 功能：执行`Generate Async`。
+     * 参数：
+     * - `prevMsg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<TbMsg> executeGenerateAsync(TbMsg prevMsg);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步执行过滤脚本。
-     * 2. 输入参数：msg 是待判断的规则消息。
-     * 3. 返回值：ListenableFuture 包装的 Boolean，true 表示通过，false 表示过滤。
-     * 4. 调用时机：过滤节点处理消息时调用。
-     * 5. 调用方：脚本过滤节点。
-     * 6. 使用流程：属于 Rule Engine 消息过滤流程。
-     * 7. 线程安全：由具体脚本引擎保证。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；直接影响 Rule Engine 关系路由。
+     * 功能：执行`Filter Async`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<Boolean> executeFilterAsync(TbMsg msg);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步执行分支脚本，返回输出关系集合。
-     * 2. 输入参数：msg 是当前规则消息。
-     * 3. 返回值：ListenableFuture 包装的关系类型集合。
-     * 4. 调用时机：切换/分支节点需要按脚本结果选择关系时调用。
-     * 5. 调用方：脚本 switch 节点。
-     * 6. 使用流程：属于 Rule Engine 动态关系路由流程。
-     * 7. 线程安全：由具体脚本引擎保证。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；直接影响 Rule Engine 关系路由。
+     * 功能：执行`Switch Async`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<Set<String>> executeSwitchAsync(TbMsg msg);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步执行返回 JSON 的脚本。
-     * 2. 输入参数：msg 是脚本输入消息。
-     * 3. 返回值：ListenableFuture 包装的 JsonNode。
-     * 4. 调用时机：节点需要脚本输出结构化 JSON 时调用。
-     * 5. 调用方：转换节点、外部调用节点或自定义脚本节点。
-     * 6. 使用流程：属于 Rule Engine 脚本计算流程。
-     * 7. 线程安全：由具体脚本引擎保证。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；直接服务 Rule Engine。
+     * 功能：执行JSON。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<JsonNode> executeJsonAsync(TbMsg msg);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步执行返回字符串的脚本。
-     * 2. 输入参数：msg 是脚本输入消息。
-     * 3. 返回值：ListenableFuture 包装的字符串结果。
-     * 4. 调用时机：节点需要脚本生成文本、主题、URL 或外部载荷时调用。
-     * 5. 调用方：转换节点、外部调用节点或自定义脚本节点。
-     * 6. 使用流程：属于 Rule Engine 脚本计算流程。
-     * 7. 线程安全：由具体脚本引擎保证。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；直接服务 Rule Engine。
+     * 功能：执行`To String Async`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<String> executeToStringAsync(TbMsg msg);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：释放脚本引擎资源。
-     * 2. 输入参数：无。
-     * 3. 返回值：无。
-     * 4. 调用时机：规则节点销毁、配置变更或脚本引擎不再使用时调用。
-     * 5. 调用方：持有脚本引擎的规则节点。
-     * 6. 使用流程：属于 Rule Engine 节点生命周期清理流程。
-     * 7. 线程安全：实现需处理执行中任务与销毁并发。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不涉及事务、缓存、MQTT、Actor、数据库；直接服务 Rule Engine 资源释放。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     void destroy();
 

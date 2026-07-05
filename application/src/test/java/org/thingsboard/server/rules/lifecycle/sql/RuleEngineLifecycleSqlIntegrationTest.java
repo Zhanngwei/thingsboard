@@ -21,7 +21,6 @@ import org.thingsboard.server.rules.lifecycle.AbstractRuleEngineLifecycleIntegra
 /**
  * Created by Valerii Sosliuk on 8/22/2017.
  */
-@DaoSqlTest
 /**
  * 中文说明：
  * 1. 类目的：`RuleEngineLifecycleSqlIntegrationTest` 是ThingsBoard Application 测试模块中的测试支撑类型，用于验证 Application 模块的控制器、服务、Actor 或集成流程。
@@ -32,6 +31,7 @@ import org.thingsboard.server.rules.lifecycle.AbstractRuleEngineLifecycleIntegra
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Test Fixture。
  */
+@DaoSqlTest
 public class RuleEngineLifecycleSqlIntegrationTest extends AbstractRuleEngineLifecycleIntegrationTest {
 }
 

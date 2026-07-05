@@ -71,9 +71,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-@Service
-@Slf4j
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`DeviceProvisionServiceImpl` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -84,78 +81,51 @@ import java.util.regex.Pattern;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Slf4j
+@TbCoreComponent
 public class DeviceProvisionServiceImpl implements DeviceProvisionService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `ruleEngineMsgProducer` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 规则引擎，承载当前步骤需要处理的内容。
      */
     protected TbQueueProducer<TbProtoQueueMsg<ToRuleEngineMsg>> ruleEngineMsgProducer;
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEVICE_PROVISION_STATE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备常量，用于统一引用固定值。
      */
     private static final String DEVICE_PROVISION_STATE = "provisionState";
     private static final String PROVISIONED_STATE = "provisioned";
 
     /**
-     * 字段说明：
-     * 1. 保存 `clusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TbClusterService clusterService;
     private final DeviceProfileService deviceProfileService;
     /**
-     * 字段说明：
-     * 1. 保存 `deviceService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
     private final DeviceService deviceService;
     private final DeviceCredentialsService deviceCredentialsService;
     /**
-     * 字段说明：
-     * 1. 保存 `attributesService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final AttributesService attributesService;
     private final AuditLogService auditLogService;
     /**
-     * 字段说明：
-     * 1. 保存 `partitionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
     private final PartitionService partitionService;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DeviceProvisionServiceImpl` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DeviceProvisionServiceImpl` 实例，并初始化必要字段。
+     * 参数：
+     * - `producerProvider`：`producerProvider` 参数。
+     * - `clusterService`：服务对象。
+     * - `deviceProfileService`：设备信息或设备标识。
+     * - `deviceService`：设备信息或设备标识。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public DeviceProvisionServiceImpl(TbQueueProducerProvider producerProvider, TbClusterService clusterService, DeviceProfileService deviceProfileService, DeviceService deviceService, DeviceCredentialsService deviceCredentialsService, AttributesService attributesService, AuditLogService auditLogService, PartitionService partitionService) {
         ruleEngineMsgProducer = producerProvider.getRuleEngineMsgProducer();
@@ -168,23 +138,18 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
         this.partitionService = partitionService;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provisionDeviceViaX509Chain` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provisionDeviceViaX509Chain` 对应的处理。
+     * 参数：
+     * - `targetProfile`：`targetProfile` 参数。
+     * - `provisionRequest`：请求对象。
+     * 返回：处理结果。
      */
+    @Override
     public ProvisionResponse provisionDeviceViaX509Chain(DeviceProfile targetProfile, ProvisionRequest provisionRequest) throws ProvisionFailedException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (targetProfile == null) {
             throw new ProvisionFailedException("Device profile is not specified!");
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!DeviceProfileProvisionType.X509_CERTIFICATE_CHAIN.equals(targetProfile.getProfileData().getProvisionConfiguration().getType())) {
             throw new ProvisionFailedException("Device profile provision strategy is not X509_CERTIFICATE_CHAIN!");
         }
@@ -196,17 +161,14 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
         provisionRequest.setDeviceName(deviceName);
         Device targetDevice = deviceService.findDeviceByTenantIdAndName(targetProfile.getTenantId(), provisionRequest.getDeviceName());
         X509CertificateChainProvisionConfiguration x509Configuration = (X509CertificateChainProvisionConfiguration) targetProfile.getProfileData().getProvisionConfiguration();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (targetDevice != null && targetDevice.getDeviceProfileId().equals(targetProfile.getId())) {
             DeviceCredentials deviceCredentials = deviceCredentialsService.findDeviceCredentialsByDeviceId(targetDevice.getTenantId(), targetDevice.getId());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (DeviceCredentialsType.X509_CERTIFICATE.equals(deviceCredentials.getCredentialsType())) {
                 String updatedDeviceCertificateValue = provisionRequest.getCredentialsData().getX509CertHash();
                 deviceCredentials = updateDeviceCredentials(targetDevice.getTenantId(), deviceCredentials,
                         updatedDeviceCertificateValue, DeviceCredentialsType.X509_CERTIFICATE);
             }
             return new ProvisionResponse(deviceCredentials, ProvisionResponseStatus.SUCCESS);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (x509Configuration.isAllowCreateNewDevicesByX509Certificate()) {
             return createDevice(provisionRequest, targetProfile);
         } else {
@@ -216,38 +178,30 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provisionDevice` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provisionDevice` 对应的处理。
+     * 参数：
+     * - `provisionRequest`：请求对象。
+     * 返回：处理结果。
      */
+    @Override
     public ProvisionResponse provisionDevice(ProvisionRequest provisionRequest) {
         String provisionRequestKey = provisionRequest.getCredentials().getProvisionDeviceKey();
         String provisionRequestSecret = provisionRequest.getCredentials().getProvisionDeviceSecret();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!StringUtils.isEmpty(provisionRequest.getDeviceName())) {
             provisionRequest.setDeviceName(provisionRequest.getDeviceName().trim());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (StringUtils.isEmpty(provisionRequest.getDeviceName())) {
                 log.warn("Provision request contains empty device name!");
                 throw new ProvisionFailedException(ProvisionResponseStatus.FAILURE.name());
             }
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isEmpty(provisionRequestKey) || StringUtils.isEmpty(provisionRequestSecret)) {
             throw new ProvisionFailedException(ProvisionResponseStatus.NOT_FOUND.name());
         }
 
         DeviceProfile targetProfile = deviceProfileService.findDeviceProfileByProvisionDeviceKey(provisionRequestKey);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (targetProfile == null || targetProfile.getProfileData().getProvisionConfiguration() == null ||
                 targetProfile.getProfileData().getProvisionConfiguration().getProvisionDeviceSecret() == null) {
             throw new ProvisionFailedException(ProvisionResponseStatus.NOT_FOUND.name());
@@ -255,12 +209,9 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
 
         Device targetDevice = deviceService.findDeviceByTenantIdAndName(targetProfile.getTenantId(), provisionRequest.getDeviceName());
 
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (targetProfile.getProvisionType()) {
             case ALLOW_CREATE_NEW_DEVICES:
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (targetProfile.getProfileData().getProvisionConfiguration().getProvisionDeviceSecret().equals(provisionRequestSecret)) {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (targetDevice != null) {
                         log.warn("[{}] The device is present and could not be provisioned once more!", targetDevice.getName());
                         notify(targetDevice, provisionRequest, TbMsgType.PROVISION_FAILURE, false);
@@ -287,14 +238,11 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processProvision` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Provision`。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `provisionRequest`：请求对象。
+     * 返回：处理结果。
      */
     private ProvisionResponse processProvision(Device device, ProvisionRequest provisionRequest) {
         try {
@@ -314,28 +262,24 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDevice` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `provisionRequest`：请求对象。
+     * - `profile`：`profile` 参数。
+     * 返回：处理结果。
      */
     private ProvisionResponse createDevice(ProvisionRequest provisionRequest, DeviceProfile profile) {
         return processCreateDevice(provisionRequest, profile);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `notify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `notify` 对应的处理。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `provisionRequest`：请求对象。
+     * - `type`：类型。
+     * - `success`：`success` 参数。
+     * 返回：无。
      */
     private void notify(Device device, ProvisionRequest provisionRequest, TbMsgType type, boolean success) {
         pushProvisionEventToRuleEngine(provisionRequest, device, type);
@@ -343,14 +287,11 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processCreateDevice` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理设备。
+     * 参数：
+     * - `provisionRequest`：请求对象。
+     * - `profile`：`profile` 参数。
+     * 返回：处理结果。
      */
     private ProvisionResponse processCreateDevice(ProvisionRequest provisionRequest, DeviceProfile profile) {
         try {
@@ -377,14 +318,13 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateDeviceCredentials` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新设备凭据。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceCredentials`：设备信息或设备标识。
+     * - `certificateValue`：值。
+     * - `credentialsType`：类型。
+     * 返回：处理结果。
      */
     private DeviceCredentials updateDeviceCredentials(TenantId tenantId, DeviceCredentials deviceCredentials, String certificateValue,
                                                       DeviceCredentialsType credentialsType) {
@@ -395,14 +335,10 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveProvisionStateAttribute` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建属性。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<List<String>> saveProvisionStateAttribute(Device device) {
         return attributesService.save(device.getTenantId(), device.getId(), DataConstants.SERVER_SCOPE,
@@ -411,28 +347,22 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceCredentials` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取设备凭据。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     private DeviceCredentials getDeviceCredentials(Device device) {
         return deviceCredentialsService.findDeviceCredentialsByDeviceId(device.getTenantId(), device.getId());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `pushProvisionEventToRuleEngine` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交规则引擎。
+     * 参数：
+     * - `request`：请求对象。
+     * - `device`：设备信息或设备标识。
+     * - `type`：类型。
+     * 返回：无。
      */
     private void pushProvisionEventToRuleEngine(ProvisionRequest request, Device device, TbMsgType type) {
         try {
@@ -445,14 +375,10 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `pushDeviceCreatedEventToRuleEngine` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交规则引擎。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：无。
      */
     private void pushDeviceCreatedEventToRuleEngine(Device device) {
         try {
@@ -465,14 +391,12 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendToRuleEngine` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交规则引擎。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `tbMsg`：待处理消息。
+     * - `callback`：处理完成后的回调。
+     * 返回：无。
      */
     protected void sendToRuleEngine(TenantId tenantId, TbMsg tbMsg, TbQueueCallback callback) {
         TopicPartitionInfo tpi = partitionService.resolve(ServiceType.TB_RULE_ENGINE, tenantId, tbMsg.getOriginator());
@@ -483,14 +407,10 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createTbMsgMetaData` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建消息。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     private TbMsgMetaData createTbMsgMetaData(Device device) {
         TbMsgMetaData metaData = new TbMsgMetaData();
@@ -499,14 +419,14 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logAction` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logAction` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `device`：设备信息或设备标识。
+     * - `success`：`success` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void logAction(TenantId tenantId, CustomerId customerId, Device device, boolean success, ProvisionRequest provisionRequest) {
         ActionType actionType = success ? ActionType.PROVISION_SUCCESS : ActionType.PROVISION_FAILURE;
@@ -514,14 +434,11 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCNFromX509Certificate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取证书。
+     * 参数：
+     * - `profile`：`profile` 参数。
+     * - `x509Value`：值。
+     * 返回：文本结果。
      */
     private String getCNFromX509Certificate(DeviceProfile profile, String x509Value) {
         try {
@@ -533,14 +450,12 @@ public class DeviceProvisionServiceImpl implements DeviceProvisionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractDeviceNameFromCNByRegEx` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractDeviceNameFromCNByRegEx` 对应的处理。
+     * 参数：
+     * - `profile`：`profile` 参数。
+     * - `commonName`：名称。
+     * - `regex`：`regex` 参数。
+     * 返回：文本结果。
      */
     public String extractDeviceNameFromCNByRegEx(DeviceProfile profile, String commonName, String regex) throws ProvisionFailedException {
         try {

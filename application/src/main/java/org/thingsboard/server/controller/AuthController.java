@@ -64,11 +64,6 @@ import javax.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
-@Slf4j
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`AuthController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -79,46 +74,31 @@ import java.net.URISyntaxException;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
+@Slf4j
+@RequiredArgsConstructor
 public class AuthController extends BaseController {
 
-    @Value("${server.rest.rate_limits.reset_password_per_user:5:3600}")
     /**
-     * 字段说明：
-     * 1. 保存 `defaultLimitsConfiguration` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `defaultLimitsConfiguration`，保存当前对象的配置选项。
      */
+    @Value("${server.rest.rate_limits.reset_password_per_user:5:3600}")
     private String defaultLimitsConfiguration;
     private final BCryptPasswordEncoder passwordEncoder;
     /**
-     * 字段说明：
-     * 1. 保存 `tokenFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
     private final JwtTokenFactory tokenFactory;
     private final MailService mailService;
     /**
-     * 字段说明：
-     * 1. 保存 `systemSecurityService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final SystemSecurityService systemSecurityService;
     private final RateLimitService rateLimitService;
     /**
-     * 字段说明：
-     * 1. 保存 `eventPublisher` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 事件，表示当前对象的对应属性。
      */
     private final ApplicationEventPublisher eventPublisher;
 
@@ -129,54 +109,41 @@ public class AuthController extends BaseController {
     @RequestMapping(value = "/auth/user", method = RequestMethod.GET)
     public @ResponseBody
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getUser` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取用户。
+     * 参数：无。
+     * 返回：处理结果。
      */
     User getUser() throws ThingsboardException {
         SecurityUser securityUser = getCurrentUser();
         return userService.findUserById(securityUser.getTenantId(), securityUser.getId());
     }
 
+    /**
+     * 功能：执行 `logout` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：无。
+     */
     @ApiOperation(value = "Logout (logout)",
             notes = "Special API call to record the 'logout' of the user to the Audit Logs. Since platform uses [JWT](https://jwt.io/), the actual logout is the procedure of clearing the [JWT](https://jwt.io/) token on the client side. ")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/auth/logout", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `logout` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void logout(HttpServletRequest request) throws ThingsboardException {
         logLogoutAction(request);
     }
 
+    /**
+     * 功能：执行 `changePassword` 对应的处理。
+     * 参数：
+     * - `changePasswordRequest`：请求对象。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Change password for current User (changePassword)",
             notes = "Change the password for the User which credentials are used to perform this REST API call. Be aware that previously generated [JWT](https://jwt.io/) tokens will be still valid until they expire.")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/auth/changePassword", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `changePassword` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ObjectNode changePassword(
             @ApiParam(value = "Change Password Request")
             @RequestBody ChangePasswordRequest changePasswordRequest) throws ThingsboardException {
@@ -184,12 +151,10 @@ public class AuthController extends BaseController {
         String newPassword = changePasswordRequest.getNewPassword();
         SecurityUser securityUser = getCurrentUser();
         UserCredentials userCredentials = userService.findUserCredentialsByUserId(TenantId.SYS_TENANT_ID, securityUser.getId());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!passwordEncoder.matches(currentPassword, userCredentials.getPassword())) {
             throw new ThingsboardException("Current password doesn't match!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }
         systemSecurityService.validatePassword(newPassword, userCredentials);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (passwordEncoder.matches(newPassword, userCredentials.getPassword())) {
             throw new ThingsboardException("New password should be different from existing!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }
@@ -203,55 +168,44 @@ public class AuthController extends BaseController {
         return response;
     }
 
+    /**
+     * 功能：获取密码。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get the current User password policy (getUserPasswordPolicy)",
             notes = "API call to get the password policy for the password validation form(s).")
     @RequestMapping(value = "/noauth/userPasswordPolicy", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getUserPasswordPolicy` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public UserPasswordPolicy getUserPasswordPolicy() throws ThingsboardException {
         SecuritySettings securitySettings =
                 checkNotNull(systemSecurityService.getSecuritySettings());
         return securitySettings.getPasswordPolicy();
     }
 
+    /**
+     * 功能：校验令牌。
+     * 参数：
+     * - `activateToken`：`activateToken` 参数。
+     * 返回：判断结果。
+     */
     @ApiOperation(value = "Check Activate User Token (checkActivateToken)",
             notes = "Checks the activation token and forwards user to 'Create Password' page. " +
                     "If token is valid, returns '303 See Other' (redirect) response code with the correct address of 'Create Password' page and same 'activateToken' specified in the URL parameters. " +
                     "If token is not valid, returns '409 Conflict'.")
     @RequestMapping(value = "/noauth/activate", params = {"activateToken"}, method = RequestMethod.GET)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `checkActivateToken` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ResponseEntity<String> checkActivateToken(
             @ApiParam(value = "The activate token string.")
             @RequestParam(value = "activateToken") String activateToken) {
         HttpHeaders headers = new HttpHeaders();
         HttpStatus responseStatus;
         UserCredentials userCredentials = userService.findUserCredentialsByActivateToken(TenantId.SYS_TENANT_ID, activateToken);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (userCredentials != null) {
             String createURI = "/login/createPassword";
             try {
                 URI location = new URI(createURI + "?activateToken=" + activateToken);
                 headers.setLocation(location);
                 responseStatus = HttpStatus.SEE_OTHER;
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (URISyntaxException e) {
                 log.error("Unable to create URI with address [{}]", createURI);
                 responseStatus = HttpStatus.BAD_REQUEST;
@@ -262,21 +216,18 @@ public class AuthController extends BaseController {
         return new ResponseEntity<>(headers, responseStatus);
     }
 
+    /**
+     * 功能：执行 `requestResetPasswordByEmail` 对应的处理。
+     * 参数：
+     * - `resetPasswordByEmailRequest`：请求对象。
+     * - `request`：请求对象。
+     * 返回：无。
+     */
     @ApiOperation(value = "Request reset password email (requestResetPasswordByEmail)",
             notes = "Request to send the reset password email if the user with specified email address is present in the database. " +
                     "Always return '200 OK' status for security purposes.")
     @RequestMapping(value = "/noauth/resetPasswordByEmail", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `requestResetPasswordByEmail` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void requestResetPasswordByEmail(
             @ApiParam(value = "The JSON object representing the reset password email request.")
             @RequestBody ResetPasswordEmailRequest resetPasswordByEmailRequest,
@@ -290,27 +241,22 @@ public class AuthController extends BaseController {
                     userCredentials.getResetToken());
 
             mailService.sendResetPasswordEmailAsync(resetUrl, email);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.warn("Error occurred: {}", e.getMessage());
         }
     }
 
+    /**
+     * 功能：校验令牌。
+     * 参数：
+     * - `resetToken`：`resetToken` 参数。
+     * 返回：判断结果。
+     */
     @ApiOperation(value = "Check password reset token (checkResetToken)",
             notes = "Checks the password reset token and forwards user to 'Reset Password' page. " +
                     "If token is valid, returns '303 See Other' (redirect) response code with the correct address of 'Reset Password' page and same 'resetToken' specified in the URL parameters. " +
                     "If token is not valid, returns '409 Conflict'.")
     @RequestMapping(value = "/noauth/resetPassword", params = {"resetToken"}, method = RequestMethod.GET)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `checkResetToken` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public ResponseEntity<String> checkResetToken(
             @ApiParam(value = "The reset token string.")
             @RequestParam(value = "resetToken") String resetToken) {
@@ -319,9 +265,7 @@ public class AuthController extends BaseController {
         String resetURI = "/login/resetPassword";
         UserCredentials userCredentials = userService.findUserCredentialsByResetToken(TenantId.SYS_TENANT_ID, resetToken);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (userCredentials != null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!rateLimitService.checkRateLimit(LimitedApi.PASSWORD_RESET, userCredentials.getUserId(), defaultLimitsConfiguration)) {
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
             }
@@ -329,7 +273,6 @@ public class AuthController extends BaseController {
                 URI location = new URI(resetURI + "?resetToken=" + resetToken);
                 headers.setLocation(location);
                 responseStatus = HttpStatus.SEE_OTHER;
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (URISyntaxException e) {
                 log.error("Unable to create URI with address [{}]", resetURI);
                 responseStatus = HttpStatus.BAD_REQUEST;
@@ -340,6 +283,15 @@ public class AuthController extends BaseController {
         return new ResponseEntity<>(headers, responseStatus);
     }
 
+    /**
+     * 功能：执行 `activateUser` 对应的处理。
+     * 参数：
+     * - `activateRequest`：请求对象。
+     * - `false`：`false` 参数。
+     * - `sendActivationMail`：`sendActivationMail` 参数。
+     * - `request`：请求对象。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Activate User",
             notes = "Checks the activation token and updates corresponding user password in the database. " +
                     "Now the user may start using his password to login. " +
@@ -350,16 +302,6 @@ public class AuthController extends BaseController {
     @RequestMapping(value = "/noauth/activate", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `activateUser` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public JwtPair activateUser(
             @ApiParam(value = "Activate user request.")
             @RequestBody ActivateUserRequest activateRequest,
@@ -378,11 +320,9 @@ public class AuthController extends BaseController {
         String loginUrl = String.format("%s/login", baseUrl);
         String email = user.getEmail();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sendActivationMail) {
             try {
                 mailService.sendAccountActivatedEmail(loginUrl, email);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.info("Unable to send account activation email [{}]", e.getMessage());
             }
@@ -391,6 +331,13 @@ public class AuthController extends BaseController {
         return tokenFactory.createTokenPair(securityUser);
     }
 
+    /**
+     * 功能：执行 `resetPassword` 对应的处理。
+     * 参数：
+     * - `resetPasswordRequest`：请求对象。
+     * - `request`：请求对象。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Reset password (resetPassword)",
             notes = "Checks the password reset token and updates the password. " +
                     "If token is valid, returns the object that contains [JWT](https://jwt.io/) access and refresh tokens. " +
@@ -398,16 +345,6 @@ public class AuthController extends BaseController {
     @RequestMapping(value = "/noauth/resetPassword", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `resetPassword` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public JwtPair resetPassword(
             @ApiParam(value = "Reset password request.")
             @RequestBody ResetPasswordRequest resetPasswordRequest,
@@ -415,10 +352,8 @@ public class AuthController extends BaseController {
         String resetToken = resetPasswordRequest.getResetToken();
         String password = resetPasswordRequest.getPassword();
         UserCredentials userCredentials = userService.findUserCredentialsByResetToken(TenantId.SYS_TENANT_ID, resetToken);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (userCredentials != null) {
             systemSecurityService.validatePassword(password, userCredentials);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (passwordEncoder.matches(password, userCredentials.getPassword())) {
                 throw new ThingsboardException("New password should be different from existing!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
             }
@@ -443,14 +378,10 @@ public class AuthController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logLogoutAction` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logLogoutAction` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：无。
      */
     private void logLogoutAction(HttpServletRequest request) throws ThingsboardException {
         var user = getCurrentUser();

@@ -22,20 +22,25 @@ package org.thingsboard.rule.engine.profile;
 public interface DynamicPredicateValueCtx {
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DynamicPredicateValueCtx` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取租户。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
     EntityKeyValue getTenantValue(String key);
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DynamicPredicateValueCtx` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取客户。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
     EntityKeyValue getCustomerValue(String key);
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `DynamicPredicateValueCtx` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `resetCustomer` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     void resetCustomer();
     /*

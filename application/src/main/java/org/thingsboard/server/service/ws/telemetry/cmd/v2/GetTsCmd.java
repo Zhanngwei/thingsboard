@@ -34,130 +34,78 @@ import java.util.List;
 public interface GetTsCmd {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStartTs` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取开始时间戳。
+     * 参数：无。
+     * 返回：数值结果。
      */
     long getStartTs();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEndTs` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取结束时间戳。
+     * 参数：无。
+     * 返回：数值结果。
      */
     long getEndTs();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getKeys` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Keys`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     List<String> getKeys();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getIntervalType` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取类型。
+     * 参数：无。
+     * 返回：处理结果。
      */
     IntervalType getIntervalType();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getInterval` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间间隔。
+     * 参数：无。
+     * 返回：数值结果。
      */
     long getInterval();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimeZoneId` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String getTimeZoneId();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLimit` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取数量限制。
+     * 参数：无。
+     * 返回：数值结果。
      */
     int getLimit();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAgg` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Agg`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     Aggregation getAgg();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isFetchLatestPreviousPoint` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Fetch Latest Previous Point`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean isFetchLatestPreviousPoint();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toAggregationParams` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toAggregationParams` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     default AggregationParams toAggregationParams() {
         var agg = getAgg();
         var intervalType = getIntervalType();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (agg == null || Aggregation.NONE.equals(agg)) {
             return AggregationParams.none();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (intervalType == null || IntervalType.MILLISECONDS.equals(intervalType)) {
             return AggregationParams.milliseconds(agg, getInterval());
         } else {

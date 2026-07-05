@@ -77,254 +77,195 @@ public class JacksonUtil {
             .build();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getObjectMapperWithJavaTimeModule` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间。
+     * 参数：无。
+     * 返回：键值映射结果。
      */
     public static ObjectMapper getObjectMapperWithJavaTimeModule() {
         return new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertValue` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换值。
+     * 参数：
+     * - `fromValue`：值。
+     * - `toValueType`：类型。
+     * 返回：处理结果。
      */
     public static <T> T convertValue(Object fromValue, Class<T> toValueType) {
         try {
             return fromValue != null ? OBJECT_MAPPER.convertValue(fromValue, toValueType) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("The given object value cannot be converted to " + toValueType + ": " + fromValue, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertValue` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换值。
+     * 参数：
+     * - `fromValue`：值。
+     * - `toValueTypeRef`：类型。
+     * 返回：处理结果。
      */
     public static <T> T convertValue(Object fromValue, TypeReference<T> toValueTypeRef) {
         try {
             return fromValue != null ? OBJECT_MAPPER.convertValue(fromValue, toValueTypeRef) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("The given object value cannot be converted to " + toValueTypeRef + ": " + fromValue, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromString` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromString` 对应的处理。
+     * 参数：
+     * - `string`：`string` 参数。
+     * - `clazz`：`clazz` 参数。
+     * 返回：处理结果。
      */
     public static <T> T fromString(String string, Class<T> clazz) {
         try {
             return string != null ? OBJECT_MAPPER.readValue(string, clazz) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             throw new IllegalArgumentException("The given string value cannot be transformed to Json object: " + string, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromString` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromString` 对应的处理。
+     * 参数：
+     * - `string`：`string` 参数。
+     * - `valueTypeRef`：类型。
+     * 返回：处理结果。
      */
     public static <T> T fromString(String string, TypeReference<T> valueTypeRef) {
         try {
             return string != null ? OBJECT_MAPPER.readValue(string, valueTypeRef) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             throw new IllegalArgumentException("The given string value cannot be transformed to Json object: " + string, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromString` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromString` 对应的处理。
+     * 参数：
+     * - `string`：`string` 参数。
+     * - `javaType`：类型。
+     * 返回：处理结果。
      */
     public static <T> T fromString(String string, JavaType javaType) {
         try {
             return string != null ? OBJECT_MAPPER.readValue(string, javaType) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             throw new IllegalArgumentException("The given String value cannot be transformed to Json object: " + string, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromString` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromString` 对应的处理。
+     * 参数：
+     * - `string`：`string` 参数。
+     * - `clazz`：`clazz` 参数。
+     * - `ignoreUnknownFields`：`ignoreUnknownFields` 参数。
+     * 返回：处理结果。
      */
     public static <T> T fromString(String string, Class<T> clazz, boolean ignoreUnknownFields) {
         try {
             return string != null ? IGNORE_UNKNOWN_PROPERTIES_JSON_MAPPER.readValue(string, clazz) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             throw new IllegalArgumentException("The given string value cannot be transformed to Json object: " + string, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromBytes` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromBytes` 对应的处理。
+     * 参数：
+     * - `bytes`：`bytes` 参数。
+     * - `clazz`：`clazz` 参数。
+     * 返回：处理结果。
      */
     public static <T> T fromBytes(byte[] bytes, Class<T> clazz) {
         try {
             return bytes != null ? OBJECT_MAPPER.readValue(bytes, clazz) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             throw new IllegalArgumentException("The given string value cannot be transformed to Json object: " + Arrays.toString(bytes), e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromBytes` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromBytes` 对应的处理。
+     * 参数：
+     * - `bytes`：`bytes` 参数。
+     * 返回：处理结果。
      */
     public static JsonNode fromBytes(byte[] bytes) {
         try {
             return OBJECT_MAPPER.readTree(bytes);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             throw new IllegalArgumentException("The given byte[] value cannot be transformed to Json object: " + Arrays.toString(bytes), e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toString` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：生成当前对象的文本表示。
+     * 参数：
+     * - `value`：值。
+     * 返回：文本结果。
      */
     public static String toString(Object value) {
         try {
             return value != null ? OBJECT_MAPPER.writeValueAsString(value) : null;
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("The given Json object value cannot be transformed to a String: " + value, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toPrettyString` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toPrettyString` 对应的处理。
+     * 参数：
+     * - `o`：`o` 参数。
+     * 返回：文本结果。
      */
     public static String toPrettyString(Object o) {
         try {
             return PRETTY_SORTED_JSON_MAPPER.writeValueAsString(o);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `treeToValue` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `treeToValue` 对应的处理。
+     * 参数：
+     * - `node`：`node` 参数。
+     * - `clazz`：`clazz` 参数。
+     * 返回：处理结果。
      */
     public static <T> T treeToValue(JsonNode node, Class<T> clazz) {
         try {
             return OBJECT_MAPPER.treeToValue(node, clazz);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             throw new IllegalArgumentException("Can't convert value: " + node.toString(), e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toJsonNode` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toJsonNode` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static JsonNode toJsonNode(String value) {
         return toJsonNode(value, OBJECT_MAPPER);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toJsonNode` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toJsonNode` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * - `mapper`：键值映射。
+     * 返回：处理结果。
      */
     public static JsonNode toJsonNode(String value, ObjectMapper mapper) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (value == null || value.isEmpty()) {
             return null;
         }
@@ -336,14 +277,10 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toJsonNode` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toJsonNode` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static JsonNode toJsonNode(File value) {
         try {
@@ -355,70 +292,48 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newObjectNode` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newObjectNode` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public static ObjectNode newObjectNode() {
         return newObjectNode(OBJECT_MAPPER);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newObjectNode` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newObjectNode` 对应的处理。
+     * 参数：
+     * - `mapper`：键值映射。
+     * 返回：处理结果。
      */
     public static ObjectNode newObjectNode(ObjectMapper mapper) {
         return mapper.createObjectNode();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newArrayNode` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newArrayNode` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public static ArrayNode newArrayNode() {
         return newArrayNode(OBJECT_MAPPER);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newArrayNode` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newArrayNode` 对应的处理。
+     * 参数：
+     * - `mapper`：键值映射。
+     * 返回：处理结果。
      */
     public static ArrayNode newArrayNode(ObjectMapper mapper) {
         return mapper.createArrayNode();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clone` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `clone` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static <T> T clone(T value) {
         @SuppressWarnings("unchecked")
@@ -427,28 +342,20 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `valueToTree` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `valueToTree` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static <T> JsonNode valueToTree(T value) {
         return OBJECT_MAPPER.valueToTree(value);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `writeValueAsBytes` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `writeValueAsBytes` 对应的处理。
+     * 参数：
+     * - `value`：值。
+     * 返回：处理结果。
      */
     public static <T> byte[] writeValueAsBytes(T value) {
         try {
@@ -460,14 +367,11 @@ public class JacksonUtil {
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSafely` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Safely`。
+     * 参数：
+     * - `node`：`node` 参数。
+     * - `path`：文件或资源路径。
+     * 返回：处理结果。
      */
     public static JsonNode getSafely(JsonNode node, String... path) {
         if (node == null) {
@@ -484,28 +388,24 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `asObject` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `asObject` 对应的处理。
+     * 参数：
+     * - `node`：`node` 参数。
+     * 返回：处理结果。
      */
     public static ObjectNode asObject(JsonNode node) {
         return node != null && node.isObject() ? ((ObjectNode) node) : newObjectNode();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `replaceUuidsRecursively` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `replaceUuidsRecursively` 对应的处理。
+     * 参数：
+     * - `node`：`node` 参数。
+     * - `skippedRootFields`：`skippedRootFields` 参数。
+     * - `includedFieldsPattern`：`includedFieldsPattern` 参数。
+     * - `replacer`：`replacer` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     public static void replaceUuidsRecursively(JsonNode node, Set<String> skippedRootFields, Pattern includedFieldsPattern, UnaryOperator<UUID> replacer, boolean root) {
         if (node == null) {
@@ -550,14 +450,10 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toFlatMap` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toFlatMap` 对应的处理。
+     * 参数：
+     * - `node`：`node` 参数。
+     * 返回：处理结果。
      */
     public static Map<String, String> toFlatMap(JsonNode node) {
         HashMap<String, String> map = new HashMap<>();
@@ -566,14 +462,11 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromReader` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromReader` 对应的处理。
+     * 参数：
+     * - `reader`：`reader` 参数。
+     * - `clazz`：`clazz` 参数。
+     * 返回：处理结果。
      */
     public static <T> T fromReader(Reader reader, Class<T> clazz) {
         try {
@@ -584,14 +477,11 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `writeValue` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `writeValue` 对应的处理。
+     * 参数：
+     * - `writer`：`writer` 参数。
+     * - `value`：值。
+     * 返回：无。
      */
     public static <T> void writeValue(Writer writer, T value) {
         try {
@@ -603,28 +493,23 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructCollectionType` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructCollectionType` 对应的处理。
+     * 参数：
+     * - `collectionClass`：`collectionClass` 参数。
+     * - `elementClass`：`elementClass` 参数。
+     * 返回：处理结果。
      */
     public static JavaType constructCollectionType(Class collectionClass, Class<?> elementClass) {
         return OBJECT_MAPPER.getTypeFactory().constructCollectionType(collectionClass, elementClass);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toFlatMap` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toFlatMap` 对应的处理。
+     * 参数：
+     * - `node`：`node` 参数。
+     * - `currentPath`：文件或资源路径。
+     * - `map`：键值映射。
+     * 返回：无。
      */
     private static void toFlatMap(JsonNode node, String currentPath, Map<String, String> map) {
         if (node.isObject()) {
@@ -640,42 +525,36 @@ public class JacksonUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addKvEntry` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Kv Entry`。
+     * 参数：
+     * - `entityNode`：实体对象。
+     * - `kvEntry`：`kvEntry` 参数。
+     * 返回：无。
      */
     public static void addKvEntry(ObjectNode entityNode, KvEntry kvEntry) {
         addKvEntry(entityNode, kvEntry, kvEntry.getKey());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addKvEntry` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Kv Entry`。
+     * 参数：
+     * - `entityNode`：实体对象。
+     * - `kvEntry`：`kvEntry` 参数。
+     * - `key`：键。
+     * 返回：无。
      */
     public static void addKvEntry(ObjectNode entityNode, KvEntry kvEntry, String key) {
         addKvEntry(entityNode, kvEntry, key, OBJECT_MAPPER);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addKvEntry` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Kv Entry`。
+     * 参数：
+     * - `entityNode`：实体对象。
+     * - `kvEntry`：`kvEntry` 参数。
+     * - `key`：键。
+     * - `mapper`：键值映射。
+     * 返回：无。
      */
     public static void addKvEntry(ObjectNode entityNode, KvEntry kvEntry, String key, ObjectMapper mapper) {
         if (kvEntry.getDataType() == DataType.BOOLEAN) {

@@ -35,7 +35,6 @@ import org.thingsboard.server.common.msg.TbMsgMetaData;
 import static org.thingsboard.common.util.DonAsynchron.withCallback;
 
 
-@Slf4j
 /**
  * 中文说明：`TbAbstractAlarmNode` 是抽象告警节点规则节点，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
  * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
@@ -44,48 +43,54 @@ import static org.thingsboard.common.util.DonAsynchron.withCallback;
  * 配置对象：`TbAbstractAlarmNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
  * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
  */
+@Slf4j
 public abstract class TbAbstractAlarmNode<C extends TbAbstractAlarmNodeConfiguration> implements TbNode {
 
     /**
-     * 常量字段：定义 `PREV_ALARM_DETAILS`，用于告警类型、严重级别或详情，本身不触发外部系统调用。
+     * 告警常量，用于统一引用固定值。
      */
     static final String PREV_ALARM_DETAILS = "prevAlarmDetails";
 
     /**
-     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     * 配置，保存当前对象的配置选项。
      */
     protected C config;
     /**
-     * 字段说明：保存 `scriptEngine`，表示脚本语言或脚本文本，供本类方法在规则节点处理流程中使用。
+     * 脚本执行器，表示当前对象的对应属性。
      */
     private ScriptEngine scriptEngine;
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = loadAlarmNodeConfig(configuration);
-        // 脚本执行交给规则节点脚本引擎，异常会通过回调进入失败关系。
         scriptEngine = ctx.createScriptEngine(config.getScriptLang(),
                 ScriptLanguage.TBEL.equals(config.getScriptLang()) ? config.getAlarmDetailsBuildTbel() : config.getAlarmDetailsBuildJs());
     }
 
     /**
-     * 方法说明：加载或解析本类处理所需的配置、实体或辅助数据，供 `TbAbstractAlarmNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取告警。
+     * 参数：
+     * - `configuration`：配置对象。
+     * 返回：处理结果。
      */
     protected abstract C loadAlarmNodeConfig(TbNodeConfiguration configuration) throws TbNodeException;
 
-    @Override
     /**
-     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
-     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
-     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
-        // 异步回调用于把服务或转换结果映射为规则链成功/失败关系。
         withCallback(processAlarm(ctx, msg),
                 alarmResult -> {
                     if (alarmResult.alarm == null) {
@@ -104,14 +109,20 @@ public abstract class TbAbstractAlarmNode<C extends TbAbstractAlarmNodeConfigura
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbAbstractAlarmNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理告警。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     protected abstract ListenableFuture<TbAlarmResult> processAlarm(TbContext ctx, TbMsg msg);
 
     /**
-     * 方法说明：构造告警详情、SSL 上下文或输出对象，供 `TbAbstractAlarmNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：构建告警。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `previousDetails`：`previousDetails` 参数。
+     * 返回：匹配的数据集合。
      */
     protected ListenableFuture<JsonNode> buildAlarmDetails(TbMsg msg, JsonNode previousDetails) {
         try {
@@ -128,8 +139,12 @@ public abstract class TbAbstractAlarmNode<C extends TbAbstractAlarmNodeConfigura
     }
 
     /**
-     * 方法说明：执行 `toAlarmMsg` 对应的辅助逻辑，供 `TbAbstractAlarmNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `toAlarmMsg` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `alarmResult`：`alarmResult` 参数。
+     * - `originalMsg`：待处理消息。
+     * 返回：处理结果。
      */
     public static TbMsg toAlarmMsg(TbContext ctx, TbAlarmResult alarmResult, TbMsg originalMsg) {
         JsonNode jsonNodes = JacksonUtil.valueToTree(alarmResult.alarm);
@@ -145,11 +160,12 @@ public abstract class TbAbstractAlarmNode<C extends TbAbstractAlarmNodeConfigura
         return ctx.transformMsg(originalMsg, TbMsgType.ALARM, originalMsg.getOriginator(), metaData, data);
     }
 
-    @Override
     /**
-     * 方法说明：在节点生命周期销毁阶段释放缓存、脚本引擎、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void destroy() {
         if (scriptEngine != null) {
             scriptEngine.destroy();
@@ -157,8 +173,14 @@ public abstract class TbAbstractAlarmNode<C extends TbAbstractAlarmNodeConfigura
     }
 
     /**
-     * 方法说明：把处理结果发送到规则链后续关系，供 `TbAbstractAlarmNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `tellNext` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `alarmResult`：`alarmResult` 参数。
+     * - `actionMsgType`：待处理消息。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void tellNext(TbContext ctx, TbMsg msg, TbAlarmResult alarmResult, TbMsgType actionMsgType, String alarmAction) {
         ctx.enqueue(ctx.alarmActionMsg(alarmResult.alarm, ctx.getSelfId(), actionMsgType),

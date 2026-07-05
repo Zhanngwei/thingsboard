@@ -29,11 +29,6 @@ import org.thingsboard.server.common.data.validation.Length;
 import javax.validation.Valid;
 import java.util.List;
 
-@EqualsAndHashCode(callSuper = true)
-@Data
-@ToString
-@NoArgsConstructor
-@ApiModel
 /**
  * 中文说明：
  * 1. 类目的：`OAuth2ClientRegistrationTemplate` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -44,159 +39,95 @@ import java.util.List;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@EqualsAndHashCode(callSuper = true)
+@Data
+@ToString
+@NoArgsConstructor
+@ApiModel
 public class OAuth2ClientRegistrationTemplate extends BaseDataWithAdditionalInfo<OAuth2ClientRegistrationTemplateId> implements HasName {
 
+    /**
+     * 提供者ID，用于定位对应业务对象。
+     */
     @Length(fieldName = "providerId")
     @ApiModelProperty(value = "OAuth2 provider identifier (e.g. its name)", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `providerId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String providerId;
+    /**
+     * 配置映射关系，用于按键查找对应值。
+     */
     @Valid
     @ApiModelProperty(value = "Default config for mapping OAuth2 log in response to platform entities")
-    /**
-     * 字段说明：
-     * 1. 保存 `mapperConfig` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private OAuth2MapperConfig mapperConfig;
+    /**
+     * URI 地址，用于定位外部资源或本地资源。
+     */
     @Length(fieldName = "authorizationUri")
     @ApiModelProperty(value = "Default authorization URI of the OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `authorizationUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String authorizationUri;
+    /**
+     * URI 地址，用于定位外部资源或本地资源。
+     */
     @Length(fieldName = "accessTokenUri")
     @ApiModelProperty(value = "Default access token URI of the OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `accessTokenUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String accessTokenUri;
-    @ApiModelProperty(value = "Default OAuth scopes that will be requested from OAuth2 platform")
     /**
-     * 字段说明：
-     * 1. 保存 `scope` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `scope`列表，用于保存一组待处理对象。
      */
+    @ApiModelProperty(value = "Default OAuth scopes that will be requested from OAuth2 platform")
     private List<String> scope;
+    /**
+     * 用户对象，用于描述当前业务场景。
+     */
     @Length(fieldName = "userInfoUri")
     @ApiModelProperty(value = "Default user info URI of the OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `userInfoUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String userInfoUri;
+    /**
+     * 用户，用于标识或展示当前对象。
+     */
     @Length(fieldName = "userNameAttributeName")
     @ApiModelProperty(value = "Default name of the username attribute in OAuth2 provider log in response")
-    /**
-     * 字段说明：
-     * 1. 保存 `userNameAttributeName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String userNameAttributeName;
+    /**
+     * URI 地址，用于定位外部资源或本地资源。
+     */
     @Length(fieldName = "jwkSetUri")
     @ApiModelProperty(value = "Default JSON Web Key URI of the OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `jwkSetUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String jwkSetUri;
+    /**
+     * 客户端，用于发起外部调用或协议交互。
+     */
     @Length(fieldName = "clientAuthenticationMethod")
     @ApiModelProperty(value = "Default client authentication method to use: 'BASIC' or 'POST'")
-    /**
-     * 字段说明：
-     * 1. 保存 `clientAuthenticationMethod` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String clientAuthenticationMethod;
-    @ApiModelProperty(value = "Comment for OAuth2 provider")
     /**
-     * 字段说明：
-     * 1. 保存 `comment` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `comment` 字段，保存当前对象的对应属性。
      */
+    @ApiModelProperty(value = "Comment for OAuth2 provider")
     private String comment;
+    /**
+     * `loginButtonIcon` 字段，保存当前对象的对应属性。
+     */
     @Length(fieldName = "loginButtonIcon")
     @ApiModelProperty(value = "Default log in button icon for OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `loginButtonIcon` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String loginButtonIcon;
+    /**
+     * 显示标签，用于展示或标识当前对象。
+     */
     @Length(fieldName = "loginButtonLabel")
     @ApiModelProperty(value = "Default OAuth2 provider label")
-    /**
-     * 字段说明：
-     * 1. 保存 `loginButtonLabel` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String loginButtonLabel;
+    /**
+     * `helpLink` 字段，保存当前对象的对应属性。
+     */
     @Length(fieldName = "helpLink")
     @ApiModelProperty(value = "Help link for OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `helpLink` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String helpLink;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `OAuth2ClientRegistrationTemplate` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `OAuth2ClientRegistrationTemplate` 实例，并初始化必要字段。
+     * 参数：
+     * - `clientRegistrationTemplate`：客户端对象。
+     * 返回：新创建的对象实例。
      */
     public OAuth2ClientRegistrationTemplate(OAuth2ClientRegistrationTemplate clientRegistrationTemplate) {
         super(clientRegistrationTemplate);
@@ -215,17 +146,12 @@ public class OAuth2ClientRegistrationTemplate extends BaseDataWithAdditionalInfo
         this.helpLink = clientRegistrationTemplate.helpLink;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getName` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String getName() {
         return providerId;
     }

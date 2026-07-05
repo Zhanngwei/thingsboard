@@ -34,10 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-@SqlTsLatestAnyDao
-@Repository
-@Transactional
-@SqlDao
 /**
  * 中文说明：
  * 1. 类目的：`SqlLatestInsertTsRepository` 是 ThingsBoard DAO 模块 中的时序数据持久化类型，用于处理遥测键值、最新值、历史分区、聚合查询和 Timescale/PostgreSQL 时序读写。
@@ -49,17 +45,16 @@ import java.util.List;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Strategy / Template。
  */
+@SqlTsLatestAnyDao
+@Repository
+@Transactional
+@SqlDao
 public class SqlLatestInsertTsRepository extends AbstractInsertRepository implements InsertLatestTsRepository {
 
-    @Value("${sql.ts_latest.update_by_latest_ts:true}")
     /**
-     * 字段说明：
-     * 1. 保存 `updateByLatestTs` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 时间戳，用于标识当前数据或事件发生的时间。
      */
+    @Value("${sql.ts_latest.update_by_latest_ts:true}")
     private Boolean updateByLatestTs;
 
     private static final String BATCH_UPDATE =
@@ -70,56 +65,35 @@ public class SqlLatestInsertTsRepository extends AbstractInsertRepository implem
                     "ON CONFLICT (entity_id, key) DO UPDATE SET ts = ?, bool_v = ?, str_v = ?, long_v = ?, dbl_v = ?, json_v = cast(? AS json)";
 
     /**
-     * 字段说明：
-     * 1. 保存 `BATCH_UPDATE_BY_LATEST_TS` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 时间戳常量，用于统一引用固定值。
      */
     private static final String BATCH_UPDATE_BY_LATEST_TS = BATCH_UPDATE + " AND ts_kv_latest.ts <= ?";
 
     /**
-     * 字段说明：
-     * 1. 保存 `INSERT_OR_UPDATE_BY_LATEST_TS` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 时间戳常量，用于统一引用固定值。
      */
     private static final String INSERT_OR_UPDATE_BY_LATEST_TS = INSERT_OR_UPDATE + " WHERE ts_kv_latest.ts <= ?";
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `saveOrUpdate` 对应的时序数据持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由遥测写入、历史查询、聚合查询或测试流程按请求调用，并受数据库连接池和事务管理约束时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据实体、键、时间窗口和聚合参数选择存储路径，执行批量写入或查询后返回时序数据。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：保存或创建`Or Update`。
+     * 参数：
+     * - `entities`：数据列表。
+     * 返回：无。
      */
+    @Override
     public void saveOrUpdate(List<TsKvLatestEntity> entities) {
-        // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
         transactionTemplate.execute(new TransactionCallbackWithoutResult() {
             @Override
-            // 事务边界决定本次数据库写入与缓存失效是否作为一个原子业务步骤提交。
             protected void doInTransactionWithoutResult(TransactionStatus status) {
                 String batchUpdateQuery = updateByLatestTs ? BATCH_UPDATE_BY_LATEST_TS : BATCH_UPDATE;
                 String insertOrUpdateQuery = updateByLatestTs ? INSERT_OR_UPDATE_BY_LATEST_TS : INSERT_OR_UPDATE;
 
-                // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
                 int[] result = jdbcTemplate.batchUpdate(batchUpdateQuery, new BatchPreparedStatementSetter() {
                     @Override
-                    // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
                     public void setValues(PreparedStatement ps, int i) throws SQLException {
                         TsKvLatestEntity tsKvLatestEntity = entities.get(i);
                         ps.setLong(1, tsKvLatestEntity.getTs());
 
-                        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                         if (tsKvLatestEntity.getBooleanValue() != null) {
                             ps.setBoolean(2, tsKvLatestEntity.getBooleanValue());
                         } else {
@@ -128,14 +102,12 @@ public class SqlLatestInsertTsRepository extends AbstractInsertRepository implem
 
                         ps.setString(3, replaceNullChars(tsKvLatestEntity.getStrValue()));
 
-                        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                         if (tsKvLatestEntity.getLongValue() != null) {
                             ps.setLong(4, tsKvLatestEntity.getLongValue());
                         } else {
                             ps.setNull(4, Types.BIGINT);
                         }
 
-                        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                         if (tsKvLatestEntity.getDoubleValue() != null) {
                             ps.setDouble(5, tsKvLatestEntity.getDoubleValue());
                         } else {
@@ -146,7 +118,6 @@ public class SqlLatestInsertTsRepository extends AbstractInsertRepository implem
 
                         ps.setObject(7, tsKvLatestEntity.getEntityId());
                         ps.setInt(8, tsKvLatestEntity.getKey());
-                        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                         if (updateByLatestTs) {
                             ps.setLong(9, tsKvLatestEntity.getTs());
                         }
@@ -159,27 +130,21 @@ public class SqlLatestInsertTsRepository extends AbstractInsertRepository implem
                 });
 
                 int updatedCount = 0;
-                // 循环处理批量实体、属性、遥测或测试数据时，需要关注单项失败对整体事务和缓存状态的影响。
                 for (int i = 0; i < result.length; i++) {
-                    // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                     if (result[i] == 0) {
                         updatedCount++;
                     }
                 }
 
                 List<TsKvLatestEntity> insertEntities = new ArrayList<>(updatedCount);
-                // 循环处理批量实体、属性、遥测或测试数据时，需要关注单项失败对整体事务和缓存状态的影响。
                 for (int i = 0; i < result.length; i++) {
-                    // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
                     if (result[i] == 0) {
                         insertEntities.add(entities.get(i));
                     }
                 }
 
-                // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
                 jdbcTemplate.batchUpdate(insertOrUpdateQuery, new BatchPreparedStatementSetter() {
                     @Override
-                    // Cassandra 访问通常是异步或分页的，需要在这里维护查询语句、结果转换和失败处理边界。
                     public void setValues(PreparedStatement ps, int i) throws SQLException {
                         TsKvLatestEntity tsKvLatestEntity = insertEntities.get(i);
                         ps.setObject(1, tsKvLatestEntity.getEntityId());

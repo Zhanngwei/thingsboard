@@ -19,21 +19,21 @@ import lombok.Data;
 import org.thingsboard.rule.engine.api.NodeConfiguration;
 import org.thingsboard.server.common.data.DataConstants;
 
-@Data
 /**
- * Edge/Cloud 推送节点基础配置，提供属性 scope 默认值。
- * 配置类本身不直接保存 EdgeEvent、不访问数据库/缓存，也不涉及异步回调。
+ * `BaseTbMsgPushNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class BaseTbMsgPushNodeConfiguration implements NodeConfiguration<BaseTbMsgPushNodeConfiguration> {
 
     /**
-     * 属性事件使用的 scope，消息元数据未提供时作为默认值。
+     * `scope` 字段，保存当前对象的对应属性。
      */
     private String scope;
 
     /**
-     * 构造基础推送节点默认配置。
-     * 本方法只设置 SERVER_SCOPE，不直接处理消息或持久化事件。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     @Override
     public BaseTbMsgPushNodeConfiguration defaultConfiguration() {

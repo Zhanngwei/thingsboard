@@ -54,11 +54,6 @@ import static org.thingsboard.server.service.install.migrate.CassandraToSqlColum
 import static org.thingsboard.server.service.install.migrate.CassandraToSqlColumn.jsonColumn;
 import static org.thingsboard.server.service.install.migrate.CassandraToSqlColumn.stringColumn;
 
-@Service
-@Profile("install")
-@NoSqlTsDao
-@SqlTsLatestDao
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`CassandraTsLatestToSqlMigrateService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -69,132 +64,85 @@ import static org.thingsboard.server.service.install.migrate.CassandraToSqlColum
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Profile("install")
+@NoSqlTsDao
+@SqlTsLatestDao
+@Slf4j
 public class CassandraTsLatestToSqlMigrateService implements TsLatestMigrateService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `MAX_KEY_LENGTH` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 键常量，用于统一引用固定值。
      */
     private static final int MAX_KEY_LENGTH = 255;
     private static final int MAX_STR_V_LENGTH = 10000000;
 
     /**
-     * 字段说明：
-     * 1. 保存 `SQL_DIR` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * SQL常量，用于统一引用固定值。
      */
     private static final String SQL_DIR = "sql";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `insertLatestTsRepository` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，用于读取或保存对应领域对象。
      */
+    @Autowired
     private InsertLatestTsRepository insertLatestTsRepository;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `cluster` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 集群，用于支撑当前网络或外部服务交互。
      */
+    @Autowired
     protected CassandraCluster cluster;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `dictionaryRepository` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 存取组件，用于读取或保存对应领域对象。
      */
+    @Autowired
     protected TsKvDictionaryRepository dictionaryRepository;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `installScripts` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `installScripts` 字段，保存当前对象的对应属性。
      */
+    @Autowired
     private InstallScripts installScripts;
 
-    @Value("${spring.datasource.url}")
     /**
-     * 字段说明：
-     * 1. 保存 `dbUrl` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * URL 地址，用于定位外部资源或本地资源。
      */
+    @Value("${spring.datasource.url}")
     protected String dbUrl;
 
-    @Value("${spring.datasource.username}")
     /**
-     * 字段说明：
-     * 1. 保存 `dbUserName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，用于标识或展示当前对象。
      */
+    @Value("${spring.datasource.username}")
     protected String dbUserName;
 
-    @Value("${spring.datasource.password}")
     /**
-     * 字段说明：
-     * 1. 保存 `dbPassword` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @Value("${spring.datasource.password}")
     protected String dbPassword;
 
     private final ConcurrentMap<String, Integer> tsKvDictionaryMap = new ConcurrentHashMap<>();
 
     protected static final ReentrantLock tsCreationLock = new ReentrantLock();
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `migrate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `migrate` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void migrate() throws Exception {
         log.info("Performing migration of latest timeseries data from cassandra to SQL database ...");
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUserName, dbPassword)) {
             Path schemaUpdateFile = Paths.get(installScripts.getDataDir(), SQL_DIR, "schema-ts-latest-psql.sql");
             loadSql(schemaUpdateFile, conn);
             conn.setAutoCommit(false);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (CassandraToSqlTable table : tables) {
                 table.migrateToSql(cluster.getSession(), conn);
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("Unexpected error during ThingsBoard entities data migration!", e);
             throw e;
@@ -225,14 +173,10 @@ public class CassandraTsLatestToSqlMigrateService implements TsLatestMigrateServ
             });
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTsKvLatestEntity` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：处理结果。
      */
     private TsKvLatestEntity getTsKvLatestEntity(CassandraToSqlColumnData[] data) {
         TsKvLatestEntity latestEntity = new TsKvLatestEntity();
@@ -241,9 +185,7 @@ public class CassandraTsLatestToSqlMigrateService implements TsLatestMigrateServ
         latestEntity.setTs(Long.parseLong(data[2].getValue()));
 
         String strV = data[4].getValue();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (strV != null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (strV.length() > MAX_STR_V_LENGTH) {
                 log.warn("[ts_kv_latest] Value size [{}] exceeds maximum size [{}] of column [str_v] and will be truncated!",
                         strV.length(), MAX_STR_V_LENGTH);
@@ -255,36 +197,29 @@ public class CassandraTsLatestToSqlMigrateService implements TsLatestMigrateServ
             Long longV = null;
             try {
                 longV = Long.parseLong(data[5].getValue());
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (longV != null) {
                 latestEntity.setLongValue(longV);
             } else {
                 Double doubleV = null;
                 try {
                     doubleV = Double.parseDouble(data[6].getValue());
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (Exception e) {
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (doubleV != null) {
                     latestEntity.setDoubleValue(doubleV);
                 } else {
 
                     String jsonV = data[7].getValue();
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (StringUtils.isNoneEmpty(jsonV)) {
                         latestEntity.setJsonValue(jsonV);
                     } else {
                         Boolean boolV = null;
                         try {
                             boolV = Boolean.parseBoolean(data[3].getValue());
-                        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                         } catch (Exception e) {
                         }
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (boolV != null) {
                             latestEntity.setBooleanValue(boolV);
                         } else {
@@ -298,17 +233,12 @@ public class CassandraTsLatestToSqlMigrateService implements TsLatestMigrateServ
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrSaveKeyId` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取键。
+     * 参数：
+     * - `strKey`：键。
+     * 返回：数值结果。
      */
     protected Integer getOrSaveKeyId(String strKey) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (strKey.length() > MAX_KEY_LENGTH) {
             log.warn("[ts_kv_latest] Value size [{}] exceeds maximum size [{}] of column [key] and will be truncated!",
                     strKey.length(), MAX_KEY_LENGTH);
@@ -352,14 +282,11 @@ public class CassandraTsLatestToSqlMigrateService implements TsLatestMigrateServ
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadSql` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取SQL。
+     * 参数：
+     * - `sqlFile`：`sqlFile` 参数。
+     * - `conn`：`conn` 参数。
+     * 返回：无。
      */
     private void loadSql(Path sqlFile, Connection conn) throws Exception {
         String sql = new String(Files.readAllBytes(sqlFile), Charset.forName("UTF-8"));

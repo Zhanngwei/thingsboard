@@ -44,9 +44,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-@Service
-@Slf4j
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbImageService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -57,126 +54,94 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Slf4j
+@TbCoreComponent
 public class DefaultTbImageService extends AbstractTbEntityService implements TbImageService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `clusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TbClusterService clusterService;
     private final ImageService imageService;
     /**
-     * 字段说明：
-     * 1. 保存 `etagCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `etagCache` 字段，保存当前对象的对应属性。
      */
     private final Cache<ImageCacheKey, String> etagCache;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultTbImageService` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultTbImageService` 实例，并初始化必要字段。
+     * 参数：
+     * - `clusterService`：服务对象。
+     * - `imageService`：服务对象。
+     * - `cacheTtl`：`cacheTtl` 参数。
+     * - `cacheMaxSize`：`cacheMaxSize` 参数。
+     * 返回：新创建的对象实例。
      */
     public DefaultTbImageService(TbClusterService clusterService, ImageService imageService,
                                  @Value("${cache.image.etag.timeToLiveInMinutes:44640}") int cacheTtl,
                                  @Value("${cache.image.etag.maxSize:10000}") int cacheMaxSize) {
         this.clusterService = clusterService;
         this.imageService = imageService;
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         this.etagCache = Caffeine.newBuilder()
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 .expireAfterAccess(cacheTtl, TimeUnit.MINUTES)
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 .maximumSize(cacheMaxSize)
                 .build();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getETag` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`E Tag`。
+     * 参数：
+     * - `imageCacheKey`：键。
+     * 返回：文本结果。
      */
+    @Override
     public String getETag(ImageCacheKey imageCacheKey) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         return etagCache.getIfPresent(imageCacheKey);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `putETag` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `putETag` 对应的处理。
+     * 参数：
+     * - `imageCacheKey`：键。
+     * - `etag`：`etag` 参数。
+     * 返回：无。
      */
+    @Override
     public void putETag(ImageCacheKey imageCacheKey, String etag) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         etagCache.put(imageCacheKey, etag);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evictETags` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`E Tags`。
+     * 参数：
+     * - `imageCacheKey`：键。
+     * 返回：无。
      */
+    @Override
     public void evictETags(ImageCacheKey imageCacheKey) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         etagCache.invalidate(imageCacheKey);
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         if (imageCacheKey.getPublicResourceKey() == null) {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             etagCache.invalidate(imageCacheKey.withPreview(true));
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `image`：`image` 参数。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public TbResourceInfo save(TbResource image, User user) throws Exception {
         ActionType actionType = image.getId() == null ? ActionType.ADDED : ActionType.UPDATED;
         TenantId tenantId = image.getTenantId();
         try {
             var oldEtag = getEtag(image);
             TbResourceInfo existingImage = null;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (image.getId() == null && StringUtils.isNotEmpty(image.getResourceKey())) {
                 existingImage = imageService.getImageInfoByTenantIdAndKey(tenantId, image.getResourceKey());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (existingImage != null) {
                     image.setId(existingImage.getId());
                 }
@@ -184,9 +149,7 @@ public class DefaultTbImageService extends AbstractTbEntityService implements Tb
             TbResourceInfo savedImage = imageService.saveImage(image);
             notificationEntityService.logEntityAction(tenantId, savedImage.getId(), savedImage, actionType, user);
 
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             List<ImageCacheKey> toEvict = new ArrayList<>();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (oldEtag.isPresent()) {
                 var newEtag = getEtag(savedImage);
                 if (newEtag.isPresent() && !oldEtag.get().equals(newEtag.get())) {
@@ -211,14 +174,10 @@ public class DefaultTbImageService extends AbstractTbEntityService implements Tb
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEtag` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Etag`。
+     * 参数：
+     * - `image`：`image` 参数。
+     * 返回：可能存在的结果。
      */
     private Optional<String> getEtag(TbResourceInfo image) throws JsonProcessingException {
         var descriptor = image.getDescriptor(ImageDescriptor.class);
@@ -226,14 +185,10 @@ public class DefaultTbImageService extends AbstractTbEntityService implements Tb
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getPreviewEtag` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Preview Etag`。
+     * 参数：
+     * - `image`：`image` 参数。
+     * 返回：可能存在的结果。
      */
     private Optional<String> getPreviewEtag(TbResourceInfo image) throws JsonProcessingException {
         var descriptor = image.getDescriptor(ImageDescriptor.class);
@@ -241,17 +196,15 @@ public class DefaultTbImageService extends AbstractTbEntityService implements Tb
         return Optional.ofNullable(descriptor != null ? descriptor.getEtag() : null);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `imageInfo`：`imageInfo` 参数。
+     * - `oldImageInfo`：`oldImageInfo` 参数。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public TbResourceInfo save(TbResourceInfo imageInfo, TbResourceInfo oldImageInfo, User user) {
         TenantId tenantId = imageInfo.getTenantId();
         TbResourceId imageId = imageInfo.getId();
@@ -269,17 +222,15 @@ public class DefaultTbImageService extends AbstractTbEntityService implements Tb
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `delete` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `delete` 对应的处理。
+     * 参数：
+     * - `imageInfo`：`imageInfo` 参数。
+     * - `user`：`user` 参数。
+     * - `force`：`force` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public TbImageDeleteResult delete(TbResourceInfo imageInfo, User user, boolean force) {
         TenantId tenantId = imageInfo.getTenantId();
         TbResourceId imageId = imageInfo.getId();
@@ -303,14 +254,11 @@ public class DefaultTbImageService extends AbstractTbEntityService implements Tb
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evictFromCache` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`From Cache`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `toEvict`：数据列表。
+     * 返回：无。
      */
     private void evictFromCache(TenantId tenantId, List<ImageCacheKey> toEvict) {
         toEvict.forEach(this::evictETags);

@@ -27,7 +27,6 @@ import static org.thingsboard.server.msa.ui.utils.Const.IMPORT_RULE_CHAIN_NAME;
 import static org.thingsboard.server.msa.ui.utils.Const.IMPORT_TXT_FILE_NAME;
 import static org.thingsboard.server.msa.ui.utils.EntityPrototypes.defaultRuleChainPrototype;
 
-@Feature("Import rule chain")
 /**
  * 中文说明：
  * 1. 类目的：`CreateRuleChainImportTest` 是 ThingsBoard MSA 测试模块 中的MSA UI 黑盒测试类型，用于通过 Selenium 验证客户、设备、资产、规则链等页面工作流。
@@ -39,131 +38,88 @@ import static org.thingsboard.server.msa.ui.utils.EntityPrototypes.defaultRuleCh
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 End-to-End Test / Template Method。
  */
+@Feature("Import rule chain")
 public class CreateRuleChainImportTest extends AbstractRuleChainTest {
 
     private final String absolutePathToFileImportRuleChain = getClass().getClassLoader().getResource(IMPORT_RULE_CHAIN_FILE_NAME).getPath();
     private final String absolutePathToFileImportTxt = getClass().getClassLoader().getResource(IMPORT_TXT_FILE_NAME).getPath();
 
+    /**
+     * 功能：执行 `importRuleChain` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(priority = 10, groups = "smoke")
     @Description("Drop json file")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `importRuleChain` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void importRuleChain() {
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         sideBarMenuView.ruleChainsBtn().click();
         ruleChainsPage.openImportRuleChainView();
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         ruleChainsPage.browseFile().sendKeys(absolutePathToFileImportRuleChain);
 
         assertIsDisplayed(ruleChainsPage.importingFile(IMPORT_RULE_CHAIN_FILE_NAME));
     }
 
+    /**
+     * 功能：执行 `importRuleChainAndDeleteFile` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(priority = 20, groups = "smoke")
     @Description("Drop json file and delete it")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `importRuleChainAndDeleteFile` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void importRuleChainAndDeleteFile() {
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         sideBarMenuView.ruleChainsBtn().click();
         ruleChainsPage.openImportRuleChainView();
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         ruleChainsPage.browseFile().sendKeys(absolutePathToFileImportRuleChain);
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         ruleChainsPage.clearImportFileBtn().click();
 
         assertIsDisplayed(ruleChainsPage.importingFile(EMPTY_IMPORT_MESSAGE));
         ruleChainsPage.assertEntityIsNotPresent(IMPORT_RULE_CHAIN_FILE_NAME);
     }
 
+    /**
+     * 功能：执行 `importTxtFile` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(priority = 20, groups = "smoke")
     @Description("Import txt file")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `importTxtFile` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void importTxtFile() {
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         sideBarMenuView.ruleChainsBtn().click();
         ruleChainsPage.openImportRuleChainView();
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         ruleChainsPage.browseFile().sendKeys(absolutePathToFileImportTxt);
 
         assertIsDisplayed(ruleChainsPage.importingFile(EMPTY_IMPORT_MESSAGE));
     }
 
+    /**
+     * 功能：执行 `importRuleChainAndSave` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(priority = 30, groups = "smoke")
     @Description("Import rule chain")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `importRuleChainAndSave` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void importRuleChainAndSave() {
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         sideBarMenuView.ruleChainsBtn().click();
         ruleChainsPage.openImportRuleChainView();
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         ruleChainsPage.browseFile().sendKeys(absolutePathToFileImportRuleChain);
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         ruleChainsPage.importBrowseFileBtn().click();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         WebElement doneBtn = openRuleChainPage.doneBtn();
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         doneBtn.click();
         ruleChainName = IMPORT_RULE_CHAIN_NAME;
-        // Selenium 操作依赖页面实时状态，通常需要等待元素可见或可点击后再继续断言。
         sideBarMenuView.ruleChainsBtn().click();
 
         assertIsDisplayed(ruleChainsPage.entity(ruleChainName));
     }
 
+    /**
+     * 功能：执行 `importRuleChainAndSaveWithSameName` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Test(priority = 40, groups = "smoke")
     @Description("Import rule chain with same name")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `importRuleChainAndSaveWithSameName` 对应的MSA UI 黑盒测试类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
-     */
     public void importRuleChainAndSaveWithSameName() {
         ruleChainName = IMPORT_RULE_CHAIN_NAME;
-        // 网络调用用于验证服务端可达性或订阅链路，失败时需要区分连接问题和业务断言问题。
         testRestClient.postRuleChain(defaultRuleChainPrototype(ruleChainName));
 
         sideBarMenuView.ruleChainsBtn().click();

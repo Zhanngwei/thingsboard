@@ -34,37 +34,24 @@ import org.thingsboard.server.msa.DisableUIListeners;
 public class RetryAnalyzer implements IRetryAnalyzer {
 
     /**
-     * 字段说明：
-     * 1. 保存 `retryCount` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 数量，用于控制数量、位置或分页范围。
      */
     private int retryCount = 0;
     private static final int MAX_RETRY_COUNT = 2;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `retry` 对应的微服务测试和部署支撑类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `retry` 对应的处理。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：判断结果。
      */
+    @Override
     public boolean retry(ITestResult result) {
         ConstructorOrMethod consOrMethod = result.getMethod().getConstructorOrMethod();
-        // 异步结果通过回调继续处理，调用线程不能假设这里已经完成完整链路。
         DisableUIListeners disable = consOrMethod.getMethod().getDeclaringClass().getAnnotation(DisableUIListeners.class);
-        // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
         if (disable != null) {
             return false;
         }
-        // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
         if (retryCount < MAX_RETRY_COUNT) {
             System.out.printf("Retrying test %s for the %d time(s).%n", result.getName(), retryCount + 1);
             retryCount++;

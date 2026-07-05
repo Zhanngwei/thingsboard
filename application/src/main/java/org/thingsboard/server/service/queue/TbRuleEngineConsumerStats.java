@@ -33,7 +33,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbRuleEngineConsumerStats` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
@@ -44,107 +43,58 @@ import java.util.concurrent.ConcurrentMap;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
  */
+@Slf4j
 public class TbRuleEngineConsumerStats {
 
     /**
-     * 字段说明：
-     * 1. 保存 `TOTAL_MSGS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `TOTAL_MSGS`常量，用于统一引用固定值。
      */
     public static final String TOTAL_MSGS = "totalMsgs";
     public static final String SUCCESSFUL_MSGS = "successfulMsgs";
     /**
-     * 字段说明：
-     * 1. 保存 `TMP_TIMEOUT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间常量，用于统一引用固定值。
      */
     public static final String TMP_TIMEOUT = "tmpTimeout";
     public static final String TMP_FAILED = "tmpFailed";
     /**
-     * 字段说明：
-     * 1. 保存 `TIMEOUT_MSGS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间常量，用于统一引用固定值。
      */
     public static final String TIMEOUT_MSGS = "timeoutMsgs";
     public static final String FAILED_MSGS = "failedMsgs";
     /**
-     * 字段说明：
-     * 1. 保存 `SUCCESSFUL_ITERATIONS` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `SUCCESSFUL_ITERATIONS`常量，用于统一引用固定值。
      */
     public static final String SUCCESSFUL_ITERATIONS = "successfulIterations";
     public static final String FAILED_ITERATIONS = "failedIterations";
     /**
-     * 字段说明：
-     * 1. 保存 `TENANT_ID_TAG` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户ID常量，用于统一引用固定值。
      */
     public static final String TENANT_ID_TAG = "tenantId";
 
     /**
-     * 字段说明：
-     * 1. 保存 `statsFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
     private final StatsFactory statsFactory;
 
     /**
-     * 字段说明：
-     * 1. 保存 `totalMsgCounter` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private final StatsCounter totalMsgCounter;
     private final StatsCounter successMsgCounter;
     /**
-     * 字段说明：
-     * 1. 保存 `tmpTimeoutMsgCounter` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private final StatsCounter tmpTimeoutMsgCounter;
     private final StatsCounter tmpFailedMsgCounter;
 
     /**
-     * 字段说明：
-     * 1. 保存 `timeoutMsgCounter` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private final StatsCounter timeoutMsgCounter;
     private final StatsCounter failedMsgCounter;
 
     /**
-     * 字段说明：
-     * 1. 保存 `successIterationsCounter` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 计数器，用于控制处理规模或位置。
      */
     private final StatsCounter successIterationsCounter;
     private final StatsCounter failedIterationsCounter;
@@ -155,25 +105,17 @@ public class TbRuleEngineConsumerStats {
     private final ConcurrentMap<TenantId, RuleEngineException> tenantExceptions = new ConcurrentHashMap<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `queueName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列名称，用于标识或展示当前对象。
      */
     private final String queueName;
     private final TenantId tenantId;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbRuleEngineConsumerStats` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbRuleEngineConsumerStats` 实例，并初始化必要字段。
+     * 参数：
+     * - `queueKey`：队列名称或队列对象。
+     * - `statsFactory`：`statsFactory` 参数。
+     * 返回：新创建的对象实例。
      */
     public TbRuleEngineConsumerStats(QueueKey queueKey, StatsFactory statsFactory) {
         this.queueName = queueKey.getQueueName();
@@ -182,17 +124,11 @@ public class TbRuleEngineConsumerStats {
 
         String statsKey = StatsType.RULE_ENGINE.getName() + "." + queueName;
         String tenant = tenantId == null || tenantId.isSysTenantId() ? "system" : tenantId.toString();
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         this.totalMsgCounter = statsFactory.createStatsCounter(statsKey, TOTAL_MSGS, TENANT_ID_TAG, tenant);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         this.successMsgCounter = statsFactory.createStatsCounter(statsKey, SUCCESSFUL_MSGS, TENANT_ID_TAG, tenant);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         this.timeoutMsgCounter = statsFactory.createStatsCounter(statsKey, TIMEOUT_MSGS, TENANT_ID_TAG, tenant);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         this.failedMsgCounter = statsFactory.createStatsCounter(statsKey, FAILED_MSGS, TENANT_ID_TAG, tenant);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         this.tmpTimeoutMsgCounter = statsFactory.createStatsCounter(statsKey, TMP_TIMEOUT, TENANT_ID_TAG, tenant);
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         this.tmpFailedMsgCounter = statsFactory.createStatsCounter(statsKey, TMP_FAILED, TENANT_ID_TAG, tenant);
         this.successIterationsCounter = statsFactory.createStatsCounter(statsKey, SUCCESSFUL_ITERATIONS, TENANT_ID_TAG, tenant);
         this.failedIterationsCounter = statsFactory.createStatsCounter(statsKey, FAILED_ITERATIONS, TENANT_ID_TAG, tenant);
@@ -209,14 +145,11 @@ public class TbRuleEngineConsumerStats {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTimer` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取定时器。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `status`：`status` 参数。
+     * 返回：处理结果。
      */
     public Timer getTimer(TenantId tenantId, String status) {
         return tenantMsgProcessTimers.computeIfAbsent(tenantId,
@@ -227,14 +160,11 @@ public class TbRuleEngineConsumerStats {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `log` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `log` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `finalIterationForPack`：`finalIterationForPack` 参数。
+     * 返回：无。
      */
     public void log(TbRuleEngineProcessingResult msg, boolean finalIterationForPack) {
         int success = msg.getSuccessMap().size();
@@ -243,17 +173,13 @@ public class TbRuleEngineConsumerStats {
         totalMsgCounter.add(success + pending + failed);
         successMsgCounter.add(success);
         msg.getSuccessMap().values().forEach(m -> getTenantStats(m).logSuccess());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (finalIterationForPack) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pending > 0 || failed > 0) {
                 timeoutMsgCounter.add(pending);
                 failedMsgCounter.add(failed);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (pending > 0) {
                     msg.getPendingMap().values().forEach(m -> getTenantStats(m).logTimeout());
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (failed > 0) {
                     msg.getFailedMap().values().forEach(m -> getTenantStats(m).logFailed());
                 }
@@ -265,11 +191,9 @@ public class TbRuleEngineConsumerStats {
             failedIterationsCounter.increment();
             tmpTimeoutMsgCounter.add(pending);
             tmpFailedMsgCounter.add(failed);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (pending > 0) {
                 msg.getPendingMap().values().forEach(m -> getTenantStats(m).logTmpTimeout());
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (failed > 0) {
                 msg.getFailedMap().values().forEach(m -> getTenantStats(m).logTmpFailed());
             }
@@ -278,14 +202,10 @@ public class TbRuleEngineConsumerStats {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantStats` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户。
+     * 参数：
+     * - `m`：`m` 参数。
+     * 返回：处理结果。
      */
     private TbTenantRuleEngineStats getTenantStats(TbProtoQueueMsg<ToRuleEngineMsg> m) {
         ToRuleEngineMsg reMsg = m.getValue();
@@ -293,56 +213,36 @@ public class TbRuleEngineConsumerStats {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantStats` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public ConcurrentMap<UUID, TbTenantRuleEngineStats> getTenantStats() {
         return tenantStats;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getQueueName` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取队列名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getQueueName() {
         return queueName;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantExceptions` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public ConcurrentMap<TenantId, RuleEngineException> getTenantExceptions() {
         return tenantExceptions;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `printStats` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `printStats` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void printStats() {
         int total = totalMsgCounter.get();
@@ -360,14 +260,9 @@ public class TbRuleEngineConsumerStats {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reset` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `reset` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void reset() {
         counters.forEach(StatsCounter::clear);

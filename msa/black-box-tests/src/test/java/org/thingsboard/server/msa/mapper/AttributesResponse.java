@@ -19,7 +19,6 @@ import lombok.Data;
 
 import java.util.Map;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`AttributesResponse` 是 ThingsBoard MSA 测试模块 中的微服务测试和部署支撑类型，用于支撑微服务部署、黑盒测试、UI 自动化、协议连通性验证或版本控制执行器路由。
@@ -31,14 +30,10 @@ import java.util.Map;
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 Test Fixture / Page Object / Service。
  */
+@Data
 public class AttributesResponse {
     /**
-     * 字段说明：
-     * 1. 保存 `client` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 客户端映射关系，用于按键查找对应值。
      */
     private Map<String, Object> client;
     private Map<String, Object> shared;

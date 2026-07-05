@@ -40,9 +40,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-@Component
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`MonitoringReporter` 是 ThingsBoard Monitoring 模块 中的监控服务与健康检查类型，用于编排周期性探测、延迟统计、异常捕获、恢复判断和报告输出。
@@ -54,112 +51,70 @@ import java.util.stream.Collectors;
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 Template Method / Strategy。
  */
+@Component
+@RequiredArgsConstructor
+@Slf4j
 public class MonitoringReporter {
 
     /**
-     * 字段说明：
-     * 1. 保存 `notificationService` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 通知服务，提供当前类调用的业务操作。
      */
     private final NotificationService notificationService;
 
     private final Map<String, Latency> latencies = new ConcurrentHashMap<>();
     private final Map<Object, AtomicInteger> failuresCounters = new ConcurrentHashMap<>();
 
+    /**
+     * 失败次数阈值，用于判断是否达到处理条件。
+     */
     @Value("${monitoring.failures_threshold}")
-    /**
-     * 字段说明：
-     * 1. 保存 `failuresThreshold` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
-     */
     private int failuresThreshold;
-    @Value("${monitoring.repeated_failure_notification}")
     /**
-     * 字段说明：
-     * 1. 保存 `repeatedFailureNotification` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 通知，表示当前对象的对应属性。
      */
+    @Value("${monitoring.repeated_failure_notification}")
     private int repeatedFailureNotification;
 
+    /**
+     * 是否启用延迟上报。
+     */
     @Value("${monitoring.latency.enabled}")
-    /**
-     * 字段说明：
-     * 1. 保存 `latencyReportingEnabled` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
-     */
     private boolean latencyReportingEnabled;
+    /**
+     * 延迟阈值，用于判断是否达到处理条件。
+     */
     @Value("${monitoring.latency.threshold_ms}")
-    /**
-     * 字段说明：
-     * 1. 保存 `latencyThresholdMs` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
-     */
     private int latencyThresholdMs;
-    @Value("${monitoring.latency.reporting_asset_id}")
     /**
-     * 字段说明：
-     * 1. 保存 `reportingAssetId` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * 资产ID，用于定位对应业务对象。
      */
+    @Value("${monitoring.latency.reporting_asset_id}")
     private String reportingAssetId;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportLatencies` 对应的监控服务与健康检查类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：上报延迟数据。
+     * 参数：
+     * - `tbClient`：客户端对象。
+     * 返回：无。
      */
     public void reportLatencies(TbClient tbClient) {
-        // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
         if (latencies.isEmpty()) {
             return;
         }
-        // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
         log.debug("Latencies:\n{}", latencies.values().stream().map(latency -> latency.getKey() + ": " + latency.getFormattedValue())
                 .collect(Collectors.joining("\n")) + "\n");
-        // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
         if (!latencyReportingEnabled) return;
 
-        // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
         List<Latency> highLatencies = latencies.values().stream()
-                // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
                 .filter(latency -> latency.getValue() >= (double) latencyThresholdMs)
                 .collect(Collectors.toList());
-        // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
         if (!highLatencies.isEmpty()) {
-            // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
             HighLatencyNotification highLatencyNotification = new HighLatencyNotification(highLatencies, latencyThresholdMs);
-            // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
             notificationService.sendNotification(highLatencyNotification);
-            // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
             log.warn("{}", highLatencyNotification.getText());
         }
 
         try {
-            // 条件分支用于保护配置、连接状态、测试前置条件或协议状态机边界。
             if (StringUtils.isBlank(reportingAssetId)) {
                 String assetName = "[Monitoring] Latencies";
                 Asset monitoringAsset = tbClient.findAsset(assetName).orElseGet(() -> {
@@ -174,30 +129,22 @@ public class MonitoringReporter {
             }
 
             ObjectNode msg = JacksonUtil.newObjectNode();
-            // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
             latencies.values().forEach(latency -> {
-                // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
                 msg.set(latency.getKey(), new DoubleNode(latency.getValue()));
             });
             tbClient.saveEntityTelemetry(new AssetId(UUID.fromString(reportingAssetId)), "time", msg);
-            // 延迟和通知逻辑用于把运行时状态转化为可观测事件，避免探测结果只停留在日志中。
             latencies.clear();
-        // 异常在这里转换为统一失败路径，便于监控告警、测试断言或客户端回调处理。
         } catch (Exception e) {
             log.error("Failed to report latencies: {}", e.getMessage());
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportLatency` 对应的监控服务与健康检查类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：上报延迟。
+     * 参数：
+     * - `key`：键。
+     * - `latencyInNanos`：`latencyInNanos` 参数。
+     * 返回：无。
      */
     public void reportLatency(String key, long latencyInNanos) {
         String latencyKey = key + "Latency";
@@ -207,15 +154,11 @@ public class MonitoringReporter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `serviceFailure` 对应的监控服务与健康检查类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `serviceFailure` 对应的处理。
+     * 参数：
+     * - `serviceKey`：服务对象。
+     * - `error`：错误信息。
+     * 返回：无。
      */
     public void serviceFailure(Object serviceKey, Throwable error) {
         if (log.isDebugEnabled()) {
@@ -230,15 +173,10 @@ public class MonitoringReporter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `serviceIsOk` 对应的监控服务与健康检查类型流程，完成配置读取、连接管理、协议处理、页面操作、健康探测或测试断言。
-     * 2. 参数：输入参数通常代表配置项、目标地址、设备凭据、MQTT 消息、Web 元素、测试夹具、回调或异步结果。
-     * 3. 返回值：返回客户端状态、协议响应、通知结果、测试对象、Future/回调句柄或 `void`；`void` 通常通过副作用、断言或回调表达结果。
-     * 4. 调用时机：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放时，由 Spring Boot、Netty pipeline、测试框架、Selenium 页面对象、监控调度器或上层客户端调用。
-     * 5. 使用流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
-     * 6. 线程安全：方法本身不额外声明线程安全；Netty 事件循环、Selenium 驱动、测试框架并发和 Spring Bean 生命周期决定并发边界。
-     * 7. 事务/缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态；若测试通过 REST 或协议入口触发服务端写入，事务由目标服务端模块控制。
-     * 8. MQTT/Actor/数据库/Rule Engine：方法可能直接处理 MQTT 或通过 HTTP/WebSocket/CoAP 间接影响 Transport、Actor、Rule Engine 和 DAO 流程。
+     * 功能：执行 `serviceIsOk` 对应的处理。
+     * 参数：
+     * - `serviceKey`：服务对象。
+     * 返回：无。
      */
     public void serviceIsOk(Object serviceKey) {
         ServiceRecoveryNotification notification = new ServiceRecoveryNotification(serviceKey);

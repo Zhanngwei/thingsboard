@@ -35,62 +35,47 @@ import org.thingsboard.server.service.ws.telemetry.cmd.v2.UnsubscribeCmd;
 public interface NotificationCommandsHandler {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleUnreadNotificationsSubCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Unread Notifications Sub Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
     void handleUnreadNotificationsSubCmd(WebSocketSessionRef sessionRef, NotificationsSubCmd cmd);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleUnreadNotificationsCountSubCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理数量。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
     void handleUnreadNotificationsCountSubCmd(WebSocketSessionRef sessionRef, NotificationsCountSubCmd cmd);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleMarkAsReadCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Mark As Read Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
     void handleMarkAsReadCmd(WebSocketSessionRef sessionRef, MarkNotificationsAsReadCmd cmd);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleMarkAllAsReadCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Mark All As Read Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
     void handleMarkAllAsReadCmd(WebSocketSessionRef sessionRef, MarkAllNotificationsAsReadCmd cmd);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleUnsubCmd` 对应的WebSocket 服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：随 WebSocket 建连创建订阅，断连或取消订阅时释放时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收订阅请求后注册监听，数据变化时推送到客户端。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Unsub Cmd`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `cmd`：`cmd` 参数。
+     * 返回：无。
      */
     void handleUnsubCmd(WebSocketSessionRef sessionRef, UnsubscribeCmd cmd);
 

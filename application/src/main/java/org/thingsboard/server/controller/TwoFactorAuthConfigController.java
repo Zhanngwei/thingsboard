@@ -46,10 +46,6 @@ import java.util.stream.Collectors;
 
 import static org.thingsboard.server.controller.ControllerConstants.NEW_LINE;
 
-@RestController
-@RequestMapping("/api/2fa")
-@TbCoreComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`TwoFactorAuthConfigController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -60,20 +56,24 @@ import static org.thingsboard.server.controller.ControllerConstants.NEW_LINE;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@RequestMapping("/api/2fa")
+@TbCoreComponent
+@RequiredArgsConstructor
 public class TwoFactorAuthConfigController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `twoFaConfigManager` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置，负责处理对应任务或消息。
      */
     private final TwoFaConfigManager twoFaConfigManager;
     private final TwoFactorAuthService twoFactorAuthService;
 
 
+    /**
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get account 2FA settings (getAccountTwoFaSettings)",
             notes = "Get user's account 2FA configuration. Configuration contains configs for different 2FA providers." + NEW_LINE +
                     "Example:\n" +
@@ -85,22 +85,20 @@ public class TwoFactorAuthConfigController extends BaseController {
                     ControllerConstants.AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @GetMapping("/account/settings")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAccountTwoFaSettings` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AccountTwoFaSettings getAccountTwoFaSettings() throws ThingsboardException {
         SecurityUser user = getCurrentUser();
         return twoFaConfigManager.getAccountTwoFaSettings(user.getTenantId(), user.getId()).orElse(null);
     }
 
 
+    /**
+     * 功能：执行 `generateTwoFaAccountConfig` 对应的处理。
+     * 参数：
+     * - `for`：`for` 参数。
+     * - `TOTP`：`TOTP` 参数。
+     * - `providerType`：类型。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Generate 2FA account config (generateTwoFaAccountConfig)",
             notes = "Generate new 2FA account config template for specified provider type. " + NEW_LINE +
                     "For TOTP, this will return a corresponding account config template " +
@@ -127,22 +125,18 @@ public class TwoFactorAuthConfigController extends BaseController {
                     ControllerConstants.AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @PostMapping("/account/config/generate")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `generateTwoFaAccountConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public TwoFaAccountConfig generateTwoFaAccountConfig(@ApiParam(value = "2FA provider type to generate new account config for", defaultValue = "TOTP", required = true)
                                                          @RequestParam TwoFaProviderType providerType) throws Exception {
         SecurityUser user = getCurrentUser();
         return twoFactorAuthService.generateNewAccountConfig(user, providerType);
     }
 
+    /**
+     * 功能：发送或提交配置。
+     * 参数：
+     * - `accountConfig`：配置对象。
+     * 返回：无。
+     */
     @ApiOperation(value = "Submit 2FA account config (submitTwoFaAccountConfig)",
             notes = "Submit 2FA account config to prepare for a future verification. " +
                     "Basically, this method will send a verification code for a given account config, if this has " +
@@ -165,21 +159,18 @@ public class TwoFactorAuthConfigController extends BaseController {
                     ControllerConstants.AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @PostMapping("/account/config/submit")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `submitTwoFaAccountConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void submitTwoFaAccountConfig(@Valid @RequestBody TwoFaAccountConfig accountConfig) throws Exception {
         SecurityUser user = getCurrentUser();
         twoFactorAuthService.prepareVerificationCode(user, accountConfig, false);
     }
 
+    /**
+     * 功能：校验配置。
+     * 参数：
+     * - `accountConfig`：配置对象。
+     * - `verificationCode`：`verificationCode` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Verify and save 2FA account config (verifyAndSaveTwoFaAccountConfig)",
             notes = "Checks the verification code for submitted config, and if it is correct, saves the provided account config. " + NEW_LINE +
                     "Returns whole account's 2FA settings object.\n" +
@@ -187,32 +178,19 @@ public class TwoFactorAuthConfigController extends BaseController {
                     ControllerConstants.AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @PostMapping("/account/config")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `verifyAndSaveTwoFaAccountConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AccountTwoFaSettings verifyAndSaveTwoFaAccountConfig(@Valid @RequestBody TwoFaAccountConfig accountConfig,
                                                                 @RequestParam(required = false) String verificationCode) throws Exception {
         SecurityUser user = getCurrentUser();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (twoFaConfigManager.getTwoFaAccountConfig(user.getTenantId(), user.getId(), accountConfig.getProviderType()).isPresent()) {
             throw new IllegalArgumentException("2FA provider is already configured");
         }
 
         boolean verificationSuccess;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (accountConfig.getProviderType() != TwoFaProviderType.BACKUP_CODE) {
             verificationSuccess = twoFactorAuthService.checkVerificationCode(user, verificationCode, accountConfig, false);
         } else {
             verificationSuccess = true;
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (verificationSuccess) {
             return twoFaConfigManager.saveTwoFaAccountConfig(user.getTenantId(), user.getId(), accountConfig);
         } else {
@@ -220,6 +198,13 @@ public class TwoFactorAuthConfigController extends BaseController {
         }
     }
 
+    /**
+     * 功能：更新配置。
+     * 参数：
+     * - `providerType`：类型。
+     * - `updateRequest`：请求对象。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Update 2FA account config (updateTwoFaAccountConfig)", notes =
             "Update config for a given provider type. \n" +
                     "Update request example:\n" +
@@ -228,16 +213,6 @@ public class TwoFactorAuthConfigController extends BaseController {
                     ControllerConstants.AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @PutMapping("/account/config")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `updateTwoFaAccountConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AccountTwoFaSettings updateTwoFaAccountConfig(@RequestParam TwoFaProviderType providerType,
                                                          @RequestBody TwoFaAccountConfigUpdateRequest updateRequest) throws ThingsboardException {
         SecurityUser user = getCurrentUser();
@@ -248,28 +223,29 @@ public class TwoFactorAuthConfigController extends BaseController {
         return twoFaConfigManager.saveTwoFaAccountConfig(user.getTenantId(), user.getId(), accountConfig);
     }
 
+    /**
+     * 功能：删除或清理配置。
+     * 参数：
+     * - `providerType`：类型。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Delete 2FA account config (deleteTwoFaAccountConfig)", notes =
             "Delete 2FA config for a given 2FA provider type. \n" +
                     "Returns whole account's 2FA settings object.\n" +
                     ControllerConstants.AVAILABLE_FOR_ANY_AUTHORIZED_USER)
     @DeleteMapping("/account/config")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTwoFaAccountConfig` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public AccountTwoFaSettings deleteTwoFaAccountConfig(@RequestParam TwoFaProviderType providerType) throws ThingsboardException {
         SecurityUser user = getCurrentUser();
         return twoFaConfigManager.deleteTwoFaAccountConfig(user.getTenantId(), user.getId(), providerType);
     }
 
 
+    /**
+     * 功能：获取`Available Two Fa Providers`。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get available 2FA providers (getAvailableTwoFaProviders)", notes =
             "Get the list of provider types available for user to use (the ones configured by tenant or sysadmin).\n" +
                     "Example of response:\n" +
@@ -278,16 +254,6 @@ public class TwoFactorAuthConfigController extends BaseController {
     )
     @GetMapping("/providers")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAvailableTwoFaProviders` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<TwoFaProviderType> getAvailableTwoFaProviders() throws ThingsboardException {
         return twoFaConfigManager.getPlatformTwoFaSettings(getTenantId(), true)
                 .map(PlatformTwoFaSettings::getProviders).orElse(Collections.emptyList()).stream()
@@ -296,26 +262,28 @@ public class TwoFactorAuthConfigController extends BaseController {
     }
 
 
+    /**
+     * 功能：获取配置。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get platform 2FA settings (getPlatformTwoFaSettings)",
             notes = "Get platform settings for 2FA. The settings are described for savePlatformTwoFaSettings API method. " +
                     "If 2FA is not configured, then an empty response will be returned." +
                     ControllerConstants.SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping("/settings")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getPlatformTwoFaSettings` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PlatformTwoFaSettings getPlatformTwoFaSettings() throws ThingsboardException {
         return twoFaConfigManager.getPlatformTwoFaSettings(getTenantId(), false).orElse(null);
     }
 
+    /**
+     * 功能：保存或创建配置。
+     * 参数：
+     * - `value`：值。
+     * - `twoFaSettings`：配置对象。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Save platform 2FA settings (savePlatformTwoFaSettings)",
             notes = "Save 2FA settings for platform. The settings have following properties:\n" +
                     "- `providers` - the list of 2FA providers' configs. Users will only be allowed to use 2FA providers from this list. \n\n" +
@@ -359,23 +327,12 @@ public class TwoFactorAuthConfigController extends BaseController {
                     ControllerConstants.SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PostMapping("/settings")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `savePlatformTwoFaSettings` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PlatformTwoFaSettings savePlatformTwoFaSettings(@ApiParam(value = "Settings value", required = true)
                                           @RequestBody PlatformTwoFaSettings twoFaSettings) throws ThingsboardException {
         return twoFaConfigManager.savePlatformTwoFaSettings(getTenantId(), twoFaSettings);
     }
 
 
-    @Data
     /**
      * 中文说明：
      * 1. 类目的：`TwoFaAccountConfigUpdateRequest` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -386,14 +343,10 @@ public class TwoFactorAuthConfigController extends BaseController {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 MVC Controller / Facade。
      */
+    @Data
     public static class TwoFaAccountConfigUpdateRequest {
         /**
-         * 字段说明：
-         * 1. 保存 `useByDefault` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 当前对象是否为默认项。
          */
         private boolean useByDefault;
     }

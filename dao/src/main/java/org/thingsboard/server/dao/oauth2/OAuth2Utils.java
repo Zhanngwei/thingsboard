@@ -46,26 +46,15 @@ import java.util.stream.Collectors;
  */
 public class OAuth2Utils {
     /**
-     * 字段说明：
-     * 1. 保存 `OAUTH2_AUTHORIZATION_PATH_TEMPLATE` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 路径常量，用于统一引用固定值。
      */
     public static final String OAUTH2_AUTHORIZATION_PATH_TEMPLATE = "/oauth2/authorization/%s";
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toClientInfo` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toClientInfo` 对应的处理。
+     * 参数：
+     * - `registration`：`registration` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2ClientInfo toClientInfo(OAuth2Registration registration) {
         OAuth2ClientInfo client = new OAuth2ClientInfo();
@@ -76,16 +65,12 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOAuth2ParamsInfo` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toOAuth2ParamsInfo` 对应的处理。
+     * 参数：
+     * - `registrations`：数据列表。
+     * - `domains`：数据列表。
+     * - `mobiles`：数据列表。
+     * 返回：处理结果。
      */
     public static OAuth2ParamsInfo toOAuth2ParamsInfo(List<OAuth2Registration> registrations, List<OAuth2Domain> domains, List<OAuth2Mobile> mobiles) {
         OAuth2ParamsInfo oauth2ParamsInfo = new OAuth2ParamsInfo();
@@ -96,16 +81,10 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOAuth2RegistrationInfo` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toOAuth2RegistrationInfo` 对应的处理。
+     * 参数：
+     * - `registration`：`registration` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2RegistrationInfo toOAuth2RegistrationInfo(OAuth2Registration registration) {
         return OAuth2RegistrationInfo.builder()
@@ -127,16 +106,10 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOAuth2DomainInfo` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toOAuth2DomainInfo` 对应的处理。
+     * 参数：
+     * - `domain`：`domain` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2DomainInfo toOAuth2DomainInfo(OAuth2Domain domain) {
         return OAuth2DomainInfo.builder()
@@ -146,16 +119,10 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOAuth2MobileInfo` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toOAuth2MobileInfo` 对应的处理。
+     * 参数：
+     * - `mobile`：`mobile` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2MobileInfo toOAuth2MobileInfo(OAuth2Mobile mobile) {
         return OAuth2MobileInfo.builder()
@@ -165,16 +132,10 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `infoToOAuth2Params` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `infoToOAuth2Params` 对应的处理。
+     * 参数：
+     * - `oauth2Info`：`oauth2Info` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2Params infoToOAuth2Params(OAuth2Info oauth2Info) {
         OAuth2Params oauth2Params = new OAuth2Params();
@@ -184,16 +145,11 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOAuth2Registration` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toOAuth2Registration` 对应的处理。
+     * 参数：
+     * - `oauth2ParamsId`：`oauth2ParamsId`ID。
+     * - `registrationInfo`：`registrationInfo` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2Registration toOAuth2Registration(OAuth2ParamsId oauth2ParamsId, OAuth2RegistrationInfo registrationInfo) {
         OAuth2Registration registration = new OAuth2Registration();
@@ -216,16 +172,11 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOAuth2Domain` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toOAuth2Domain` 对应的处理。
+     * 参数：
+     * - `oauth2ParamsId`：`oauth2ParamsId`ID。
+     * - `domainInfo`：`domainInfo` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2Domain toOAuth2Domain(OAuth2ParamsId oauth2ParamsId, OAuth2DomainInfo domainInfo) {
         OAuth2Domain domain = new OAuth2Domain();
@@ -236,16 +187,11 @@ public class OAuth2Utils {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOAuth2Mobile` 对应的OAuth2 配置持久化类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由安全配置加载、登录回调或管理 API 调用，配置变更后通常需要缓存刷新时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：读取或保存 OAuth2 配置后交给安全模块完成认证、用户映射和租户解析。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `toOAuth2Mobile` 对应的处理。
+     * 参数：
+     * - `oauth2ParamsId`：`oauth2ParamsId`ID。
+     * - `mobileInfo`：`mobileInfo` 参数。
+     * 返回：处理结果。
      */
     public static OAuth2Mobile toOAuth2Mobile(OAuth2ParamsId oauth2ParamsId, OAuth2MobileInfo mobileInfo) {
         OAuth2Mobile mobile = new OAuth2Mobile();

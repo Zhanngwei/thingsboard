@@ -47,7 +47,6 @@ import java.util.List;
 import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.LOG_LWM2M_ERROR;
 import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.LOG_LWM2M_INFO;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`LwM2mDefaultBootstrapSessionManager` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -58,35 +57,21 @@ import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.LO
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSessionManager {
 
     /**
-     * 字段说明：
-     * 1. 保存 `bsSecurityStore` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 存储组件，表示当前对象的对应属性。
      */
     private final BootstrapSecurityStore bsSecurityStore;
     private final SecurityChecker securityChecker;
     /**
-     * 字段说明：
-     * 1. 保存 `tasksProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 提供者，用于按场景创建或提供目标对象。
      */
     private final LwM2MBootstrapTaskProvider tasksProvider;
     private final LwM2mBootstrapModelProvider modelProvider;
     /**
-     * 字段说明：
-     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private TransportService transportService;
 
@@ -97,19 +82,16 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
      * @param bsSecurityStore the {@link BootstrapSecurityStore} used by default {@link SecurityChecker}.
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `LwM2mDefaultBootstrapSessionManager` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `LwM2mDefaultBootstrapSessionManager` 实例，并初始化必要字段。
+     * 参数：
+     * - `bsSecurityStore`：`bsSecurityStore` 参数。
+     * - `configStore`：配置对象。
+     * - `transportService`：服务对象。
+     * 返回：新创建的对象实例。
      */
     public LwM2mDefaultBootstrapSessionManager(BootstrapSecurityStore bsSecurityStore, BootstrapConfigStore configStore, TransportService transportService) {
         this(bsSecurityStore, new SecurityChecker(), new LwM2MBootstrapConfigStoreTaskProvider(configStore),
                 new StandardBootstrapModelProvider());
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         this.transportService = transportService;
     }
 
@@ -120,14 +102,13 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
      * @param securityChecker used to accept or refuse new {@link BootstrapSession}.
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `LwM2mDefaultBootstrapSessionManager` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `LwM2mDefaultBootstrapSessionManager` 实例，并初始化必要字段。
+     * 参数：
+     * - `bsSecurityStore`：`bsSecurityStore` 参数。
+     * - `securityChecker`：`securityChecker` 参数。
+     * - `tasksProvider`：`tasksProvider` 参数。
+     * - `modelProvider`：`modelProvider` 参数。
+     * 返回：新创建的对象实例。
      */
     public LwM2mDefaultBootstrapSessionManager(BootstrapSecurityStore bsSecurityStore, SecurityChecker securityChecker,
                                                LwM2MBootstrapTaskProvider tasksProvider, LwM2mBootstrapModelProvider modelProvider) {
@@ -138,43 +119,34 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
         this.modelProvider = modelProvider;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `begin` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `begin` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * - `clientIdentity`：客户端对象。
+     * 返回：处理结果。
      */
+    @Override
     public BootstrapSession begin(BootstrapRequest request, Identity clientIdentity) {
         boolean authorized = true;
         Iterator<SecurityInfo> securityInfos = null;
         try {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (bsSecurityStore != null && securityChecker != null) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (clientIdentity.isPSK()) {
                     SecurityInfo securityInfo = bsSecurityStore.getByIdentity(clientIdentity.getPskIdentity());
                     securityInfos = Collections.singletonList(securityInfo).iterator();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (!clientIdentity.isX509()) {
                     securityInfos = bsSecurityStore.getAllByEndpoint(request.getEndpointName());
                 }
                 authorized = this.checkSecurityInfo(request.getEndpointName(), clientIdentity, securityInfos);
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (LwM2MAuthException e) {
             authorized = false;
         }
         DefaultBootstrapSession session = new DefaultBootstrapSession(request, clientIdentity, authorized);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (authorized) {
             try {
                 this.tasksProvider.put(session.getEndpoint());
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (InvalidConfigurationException e){
                 log.error("Failed put to lwM2MBootstrapSessionClients by endpoint [{}]", request.getEndpointName(), e);
             }
@@ -184,20 +156,15 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
         return session;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hasConfigFor` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断配置。
+     * 参数：
+     * - `session`：会话对象。
+     * 返回：判断结果。
      */
+    @Override
     public boolean hasConfigFor(BootstrapSession session) {
         BootstrapTaskProvider.Tasks firstTasks = this.tasksProvider.getTasks(session, null);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (firstTasks == null) {
             return false;
         }
@@ -206,14 +173,11 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initTasks` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Tasks`。
+     * 参数：
+     * - `bssession`：会话对象。
+     * - `tasks`：`tasks` 参数。
+     * 返回：无。
      */
     protected void initTasks(BootstrapSession bssession, BootstrapTaskProvider.Tasks tasks) {
         DefaultBootstrapSession session = (DefaultBootstrapSession) bssession;
@@ -232,44 +196,33 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
         session.setMoreTasks(!tasks.last);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getFirstRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取请求。
+     * 参数：
+     * - `bsSession`：会话对象。
+     * 返回：处理结果。
      */
+    @Override
     public BootstrapDownlinkRequest<? extends LwM2mResponse> getFirstRequest(BootstrapSession bsSession) {
         return nextRequest(bsSession);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `nextRequest` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `nextRequest` 对应的处理。
+     * 参数：
+     * - `bsSession`：会话对象。
+     * 返回：处理结果。
      */
     protected BootstrapDownlinkRequest<? extends LwM2mResponse> nextRequest(BootstrapSession bsSession) {
         DefaultBootstrapSession session = (DefaultBootstrapSession) bsSession;
         List<BootstrapDownlinkRequest<? extends LwM2mResponse>> requestsToSend = session.getRequests();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!requestsToSend.isEmpty()) {
             // get next requests
             return requestsToSend.remove(0);
         } else {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (session.hasMoreTasks()) {
                 BootstrapTaskProvider.Tasks nextTasks = this.tasksProvider.getTasks(session, session.getResponses());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (nextTasks == null) {
                     session.setMoreTasks(false);
                     return new BootstrapFinishRequest();
@@ -283,20 +236,17 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onResponseSuccess` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `bsSession`：会话对象。
+     * - `request`：请求对象。
+     * - `response`：响应对象。
+     * 返回：处理结果。
      */
+    @Override
     public BootstrapPolicy onResponseSuccess(BootstrapSession bsSession,
                                              BootstrapDownlinkRequest<? extends LwM2mResponse> request, LwM2mResponse response) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!(request instanceof BootstrapFinishRequest)) {
             // store response
             DefaultBootstrapSession session = (DefaultBootstrapSession) bsSession;
@@ -316,17 +266,15 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onResponseError` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `bsSession`：会话对象。
+     * - `request`：请求对象。
+     * - `response`：响应对象。
+     * 返回：处理结果。
      */
+    @Override
     public BootstrapPolicy onResponseError(BootstrapSession bsSession,
                                            BootstrapDownlinkRequest<? extends LwM2mResponse> request, LwM2mResponse response) {
         if (!(request instanceof BootstrapFinishRequest)) {
@@ -348,17 +296,15 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onRequestFailure` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理请求。
+     * 参数：
+     * - `bsSession`：会话对象。
+     * - `request`：请求对象。
+     * - `cause`：`cause` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public BootstrapPolicy onRequestFailure(BootstrapSession bsSession,
                                             BootstrapDownlinkRequest<? extends LwM2mResponse> request, Throwable cause) {
         this.sendLogs(bsSession.getEndpoint(),
@@ -367,33 +313,26 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
         return BootstrapPolicy.failed();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `end` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `end` 对应的处理。
+     * 参数：
+     * - `bsSession`：会话对象。
+     * 返回：无。
      */
+    @Override
     public void end(BootstrapSession bsSession) {
         this.sendLogs(bsSession.getEndpoint(), String.format("%s: Bootstrap session finished.", LOG_LWM2M_INFO));
         this.tasksProvider.remove(bsSession.getEndpoint());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `failed` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `failed` 对应的处理。
+     * 参数：
+     * - `bsSession`：会话对象。
+     * - `cause`：`cause` 参数。
+     * 返回：无。
      */
+    @Override
     public void failed(BootstrapSession bsSession, BootstrapFailureCause cause) {
         this.sendLogs(bsSession.getEndpoint(), String.format("%s: Bootstrap session failed because of %s", LOG_LWM2M_ERROR,
                 cause.toString()));
@@ -401,14 +340,11 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendLogs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Logs`。
+     * 参数：
+     * - `endpointName`：名称。
+     * - `logMsg`：待处理消息。
+     * 返回：无。
      */
     private void sendLogs(String endpointName, String logMsg) {
         log.info("Endpoint: [{}] [{}]", endpointName, logMsg);
@@ -416,14 +352,12 @@ public class LwM2mDefaultBootstrapSessionManager extends DefaultBootstrapSession
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkSecurityInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验信息对象。
+     * 参数：
+     * - `endpoint`：`endpoint` 参数。
+     * - `clientIdentity`：客户端对象。
+     * - `securityInfos`：`securityInfos` 参数。
+     * 返回：判断结果。
      */
     private boolean checkSecurityInfo(String endpoint, Identity clientIdentity, Iterator<SecurityInfo> securityInfos) {
         if (clientIdentity.isX509()) {

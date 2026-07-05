@@ -23,7 +23,6 @@ import org.thingsboard.server.service.ws.WebSocketService;
 import org.thingsboard.server.service.ws.WebSocketSessionRef;
 import org.thingsboard.server.service.ws.telemetry.cmd.v2.EntityCountUpdate;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbEntityCountSubCtx` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -34,27 +33,23 @@ import org.thingsboard.server.service.ws.telemetry.cmd.v2.EntityCountUpdate;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Slf4j
 public class TbEntityCountSubCtx extends TbAbstractSubCtx<EntityCountQuery> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `result` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `result` 字段，保存当前对象的对应属性。
      */
     private volatile int result;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbEntityCountSubCtx` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbEntityCountSubCtx` 实例，并初始化必要字段。
+     * 参数：
+     * - `serviceId`：服务ID。
+     * - `wsService`：服务对象。
+     * - `entityService`：服务对象。
+     * - `localSubscriptionService`：服务对象。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public TbEntityCountSubCtx(String serviceId, WebSocketService wsService, EntityService entityService,
                                TbLocalSubscriptionService localSubscriptionService, AttributesService attributesService,
@@ -62,53 +57,37 @@ public class TbEntityCountSubCtx extends TbAbstractSubCtx<EntityCountQuery> {
         super(serviceId, wsService, entityService, localSubscriptionService, attributesService, stats, sessionRef, cmdId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fetchData` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取数据。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void fetchData() {
         result = (int) entityService.countEntitiesByQuery(getTenantId(), getCustomerId(), query);
         sendWsMsg(new EntityCountUpdate(cmdId, result));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `update` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `update` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     protected void update() {
         int newCount = (int) entityService.countEntitiesByQuery(getTenantId(), getCustomerId(), query);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (newCount != result) {
             result = newCount;
             sendWsMsg(new EntityCountUpdate(cmdId, result));
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isDynamic` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Dynamic`。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public boolean isDynamic() {
         return true;
     }

@@ -45,7 +45,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbQueueRequestTemplate` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -56,92 +55,58 @@ import java.util.concurrent.locks.ReentrantLock;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response extends TbQueueMsg> extends AbstractTbQueueTemplate
         implements TbQueueRequestTemplate<Request, Response> {
 
     /**
-     * 字段说明：
-     * 1. 保存 `queueAdmin` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，用于标识消息投递或消费的队列。
      */
     private final TbQueueAdmin queueAdmin;
     private final TbQueueProducer<Request> requestTemplate;
     /**
-     * 字段说明：
-     * 1. 保存 `responseTemplate` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前响应对象，封装处理完成后的返回信息。
      */
     private final TbQueueConsumer<Response> responseTemplate;
     final ConcurrentHashMap<UUID, DefaultTbQueueRequestTemplate.ResponseMetaData<Response>> pendingRequests = new ConcurrentHashMap<>();
     /**
-     * 字段说明：
-     * 1. 保存 `internalExecutor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足执行器条件。
      */
     final boolean internalExecutor;
     final ExecutorService executor;
     /**
-     * 字段说明：
-     * 1. 保存 `maxRequestTimeoutNs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
     final long maxRequestTimeoutNs;
     final long maxRequestTimeout;
     /**
-     * 字段说明：
-     * 1. 保存 `maxPendingRequests` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
     final long maxPendingRequests;
     final long pollInterval;
     /**
-     * 字段说明：
-     * 1. 保存 `stopped` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前处理是否已经停止。
      */
     volatile boolean stopped = false;
     long nextCleanupNs = 0L;
     private final Lock cleanerLock = new ReentrantLock();
 
     /**
-     * 字段说明：
-     * 1. 保存 `messagesStats` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `messagesStats` 字段，保存当前对象的对应属性。
      */
     private MessagesStats messagesStats;
 
-    @Builder
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultTbQueueRequestTemplate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultTbQueueRequestTemplate` 实例，并初始化必要字段。
+     * 参数：
+     * - `queueAdmin`：队列名称或队列对象。
+     * - `requestTemplate`：请求对象。
+     * - `responseTemplate`：响应对象。
+     * - `maxRequestTimeout`：请求对象。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
+    @Builder
     public DefaultTbQueueRequestTemplate(TbQueueAdmin queueAdmin,
                                          TbQueueProducer<Request> requestTemplate,
                                          TbQueueConsumer<Response> responseTemplate,
@@ -161,30 +126,20 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createExecutor` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建执行器。
+     * 参数：无。
+     * 返回：处理结果。
      */
     ExecutorService createExecutor() {
         return Executors.newSingleThreadExecutor(ThingsBoardThreadFactory.forName("tb-queue-request-template-" + responseTemplate.getTopic()));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void init() {
         queueAdmin.createTopicIfNotExists(responseTemplate.getTopic());
         requestTemplate.init();
@@ -193,22 +148,15 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `mainLoop` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `mainLoop` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     void mainLoop() {
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while (!stopped) {
             TbStopWatch sw = TbStopWatch.create();
             try {
                 fetchAndProcessResponses();
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Throwable e) {
                 long sleepNanos = TimeUnit.MILLISECONDS.toNanos(this.pollInterval) - sw.stopAndGetTotalTimeNanos();
                 log.warn("Failed to obtain and process responses from queue. Going to sleep " + sleepNanos + "ns", e);
@@ -218,14 +166,9 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fetchAndProcessResponses` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`And Process Responses`。
+     * 参数：无。
+     * 返回：无。
      */
     void fetchAndProcessResponses() {
         final long pendingRequestsCount = pendingRequests.mappingCount();
@@ -238,30 +181,21 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `tryCleanStaleRequests` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `tryCleanStaleRequests` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     private boolean tryCleanStaleRequests() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!cleanerLock.tryLock()) {
             return false;
         }
         try {
             log.trace("tryCleanStaleRequest...");
             final long currentNs = getCurrentClockNs();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (nextCleanupNs < currentNs) {
                 pendingRequests.forEach((key, value) -> {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (value.expTime < currentNs) {
                         ResponseMetaData<Response> staleRequest = pendingRequests.remove(key);
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (staleRequest != null) {
                             setTimeoutException(key, staleRequest, currentNs);
                         }
@@ -276,14 +210,9 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setupNextCleanup` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `setupNextCleanup` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     void setupNextCleanup() {
         nextCleanupNs = getCurrentClockNs() + maxRequestTimeoutNs;
@@ -291,99 +220,73 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doPoll` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doPoll` 对应的处理。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     List<Response> doPoll() {
         return responseTemplate.poll(pollInterval);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sleep` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `sleep` 对应的处理。
+     * 参数：
+     * - `nanos`：`nanos` 参数。
+     * 返回：无。
      */
     void sleep(long nanos) {
         LockSupport.parkNanos(nanos);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setTimeoutException` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新超时时间。
+     * 参数：
+     * - `key`：键。
+     * - `staleRequest`：请求对象。
+     * - `currentNs`：`currentNs` 参数。
+     * 返回：无。
      */
     void setTimeoutException(UUID key, ResponseMetaData<Response> staleRequest, long currentNs) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (currentNs >= staleRequest.getSubmitTime() + staleRequest.getTimeout()) {
             log.debug("Request timeout detected, currentNs [{}], {}, key [{}]", currentNs, staleRequest, key);
         } else {
             log.info("Request timeout detected, currentNs [{}], {}, key [{}]", currentNs, staleRequest, key);
         }
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         staleRequest.future.setException(new TimeoutException());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：无。
      */
     void processResponse(Response response) {
         byte[] requestIdHeader = response.getHeaders().get(REQUEST_ID_HEADER);
         UUID requestId;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (requestIdHeader == null) {
             log.error("[{}] Missing requestId in header and body", response);
         } else {
             requestId = bytesToUuid(requestIdHeader);
             log.trace("[{}] Response received: {}", requestId, response);
             ResponseMetaData<Response> expectedResponse = pendingRequests.remove(requestId);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (expectedResponse == null) {
                 log.debug("[{}] Invalid or stale request, response: {}", requestId, String.valueOf(response).replace("\n", " "));
             } else {
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 expectedResponse.future.set(response);
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `stop` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `stop` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void stop() {
         stopped = true;
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (responseTemplate != null) {
             responseTemplate.unsubscribe();
         }
@@ -397,47 +300,36 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setMessagesStats` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Messages Stats`。
+     * 参数：
+     * - `messagesStats`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void setMessagesStats(MessagesStats messagesStats) {
         this.messagesStats = messagesStats;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `send` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `send` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Response> send(Request request) {
         return send(request, this.maxRequestTimeoutNs);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `send` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `send` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * - `requestTimeoutNs`：请求对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Response> send(Request request, long requestTimeoutNs) {
         if (pendingRequests.mappingCount() >= maxPendingRequests) {
             log.warn("Pending request map is full [{}]! Consider to increase maxPendingRequests or increase processing performance. Request is {}", maxPendingRequests, request);
@@ -464,14 +356,9 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
      * Wrapped into the method for the test purposes to travel through the time
      * */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCurrentClockNs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Current Clock Ns`。
+     * 参数：无。
+     * 返回：数值结果。
      */
     long getCurrentClockNs() {
         return System.nanoTime();
@@ -481,28 +368,22 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
      * Wall clock to send timestamp to an external service
      * */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCurrentTimeMs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间。
+     * 参数：无。
+     * 返回：数值结果。
      */
     long getCurrentTimeMs() {
         return System.currentTimeMillis();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendToRequestTemplate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交请求。
+     * 参数：
+     * - `request`：请求对象。
+     * - `requestId`：请求ID。
+     * - `future`：`future` 参数。
+     * - `responseMetaData`：响应对象。
+     * 返回：无。
      */
     void sendToRequestTemplate(Request request, UUID requestId, SettableFuture<Response> future, ResponseMetaData<Response> responseMetaData) {
         log.trace("[{}] Sending request, key [{}], expTime [{}], request {}", requestId, request.getKey(), responseMetaData.expTime, request);
@@ -529,7 +410,6 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
         });
     }
 
-    @Getter
     /**
      * 中文说明：
      * 1. 类目的：`ResponseMetaData` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -540,24 +420,15 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @Getter
     static class ResponseMetaData<T> {
         /**
-         * 字段说明：
-         * 1. 保存 `submitTime` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 时间，用于控制时间范围或等待时长。
          */
         private final long submitTime;
         private final long timeout;
         /**
-         * 字段说明：
-         * 1. 保存 `expTime` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 时间，用于控制时间范围或等待时长。
          */
         private final long expTime;
         private final SettableFuture<T> future;
@@ -569,17 +440,12 @@ public class DefaultTbQueueRequestTemplate<Request extends TbQueueMsg, Response 
             this.future = future;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `toString` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：生成当前对象的文本表示。
+         * 参数：无。
+         * 返回：文本结果。
          */
+        @Override
         public String toString() {
             return "ResponseMetaData{" +
                     "submitTime=" + submitTime +

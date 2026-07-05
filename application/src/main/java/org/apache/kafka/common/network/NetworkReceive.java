@@ -49,22 +49,12 @@ import java.util.stream.Collectors;
 public class NetworkReceive implements Receive {
 
     /**
-     * 字段说明：
-     * 1. 保存 `UNKNOWN_SOURCE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `UNKNOWN_SOURCE`常量，用于统一引用固定值。
      */
     public final static String UNKNOWN_SOURCE = "";
     public final static int UNLIMITED = -1;
     /**
-     * 字段说明：
-     * 1. 保存 `TB_MAX_REQUESTED_BUFFER_SIZE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `TB_MAX_REQUESTED_BUFFER_SIZE`常量，用于统一引用固定值。
      */
     public final static int TB_MAX_REQUESTED_BUFFER_SIZE = 100 * 1024 * 1024;
     public final static int TB_LOG_REQUESTED_BUFFER_SIZE = 10 * 1024 * 1024;
@@ -72,46 +62,28 @@ public class NetworkReceive implements Receive {
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
     /**
-     * 字段说明：
-     * 1. 保存 `source` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `source` 字段，保存当前对象的对应属性。
      */
     private final String source;
     private final ByteBuffer size;
     /**
-     * 字段说明：
-     * 1. 保存 `maxSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `maxSize` 字段，保存当前对象的对应属性。
      */
     private final int maxSize;
     private final MemoryPool memoryPool;
     /**
-     * 字段说明：
-     * 1. 保存 `requestedBufferSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
     private int requestedBufferSize = -1;
     private ByteBuffer buffer;
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `NetworkReceive` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `NetworkReceive` 实例，并初始化必要字段。
+     * 参数：
+     * - `source`：`source` 参数。
+     * - `buffer`：`buffer` 参数。
+     * 返回：新创建的对象实例。
      */
     public NetworkReceive(String source, ByteBuffer buffer) {
         this.source = source;
@@ -122,14 +94,10 @@ public class NetworkReceive implements Receive {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `NetworkReceive` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `NetworkReceive` 实例，并初始化必要字段。
+     * 参数：
+     * - `source`：`source` 参数。
+     * 返回：新创建的对象实例。
      */
     public NetworkReceive(String source) {
         this.source = source;
@@ -140,14 +108,11 @@ public class NetworkReceive implements Receive {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `NetworkReceive` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `NetworkReceive` 实例，并初始化必要字段。
+     * 参数：
+     * - `maxSize`：`maxSize` 参数。
+     * - `source`：`source` 参数。
+     * 返回：新创建的对象实例。
      */
     public NetworkReceive(int maxSize, String source) {
         this.source = source;
@@ -158,14 +123,12 @@ public class NetworkReceive implements Receive {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `NetworkReceive` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `NetworkReceive` 实例，并初始化必要字段。
+     * 参数：
+     * - `maxSize`：`maxSize` 参数。
+     * - `source`：`source` 参数。
+     * - `memoryPool`：`memoryPool` 参数。
+     * 返回：新创建的对象实例。
      */
     public NetworkReceive(int maxSize, String source, MemoryPool memoryPool) {
         this.source = source;
@@ -176,103 +139,73 @@ public class NetworkReceive implements Receive {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `NetworkReceive` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `NetworkReceive` 实例，并初始化必要字段。
+     * 参数：无。
+     * 返回：新创建的对象实例。
      */
     public NetworkReceive() {
         this(UNKNOWN_SOURCE);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `source` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `source` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     public String source() {
         return source;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `complete` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `complete` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public boolean complete() {
         return !size.hasRemaining() && buffer != null && !buffer.hasRemaining();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `readFrom` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `readFrom` 对应的处理。
+     * 参数：
+     * - `channel`：网络通道。
+     * 返回：数值结果。
      */
     public long readFrom(ScatteringByteChannel channel) throws IOException {
         int read = 0;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (size.hasRemaining()) {
             int bytesRead = channel.read(size);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (bytesRead < 0)
                 throw new EOFException();
             read += bytesRead;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!size.hasRemaining()) {
                 size.rewind();
                 int receiveSize = size.getInt();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (receiveSize < 0)
                     throw new InvalidReceiveException("Invalid receive (size = " + receiveSize + ")");
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (maxSize != UNLIMITED && receiveSize > maxSize) {
                     throw new ThingsboardKafkaClientError("Invalid receive (size = " + receiveSize + " larger than " + maxSize + ")");
                 }
                 requestedBufferSize = receiveSize; //may be 0 for some payloads (SASL)
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (receiveSize == 0) {
                     buffer = EMPTY_BUFFER;
                 }
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (buffer == null && requestedBufferSize != -1) { //we know the size we want but havent been able to allocate it yet
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (requestedBufferSize > TB_LOG_REQUESTED_BUFFER_SIZE) {
                 String stackTrace = Arrays.stream(Thread.currentThread().getStackTrace()).map(StackTraceElement::toString).collect(Collectors.joining("|"));
                 log.error("Allocating buffer of size {} for source {}", requestedBufferSize, source);
                 log.error("Stack Trace: {}", stackTrace);
             }
             buffer = memoryPool.tryAllocate(requestedBufferSize);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (buffer == null)
                 log.trace("Broker low on memory - could not allocate buffer of size {} for source {}", requestedBufferSize, source);
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (buffer != null) {
             int bytesRead = channel.read(buffer);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (bytesRead < 0)
                 throw new EOFException();
             read += bytesRead;
@@ -281,50 +214,34 @@ public class NetworkReceive implements Receive {
         return read;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `requiredMemoryAmountKnown` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `requiredMemoryAmountKnown` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public boolean requiredMemoryAmountKnown() {
         return requestedBufferSize != -1;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `memoryAllocated` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `memoryAllocated` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public boolean memoryAllocated() {
         return buffer != null;
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `close` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `close` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void close() throws IOException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (buffer != null && buffer != EMPTY_BUFFER) {
             memoryPool.release(buffer);
             buffer = null;
@@ -332,28 +249,18 @@ public class NetworkReceive implements Receive {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `payload` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `payload` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public ByteBuffer payload() {
         return this.buffer;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `bytesRead` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `bytesRead` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     public int bytesRead() {
         if (buffer == null)
@@ -366,28 +273,19 @@ public class NetworkReceive implements Receive {
      * for use in metrics. This is consistent with {@link NetworkSend#size()}
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `size` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `size` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     public int size() {
         return payload().limit() + size.limit();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getMaxSize` 对应的应用服务支撑类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器、Actor System、Web 请求或队列消费流程管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Max Size`。
+     * 参数：
+     * - `maxSize`：`maxSize` 参数。
+     * 返回：数值结果。
      */
     private int getMaxSize(int maxSize) {
         return maxSize == UNLIMITED ? TB_MAX_REQUESTED_BUFFER_SIZE : Math.min(maxSize, TB_MAX_REQUESTED_BUFFER_SIZE);

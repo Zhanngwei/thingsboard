@@ -20,58 +20,58 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 import org.thingsboard.rule.engine.credentials.AnonymousCredentials;
 import org.thingsboard.rule.engine.credentials.ClientCredentials;
 
-@Data
 /**
- * MQTT 节点配置模型，保存 Broker 地址、Topic 模板、客户端会话、SSL 和认证信息。
- * 配置类本身不直接使用 MQTT 客户端，也不直接涉及数据库、缓存、Actor 或 Rule Engine 消息确认。
+ * `TbMqttNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbMqttNodeConfiguration implements NodeConfiguration<TbMqttNodeConfiguration> {
 
     /**
-     * MQTT Topic 模板，运行时由节点结合 TbMsg 元数据/数据解析得到最终 Topic。
+     * 主题，用于匹配或发送对应主题的数据。
      */
     private String topicPattern;
     /**
-     * MQTT Broker 主机名或地址。
+     * 主机地址，用于描述服务监听或访问地址。
      */
     private String host;
     /**
-     * MQTT Broker 端口。
+     * 端口号，用于描述服务监听或访问地址。
      */
     private int port;
     /**
-     * MQTT 连接初始化时等待 CONNACK 的超时时间，单位为秒。
+     * 超时时间，用于控制时间范围或等待时长。
      */
     private int connectTimeoutSec;
     /**
-     * MQTT clientId，可为空以使用客户端默认值。
+     * 客户端ID，用于定位对应业务对象。
      */
     private String clientId;
     /**
-     * 是否在 clientId 后追加服务实例后缀，避免集群中客户端 ID 冲突。
+     * 是否满足客户端条件。
      */
     private boolean appendClientIdSuffix;
     /**
-     * MQTT retained 标志，发布时由节点直接传给 MQTT 客户端。
+     * 是否满足消息条件。
      */
     private boolean retainedMessage;
 
     /**
-     * MQTT cleanSession 标志，控制连接会话生命周期。
+     * 是否满足会话条件。
      */
     private boolean cleanSession;
     /**
-     * 是否启用 SSL/TLS 连接。
+     * 是否启用 SSL。
      */
     private boolean ssl;
     /**
-     * MQTT 客户端凭据，可能是匿名、基础用户名密码或证书类凭据。
+     * 凭据，用于认证或安全校验。
      */
     private ClientCredentials credentials;
 
     /**
-     * 构造 MQTT 节点的默认配置。
-     * 本方法只填充配置默认值，不直接创建 MQTT 客户端、不访问外部 Broker，也不处理 Rule Engine 消息确认。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbMqttNodeConfiguration defaultConfiguration() {

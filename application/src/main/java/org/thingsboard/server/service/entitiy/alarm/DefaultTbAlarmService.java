@@ -45,9 +45,6 @@ import org.thingsboard.server.service.entitiy.AbstractTbEntityService;
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
-@AllArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbAlarmService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -58,110 +55,90 @@ import java.util.List;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@AllArgsConstructor
+@Slf4j
 public class DefaultTbAlarmService extends AbstractTbEntityService implements TbAlarmService {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `alarmCommentService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 告警，提供当前类调用的业务操作。
      */
+    @Autowired
     protected TbAlarmCommentService alarmCommentService;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Alarm save(Alarm alarm, User user) throws ThingsboardException {
         ActionType actionType = alarm.getId() == null ? ActionType.ADDED : ActionType.UPDATED;
         TenantId tenantId = alarm.getTenantId();
         try {
             AlarmApiCallResult result;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (alarm.getId() == null) {
                 result = alarmSubscriptionService.createAlarm(AlarmCreateOrUpdateActiveRequest.fromAlarm(alarm, user.getId()));
             } else {
                 result = alarmSubscriptionService.updateAlarm(AlarmUpdateRequest.fromAlarm(alarm, user.getId()));
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!result.isSuccessful()) {
                 throw new ThingsboardException(ThingsboardErrorCode.ITEM_NOT_FOUND);
             }
             AlarmInfo resultAlarm = result.getAlarm();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (alarm.isAcknowledged() && !resultAlarm.isAcknowledged()) {
                 resultAlarm = ack(resultAlarm, alarm.getAckTs(), user);
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (alarm.isCleared() && !resultAlarm.isCleared()) {
                 resultAlarm = clear(resultAlarm, alarm.getClearTs(), user);
             }
             UserId newAssignee = alarm.getAssigneeId();
             UserId curAssignee = resultAlarm.getAssigneeId();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (newAssignee != null && !newAssignee.equals(curAssignee)) {
                 resultAlarm = assign(resultAlarm, newAssignee, alarm.getAssignTs(), user);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             } else if (newAssignee == null && curAssignee != null) {
                 resultAlarm = unassign(alarm, alarm.getAssignTs(), user);
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (result.isModified()) {
                 notificationEntityService.logEntityAction(tenantId, alarm.getOriginator(), resultAlarm,
                         resultAlarm.getCustomerId(), actionType, user);
             }
             return new Alarm(resultAlarm);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             notificationEntityService.logEntityAction(tenantId, emptyId(EntityType.ALARM), alarm, actionType, user, e);
             throw e;
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ack` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `ack` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public AlarmInfo ack(Alarm alarm, User user) throws ThingsboardException {
         return ack(alarm, System.currentTimeMillis(), user);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `ack` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `ack` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `ackTs`：时间戳。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public AlarmInfo ack(Alarm alarm, long ackTs, User user) throws ThingsboardException {
         AlarmApiCallResult result = alarmSubscriptionService.acknowledgeAlarm(alarm.getTenantId(), alarm.getId(), getOrDefault(ackTs));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!result.isSuccessful()) {
             throw new ThingsboardException(ThingsboardErrorCode.ITEM_NOT_FOUND);
         }
         AlarmInfo alarmInfo = result.getAlarm();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (result.isModified()) {
             String systemComment = String.format("Alarm was acknowledged by user %s", user.getTitle());
             addSystemAlarmComment(alarmInfo, user, "ACK", systemComment);
@@ -173,40 +150,33 @@ public class DefaultTbAlarmService extends AbstractTbEntityService implements Tb
         return alarmInfo;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clear` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `clear` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public AlarmInfo clear(Alarm alarm, User user) throws ThingsboardException {
         return clear(alarm, System.currentTimeMillis(), user);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `clear` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `clear` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `clearTs`：时间戳。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public AlarmInfo clear(Alarm alarm, long clearTs, User user) throws ThingsboardException {
         AlarmApiCallResult result = alarmSubscriptionService.clearAlarm(alarm.getTenantId(), alarm.getId(), getOrDefault(clearTs), null);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!result.isSuccessful()) {
             throw new ThingsboardException(ThingsboardErrorCode.ITEM_NOT_FOUND);
         }
         AlarmInfo alarmInfo = result.getAlarm();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (result.isCleared()) {
             String systemComment = String.format("Alarm was cleared by user %s", user.getTitle());
             addSystemAlarmComment(alarmInfo, user, "CLEAR", systemComment);
@@ -218,17 +188,16 @@ public class DefaultTbAlarmService extends AbstractTbEntityService implements Tb
         return alarmInfo;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `assign` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `assign` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `assigneeId`：`assigneeId`ID。
+     * - `assignTs`：时间戳。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public AlarmInfo assign(Alarm alarm, UserId assigneeId, long assignTs, User user) throws ThingsboardException {
         AlarmApiCallResult result = alarmSubscriptionService.assignAlarm(alarm.getTenantId(), alarm.getId(), assigneeId, getOrDefault(assignTs));
         if (!result.isSuccessful()) {
@@ -247,17 +216,15 @@ public class DefaultTbAlarmService extends AbstractTbEntityService implements Tb
         return alarmInfo;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unassign` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `unassign` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `unassignTs`：时间戳。
+     * - `user`：`user` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public AlarmInfo unassign(Alarm alarm, long unassignTs, User user) throws ThingsboardException {
         AlarmApiCallResult result = alarmSubscriptionService.unassignAlarm(alarm.getTenantId(), alarm.getId(), getOrDefault(unassignTs));
         if (!result.isSuccessful()) {
@@ -275,17 +242,15 @@ public class DefaultTbAlarmService extends AbstractTbEntityService implements Tb
         return alarmInfo;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDeletedUserAlarms` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `unassignDeletedUserAlarms` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `user`：`user` 参数。
+     * - `unassignTs`：时间戳。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<AlarmId> unassignDeletedUserAlarms(TenantId tenantId, User user, long unassignTs) {
         List<AlarmId> totalAlarmIds = new ArrayList<>();
         PageLink pageLink = new PageLink(100, 0, null, new SortOrder("id", SortOrder.Direction.ASC));
@@ -302,17 +267,14 @@ public class DefaultTbAlarmService extends AbstractTbEntityService implements Tb
         return totalAlarmIds;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `delete` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `delete` 对应的处理。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `user`：`user` 参数。
+     * 返回：判断结果。
      */
+    @Override
     public Boolean delete(Alarm alarm, User user) {
         TenantId tenantId = alarm.getTenantId();
         notificationEntityService.logEntityAction(tenantId, alarm.getOriginator(), alarm, alarm.getCustomerId(),
@@ -321,28 +283,23 @@ public class DefaultTbAlarmService extends AbstractTbEntityService implements Tb
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrDefault` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Or Default`。
+     * 参数：
+     * - `ts`：时间戳。
+     * 返回：数值结果。
      */
     private static long getOrDefault(long ts) {
         return ts > 0 ? ts : System.currentTimeMillis();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processAlarmsUnassignment` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Alarms Unassignment`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `user`：`user` 参数。
+     * - `alarmIds`：数据列表。
+     * - `unassignTs`：时间戳。
+     * 返回：无。
      */
     private void processAlarmsUnassignment(TenantId tenantId, User user, List<AlarmId> alarmIds, long unassignTs) {
         for (AlarmId alarmId : alarmIds) {
@@ -361,28 +318,27 @@ public class DefaultTbAlarmService extends AbstractTbEntityService implements Tb
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addSystemAlarmComment` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建告警。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `user`：`user` 参数。
+     * - `subType`：类型。
+     * - `commentText`：`commentText` 参数。
+     * 返回：无。
      */
     private void addSystemAlarmComment(Alarm alarm, User user, String subType, String commentText) {
         addSystemAlarmComment(alarm, user, subType, commentText, null);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addSystemAlarmComment` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建告警。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `user`：`user` 参数。
+     * - `subType`：类型。
+     * - `commentText`：`commentText` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void addSystemAlarmComment(Alarm alarm, User user, String subType, String commentText, UserId assigneeId) {
         ObjectNode commentNode = JacksonUtil.newObjectNode();

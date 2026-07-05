@@ -44,9 +44,6 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
 
-@Service
-@RequiredArgsConstructor
-@TbCoreComponent
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTwoFactorAuthService` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
@@ -57,25 +54,18 @@ import java.util.Optional;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Strategy。
  */
+@Service
+@RequiredArgsConstructor
+@TbCoreComponent
 public class DefaultTwoFactorAuthService implements TwoFactorAuthService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `configManager` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置，负责处理对应任务或消息。
      */
     private final TwoFaConfigManager configManager;
     private final SystemSecurityService systemSecurityService;
     /**
-     * 字段说明：
-     * 1. 保存 `userService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 用户，提供当前类调用的业务操作。
      */
     private final UserService userService;
     private final RateLimitService rateLimitService;
@@ -86,79 +76,66 @@ public class DefaultTwoFactorAuthService implements TwoFactorAuthService {
     private static final ThingsboardException PROVIDER_NOT_AVAILABLE_ERROR = new ThingsboardException("2FA provider is not available", ThingsboardErrorCode.GENERAL);
     private static final ThingsboardException TOO_MANY_REQUESTS_ERROR = new ThingsboardException("Too many requests", ThingsboardErrorCode.TOO_MANY_REQUESTS);
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isTwoFaEnabled` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Two Fa Enabled`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `userId`：用户ID。
+     * 返回：判断结果。
      */
+    @Override
     public boolean isTwoFaEnabled(TenantId tenantId, UserId userId) {
         return configManager.getAccountTwoFaSettings(tenantId, userId)
                 .map(settings -> !settings.getConfigs().isEmpty())
                 .orElse(false);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkProvider` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验提供者。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `providerType`：类型。
+     * 返回：无。
      */
+    @Override
     public void checkProvider(TenantId tenantId, TwoFaProviderType providerType) throws ThingsboardException {
         getTwoFaProvider(providerType).check(tenantId);
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `prepareVerificationCode` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `prepareVerificationCode` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `providerType`：类型。
+     * - `checkLimits`：数量限制。
+     * 返回：无。
      */
+    @Override
     public void prepareVerificationCode(SecurityUser user, TwoFaProviderType providerType, boolean checkLimits) throws Exception {
         TwoFaAccountConfig accountConfig = configManager.getTwoFaAccountConfig(user.getTenantId(), user.getId(), providerType)
                 .orElseThrow(() -> ACCOUNT_NOT_CONFIGURED_ERROR);
         prepareVerificationCode(user, accountConfig, checkLimits);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `prepareVerificationCode` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `prepareVerificationCode` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `accountConfig`：配置对象。
+     * - `checkLimits`：数量限制。
+     * 返回：无。
      */
+    @Override
     public void prepareVerificationCode(SecurityUser user, TwoFaAccountConfig accountConfig, boolean checkLimits) throws ThingsboardException {
         PlatformTwoFaSettings twoFaSettings = configManager.getPlatformTwoFaSettings(user.getTenantId(), true)
                 .orElseThrow(() -> PROVIDER_NOT_CONFIGURED_ERROR);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (checkLimits) {
             Integer minVerificationCodeSendPeriod = twoFaSettings.getMinVerificationCodeSendPeriod();
             String rateLimit = null;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (minVerificationCodeSendPeriod != null && minVerificationCodeSendPeriod > 4) {
                 rateLimit = "1:" + minVerificationCodeSendPeriod;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!rateLimitService.checkRateLimit(LimitedApi.TWO_FA_VERIFICATION_CODE_SEND,
                     Pair.of(user.getId(), accountConfig.getProviderType()), rateLimit)) {
                 throw TOO_MANY_REQUESTS_ERROR;
@@ -171,45 +148,40 @@ public class DefaultTwoFactorAuthService implements TwoFactorAuthService {
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkVerificationCode` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验编码。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `providerType`：类型。
+     * - `verificationCode`：`verificationCode` 参数。
+     * - `checkLimits`：数量限制。
+     * 返回：判断结果。
      */
+    @Override
     public boolean checkVerificationCode(SecurityUser user, TwoFaProviderType providerType, String verificationCode, boolean checkLimits) throws ThingsboardException {
         TwoFaAccountConfig accountConfig = configManager.getTwoFaAccountConfig(user.getTenantId(), user.getId(), providerType)
                 .orElseThrow(() -> ACCOUNT_NOT_CONFIGURED_ERROR);
         return checkVerificationCode(user, verificationCode, accountConfig, checkLimits);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkVerificationCode` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验编码。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `verificationCode`：`verificationCode` 参数。
+     * - `accountConfig`：配置对象。
+     * - `checkLimits`：数量限制。
+     * 返回：判断结果。
      */
+    @Override
     public boolean checkVerificationCode(SecurityUser user, String verificationCode, TwoFaAccountConfig accountConfig, boolean checkLimits) throws ThingsboardException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!userService.findUserCredentialsByUserId(user.getTenantId(), user.getId()).isEnabled()) {
             throw new ThingsboardException("User is disabled", ThingsboardErrorCode.AUTHENTICATION);
         }
 
         PlatformTwoFaSettings twoFaSettings = configManager.getPlatformTwoFaSettings(user.getTenantId(), true)
                 .orElseThrow(() -> PROVIDER_NOT_CONFIGURED_ERROR);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (checkLimits) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!rateLimitService.checkRateLimit(LimitedApi.TWO_FA_VERIFICATION_CODE_CHECK,
                     Pair.of(user.getId(), accountConfig.getProviderType()), twoFaSettings.getVerificationCodeCheckRateLimit())) {
                 throw TOO_MANY_REQUESTS_ERROR;
@@ -219,23 +191,18 @@ public class DefaultTwoFactorAuthService implements TwoFactorAuthService {
                 .orElseThrow(() -> PROVIDER_NOT_CONFIGURED_ERROR);
 
         boolean verificationSuccess = false;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (StringUtils.isNotBlank(verificationCode)) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (StringUtils.isNumeric(verificationCode) || accountConfig.getProviderType() == TwoFaProviderType.BACKUP_CODE) {
                 verificationSuccess = getTwoFaProvider(accountConfig.getProviderType()).checkVerificationCode(user, verificationCode, providerConfig, accountConfig);
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (checkLimits) {
             try {
                 systemSecurityService.validateTwoFaVerification(user, verificationSuccess, twoFaSettings);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (LockedException e) {
                 cleanUpRateLimits(user.getId());
                 throw new ThingsboardException(e.getMessage(), ThingsboardErrorCode.AUTHENTICATION);
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (verificationSuccess) {
                 cleanUpRateLimits(user.getId());
             }
@@ -243,34 +210,26 @@ public class DefaultTwoFactorAuthService implements TwoFactorAuthService {
         return verificationSuccess;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `generateNewAccountConfig` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `generateNewAccountConfig` 对应的处理。
+     * 参数：
+     * - `user`：`user` 参数。
+     * - `providerType`：类型。
+     * 返回：处理结果。
      */
+    @Override
     public TwoFaAccountConfig generateNewAccountConfig(User user, TwoFaProviderType providerType) throws ThingsboardException {
         TwoFaProviderConfig providerConfig = getTwoFaProviderConfig(user.getTenantId(), providerType);
         return getTwoFaProvider(providerType).generateNewAccountConfig(user, providerConfig);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanUpRateLimits` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理频率。
+     * 参数：
+     * - `userId`：用户ID。
+     * 返回：无。
      */
     private void cleanUpRateLimits(UserId userId) {
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (TwoFaProviderType providerType : TwoFaProviderType.values()) {
             rateLimitService.cleanUp(LimitedApi.TWO_FA_VERIFICATION_CODE_SEND, Pair.of(userId, providerType));
             rateLimitService.cleanUp(LimitedApi.TWO_FA_VERIFICATION_CODE_CHECK, Pair.of(userId, providerType));
@@ -278,14 +237,11 @@ public class DefaultTwoFactorAuthService implements TwoFactorAuthService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTwoFaProviderConfig` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取配置。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `providerType`：类型。
+     * 返回：处理结果。
      */
     private TwoFaProviderConfig getTwoFaProviderConfig(TenantId tenantId, TwoFaProviderType providerType) throws ThingsboardException {
         return configManager.getPlatformTwoFaSettings(tenantId, true)
@@ -294,31 +250,23 @@ public class DefaultTwoFactorAuthService implements TwoFactorAuthService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTwoFaProvider` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取提供者。
+     * 参数：
+     * - `providerType`：类型。
+     * 返回：处理结果。
      */
     private TwoFaProvider<TwoFaProviderConfig, TwoFaAccountConfig> getTwoFaProvider(TwoFaProviderType providerType) throws ThingsboardException {
         return Optional.ofNullable(providers.get(providerType))
                 .orElseThrow(() -> PROVIDER_NOT_AVAILABLE_ERROR);
     }
 
-    @Autowired
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setProviders` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Providers`。
+     * 参数：
+     * - `providers`：数据列表。
+     * 返回：无。
      */
+    @Autowired
     private void setProviders(Collection<TwoFaProvider> providers) {
         providers.forEach(provider -> {
             this.providers.put(provider.getType(), provider);

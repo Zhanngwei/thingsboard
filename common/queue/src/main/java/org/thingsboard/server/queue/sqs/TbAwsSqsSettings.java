@@ -21,10 +21,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
-@Slf4j
-@ConditionalOnExpression("'${queue.type:null}'=='aws-sqs'")
-@Component
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`TbAwsSqsSettings` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -35,72 +31,46 @@ import org.springframework.stereotype.Component;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@ConditionalOnExpression("'${queue.type:null}'=='aws-sqs'")
+@Component
+@Data
 public class TbAwsSqsSettings {
 
-    @Value("${queue.aws_sqs.use_default_credential_provider_chain}")
     /**
-     * 字段说明：
-     * 1. 保存 `useDefaultCredentialProviderChain` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前对象是否为默认项。
      */
+    @Value("${queue.aws_sqs.use_default_credential_provider_chain}")
     private Boolean useDefaultCredentialProviderChain;
 
-    @Value("${queue.aws_sqs.access_key_id}")
     /**
-     * 字段说明：
-     * 1. 保存 `accessKeyId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 键ID，用于定位对应业务对象。
      */
+    @Value("${queue.aws_sqs.access_key_id}")
     private String accessKeyId;
 
-    @Value("${queue.aws_sqs.secret_access_key}")
     /**
-     * 字段说明：
-     * 1. 保存 `secretAccessKey` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 键，用于定位映射、配置或数据项。
      */
+    @Value("${queue.aws_sqs.secret_access_key}")
     private String secretAccessKey;
 
-    @Value("${queue.aws_sqs.region}")
     /**
-     * 字段说明：
-     * 1. 保存 `region` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `region` 字段，保存当前对象的对应属性。
      */
+    @Value("${queue.aws_sqs.region}")
     private String region;
 
-    @Value("${queue.aws_sqs.threads_per_topic}")
     /**
-     * 字段说明：
-     * 1. 保存 `threadsPerTopic` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主题，用于匹配或发送对应主题的数据。
      */
+    @Value("${queue.aws_sqs.threads_per_topic}")
     private int threadsPerTopic;
 
-    @Value("${queue.aws_sqs.producer_thread_pool_size:50}")
     /**
-     * 字段说明：
-     * 1. 保存 `threadPoolSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 线程池大小，用于控制处理规模或位置。
      */
+    @Value("${queue.aws_sqs.producer_thread_pool_size:50}")
     private int threadPoolSize;
 
 }

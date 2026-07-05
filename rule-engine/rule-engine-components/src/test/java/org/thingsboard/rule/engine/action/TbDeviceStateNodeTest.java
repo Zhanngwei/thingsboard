@@ -60,42 +60,56 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 /**
- * 测试目标：验证 {@code TbDeviceStateNodeTest} 覆盖的 动作节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbDeviceStateNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbDeviceStateNodeTest` 测试类，用于验证 `TbDeviceStateNode` 相关行为。
  */
 @ExtendWith(MockitoExtension.class)
 public class TbDeviceStateNodeTest {
 
-    /** Mock 依赖字段：{@code ctxMock} 保存 {@code TbContext} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 上下文，汇总当前处理所需的上下文信息。
+     */
     @Mock
     private TbContext ctxMock;
-    /** Mock 依赖字段：{@code deviceStateManagerMock} 保存 {@code RuleEngineDeviceStateManager} 测试数据或依赖，来源：由 Mockito 注解在测试实例初始化时创建，生命周期随单个测试实例或 runner 管理。 */
+    /**
+     * 设备状态管理器，负责处理对应任务或消息。
+     */
     @Mock
     private static RuleEngineDeviceStateManager deviceStateManagerMock;
-    /** 参数捕获字段：{@code callbackCaptor} 保存 {@code ArgumentCaptor<TbCallback>} 测试数据或依赖，来源：由 Mockito 注解创建，用于捕获被测逻辑传给 Mock 的参数，生命周期随单个测试实例。 */
+    /**
+     * 回调，用于接收异步处理完成后的结果。
+     */
     @Captor
     private static ArgumentCaptor<TbCallback> callbackCaptor;
-    /** 可变 fixture 字段：{@code node} 保存 {@code TbDeviceStateNode} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，表示当前对象的对应属性。
+     */
     private TbDeviceStateNode node;
-    /** 可变 fixture 字段：{@code config} 保存 {@code TbDeviceStateNodeConfiguration} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 配置，保存当前对象的配置选项。
+     */
     private TbDeviceStateNodeConfiguration config;
 
-    /** 测试常量字段：{@code TENANT_ID} 保存 {@code TenantId} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 租户ID常量，用于统一引用固定值。
+     */
     private static final TenantId TENANT_ID = TenantId.fromUUID(UUID.randomUUID());
-    /** 测试常量字段：{@code DEVICE_ID} 保存 {@code DeviceId} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 设备ID常量，用于统一引用固定值。
+     */
     private static final DeviceId DEVICE_ID = new DeviceId(UUID.randomUUID());
-    /** 测试常量字段：{@code METADATA_TS} 保存 {@code long} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * 时间戳常量，用于统一引用固定值。
+     */
     private static final long METADATA_TS = 123L;
-    /** 可变 fixture 字段：{@code msg} 保存 {@code TbMsg} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 消息，承载当前步骤需要处理的内容。
+     */
     private TbMsg msg;
 
     /**
-     * 生命周期方法：{@code setup} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
     @BeforeEach
     public void setup() {
@@ -109,9 +123,9 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 生命周期方法：{@code setUp} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
     @BeforeEach
     public void setUp() {
@@ -120,28 +134,22 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenDefaultConfiguration_whenInvoked_thenCorrectValuesAreSet} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenDefaultConfiguration_whenInvoked_thenCorrectValuesAreSet` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenDefaultConfiguration_whenInvoked_thenCorrectValuesAreSet() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         assertThat(config.getEvent()).isEqualTo(TbMsgType.ACTIVITY_EVENT);
     }
 
     /**
-     * 测试方法：覆盖 {@code givenNullEventInConfig_whenInit_thenThrowsUnrecoverableTbNodeException} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenNullEventInConfig_whenInit_thenThrowsUnrecoverableTbNodeException` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenNullEventInConfig_whenInit_thenThrowsUnrecoverableTbNodeException() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN-WHEN-THEN
         assertThatThrownBy(() -> initNode(null))
                 .isInstanceOf(TbNodeException.class)
@@ -150,15 +158,12 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenInvalidRateLimitConfig_whenInit_thenUsesDefaultConfig} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenInvalidRateLimitConfig_whenInit_thenUsesDefaultConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenInvalidRateLimitConfig_whenInit_thenUsesDefaultConfig() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         given(ctxMock.getDeviceStateNodeRateLimitConfig()).willReturn("invalid rate limit config");
         given(ctxMock.getTenantId()).willReturn(TENANT_ID);
@@ -177,15 +182,12 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenMsgArrivedTooFast_whenOnMsg_thenRateLimitsThisMsg} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenMsgArrivedTooFast_whenOnMsg_thenRateLimitsThisMsg` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenMsgArrivedTooFast_whenOnMsg_thenRateLimitsThisMsg() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         ConcurrentReferenceHashMap<DeviceId, TbRateLimits> rateLimits = new ConcurrentReferenceHashMap<>();
         ReflectionTestUtils.setField(node, "rateLimits", rateLimits);
@@ -207,15 +209,12 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenHasNonLocalDevices_whenOnPartitionChange_thenRemovesEntriesForNonLocalDevices} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenHasNonLocalDevices_whenOnPartitionChange_thenRemovesEntriesForNonLocalDevices` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenHasNonLocalDevices_whenOnPartitionChange_thenRemovesEntriesForNonLocalDevices() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         ConcurrentReferenceHashMap<DeviceId, TbRateLimits> rateLimits = new ConcurrentReferenceHashMap<>();
         ReflectionTestUtils.setField(node, "rateLimits", rateLimits);
@@ -242,20 +241,18 @@ public class TbDeviceStateNodeTest {
                 .size().isOne();
     }
 
-    /** 可变 fixture 字段：{@code value} 保存 {@code 字段} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 功能：验证 `givenUnsupportedEventInConfig_whenInit_thenThrowsUnrecoverableTbNodeException` 描述的测试场景。
+     * 参数：
+     * - `unsupportedEvent`：`unsupportedEvent` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @EnumSource(
             value = TbMsgType.class,
-            /** 可变 fixture 字段：{@code names} 保存 {@code 字段} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
             names = {"CONNECT_EVENT", "ACTIVITY_EVENT", "DISCONNECT_EVENT", "INACTIVITY_EVENT"},
-            /** 可变 fixture 字段：{@code mode} 保存 {@code 字段} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
             mode = EnumSource.Mode.EXCLUDE
     )
-    /**
-     * 辅助方法：{@code givenUnsupportedEventInConfig_whenInit_thenThrowsUnrecoverableTbNodeException} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
-     */
     public void givenUnsupportedEventInConfig_whenInit_thenThrowsUnrecoverableTbNodeException(TbMsgType unsupportedEvent) {
         // GIVEN-WHEN-THEN
         assertThatThrownBy(() -> initNode(unsupportedEvent))
@@ -265,26 +262,32 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenNonDeviceOriginator_whenOnMsg_thenTellsSuccessAndNoActivityActionsTriggered} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenNonDeviceOriginator_whenOnMsg_thenTellsSuccessAndNoActivityActionsTriggered` 描述的测试场景。
+     * 参数：
+     * - `unsupportedType`：类型。
+     * 返回：无。
      */
     @ParameterizedTest
     @EnumSource(value = EntityType.class, names = "DEVICE", mode = EnumSource.Mode.EXCLUDE)
     public void givenNonDeviceOriginator_whenOnMsg_thenTellsSuccessAndNoActivityActionsTriggered(EntityType unsupportedType) {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         var nonDeviceOriginator = new EntityId() {
 
-            /** 实现方法：{@code getId} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+            /**
+             * 功能：获取`Id`。
+             * 参数：无。
+             * 返回：处理结果。
+             */
             @Override
             public UUID getId() {
                 return UUID.randomUUID();
             }
 
-            /** 实现方法：{@code getEntityType} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+            /**
+             * 功能：获取实体。
+             * 参数：无。
+             * 返回：处理结果。
+             */
             @Override
             public EntityType getEntityType() {
                 return unsupportedType;
@@ -306,15 +309,12 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenMetadataDoesNotContainTs_whenOnMsg_thenMsgTsIsUsedAsEventTs} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenMetadataDoesNotContainTs_whenOnMsg_thenMsgTsIsUsedAsEventTs` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void givenMetadataDoesNotContainTs_whenOnMsg_thenMsgTsIsUsedAsEventTs() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         given(ctxMock.getDeviceStateNodeRateLimitConfig()).willReturn("1:1");
         try {
@@ -337,16 +337,15 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code givenSupportedEventAndDeviceOriginator_whenOnMsg_thenCorrectEventIsSentWithCorrectCallback} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenSupportedEventAndDeviceOriginator_whenOnMsg_thenCorrectEventIsSentWithCorrectCallback` 描述的测试场景。
+     * 参数：
+     * - `supportedEventType`：类型。
+     * - `actionVerification`：`actionVerification` 参数。
+     * 返回：无。
      */
     @ParameterizedTest
     @MethodSource
     public void givenSupportedEventAndDeviceOriginator_whenOnMsg_thenCorrectEventIsSentWithCorrectCallback(TbMsgType supportedEventType, Runnable actionVerification) {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         // GIVEN
         given(ctxMock.getTenantId()).willReturn(TENANT_ID);
         given(ctxMock.getDeviceStateNodeRateLimitConfig()).willReturn("1:1");
@@ -378,7 +377,11 @@ public class TbDeviceStateNodeTest {
         then(ctxMock).shouldHaveNoMoreInteractions();
     }
 
-    /** 参数源方法：{@code givenSupportedEventAndDeviceOriginator_whenOnMsg_thenCorrectEventIsSentWithCorrectCallback} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
+    /**
+     * 功能：验证 `givenSupportedEventAndDeviceOriginator_whenOnMsg_thenCorrectEventIsSentWithCorrectCallback` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     private static Stream<Arguments> givenSupportedEventAndDeviceOriginator_whenOnMsg_thenCorrectEventIsSentWithCorrectCallback() {
         return Stream.of(
                 Arguments.of(TbMsgType.CONNECT_EVENT, (Runnable) () -> then(deviceStateManagerMock).should().onDeviceConnect(eq(TENANT_ID), eq(DEVICE_ID), eq(METADATA_TS), callbackCaptor.capture())),
@@ -389,9 +392,10 @@ public class TbDeviceStateNodeTest {
     }
 
     /**
-     * 辅助方法：{@code initNode} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化或启动节点实例。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
     private void initNode(TbMsgType event) throws TbNodeException {
         config.setEvent(event);

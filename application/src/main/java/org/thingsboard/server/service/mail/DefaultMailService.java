@@ -56,8 +56,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-@Service
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultMailService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -68,134 +66,80 @@ import java.util.concurrent.TimeoutException;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@Slf4j
 public class DefaultMailService implements MailService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `TARGET_EMAIL` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 邮箱常量，用于统一引用固定值。
      */
     public static final String TARGET_EMAIL = "targetEmail";
     public static final String UTF_8 = "UTF-8";
 
     /**
-     * 字段说明：
-     * 1. 保存 `messages` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `messages` 字段，保存当前对象的对应属性。
      */
     private final MessageSource messages;
     private final Configuration freemarkerConfig;
     /**
-     * 字段说明：
-     * 1. 保存 `adminSettingsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
     private final AdminSettingsService adminSettingsService;
     private final TbApiUsageReportClient apiUsageClient;
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEFAULT_TIMEOUT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间常量，用于统一引用固定值。
      */
     private static final long DEFAULT_TIMEOUT = 10_000;
 
+    /**
+     * 状态，提供当前类调用的业务操作。
+     */
     @Lazy
     @Autowired
-    /**
-     * 字段说明：
-     * 1. 保存 `apiUsageStateService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private TbApiUsageStateService apiUsageStateService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `mailExecutorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private MailExecutorService mailExecutorService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `passwordResetExecutorService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码集合，用于去重保存或快速判断对象是否存在。
      */
+    @Autowired
     private PasswordResetExecutorService passwordResetExecutorService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tbMailContextComponent` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @Autowired
     private TbMailContextComponent tbMailContextComponent;
 
     /**
-     * 字段说明：
-     * 1. 保存 `mailSender` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `mailSender` 字段，保存当前对象的对应属性。
      */
     private TbMailSender mailSender;
 
     /**
-     * 字段说明：
-     * 1. 保存 `mailFrom` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `mailFrom` 字段，保存当前对象的对应属性。
      */
     private String mailFrom;
 
     /**
-     * 字段说明：
-     * 1. 保存 `timeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间，用于控制时间范围或等待时长。
      */
     private long timeout;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultMailService` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultMailService` 实例，并初始化必要字段。
+     * 参数：
+     * - `messages`：待处理消息。
+     * - `freemarkerConfig`：配置对象。
+     * - `adminSettingsService`：服务对象。
+     * - `apiUsageClient`：客户端对象。
+     * 返回：新创建的对象实例。
      */
     public DefaultMailService(MessageSource messages, Configuration freemarkerConfig, AdminSettingsService adminSettingsService, TbApiUsageReportClient apiUsageClient) {
         this.messages = messages;
@@ -204,35 +148,24 @@ public class DefaultMailService implements MailService {
         this.apiUsageClient = apiUsageClient;
     }
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     private void init() {
         updateMailConfiguration();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateMailConfiguration` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Mail Configuration`。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void updateMailConfiguration() {
         AdminSettings settings = adminSettingsService.findAdminSettingsByKey(TenantId.SYS_TENANT_ID, "mail");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (settings != null) {
             JsonNode jsonConfig = settings.getJsonValue();
             mailSender = new TbMailSender(tbMailContextComponent, jsonConfig);
@@ -243,32 +176,28 @@ public class DefaultMailService implements MailService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交邮箱。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `email`：`email` 参数。
+     * - `subject`：`subject` 参数。
+     * - `message`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void sendEmail(TenantId tenantId, String email, String subject, String message) throws ThingsboardException {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendTestMail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Test Mail`。
+     * 参数：
+     * - `jsonConfig`：配置对象。
+     * - `email`：`email` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendTestMail(JsonNode jsonConfig, String email) throws ThingsboardException {
         TbMailSender testMailSender = new TbMailSender(tbMailContextComponent, jsonConfig);
         String mailFrom = jsonConfig.get("mailFrom").asText();
@@ -283,17 +212,14 @@ public class DefaultMailService implements MailService {
         sendMail(testMailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendActivationEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交邮箱。
+     * 参数：
+     * - `activationLink`：`activationLink` 参数。
+     * - `email`：`email` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendActivationEmail(String activationLink, String email) throws ThingsboardException {
 
         String subject = messages.getMessage("activation.subject", null, Locale.US);
@@ -307,17 +233,14 @@ public class DefaultMailService implements MailService {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendAccountActivatedEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交邮箱。
+     * 参数：
+     * - `loginLink`：`loginLink` 参数。
+     * - `email`：`email` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendAccountActivatedEmail(String loginLink, String email) throws ThingsboardException {
 
         String subject = messages.getMessage("account.activated.subject", null, Locale.US);
@@ -331,17 +254,14 @@ public class DefaultMailService implements MailService {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendResetPasswordEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交密码。
+     * 参数：
+     * - `passwordResetLink`：`passwordResetLink` 参数。
+     * - `email`：`email` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendResetPasswordEmail(String passwordResetLink, String email) throws ThingsboardException {
 
         String subject = messages.getMessage("reset.password.subject", null, Locale.US);
@@ -355,39 +275,32 @@ public class DefaultMailService implements MailService {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendResetPasswordEmailAsync` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交密码。
+     * 参数：
+     * - `passwordResetLink`：`passwordResetLink` 参数。
+     * - `email`：`email` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendResetPasswordEmailAsync(String passwordResetLink, String email) {
         passwordResetExecutorService.execute(() -> {
             try {
                 this.sendResetPasswordEmail(passwordResetLink, email);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.error("Error occurred: {} ", e.getMessage());
             }
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendPasswordWasResetEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交密码。
+     * 参数：
+     * - `loginLink`：`loginLink` 参数。
+     * - `email`：`email` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendPasswordWasResetEmail(String loginLink, String email) throws ThingsboardException {
 
         String subject = messages.getMessage("password.was.reset.subject", null, Locale.US);
@@ -401,48 +314,45 @@ public class DefaultMailService implements MailService {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `send` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `send` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `tbEmail`：`tbEmail` 参数。
+     * 返回：无。
      */
+    @Override
     public void send(TenantId tenantId, CustomerId customerId, TbEmail tbEmail) throws ThingsboardException {
         sendMail(tenantId, customerId, tbEmail, this.mailSender, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `send` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `send` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `tbEmail`：`tbEmail` 参数。
+     * - `javaMailSender`：`javaMailSender` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void send(TenantId tenantId, CustomerId customerId, TbEmail tbEmail, JavaMailSender javaMailSender, long timeout) throws ThingsboardException {
         sendMail(tenantId, customerId, tbEmail, javaMailSender, timeout);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendMail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Mail`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `tbEmail`：`tbEmail` 参数。
+     * - `javaMailSender`：`javaMailSender` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void sendMail(TenantId tenantId, CustomerId customerId, TbEmail tbEmail, JavaMailSender javaMailSender, long timeout) throws ThingsboardException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (apiUsageStateService.getApiUsageState(tenantId).isEmailSendEnabled()) {
             try {
                 MimeMessage mailMsg = javaMailSender.createMimeMessage();
@@ -450,20 +360,16 @@ public class DefaultMailService implements MailService {
                 MimeMessageHelper helper = new MimeMessageHelper(mailMsg, multipart, "UTF-8");
                 helper.setFrom(StringUtils.isBlank(tbEmail.getFrom()) ? mailFrom : tbEmail.getFrom());
                 helper.setTo(tbEmail.getTo().split("\\s*,\\s*"));
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!StringUtils.isBlank(tbEmail.getCc())) {
                     helper.setCc(tbEmail.getCc().split("\\s*,\\s*"));
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!StringUtils.isBlank(tbEmail.getBcc())) {
                     helper.setBcc(tbEmail.getBcc().split("\\s*,\\s*"));
                 }
                 helper.setSubject(tbEmail.getSubject());
                 helper.setText(tbEmail.getBody(), tbEmail.isHtml());
 
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (multipart) {
-                    // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                     for (String imgId : tbEmail.getImages().keySet()) {
                         String imgValue = tbEmail.getImages().get(imgId);
                         String value = imgValue.replaceFirst("^data:image/[^;]*;base64,?", "");
@@ -475,7 +381,6 @@ public class DefaultMailService implements MailService {
                 }
                 sendMailWithTimeout(javaMailSender, helper.getMimeMessage(), timeout);
                 apiUsageClient.report(tenantId, customerId, ApiUsageRecordKey.EMAIL_EXEC_COUNT, 1);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 throw handleException(e);
             }
@@ -484,17 +389,15 @@ public class DefaultMailService implements MailService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendAccountLockoutEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交邮箱。
+     * 参数：
+     * - `lockoutEmail`：`lockoutEmail` 参数。
+     * - `email`：`email` 参数。
+     * - `maxFailedLoginAttempts`：`maxFailedLoginAttempts` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendAccountLockoutEmail(String lockoutEmail, String email, Integer maxFailedLoginAttempts) throws ThingsboardException {
         String subject = messages.getMessage("account.lockout.subject", null, Locale.US);
 
@@ -508,17 +411,15 @@ public class DefaultMailService implements MailService {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendTwoFaVerificationEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交邮箱。
+     * 参数：
+     * - `email`：`email` 参数。
+     * - `verificationCode`：`verificationCode` 参数。
+     * - `expirationTimeSeconds`：`expirationTimeSeconds` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendTwoFaVerificationEmail(String email, String verificationCode, int expirationTimeSeconds) throws ThingsboardException {
         String subject = messages.getMessage("2fa.verification.code.subject", null, Locale.US);
         String message = mergeTemplateIntoString("2fa.verification.code.ftl", Map.of(
@@ -530,17 +431,16 @@ public class DefaultMailService implements MailService {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendApiFeatureStateEmail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交状态。
+     * 参数：
+     * - `apiFeature`：`apiFeature` 参数。
+     * - `stateValue`：值。
+     * - `email`：`email` 参数。
+     * - `recordState`：`recordState` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendApiFeatureStateEmail(ApiFeature apiFeature, ApiUsageStateValue stateValue, String email, ApiUsageRecordState recordState) throws ThingsboardException {
         String subject = messages.getMessage("api.usage.state", null, Locale.US);
 
@@ -550,7 +450,6 @@ public class DefaultMailService implements MailService {
 
         String message = null;
 
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (stateValue) {
             case ENABLED:
                 model.put("apiLabel", toEnabledValueLabel(apiFeature));
@@ -568,52 +467,38 @@ public class DefaultMailService implements MailService {
         sendMail(mailSender, mailFrom, email, subject, message, timeout);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testConnection` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证`Connection`相关场景。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
+    @Override
     public void testConnection(TenantId tenantId) throws Exception {
         mailSender.testConnection();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isConfigured` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Configured`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：判断结果。
      */
+    @Override
     public boolean isConfigured(TenantId tenantId) {
         return mailSender != null;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toEnabledValueLabel` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toEnabledValueLabel` 对应的处理。
+     * 参数：
+     * - `apiFeature`：`apiFeature` 参数。
+     * 返回：文本结果。
      */
     private String toEnabledValueLabel(ApiFeature apiFeature) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (apiFeature) {
             case DB:
                 return "save";
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             case TRANSPORT:
                 return "receive";
             case JS:
@@ -631,17 +516,12 @@ public class DefaultMailService implements MailService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toDisabledValueLabel` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toDisabledValueLabel` 对应的处理。
+     * 参数：
+     * - `apiFeature`：`apiFeature` 参数。
+     * 返回：文本结果。
      */
     private String toDisabledValueLabel(ApiFeature apiFeature) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (apiFeature) {
             case DB:
                 return "saved";
@@ -662,14 +542,10 @@ public class DefaultMailService implements MailService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toWarningValueLabel` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toWarningValueLabel` 对应的处理。
+     * 参数：
+     * - `recordState`：`recordState` 参数。
+     * 返回：文本结果。
      */
     private String toWarningValueLabel(ApiUsageRecordState recordState) {
         String valueInM = recordState.getValueAsString();
@@ -696,14 +572,10 @@ public class DefaultMailService implements MailService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toDisabledValueLabel` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toDisabledValueLabel` 对应的处理。
+     * 参数：
+     * - `recordState`：`recordState` 参数。
+     * 返回：文本结果。
      */
     private String toDisabledValueLabel(ApiUsageRecordState recordState) {
         switch (recordState.getKey()) {
@@ -728,14 +600,14 @@ public class DefaultMailService implements MailService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendMail` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Mail`。
+     * 参数：
+     * - `mailSender`：`mailSender` 参数。
+     * - `mailFrom`：`mailFrom` 参数。
+     * - `email`：`email` 参数。
+     * - `subject`：`subject` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void sendMail(JavaMailSenderImpl mailSender, String mailFrom, String email,
                           String subject, String message, long timeout) throws ThingsboardException {
@@ -754,14 +626,12 @@ public class DefaultMailService implements MailService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendMailWithTimeout` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交超时时间。
+     * 参数：
+     * - `mailSender`：`mailSender` 参数。
+     * - `msg`：待处理消息。
+     * - `timeout`：`timeout` 参数。
+     * 返回：无。
      */
     private void sendMailWithTimeout(JavaMailSender mailSender, MimeMessage msg, long timeout) {
         try {
@@ -775,14 +645,11 @@ public class DefaultMailService implements MailService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `mergeTemplateIntoString` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `mergeTemplateIntoString` 对应的处理。
+     * 参数：
+     * - `templateLocation`：`templateLocation` 参数。
+     * - `model`：键值映射。
+     * 返回：文本结果。
      */
     private String mergeTemplateIntoString(String templateLocation,
                                            Map<String, Object> model) throws ThingsboardException {
@@ -795,14 +662,10 @@ public class DefaultMailService implements MailService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleException` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Exception`。
+     * 参数：
+     * - `exception`：`exception` 参数。
+     * 返回：处理结果。
      */
     protected ThingsboardException handleException(Exception exception) {
         String message;

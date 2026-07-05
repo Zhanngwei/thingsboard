@@ -35,8 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
 
-@Slf4j
-@AllArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`BaseRuleChainMetadataConstructor` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
@@ -47,19 +45,20 @@ import java.util.NavigableSet;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
  */
+@Slf4j
+@AllArgsConstructor
 public abstract class BaseRuleChainMetadataConstructor implements RuleChainMetadataConstructor {
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructRuleChainMetadataUpdatedMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructRuleChainMetadataUpdatedMsg` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `msgType`：待处理消息。
+     * - `ruleChainMetaData`：待处理数据。
+     * - `edgeVersion`：`edgeVersion` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public RuleChainMetadataUpdateMsg constructRuleChainMetadataUpdatedMsg(TenantId tenantId,
                                                                            UpdateMsgType msgType,
                                                                            RuleChainMetaData ruleChainMetaData,
@@ -71,34 +70,26 @@ public abstract class BaseRuleChainMetadataConstructor implements RuleChainMetad
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructRuleChainMetadataUpdatedMsg` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructRuleChainMetadataUpdatedMsg` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `builder`：`builder` 参数。
+     * - `ruleChainMetaData`：待处理数据。
+     * 返回：无。
      */
     protected abstract void constructRuleChainMetadataUpdatedMsg(TenantId tenantId,
                                                                  RuleChainMetadataUpdateMsg.Builder builder,
                                                                  RuleChainMetaData ruleChainMetaData);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructConnections` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructConnections` 对应的处理。
+     * 参数：
+     * - `connections`：数据列表。
+     * 返回：匹配的数据集合。
      */
     protected List<NodeConnectionInfoProto> constructConnections(List<NodeConnectionInfo> connections) {
         List<NodeConnectionInfoProto> result = new ArrayList<>();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (connections != null && !connections.isEmpty()) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (NodeConnectionInfo connection : connections) {
                 result.add(constructConnection(connection));
             }
@@ -107,14 +98,10 @@ public abstract class BaseRuleChainMetadataConstructor implements RuleChainMetad
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructConnection` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructConnection` 对应的处理。
+     * 参数：
+     * - `connection`：`connection` 参数。
+     * 返回：处理结果。
      */
     private NodeConnectionInfoProto constructConnection(NodeConnectionInfo connection) {
         return NodeConnectionInfoProto.newBuilder()
@@ -125,20 +112,14 @@ public abstract class BaseRuleChainMetadataConstructor implements RuleChainMetad
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructNodes` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructNodes` 对应的处理。
+     * 参数：
+     * - `nodes`：数据列表。
+     * 返回：匹配的数据集合。
      */
     protected List<RuleNodeProto> constructNodes(List<RuleNode> nodes) {
         List<RuleNodeProto> result = new ArrayList<>();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (nodes != null && !nodes.isEmpty()) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (RuleNode node : nodes) {
                 result.add(constructNode(node));
             }
@@ -147,14 +128,10 @@ public abstract class BaseRuleChainMetadataConstructor implements RuleChainMetad
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructNode` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructNode` 对应的处理。
+     * 参数：
+     * - `node`：`node` 参数。
+     * 返回：处理结果。
      */
     private RuleNodeProto constructNode(RuleNode node) {
         return RuleNodeProto.newBuilder()
@@ -171,35 +148,27 @@ public abstract class BaseRuleChainMetadataConstructor implements RuleChainMetad
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructRuleChainConnections` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructRuleChainConnections` 对应的处理。
+     * 参数：
+     * - `ruleChainConnections`：数据列表。
+     * - `removedNodeIndexes`：`removedNodeIndexes` 参数。
+     * 返回：匹配的数据集合。
      */
     protected List<RuleChainConnectionInfoProto> constructRuleChainConnections(List<RuleChainConnectionInfo> ruleChainConnections,
                                                                                NavigableSet<Integer> removedNodeIndexes) {
         List<RuleChainConnectionInfoProto> result = new ArrayList<>();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (ruleChainConnections != null && !ruleChainConnections.isEmpty()) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (RuleChainConnectionInfo ruleChainConnectionInfo : ruleChainConnections) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!removedNodeIndexes.isEmpty()) { // 3_3_0 only
                     int fromIndex = ruleChainConnectionInfo.getFromIndex();
                     // decrease index because of removed nodes
                     for (Integer removedIndex : removedNodeIndexes) {
-                        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                         if (fromIndex > removedIndex) {
                             fromIndex = fromIndex - 1;
                         }
                     }
                     ruleChainConnectionInfo.setFromIndex(fromIndex);
                     ObjectNode additionalInfo = (ObjectNode) ruleChainConnectionInfo.getAdditionalInfo();
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (additionalInfo.get("ruleChainNodeId") == null) {
                         additionalInfo.put("ruleChainNodeId", "rule-chain-node-UNDEFINED");
                     }
@@ -211,14 +180,10 @@ public abstract class BaseRuleChainMetadataConstructor implements RuleChainMetad
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `constructRuleChainConnection` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `constructRuleChainConnection` 对应的处理。
+     * 参数：
+     * - `ruleChainConnectionInfo`：`ruleChainConnectionInfo` 参数。
+     * 返回：处理结果。
      */
     private RuleChainConnectionInfoProto constructRuleChainConnection(RuleChainConnectionInfo ruleChainConnectionInfo) {
         return RuleChainConnectionInfoProto.newBuilder()

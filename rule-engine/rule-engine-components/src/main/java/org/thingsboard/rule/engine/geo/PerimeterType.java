@@ -21,7 +21,7 @@ package org.thingsboard.rule.engine.geo;
  */
 public enum PerimeterType {
     /**
-     * 枚举项说明：本行枚举常量定义 `PerimeterType` 支持的取值，用于配置或处理流程中的分支判断。
+     * 字段名，表示当前对象的对应属性。
      */
     CIRCLE, POLYGON
     /*

@@ -61,9 +61,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-@Slf4j
-@ConditionalOnProperty(prefix = "tbel", value = "enabled", havingValue = "true", matchIfMissing = true)
-@Service
 /**
  * 中文说明：
  * 1. 类目的：`DefaultTbelInvokeService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -74,210 +71,130 @@ import java.util.concurrent.locks.ReentrantLock;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@ConditionalOnProperty(prefix = "tbel", value = "enabled", havingValue = "true", matchIfMissing = true)
+@Service
 public class DefaultTbelInvokeService extends AbstractScriptInvokeService implements TbelInvokeService {
 
     protected final Map<UUID, String> scriptIdToHash = new ConcurrentHashMap<>();
     protected final Map<String, TbelScript> scriptMap = new ConcurrentHashMap<>();
     /**
-     * 字段说明：
-     * 1. 保存 `compiledScriptsCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `compiledScriptsCache` 字段，保存当前对象的对应属性。
      */
     protected Cache<String, Serializable> compiledScriptsCache;
 
     /**
-     * 字段说明：
-     * 1. 保存 `parserConfig` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置，保存当前对象的配置选项。
      */
     private SandboxedParserConfiguration parserConfig;
     private final Optional<TbApiUsageStateClient> apiUsageStateClient;
     /**
-     * 字段说明：
-     * 1. 保存 `apiUsageReportClient` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户端，用于发起外部调用或协议交互。
      */
     private final Optional<TbApiUsageReportClient> apiUsageReportClient;
 
+    /**
+     * 参数，表示当前对象的对应属性。
+     */
     @Getter
     @Value("${tbel.max_total_args_size:100000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxTotalArgsSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long maxTotalArgsSize;
+    /**
+     * `maxResultSize` 字段，保存当前对象的对应属性。
+     */
     @Getter
     @Value("${tbel.max_result_size:300000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxResultSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long maxResultSize;
+    /**
+     * `maxScriptBodySize` 字段，保存当前对象的对应属性。
+     */
     @Getter
     @Value("${tbel.max_script_body_size:50000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxScriptBodySize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long maxScriptBodySize;
 
+    /**
+     * `maxErrors` 字段，保存当前对象的对应属性。
+     */
     @Getter
     @Value("${tbel.max_errors:3}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxErrors` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxErrors;
 
+    /**
+     * 持续时间，用于控制时间范围或等待时长。
+     */
     @Getter
     @Value("${tbel.max_black_list_duration_sec:60}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxBlackListDurationSec` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxBlackListDurationSec;
 
+    /**
+     * 当前请求对象，封装本次处理需要的输入信息。
+     */
     @Getter
     @Value("${tbel.max_requests_timeout:0}")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxInvokeRequestsTimeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long maxInvokeRequestsTimeout;
 
+    /**
+     * 是否启用`stats`。
+     */
     @Getter
     @Value("${tbel.stats.enabled:false}")
-    /**
-     * 字段说明：
-     * 1. 保存 `statsEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private boolean statsEnabled;
 
-    @Value("${tbel.thread_pool_size:50}")
     /**
-     * 字段说明：
-     * 1. 保存 `threadPoolSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 线程池大小，用于控制处理规模或位置。
      */
+    @Value("${tbel.thread_pool_size:50}")
     private int threadPoolSize;
 
-    @Value("${tbel.max_memory_limit_mb:8}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxMemoryLimitMb` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数量限制，用于控制数量、位置或分页范围。
      */
+    @Value("${tbel.max_memory_limit_mb:8}")
     private long maxMemoryLimitMb;
 
-    @Value("${tbel.compiled_scripts_cache_size:1000}")
     /**
-     * 字段说明：
-     * 1. 保存 `compiledScriptsCacheSize` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `compiledScriptsCacheSize` 字段，保存当前对象的对应属性。
      */
+    @Value("${tbel.compiled_scripts_cache_size:1000}")
     private int compiledScriptsCacheSize;
 
     /**
-     * 字段说明：
-     * 1. 保存 `executor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 执行器列表，用于保存一组待处理对象。
      */
     private ListeningExecutorService executor;
 
     private final Lock lock = new ReentrantLock();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `DefaultTbelInvokeService` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `DefaultTbelInvokeService` 实例，并初始化必要字段。
+     * 参数：
+     * - `apiUsageStateClient`：客户端对象。
+     * - `apiUsageReportClient`：客户端对象。
+     * 返回：新创建的对象实例。
      */
     protected DefaultTbelInvokeService(Optional<TbApiUsageStateClient> apiUsageStateClient, Optional<TbApiUsageReportClient> apiUsageReportClient) {
         this.apiUsageStateClient = apiUsageStateClient;
         this.apiUsageReportClient = apiUsageReportClient;
     }
 
-    @Scheduled(fixedDelayString = "${tbel.stats.print_interval_ms:10000}")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `printStats` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `printStats` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Scheduled(fixedDelayString = "${tbel.stats.print_interval_ms:10000}")
     public void printStats() {
         super.printStats();
     }
 
+    /**
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @SneakyThrows
     @PostConstruct
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void init() {
         super.init();
         OptimizerFactory.setDefaultOptimizer(OptimizerFactory.SAFE_REFLECTIVE);
@@ -292,128 +209,97 @@ public class DefaultTbelInvokeService extends AbstractScriptInvokeService implem
             // Special command to warm up TBEL engine
             Serializable script = compileScript("var warmUp = {}; warmUp");
             MVEL.executeTbExpression(script, new ExecutionContext(parserConfig), Collections.emptyMap());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             // do nothing
         }
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         compiledScriptsCache = Caffeine.newBuilder()
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 .maximumSize(compiledScriptsCacheSize)
                 .build();
     }
 
+    /**
+     * 功能：执行 `stop` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @PreDestroy
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `stop` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void stop() {
         super.stop();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (executor != null) {
             executor.shutdownNow();
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStatsName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     protected String getStatsName() {
         return "TBEL Scripts Stats";
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCallbackExecutor` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取回调。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @Override
     protected Executor getCallbackExecutor() {
         return MoreExecutors.directExecutor();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isScriptPresent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Script Present`。
+     * 参数：
+     * - `scriptId`：`scriptId`ID。
+     * 返回：判断结果。
      */
+    @Override
     protected boolean isScriptPresent(UUID scriptId) {
         return scriptIdToHash.containsKey(scriptId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isExecEnabled` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Exec Enabled`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：判断结果。
      */
+    @Override
     protected boolean isExecEnabled(TenantId tenantId) {
         return !apiUsageStateClient.isPresent() || apiUsageStateClient.get().getApiUsageState(tenantId).isTbelExecEnabled();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportExecution` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：上报`Execution`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * 返回：无。
      */
+    @Override
     protected void reportExecution(TenantId tenantId, CustomerId customerId) {
         apiUsageReportClient.ifPresent(client -> client.report(tenantId, customerId, ApiUsageRecordKey.TBEL_EXEC_COUNT, 1));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doEvalScript` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doEvalScript` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `scriptType`：类型。
+     * - `scriptBody`：`scriptBody` 参数。
+     * - `scriptId`：`scriptId`ID。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected ListenableFuture<UUID> doEvalScript(TenantId tenantId, ScriptType scriptType, String scriptBody, UUID scriptId, String[] argNames) {
         return executor.submit(() -> {
             try {
                 String scriptHash = hash(scriptBody, argNames);
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 compiledScriptsCache.get(scriptHash, k -> compileScript(scriptBody));
                 lock.lock();
                 try {
@@ -423,65 +309,51 @@ public class DefaultTbelInvokeService extends AbstractScriptInvokeService implem
                     lock.unlock();
                 }
                 return scriptId;
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 throw new TbScriptException(scriptId, TbScriptException.ErrorCode.COMPILATION, scriptBody, e);
             }
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doInvokeFunction` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doInvokeFunction` 对应的处理。
+     * 参数：
+     * - `scriptId`：`scriptId`ID。
+     * - `args`：传入程序的参数。
+     * 返回：处理结果。
      */
+    @Override
     protected TbelScriptExecutionTask doInvokeFunction(UUID scriptId, Object[] args) {
         ExecutionContext executionContext = new ExecutionContext(this.parserConfig, maxMemoryLimitMb * 1024 * 1024);
         return new TbelScriptExecutionTask(executionContext, executor.submit(() -> {
             String scriptHash = scriptIdToHash.get(scriptId);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (scriptHash == null) {
                 throw new TbScriptException(scriptId, TbScriptException.ErrorCode.OTHER, null, new RuntimeException("Script not found!"));
             }
             TbelScript script = scriptMap.get(scriptHash);
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             Serializable compiledScript = compiledScriptsCache.get(scriptHash, k -> compileScript(script.getScriptBody()));
             try {
                 return MVEL.executeTbExpression(compiledScript, executionContext, script.createVars(args));
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (ScriptMemoryOverflowException e) {
                 throw new TbScriptException(scriptId, TbScriptException.ErrorCode.OTHER, script.getScriptBody(), new RuntimeException("Script memory overflow!"));
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 throw new TbScriptException(scriptId, TbScriptException.ErrorCode.RUNTIME, script.getScriptBody(), e);
             }
         }));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doRelease` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doRelease` 对应的处理。
+     * 参数：
+     * - `scriptId`：`scriptId`ID。
+     * 返回：无。
      */
+    @Override
     protected void doRelease(UUID scriptId) {
         String scriptHash = scriptIdToHash.remove(scriptId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (scriptHash != null) {
             lock.lock();
             try {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!scriptIdToHash.containsValue(scriptHash)) {
                     scriptMap.remove(scriptHash);
                     compiledScriptsCache.invalidate(scriptHash);
@@ -493,30 +365,23 @@ public class DefaultTbelInvokeService extends AbstractScriptInvokeService implem
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `compileScript` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `compileScript` 对应的处理。
+     * 参数：
+     * - `scriptBody`：`scriptBody` 参数。
+     * 返回：处理结果。
      */
     private Serializable compileScript(String scriptBody) {
         return MVEL.compileExpression(scriptBody, new ParserContext());
     }
 
-    @SuppressWarnings("UnstableApiUsage")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hash` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `hash` 对应的处理。
+     * 参数：
+     * - `scriptBody`：`scriptBody` 参数。
+     * - `argNames`：名称。
+     * 返回：文本结果。
      */
+    @SuppressWarnings("UnstableApiUsage")
     protected String hash(String scriptBody, String[] argNames) {
         Hasher hasher = Hashing.murmur3_128().newHasher();
         hasher.putUnencodedChars(scriptBody);

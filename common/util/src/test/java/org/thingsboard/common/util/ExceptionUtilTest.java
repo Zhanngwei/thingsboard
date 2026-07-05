@@ -35,98 +35,67 @@ class ExceptionUtilTest {
 
     final Exception cause = new RuntimeException();
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenRootCause_whenLookupExceptionInCause_thenReturnRootCauseAndNoStackOverflow` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenRootCause_whenLookupExceptionInCause_thenReturnRootCauseAndNoStackOverflow` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenRootCause_whenLookupExceptionInCause_thenReturnRootCauseAndNoStackOverflow() {
         Exception e = cause;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i <= 16384; i++) {
             e = new Exception(e);
         }
         assertThat(ExceptionUtil.lookupExceptionInCause(e, RuntimeException.class)).isSameAs(cause);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenCause_whenLookupExceptionInCause_thenReturnCause` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenCause_whenLookupExceptionInCause_thenReturnCause` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenCause_whenLookupExceptionInCause_thenReturnCause() {
         assertThat(ExceptionUtil.lookupExceptionInCause(new Exception(cause), RuntimeException.class)).isSameAs(cause);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNoCauseAndExceptionIsWantedCauseClass_whenLookupExceptionInCause_thenReturnSelf` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenNoCauseAndExceptionIsWantedCauseClass_whenLookupExceptionInCause_thenReturnSelf` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenNoCauseAndExceptionIsWantedCauseClass_whenLookupExceptionInCause_thenReturnSelf() {
         assertThat(ExceptionUtil.lookupExceptionInCause(cause, RuntimeException.class)).isSameAs(cause);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNoCause_whenLookupExceptionInCause_thenReturnNull` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenNoCause_whenLookupExceptionInCause_thenReturnNull` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenNoCause_whenLookupExceptionInCause_thenReturnNull() {
         assertThat(ExceptionUtil.lookupExceptionInCause(new Exception(), RuntimeException.class)).isNull();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNotWantedCause_whenLookupExceptionInCause_thenReturnNull` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenNotWantedCause_whenLookupExceptionInCause_thenReturnNull` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenNotWantedCause_whenLookupExceptionInCause_thenReturnNull() {
         final Exception cause = new IOException();
         assertThat(ExceptionUtil.lookupExceptionInCause(new Exception(cause), RuntimeException.class)).isNull();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenCause_whenLookupExceptionInCauseByMany_thenReturnFirstCause` 对应的公共工具类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收输入参数后执行本地转换、校验或解析并返回结果。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenCause_whenLookupExceptionInCauseByMany_thenReturnFirstCause` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     void givenCause_whenLookupExceptionInCauseByMany_thenReturnFirstCause() {
         final Exception causeIAE = new IllegalAccessException();
         assertThat(ExceptionUtil.lookupExceptionInCause(new Exception(causeIAE))).isNull();

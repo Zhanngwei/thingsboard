@@ -47,9 +47,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-@Service
-@TbCoreComponent
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultUpdateService` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -60,161 +57,96 @@ import java.util.concurrent.TimeUnit;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Service
+@TbCoreComponent
+@Slf4j
 public class DefaultUpdateService implements UpdateService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `INSTANCE_ID_FILE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 文件常量，用于统一引用固定值。
      */
     private static final String INSTANCE_ID_FILE = ".instance_id";
     private static final String UPDATE_SERVER_BASE_URL = "https://updates.thingsboard.io";
 
     /**
-     * 字段说明：
-     * 1. 保存 `PLATFORM_PARAM` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `PLATFORM_PARAM`常量，用于统一引用固定值。
      */
     private static final String PLATFORM_PARAM = "platform";
     private static final String VERSION_PARAM = "version";
     /**
-     * 字段说明：
-     * 1. 保存 `INSTANCE_ID_PARAM` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `INSTANCE_ID_PARAM`常量，用于统一引用固定值。
      */
     private static final String INSTANCE_ID_PARAM = "instanceId";
 
-    @Value("${updates.enabled}")
     /**
-     * 字段说明：
-     * 1. 保存 `updatesEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否启用`updates`。
      */
+    @Value("${updates.enabled}")
     private boolean updatesEnabled;
 
-    @Autowired(required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `buildProperties` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `buildProperties` 字段，保存当前对象的对应属性。
      */
+    @Autowired(required = false)
     private BuildProperties buildProperties;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRuleProcessor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 处理器，负责处理对应任务或消息。
      */
+    @Autowired
     private NotificationRuleProcessor notificationRuleProcessor;
 
-    @Autowired(required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `edgeInstallInstructionsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 边缘节点，提供当前类调用的业务操作。
      */
+    @Autowired(required = false)
     private EdgeInstallInstructionsService edgeInstallInstructionsService;
 
-    @Autowired(required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `edgeUpgradeInstructionsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 边缘节点，提供当前类调用的业务操作。
      */
+    @Autowired(required = false)
     private EdgeUpgradeInstructionsService edgeUpgradeInstructionsService;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, ThingsBoardThreadFactory.forName("tb-update-service"));
 
     /**
-     * 字段说明：
-     * 1. 保存 `checkUpdatesFuture` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 异步结果，表示当前对象的对应属性。
      */
     private ScheduledFuture<?> checkUpdatesFuture = null;
     private final RestTemplate restClient = new RestTemplate();
 
     /**
-     * 字段说明：
-     * 1. 保存 `updateMessage` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private UpdateMessage updateMessage;
 
     /**
-     * 字段说明：
-     * 1. 保存 `platform` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `platform` 字段，保存当前对象的对应属性。
      */
     private String platform;
     private String version;
     /**
-     * 字段说明：
-     * 1. 保存 `instanceId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `instanceId`ID，用于定位对应业务对象。
      */
     private UUID instanceId = null;
 
-    @AfterStartUp(order = AfterStartUp.REGULAR_SERVICE)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @AfterStartUp(order = AfterStartUp.REGULAR_SERVICE)
     public void init() {
         version = buildProperties != null ? buildProperties.getVersion() : "unknown";
         updateMessage = new UpdateMessage(false, version, "", "",
                 "https://thingsboard.io/docs/reference/releases",
                 "https://thingsboard.io/docs/reference/releases");
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (updatesEnabled) {
             try {
                 platform = System.getProperty("platform", "unknown");
                 instanceId = parseInstanceId();
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 checkUpdatesFuture = scheduler.scheduleAtFixedRate(checkUpdatesRunnable, 0, 1, TimeUnit.HOURS);
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 //Do nothing
             }
@@ -222,32 +154,23 @@ public class DefaultUpdateService implements UpdateService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseInstanceId` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`Instance Id`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private UUID parseInstanceId() throws IOException {
         UUID result = null;
         Path instanceIdPath = Paths.get(INSTANCE_ID_FILE);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (instanceIdPath.toFile().exists()) {
             byte[] data = Files.readAllBytes(instanceIdPath);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (data.length > 0) {
                 try {
                     result = UUID.fromString(new String(data));
-                // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                 } catch (IllegalArgumentException e) {
                     //Do nothing
                 }
             }
         }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (result == null) {
             result = UUID.randomUUID();
             Files.write(instanceIdPath, result.toString().getBytes());
@@ -255,26 +178,18 @@ public class DefaultUpdateService implements UpdateService {
         return result;
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     private void destroy() {
         try {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             if (checkUpdatesFuture != null) {
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 checkUpdatesFuture.cancel(true);
             }
             scheduler.shutdownNow();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             //Do nothing
         }
@@ -291,7 +206,6 @@ public class DefaultUpdateService implements UpdateService {
             request.put(INSTANCE_ID_PARAM, instanceId.toString());
             UpdateMessage prevUpdateMessage = updateMessage;
             updateMessage = restClient.postForObject(UPDATE_SERVER_BASE_URL + "/api/v2/thingsboard/updates", new HttpEntity<>(request.toString(), headers), UpdateMessage.class);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (updateMessage != null && updateMessage.isUpdateAvailable() && !updateMessage.equals(prevUpdateMessage)) {
                 notificationRuleProcessor.process(NewPlatformVersionTrigger.builder()
                         .updateInfo(updateMessage)
@@ -299,7 +213,6 @@ public class DefaultUpdateService implements UpdateService {
             }
             ObjectNode edgeRequest = JacksonUtil.newObjectNode().put(VERSION_PARAM, version);
             String edgeInstallVersion = restClient.postForObject(UPDATE_SERVER_BASE_URL + "/api/v1/edge/installMapping", new HttpEntity<>(edgeRequest.toString(), headers), String.class);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (edgeInstallVersion != null) {
                 edgeInstallInstructionsService.setAppVersion(edgeInstallVersion);
                 edgeUpgradeInstructionsService.setAppVersion(edgeInstallVersion);
@@ -313,17 +226,12 @@ public class DefaultUpdateService implements UpdateService {
         }
     };
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkUpdates` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Updates`。
+     * 参数：无。
+     * 返回：判断结果。
      */
+    @Override
     public UpdateMessage checkUpdates() {
         return updateMessage;
     }

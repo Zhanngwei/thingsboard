@@ -42,7 +42,6 @@ import static org.thingsboard.common.util.JacksonUtil.newArrayNode;
 /**
  * Provides utility methods for SparkplugB MQTT Payload Metric.
  */
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`SparkplugMetricUtil` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -53,17 +52,15 @@ import static org.thingsboard.common.util.JacksonUtil.newArrayNode;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class SparkplugMetricUtil {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromSparkplugBMetricToKeyValueProto` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromSparkplugBMetricToKeyValueProto` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `protoMetric`：`protoMetric` 参数。
+     * 返回：可能存在的结果。
      */
     public static Optional<TransportProtos.KeyValueProto> fromSparkplugBMetricToKeyValueProto(String key, SparkplugBProto.Payload.Metric protoMetric) throws ThingsboardException {
         // Check if the null flag has been set indicating that the value is null
@@ -72,29 +69,23 @@ public class SparkplugMetricUtil {
         }
         // Otherwise convert the value based on the type
         int metricType = protoMetric.getDatatype();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.KeyValueProto.Builder builderProto = TransportProtos.KeyValueProto.newBuilder();
         ArrayNode nodeArray = newArrayNode();
         MetricDataType metricDataType = MetricDataType.fromInteger(metricType);
         try {
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (metricDataType) {
                 case Boolean:
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.BOOLEAN_V)
                             .setBoolV(protoMetric.getBooleanValue()).build());
                 case DateTime:
                 case Int64:
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.LONG_V)
                             .setLongV(protoMetric.getLongValue()).build());
                 case Float:
                     var f = new BigDecimal(String.valueOf(protoMetric.getFloatValue()));
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.DOUBLE_V)
                             .setDoubleV(f.doubleValue()).build());
                 case Double:
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.LONG_V)
                             .setLongV(Double.valueOf(protoMetric.getDoubleValue()).longValue()).build());
                 case Int8:
@@ -102,19 +93,14 @@ public class SparkplugMetricUtil {
                 case Int16:
                 case Int32:
                 case UInt16:
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.LONG_V)
                             .setLongV(protoMetric.getIntValue()).build());
                 case UInt32:
                 case UInt64:
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (protoMetric.hasIntValue()) {
-                        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                         return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.LONG_V)
                                 .setLongV(protoMetric.getIntValue()).build());
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     } else if (protoMetric.hasLongValue()) {
-                        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                         return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.LONG_V)
                                 .setLongV(protoMetric.getLongValue()).build());
                     } else {
@@ -124,7 +110,6 @@ public class SparkplugMetricUtil {
                 case String:
                 case Text:
                 case UUID:
-                    // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                     return Optional.of(builderProto.setKey(key).setType(TransportProtos.KeyValueType.STRING_V)
                             .setStringV(protoMetric.getStringValue()).build());
                 // byte[]
@@ -175,14 +160,13 @@ public class SparkplugMetricUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createMetric` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Metric`。
+     * 参数：
+     * - `value`：值。
+     * - `ts`：时间戳。
+     * - `key`：键。
+     * - `metricDataType`：待处理数据。
+     * 返回：处理结果。
      */
     public static SparkplugBProto.Payload.Metric createMetric(Object value, long ts, String key, MetricDataType metricDataType) throws ThingsboardException {
         SparkplugBProto.Payload.Metric metric = SparkplugBProto.Payload.Metric.newBuilder()
@@ -232,14 +216,12 @@ public class SparkplugMetricUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTsKvProto` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * - `ts`：时间戳。
+     * 返回：处理结果。
      */
     public static TransportProtos.TsKvProto getTsKvProto(String key, Object value, long ts) throws ThingsboardException {
         try {
@@ -277,14 +259,11 @@ public class SparkplugMetricUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validatedValueByTypeMetric` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `validatedValueByTypeMetric` 对应的处理。
+     * 参数：
+     * - `kv`：`kv` 参数。
+     * - `metricDataType`：待处理数据。
+     * 返回：可能存在的结果。
      */
     public static Optional<Object> validatedValueByTypeMetric(TransportProtos.KeyValueProto kv, MetricDataType metricDataType) throws ThingsboardException {
         if (kv.getTypeValue() <= 3) {
@@ -301,14 +280,11 @@ public class SparkplugMetricUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validatedValuePrimitiveByTypeMetric` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `validatedValuePrimitiveByTypeMetric` 对应的处理。
+     * 参数：
+     * - `kv`：`kv` 参数。
+     * - `metricDataType`：待处理数据。
+     * 返回：可能存在的结果。
      */
     public static Optional<Object> validatedValuePrimitiveByTypeMetric(TransportProtos.KeyValueProto kv, MetricDataType metricDataType) throws ThingsboardException {
         Optional<String> valueOpt = getValueKvProtoPrimitive(kv);
@@ -390,14 +366,11 @@ public class SparkplugMetricUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validatedValueJsonByTypeMetric` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `validatedValueJsonByTypeMetric` 对应的处理。
+     * 参数：
+     * - `arrayNodeStr`：`arrayNodeStr` 参数。
+     * - `metricDataType`：待处理数据。
+     * 返回：可能存在的结果。
      */
     public static Optional<Object> validatedValueJsonByTypeMetric(String arrayNodeStr, MetricDataType metricDataType) {
         try {
@@ -429,14 +402,10 @@ public class SparkplugMetricUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getValueKvProtoPrimitive` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `kv`：`kv` 参数。
+     * 返回：可能存在的结果。
      */
     private static Optional<String> getValueKvProtoPrimitive(TransportProtos.KeyValueProto kv) {
         if (kv.getTypeValue() == 0) {         // boolean
@@ -453,14 +422,10 @@ public class SparkplugMetricUtil {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `booleanStringToInt` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `booleanStringToInt` 对应的处理。
+     * 参数：
+     * - `booleanStr`：`booleanStr` 参数。
+     * 返回：可能存在的结果。
      */
     private static Optional<Integer> booleanStringToInt(String booleanStr) {
         if ("true".equals(booleanStr)) {
@@ -472,10 +437,6 @@ public class SparkplugMetricUtil {
         }
     }
 
-    @JsonIgnoreProperties(
-            value = {"fileName"})
-    @JsonSerialize(
-            using = FileSerializer.class)
     /**
      * 中文说明：
      * 1. 类目的：`File` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -486,15 +447,14 @@ public class SparkplugMetricUtil {
      * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
      * 7. 设计模式：主要体现 DTO / Contract / Adapter。
      */
+    @JsonIgnoreProperties(
+            value = {"fileName"})
+    @JsonSerialize(
+            using = FileSerializer.class)
     public class File {
 
         /**
-         * 字段说明：
-         * 1. 保存 `fileName` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 名称，用于标识或展示当前对象。
          */
         private String fileName;
         private byte[] bytes;
@@ -503,14 +463,9 @@ public class SparkplugMetricUtil {
          * Default Constructor
          */
         /**
-         * 方法说明：
-         * 1. 职责：执行 `File` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `SparkplugMetricUtil` 实例，并初始化必要字段。
+         * 参数：无。
+         * 返回：新创建的对象实例。
          */
         public File() {
             super();
@@ -523,14 +478,11 @@ public class SparkplugMetricUtil {
          * @param bytes    the array of bytes that represent the contents of the file
          */
         /**
-         * 方法说明：
-         * 1. 职责：执行 `File` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `SparkplugMetricUtil` 实例，并初始化必要字段。
+         * 参数：
+         * - `fileName`：名称。
+         * - `bytes`：`bytes` 参数。
+         * 返回：新创建的对象实例。
          */
         public File(String fileName, byte[] bytes) {
             super();
@@ -547,14 +499,9 @@ public class SparkplugMetricUtil {
          * @return the full filename path
          */
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getFileName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取名称。
+         * 参数：无。
+         * 返回：文本结果。
          */
         public String getFileName() {
             return fileName;
@@ -566,14 +513,10 @@ public class SparkplugMetricUtil {
          * @param fileName the full filename path
          */
         /**
-         * 方法说明：
-         * 1. 职责：执行 `setFileName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：更新名称。
+         * 参数：
+         * - `fileName`：名称。
+         * 返回：无。
          */
         public void setFileName(String fileName) {
             this.fileName = fileName;
@@ -585,14 +528,9 @@ public class SparkplugMetricUtil {
          * @return the bytes that represent the contents of the file
          */
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getBytes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取`Bytes`。
+         * 参数：无。
+         * 返回：处理结果。
          */
         public byte[] getBytes() {
             return bytes;
@@ -604,30 +542,21 @@ public class SparkplugMetricUtil {
          * @param bytes the bytes that represent the contents of the file
          */
         /**
-         * 方法说明：
-         * 1. 职责：执行 `setBytes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：更新`Bytes`。
+         * 参数：
+         * - `bytes`：`bytes` 参数。
+         * 返回：无。
          */
         public void setBytes(byte[] bytes) {
             this.bytes = bytes;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `toString` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：生成当前对象的文本表示。
+         * 参数：无。
+         * 返回：文本结果。
          */
+        @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append("File [fileName=");

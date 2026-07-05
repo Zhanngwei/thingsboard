@@ -26,8 +26,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
-@Component
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DefaultInMemoryStorage` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -38,25 +36,20 @@ import java.util.concurrent.LinkedBlockingQueue;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Component
+@Slf4j
 public final class DefaultInMemoryStorage implements InMemoryStorage {
     private final ConcurrentHashMap<String, BlockingQueue<TbQueueMsg>> storage = new ConcurrentHashMap<>();
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `printStats` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `printStats` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void printStats() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (log.isDebugEnabled()) {
             storage.forEach((topic, queue) -> {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (queue.size() > 0) {
                     log.debug("[{}] Queue Size [{}]", topic, queue.size());
                 }
@@ -64,57 +57,42 @@ public final class DefaultInMemoryStorage implements InMemoryStorage {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getLagTotal` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Lag Total`。
+     * 参数：无。
+     * 返回：数值结果。
      */
+    @Override
     public int getLagTotal() {
         return storage.values().stream().map(BlockingQueue::size).reduce(0, Integer::sum);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `put` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `put` 对应的处理。
+     * 参数：
+     * - `topic`：主题名称或主题对象。
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
+    @Override
     public boolean put(String topic, TbQueueMsg msg) {
         return storage.computeIfAbsent(topic, (t) -> new LinkedBlockingQueue<>()).add(msg);
     }
 
+    /**
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `topic`：主题名称或主题对象。
+     * 返回：匹配的数据集合。
+     */
     @SuppressWarnings("unchecked")
     @Override
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `get` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public <T extends TbQueueMsg> List<T> get(String topic) throws InterruptedException {
         final BlockingQueue<TbQueueMsg> queue = storage.get(topic);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (queue != null) {
             final TbQueueMsg firstMsg = queue.poll();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (firstMsg != null) {
                 final int queueSize = queue.size();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (queueSize > 0) {
                     final List<TbQueueMsg> entities = new ArrayList<>(Math.min(queueSize, 999) + 1);
                     entities.add(firstMsg);

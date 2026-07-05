@@ -18,10 +18,6 @@ package org.thingsboard.mqtt.integration;
 import org.junit.extensions.cpsuite.ClasspathSuite;
 import org.junit.runner.RunWith;
 
-@RunWith(ClasspathSuite.class)
-@ClasspathSuite.ClassnameFilters({
-        "org.thingsboard.mqtt.integration.*Test",
-})
 /**
  * 中文说明：
  * 1. 类目的：`IntegrationTestSuite` 是 ThingsBoard Netty MQTT 测试模块 中的Netty MQTT 集成测试类型，用于通过内置 MQTT server 验证客户端连接、心跳、发布订阅和异常关闭行为。
@@ -33,6 +29,10 @@ import org.junit.runner.RunWith;
  * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
  * 8. 设计模式：主要体现 Integration Test / Test Server。
  */
+@RunWith(ClasspathSuite.class)
+@ClasspathSuite.ClassnameFilters({
+        "org.thingsboard.mqtt.integration.*Test",
+})
 public class IntegrationTestSuite {
 
 

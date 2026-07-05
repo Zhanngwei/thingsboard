@@ -51,48 +51,25 @@ import java.util.stream.Collectors;
  */
 public class RestJsonConverter {
     /**
-     * 字段说明：
-     * 1. 保存内容：`KEY` 保存本类运行所需的配置常量、客户端状态、解析结果、writer 引用、计数器或协议参数。
-     * 2. 数据来源：来源于构造参数、命令行参数、Spring/HTTP/MQTT 配置、dump 文件解析、JWT 响应、证书文件或类内固定协议常量。
-     * 3. 生命周期：字段生命周期与 `REST JSON 到 KV 模型转换器` 实例或类加载周期一致；静态常量随类加载存在，实例状态随单次客户端会话、迁移命令或 Spring Boot 进程存在。
-     * 4. 设计原因：保存为字段可以复用昂贵对象和跨方法状态，例如 token、writer、字典、分区集合、SSL 参数或默认配置名，避免每次方法调用重复构造。
-     * 5. 线程安全：不可变常量天然安全；可变字段需要遵循调用方生命周期，REST token 刷新使用同步块保护，迁移工具字段通常只在单线程命令流程内使用。
-     * 6. 事务/缓存/MQTT/Actor/数据库/Rule Engine：字段本身不打开事务；是否涉及缓存、MQTT、Actor、数据库或规则链取决于 ThingsBoard Rest Client 模块 的上层流程。
+     * 键常量，用于统一引用固定值。
      */
     private static final String KEY = "key";
     private static final String VALUE = "value";
     private static final String LAST_UPDATE_TS = "lastUpdateTs";
     /**
-     * 字段说明：
-     * 1. 保存内容：`TS` 保存本类运行所需的配置常量、客户端状态、解析结果、writer 引用、计数器或协议参数。
-     * 2. 数据来源：来源于构造参数、命令行参数、Spring/HTTP/MQTT 配置、dump 文件解析、JWT 响应、证书文件或类内固定协议常量。
-     * 3. 生命周期：字段生命周期与 `REST JSON 到 KV 模型转换器` 实例或类加载周期一致；静态常量随类加载存在，实例状态随单次客户端会话、迁移命令或 Spring Boot 进程存在。
-     * 4. 设计原因：保存为字段可以复用昂贵对象和跨方法状态，例如 token、writer、字典、分区集合、SSL 参数或默认配置名，避免每次方法调用重复构造。
-     * 5. 线程安全：不可变常量天然安全；可变字段需要遵循调用方生命周期，REST token 刷新使用同步块保护，迁移工具字段通常只在单线程命令流程内使用。
-     * 6. 事务/缓存/MQTT/Actor/数据库/Rule Engine：字段本身不打开事务；是否涉及缓存、MQTT、Actor、数据库或规则链取决于 ThingsBoard Rest Client 模块 的上层流程。
+     * 时间戳常量，用于统一引用固定值。
      */
     private static final String TS = "ts";
 
     private static final String CAN_T_PARSE_VALUE = "Can't parse value: ";
 
     /**
-     * 方法说明：
-     * 1. 职责：`toAttributes` 执行 REST JSON 到 KV 模型转换器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：作为无状态工具类被静态调用，方法执行期间临时创建转换结果，调用结束即可释放局部对象；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取 JSON 中的 key、value、ts 或 lastUpdateTs 字段，按布尔、数字、文本、JSON 容器类型构造对应 KV entry。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不涉及事务，只在内存中转换 REST 响应数据。
-     * 9. 缓存：不涉及缓存，每次调用都重新转换输入 JSON。
-     * 10. MQTT：REST 客户端不直接使用 MQTT，但设备凭据、遥测、规则链等 API 可能影响后续 MQTT transport 入站行为。
-     * 11. Actor 通信：REST 请求到达服务端后可能触发 Actor 消息，例如设备、规则链或遥测相关操作；本类只负责 HTTP 边界。
-     * 12. 数据库：不访问数据库，数据来源是服务端 REST 响应。
-     * 13. Rule Engine：不执行 Rule Engine，只为可能来自遥测/属性查询的数据构造客户端模型。
+     * 功能：执行 `toAttributes` 对应的处理。
+     * 参数：
+     * - `attributes`：数据列表。
+     * 返回：匹配的数据集合。
      */
     public static List<AttributeKvEntry> toAttributes(List<JsonNode> attributes) {
-        // 空集合直接返回空结果，避免调用方处理 null，同时表达“服务端无数据”而不是转换失败。
         if (!CollectionUtils.isEmpty(attributes)) {
             return attributes.stream().map(attr -> {
                         KvEntry entry = parseValue(attr.get(KEY).asText(), attr.get(VALUE));
@@ -105,23 +82,12 @@ public class RestJsonConverter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：`toTimeseries` 执行 REST JSON 到 KV 模型转换器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：作为无状态工具类被静态调用，方法执行期间临时创建转换结果，调用结束即可释放局部对象；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取 JSON 中的 key、value、ts 或 lastUpdateTs 字段，按布尔、数字、文本、JSON 容器类型构造对应 KV entry。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不涉及事务，只在内存中转换 REST 响应数据。
-     * 9. 缓存：不涉及缓存，每次调用都重新转换输入 JSON。
-     * 10. MQTT：REST 客户端不直接使用 MQTT，但设备凭据、遥测、规则链等 API 可能影响后续 MQTT transport 入站行为。
-     * 11. Actor 通信：REST 请求到达服务端后可能触发 Actor 消息，例如设备、规则链或遥测相关操作；本类只负责 HTTP 边界。
-     * 12. 数据库：不访问数据库，数据来源是服务端 REST 响应。
-     * 13. Rule Engine：不执行 Rule Engine，只为可能来自遥测/属性查询的数据构造客户端模型。
+     * 功能：执行 `toTimeseries` 对应的处理。
+     * 参数：
+     * - `timeseries`：数据列表。
+     * 返回：匹配的数据集合。
      */
     public static List<TsKvEntry> toTimeseries(Map<String, List<JsonNode>> timeseries) {
-        // 空集合直接返回空结果，避免调用方处理 null，同时表达“服务端无数据”而不是转换失败。
         if (!CollectionUtils.isEmpty(timeseries)) {
             List<TsKvEntry> result = new ArrayList<>();
             timeseries.forEach((key, values) ->
@@ -138,31 +104,18 @@ public class RestJsonConverter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：`parseValue` 执行 REST JSON 到 KV 模型转换器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：作为无状态工具类被静态调用，方法执行期间临时创建转换结果，调用结束即可释放局部对象；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取 JSON 中的 key、value、ts 或 lastUpdateTs 字段，按布尔、数字、文本、JSON 容器类型构造对应 KV entry。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不涉及事务，只在内存中转换 REST 响应数据。
-     * 9. 缓存：不涉及缓存，每次调用都重新转换输入 JSON。
-     * 10. MQTT：REST 客户端不直接使用 MQTT，但设备凭据、遥测、规则链等 API 可能影响后续 MQTT transport 入站行为。
-     * 11. Actor 通信：REST 请求到达服务端后可能触发 Actor 消息，例如设备、规则链或遥测相关操作；本类只负责 HTTP 边界。
-     * 12. 数据库：不访问数据库，数据来源是服务端 REST 响应。
-     * 13. Rule Engine：不执行 Rule Engine，只为可能来自遥测/属性查询的数据构造客户端模型。
+     * 功能：解析值。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：处理结果。
      */
     private static KvEntry parseValue(String key, JsonNode value) {
-        // 按 JsonNode 实际类型选择 KV 子类，保持客户端模型与服务端遥测/属性存储类型一致。
         if (!value.isContainerNode()) {
-            // 按 JsonNode 实际类型选择 KV 子类，保持客户端模型与服务端遥测/属性存储类型一致。
             if (value.isBoolean()) {
                 return new BooleanDataEntry(key, value.asBoolean());
-            // 按 JsonNode 实际类型选择 KV 子类，保持客户端模型与服务端遥测/属性存储类型一致。
             } else if (value.isNumber()) {
                 return parseNumericValue(key, value);
-            // 按 JsonNode 实际类型选择 KV 子类，保持客户端模型与服务端遥测/属性存储类型一致。
             } else if (value.isTextual()) {
                 return new StringDataEntry(key, value.asText());
             } else {
@@ -174,30 +127,19 @@ public class RestJsonConverter {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：`parseNumericValue` 执行 REST JSON 到 KV 模型转换器 的一个明确步骤，完成请求发送、参数转换、文件解析、writer 构造、TLS/MQTT 操作或 Spring Boot 启动参数处理。
-     * 2. 输入参数：参数通常表示 REST DTO/ID、分页条件、文件路径、dump 行、Cassandra 行值、命令行参数、证书配置、MQTT 消息或 Spring Boot 启动参数。
-     * 3. 返回值：返回服务端 DTO、转换后的 KV/行值、writer、更新后的参数数组、Optional/PageData/byte[]，或通过 `void` 的副作用完成发送、写入、启动、关闭和断言式失败。
-     * 4. 调用时机：作为无状态工具类被静态调用，方法执行期间临时创建转换结果，调用结束即可释放局部对象；由 SDK 调用方、命令行入口、迁移编排器、SpringApplication 或类内辅助流程触发。
-     * 5. 调用方：可能是外部 Java 客户端、测试/运维脚本、MigratorTool、PgCaMigrator、Spring Boot launcher 或本类其它辅助方法。
-     * 6. 使用流程：读取 JSON 中的 key、value、ts 或 lastUpdateTs 字段，按布尔、数字、文本、JSON 容器类型构造对应 KV entry。
-     * 7. 线程安全：方法本身不额外声明全局线程安全；REST token 刷新依赖同步块，迁移/解析方法按单线程大文件扫描设计，transport 启动方法在进程启动线程中执行。
-     * 8. 事务：不涉及事务，只在内存中转换 REST 响应数据。
-     * 9. 缓存：不涉及缓存，每次调用都重新转换输入 JSON。
-     * 10. MQTT：REST 客户端不直接使用 MQTT，但设备凭据、遥测、规则链等 API 可能影响后续 MQTT transport 入站行为。
-     * 11. Actor 通信：REST 请求到达服务端后可能触发 Actor 消息，例如设备、规则链或遥测相关操作；本类只负责 HTTP 边界。
-     * 12. 数据库：不访问数据库，数据来源是服务端 REST 响应。
-     * 13. Rule Engine：不执行 Rule Engine，只为可能来自遥测/属性查询的数据构造客户端模型。
+     * 功能：解析值。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：处理结果。
      */
     private static KvEntry parseNumericValue(String key, JsonNode value) {
-        // 条件分支用于区分配置是否存在、dump 块边界、类型选择、token 生命周期或协议启动参数覆盖场景。
         if (value.isFloatingPointNumber()) {
             return new DoubleDataEntry(key, value.asDouble());
         } else {
             try {
                 long longValue = Long.parseLong(value.toString());
                 return new LongDataEntry(key, longValue);
-            // 捕获异常后统一转为当前工具或客户端的失败路径，避免静默吞掉认证、解析、写入或协议错误。
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("Big integer values are not supported!");
             }

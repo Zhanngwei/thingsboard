@@ -70,10 +70,6 @@ import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.co
 import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.fromVersionedIdToObjectId;
 import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.valueEquals;
 
-@Slf4j
-@Service
-@TbLwM2mTransportComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`DefaultLwM2MAttributesService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -84,90 +80,57 @@ import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.va
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Service
+@TbLwM2mTransportComponent
+@RequiredArgsConstructor
 public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
 
     //TODO: add timeout logic
     private final AtomicInteger reqIdSeq = new AtomicInteger();
     /**
-     * 字段说明：
-     * 1. 保存 `futures` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `futures`列表，用于保存一组待处理对象。
      */
     private final Map<Integer, SettableFuture<List<TransportProtos.TsKvProto>>> futures;
 
     /**
-     * 字段说明：
-     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TransportService transportService;
     private final LwM2mTransportServerHelper helper;
     /**
-     * 字段说明：
-     * 1. 保存 `clientContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，用于发起外部调用或协议交互。
      */
     private final LwM2mClientContext clientContext;
     private final LwM2MTransportServerConfig config;
     /**
-     * 字段说明：
-     * 1. 保存 `uplinkHandler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 处理器，负责处理对应任务或消息。
      */
     private final LwM2mUplinkMsgHandler uplinkHandler;
     private final LwM2mDownlinkMsgHandler downlinkHandler;
     /**
-     * 字段说明：
-     * 1. 保存 `logService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final LwM2MTelemetryLogService logService;
     private final LwM2MOtaUpdateService otaUpdateService;
     /**
-     * 字段说明：
-     * 1. 保存 `modelProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 提供者，用于按场景创建或提供目标对象。
      */
     private final LwM2mModelProvider modelProvider;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSharedAttributes` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Shared Attributes`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `keys`：键。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<TransportProtos.TsKvProto>> getSharedAttributes(LwM2mClient client, Collection<String> keys) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         SettableFuture<List<TransportProtos.TsKvProto>> future = SettableFuture.create();
         int requestId = reqIdSeq.incrementAndGet();
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         futures.put(requestId, future);
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         transportService.process(client.getSession(), TransportProtos.GetAttributeRequestMsg.newBuilder().setRequestId(requestId).
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 addAllSharedAttributeNames(keys).build(), new TransportServiceCallback<Void>() {
             @Override
             public void onSuccess(Void msg) {
@@ -176,33 +139,25 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
 
             @Override
             public void onError(Throwable e) {
-                // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
                 SettableFuture<List<TransportProtos.TsKvProto>> callback = futures.remove(requestId);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (callback != null) {
                     callback.setException(e);
                 }
             }
         });
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         return future;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onGetAttributesResponse` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理响应。
+     * 参数：
+     * - `getAttributesResponse`：响应对象。
+     * - `sessionInfo`：会话对象。
+     * 返回：无。
      */
+    @Override
     public void onGetAttributesResponse(GetAttributeResponseMsg getAttributesResponse, TransportProtos.SessionInfoProto sessionInfo) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         var callback = futures.remove(getAttributesResponse.getRequestId());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (callback != null) {
             callback.set(getAttributesResponse.getSharedAttributeListList());
         }
@@ -219,20 +174,16 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
      *
      * @param msg -
      */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onAttributesUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Attributes Update`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `sessionInfo`：会话对象。
+     * 返回：无。
      */
+    @Override
     public void onAttributesUpdate(TransportProtos.AttributeUpdateNotificationMsg msg, TransportProtos.SessionInfoProto sessionInfo) {
         LwM2mClient lwM2MClient = clientContext.getClientBySessionInfo(sessionInfo);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (msg.getSharedUpdatedCount() > 0 && lwM2MClient != null) {
             String newFirmwareTitle = null;
             String newFirmwareVersion = null;
@@ -242,9 +193,7 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
             String newSoftwareVersion = null;
             String newSoftwareTag = null;
             String newSoftwareUrl = null;
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             List<TransportProtos.TsKvProto> otherAttributes = new ArrayList<>();
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             for (TransportProtos.TsKvProto tsKvProto : msg.getSharedUpdatedList()) {
                 String attrName = tsKvProto.getKv().getKey();
                 if (compareAttNameKeyOta(attrName)) {
@@ -290,17 +239,15 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
      * and LwM2MClient.delayedRequests.add(path)
      * #2.1 if there is not a difference in values between the current resource values and the shared attribute values
      */
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onAttributesUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Attributes Update`。
+     * 参数：
+     * - `lwM2MClient`：客户端对象。
+     * - `tsKvProtos`：数据列表。
+     * - `logFailedUpdateOfNonChangedValue`：值。
+     * 返回：无。
      */
+    @Override
     public void onAttributesUpdate(LwM2mClient lwM2MClient, List<TransportProtos.TsKvProto> tsKvProtos, boolean logFailedUpdateOfNonChangedValue) {
         log.trace("[{}] onAttributesUpdate [{}]", lwM2MClient.getEndpoint(), tsKvProtos);
         Map<String, TransportProtos.TsKvProto> attributesUpdate = new ConcurrentHashMap<>();
@@ -347,14 +294,14 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `pushUpdateToClientIfNeeded` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交客户端。
+     * 参数：
+     * - `lwM2MClient`：客户端对象。
+     * - `oldValue`：值。
+     * - `newValue`：值。
+     * - `versionedId`：`versionedId`ID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void pushUpdateToClientIfNeeded(LwM2mClient lwM2MClient, Object oldValue, Object newValue,
                                             String versionedId, TransportProtos.TsKvProto tsKvProto, boolean logFailedUpdateOfNonChangedValue) {
@@ -381,14 +328,14 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `pushUpdateMultiToClientIfNeeded` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交客户端。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `resourceModel`：`resourceModel` 参数。
+     * - `newValProto`：`newValProto` 参数。
+     * - `valueOld`：值。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void pushUpdateMultiToClientIfNeeded(LwM2mClient client, ResourceModel resourceModel, JsonElement newValProto,
                                                  Map<Integer, LwM2mResourceInstance> valueOld, String versionedId,
@@ -426,14 +373,11 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
      * @return - value of Resource into format KvProto or null
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getResourceValueFormatKv` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `lwM2MClient`：客户端对象。
+     * - `pathIdVer`：文件或资源路径。
+     * 返回：处理结果。
      */
     private Object getResourceValueFormatKv(LwM2mClient lwM2MClient, String pathIdVer) {
         LwM2mResource resourceValue = LwM2MTransportUtil.getResourceValueFromLwM2MClient(lwM2MClient, pathIdVer);
@@ -454,14 +398,10 @@ public class DefaultLwM2MAttributesService implements LwM2MAttributesService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getStrValue` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `tsKvProto`：`tsKvProto` 参数。
+     * 返回：文本结果。
      */
     private String getStrValue(TransportProtos.TsKvProto tsKvProto) {
         return tsKvProto.getKv().getStringV();

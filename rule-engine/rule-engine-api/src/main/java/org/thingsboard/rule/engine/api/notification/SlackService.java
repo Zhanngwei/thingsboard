@@ -33,41 +33,31 @@ import java.util.List;
 public interface SlackService {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：向指定 Slack 会话发送消息。
-     * 2. 输入参数：tenantId 是租户边界，token 是 Slack 访问令牌，conversationId 是会话 ID，message 是消息内容。
-     * 3. 返回值：无；失败处理由实现决定。
-     * 4. 调用时机：Slack 通知规则节点处理消息或通知中心触发 Slack 投递时调用。
-     * 5. 调用方：Slack 通知节点、通知中心。
-     * 6. 使用流程：属于 Rule Engine 外部通知发送流程。
-     * 7. 线程安全：接口无状态，具体实现需保证 HTTP 客户端和 token 使用并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、MQTT、Actor、数据库；实现可能使用配置缓存并调用 Slack API。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `token`：`token` 参数。
+     * - `conversationId`：`conversationId`ID。
+     * - `message`：待处理消息。
+     * 返回：无。
      */
     void sendMessage(TenantId tenantId, String token, String conversationId, String message);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：查询 Slack 会话列表。
-     * 2. 输入参数：tenantId 是租户边界，token 是 Slack 访问令牌，conversationType 是会话类型。
-     * 3. 返回值：SlackConversation 列表，用于配置界面选择目标会话。
-     * 4. 调用时机：配置 Slack 通知目标或刷新会话列表时调用。
-     * 5. 调用方：通知目标配置流程、Slack 通知节点辅助逻辑。
-     * 6. 使用流程：属于外部 Slack 配置辅助流程。
-     * 7. 线程安全：实现需保证外部 API 客户端并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务、MQTT、Actor、数据库；实现调用 Slack API，可能读取配置缓存。
+     * 功能：获取`Conversations`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `token`：`token` 参数。
+     * - `conversationType`：类型。
+     * 返回：匹配的数据集合。
      */
     List<SlackConversation> listConversations(TenantId tenantId, String token, SlackConversationType conversationType);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：获取租户可用的 Slack token。
-     * 2. 输入参数：tenantId 是租户边界。
-     * 3. 返回值：Slack 访问令牌字符串。
-     * 4. 调用时机：发送 Slack 消息或列出会话前调用。
-     * 5. 调用方：Slack 通知节点、通知目标配置流程。
-     * 6. 使用流程：属于 Rule Engine 通知前置配置读取流程。
-     * 7. 线程安全：实现需保证 token 读取和缓存并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现可能访问数据库或缓存读取 token，直接服务 Rule Engine。
+     * 功能：获取令牌。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：文本结果。
      */
     String getToken(TenantId tenantId);
 

@@ -63,10 +63,6 @@ import static org.thingsboard.server.controller.ControllerConstants.SORT_PROPERT
 import static org.thingsboard.server.controller.ControllerConstants.SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH;
 import static org.thingsboard.server.service.security.permission.Resource.NOTIFICATION;
 
-@RestController
-@TbCoreComponent
-@RequiredArgsConstructor
-@RequestMapping("/api/notification")
 /**
  * 中文说明：
  * 1. 类目的：`NotificationTemplateController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -77,28 +73,28 @@ import static org.thingsboard.server.service.security.permission.Resource.NOTIFI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequiredArgsConstructor
+@RequestMapping("/api/notification")
 public class NotificationTemplateController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `notificationTemplateService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务，提供当前类调用的业务操作。
      */
     private final NotificationTemplateService notificationTemplateService;
     private final NotificationSettingsService notificationSettingsService;
     /**
-     * 字段说明：
-     * 1. 保存 `slackService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final SlackService slackService;
 
+    /**
+     * 功能：保存或创建通知。
+     * 参数：
+     * - `notificationTemplate`：`notificationTemplate` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Save notification template (saveNotificationTemplate)",
             notes = "Creates or updates notification template." + NEW_LINE +
                     "Here is an example of template to send notification via Web, SMS and Slack:\n" +
@@ -141,58 +137,44 @@ public class NotificationTemplateController extends BaseController {
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @PostMapping("/template")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveNotificationTemplate` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public NotificationTemplate saveNotificationTemplate(@RequestBody @Valid NotificationTemplate notificationTemplate) throws Exception {
         notificationTemplate.setTenantId(getTenantId());
         checkEntity(notificationTemplate.getId(), notificationTemplate, NOTIFICATION);
         return doSaveAndLog(EntityType.NOTIFICATION_TEMPLATE, notificationTemplate, notificationTemplateService::saveNotificationTemplate);
     }
 
+    /**
+     * 功能：获取通知。
+     * 参数：
+     * - `id`：`id`ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get notification template by id (getNotificationTemplateById)",
             notes = "Fetches notification template by id." +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping("/template/{id}")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationTemplateById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public NotificationTemplate getNotificationTemplateById(@PathVariable UUID id) throws ThingsboardException {
         NotificationTemplateId notificationTemplateId = new NotificationTemplateId(id);
         return checkEntityId(notificationTemplateId, notificationTemplateService::findNotificationTemplateById, Operation.READ);
     }
 
+    /**
+     * 功能：获取通知。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get notification templates (getNotificationTemplates)",
             notes = "Returns the page of notification templates owned by sysadmin or tenant." + NEW_LINE +
                     PAGE_DATA_PARAMETERS +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping("/templates")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getNotificationTemplates` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<NotificationTemplate> getNotificationTemplates(@ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
                                                                    @RequestParam int pageSize,
                                                                    @ApiParam(value = PAGE_NUMBER_DESCRIPTION, required = true)
@@ -208,7 +190,6 @@ public class NotificationTemplateController extends BaseController {
                                                                    @AuthenticationPrincipal SecurityUser user) throws ThingsboardException {
         // PE: generic permission
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (notificationTypes == null || notificationTypes.length == 0) {
             notificationTypes = NotificationType.values();
         }
@@ -216,22 +197,17 @@ public class NotificationTemplateController extends BaseController {
                 List.of(notificationTypes), pageLink);
     }
 
+    /**
+     * 功能：执行 `method` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete notification template by id (deleteNotificationTemplateById",
             notes = "Deletes notification template by its id." + NEW_LINE +
                     "This template cannot be referenced by existing scheduled notification requests or any notification rules." +
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @DeleteMapping("/template/{id}")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteNotificationTemplateById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteNotificationTemplateById(@PathVariable UUID id) throws Exception {
         NotificationTemplateId notificationTemplateId = new NotificationTemplateId(id);
         NotificationTemplate notificationTemplate = checkEntityId(notificationTemplateId, notificationTemplateService::findNotificationTemplateById, Operation.DELETE);
@@ -243,16 +219,6 @@ public class NotificationTemplateController extends BaseController {
                     SYSTEM_OR_TENANT_AUTHORITY_PARAGRAPH)
     @GetMapping("/slack/conversations")
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN')")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `listSlackConversations` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<SlackConversation> listSlackConversations(@RequestParam SlackConversationType type,
                                                           @ApiParam(value = "Slack bot token. If absent - system Slack settings will be used")
                                                           @RequestParam(required = false) String token,
@@ -262,7 +228,6 @@ public class NotificationTemplateController extends BaseController {
             NotificationSettings settings = notificationSettingsService.findNotificationSettings(user.getTenantId());
             SlackNotificationDeliveryMethodConfig slackConfig = (SlackNotificationDeliveryMethodConfig)
                     settings.getDeliveryMethodsConfigs().get(NotificationDeliveryMethod.SLACK);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (slackConfig == null) {
                 throw new IllegalArgumentException("Slack is not configured");
             }

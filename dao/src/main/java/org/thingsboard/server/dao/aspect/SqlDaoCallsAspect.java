@@ -49,10 +49,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.join;
 
-@Aspect
-@ConditionalOnProperty(prefix = "sql", value = "log_tenant_stats", havingValue = "true")
-@Component
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`SqlDaoCallsAspect` 是 ThingsBoard DAO 模块 中的数据库调用统计切面类型，用于拦截 DAO 方法调用并统计数据库访问耗时、调用次数和快照指标。
@@ -64,60 +60,44 @@ import static org.apache.commons.lang3.StringUtils.join;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Aspect / Observer / Decorator。
  */
+@Aspect
+@ConditionalOnProperty(prefix = "sql", value = "log_tenant_stats", havingValue = "true")
+@Component
+@Slf4j
 public class SqlDaoCallsAspect {
 
     private final Set<String> invalidTenantDbCallMethods = ConcurrentHashMap.newKeySet();
     private final ConcurrentMap<TenantId, DbCallStats> statsMap = new ConcurrentHashMap<>();
 
-    @Value("${sql.batch_sort:true}")
     /**
-     * 字段说明：
-     * 1. 保存 `batchSortEnabled` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 是否启用`batch sort`。
      */
+    @Value("${sql.batch_sort:true}")
     private boolean batchSortEnabled;
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEADLOCK_DETECTED_ERROR` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 错误信息常量，用于统一引用固定值。
      */
     private static final String DEADLOCK_DETECTED_ERROR = "deadlock detected";
 
 
+    /**
+     * 功能：执行 `printStats` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @Scheduled(initialDelayString = "${sql.log_tenant_stats_interval_ms:60000}",
             fixedDelayString = "${sql.log_tenant_stats_interval_ms:60000}")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `printStats` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public void printStats() {
         List<DbCallStatsSnapshot> snapshots = snapshot();
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (snapshots.isEmpty()) return;
         try {
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (log.isTraceEnabled()) {
                 logTopNTenants(snapshots, Comparator.comparing(DbCallStatsSnapshot::getTotalTiming).reversed(), 0, snapshot -> {
                     logSnapshot(snapshot, 0, Comparator.comparing(MethodCallStatsSnapshot::getTiming).reversed(), "timing", log::trace);
                 });
 
                 Map<String, Map<TenantId, MethodCallStatsSnapshot>> byMethodStats = new HashMap<>();
-                // 循环处理批量实体、属性、遥测或测试数据时，需要关注单项失败对整体事务和缓存状态的影响。
                 for (DbCallStatsSnapshot snapshot : snapshots) {
                     snapshot.getMethodStats().forEach((method, stats) -> {
                         byMethodStats.computeIfAbsent(method, m -> new HashMap<>())
@@ -136,7 +116,6 @@ public class SqlDaoCallsAspect {
                                         methodStats.getExecutions(), methodStats.getFailures(), methodStats.getTiming());
                             });
                 });
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             } else if (log.isDebugEnabled()) {
                 log.debug("Total calls statistics below:");
                 logTopNTenants(snapshots, Comparator.comparingInt(DbCallStatsSnapshot::getTotalCalls).reversed(), 10,
@@ -147,7 +126,6 @@ public class SqlDaoCallsAspect {
                 log.debug("Total errors statistics below:");
                 logTopNTenants(snapshots, Comparator.comparingInt(DbCallStatsSnapshot::getTotalFailure).reversed(), 10,
                         s -> logSnapshot(s, 10, Comparator.comparing(MethodCallStatsSnapshot::getFailures).reversed(), "failures", log::debug));
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             } else if (log.isInfoEnabled()) {
                 log.info("Total timing statistics below:");
                 logTopNTenants(snapshots, Comparator.comparingLong(DbCallStatsSnapshot::getTotalTiming).reversed(), 3,
@@ -159,23 +137,20 @@ public class SqlDaoCallsAspect {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logSnapshot` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `logSnapshot` 对应的处理。
+     * 参数：
+     * - `snapshot`：`snapshot` 参数。
+     * - `limit`：数量限制。
+     * - `methodStatsComparator`：`methodStatsComparator` 参数。
+     * - `sortingKey`：键。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void logSnapshot(DbCallStatsSnapshot snapshot, int limit, Comparator<MethodCallStatsSnapshot> methodStatsComparator, String sortingKey, Consumer<String> logger) {
         logger.accept(String.format("[%s]: calls: %s, failures: %s, exec time: %s ",
                 snapshot.getTenantId(), snapshot.getTotalCalls(), snapshot.getTotalFailure(), snapshot.getTotalTiming()));
         var stream = snapshot.getMethodStats().entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(methodStatsComparator));
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (limit > 0) {
             logger.accept(String.format("[%s] Top %s methods by %s:", snapshot.getTenantId(), limit, sortingKey));
             stream = stream.limit(limit);
@@ -188,67 +163,48 @@ public class SqlDaoCallsAspect {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `snapshot` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `snapshot` 对应的处理。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     private List<DbCallStatsSnapshot> snapshot() {
         return statsMap.values().stream().map(DbCallStats::snapshot).collect(Collectors.toList());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logTopNTenants` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `logTopNTenants` 对应的处理。
+     * 参数：
+     * - `snapshots`：数据列表。
+     * - `comparator`：`comparator` 参数。
+     * - `n`：`n` 参数。
+     * - `logFunction`：`logFunction` 参数。
+     * 返回：无。
      */
     private void logTopNTenants(List<DbCallStatsSnapshot> snapshots, Comparator<DbCallStatsSnapshot> comparator,
                                 int n, Consumer<DbCallStatsSnapshot> logFunction) {
         var stream = snapshots.stream().sorted(comparator);
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (n > 0) {
             stream = stream.limit(n);
         }
         stream.forEach(logFunction);
     }
 
+    /**
+     * 功能：处理SQL。
+     * 参数：
+     * - `joinPoint`：`joinPoint` 参数。
+     * 返回：处理结果。
+     */
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Around("@within(org.thingsboard.server.dao.util.SqlDao)")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `handleSqlCall` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
-     */
     public Object handleSqlCall(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         var methodName = signature.toShortString();
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (invalidTenantDbCallMethods.contains(methodName)) {
             //Simply call the method if tenant is not found
             return joinPoint.proceed();
         }
         var tenantId = getTenantId(signature, methodName, joinPoint.getArgs());
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (tenantId == null || tenantId.isNullUid()) {
             //Simply call the method if tenant is null
             return joinPoint.proceed();
@@ -256,11 +212,8 @@ public class SqlDaoCallsAspect {
         var startTime = System.currentTimeMillis();
         try {
             var result = joinPoint.proceed();
-            // 异步结果会在回调或 Future 完成后继续转换，调用方不能假设这里已经同步完成数据库访问。
             if (result instanceof ListenableFuture) {
-                // 异步结果会在回调或 Future 完成后继续转换，调用方不能假设这里已经同步完成数据库访问。
                 Futures.addCallback((ListenableFuture) result,
-                        // 异步结果会在回调或 Future 完成后继续转换，调用方不能假设这里已经同步完成数据库访问。
                         new FutureCallback<>() {
                             @Override
                             public void onSuccess(@Nullable Object result) {
@@ -277,7 +230,6 @@ public class SqlDaoCallsAspect {
                 reportSuccessfulMethodExecution(tenantId, methodName, startTime);
             }
             return result;
-        // 异常在这里被转换为 DAO 层统一失败路径，避免数据库或底层驱动异常直接泄漏给上层调用方。
         } catch (Throwable t) {
             reportFailedMethodExecution(tenantId, methodName, startTime, t, joinPoint);
             throw t;
@@ -285,19 +237,16 @@ public class SqlDaoCallsAspect {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportFailedMethodExecution` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：上报`Failed Method Execution`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `method`：`method` 参数。
+     * - `startTime`：开始时间戳。
+     * - `t`：`t` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void reportFailedMethodExecution(TenantId tenantId, String method, long startTime, Throwable t, ProceedingJoinPoint joinPoint) {
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (t != null) {
             if (ExceptionUtils.indexOfThrowable(t, JDBCConnectionException.class) >= 0) {
                 return;
@@ -315,32 +264,25 @@ public class SqlDaoCallsAspect {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportSuccessfulMethodExecution` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：上报`Successful Method Execution`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `method`：`method` 参数。
+     * - `startTime`：开始时间戳。
+     * 返回：无。
      */
     private void reportSuccessfulMethodExecution(TenantId tenantId, String method, long startTime) {
         reportMethodExecution(tenantId, method, true, startTime);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `reportMethodExecution` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：上报`Method Execution`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `method`：`method` 参数。
+     * - `success`：`success` 参数。
+     * - `startTime`：开始时间戳。
+     * 返回：无。
      */
     private void reportMethodExecution(TenantId tenantId, String method, boolean success, long startTime) {
         statsMap.computeIfAbsent(tenantId, DbCallStats::new)
@@ -348,16 +290,12 @@ public class SqlDaoCallsAspect {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantId` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `signature`：`signature` 参数。
+     * - `methodName`：名称。
+     * - `args`：传入程序的参数。
+     * 返回：处理结果。
      */
     TenantId getTenantId(MethodSignature signature, String methodName, Object[] args) {
         if (args == null || args.length == 0) {
@@ -385,16 +323,10 @@ public class SqlDaoCallsAspect {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addAndLogInvalidMethods` 对应的数据库调用统计切面类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：由 Spring AOP 在应用启动时织入，随 DAO 方法调用持续采样并生成统计快照时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：在 DAO 方法执行前后采集时间和状态，将调用统计累积到可查询的快照对象中。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：保存或创建`And Log Invalid Methods`。
+     * 参数：
+     * - `methodName`：名称。
+     * 返回：无。
      */
     private void addAndLogInvalidMethods(String methodName) {
         invalidTenantDbCallMethods.add(methodName);

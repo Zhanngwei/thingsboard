@@ -33,40 +33,46 @@ import java.util.concurrent.ConcurrentHashMap;
 class DataSnapshot {
 
     /**
-     * 字段说明：保存 `ready`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 当前对象是否已准备就绪。
      */
     private volatile boolean ready;
+    /**
+     * 时间戳，用于标识当前数据或事件发生的时间。
+     */
     @Getter
     @Setter
-    /**
-     * 字段说明：保存 `ts`，表示时间戳，供本类方法在规则节点处理流程中使用。
-     */
     private long ts;
     /**
-     * 字段说明：保存 `keys`，表示消息体、元数据、属性或遥测中的键名，供本类方法在规则节点处理流程中使用。
+     * `keys`集合，用于去重保存或快速判断对象是否存在。
      */
     private final Set<AlarmConditionFilterKey> keys;
     private final Map<AlarmConditionFilterKey, EntityKeyValue> values = new ConcurrentHashMap<>();
 
     /**
-     * 方法说明：构造 `DataSnapshot` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `DataSnapshot` 实例，并初始化必要字段。
+     * 参数：
+     * - `entityKeysToFetch`：实体对象。
+     * 返回：新创建的对象实例。
      */
     DataSnapshot(Set<AlarmConditionFilterKey> entityKeysToFetch) {
         this.keys = entityKeysToFetch;
     }
 
     /**
-     * 方法说明：执行 `toConditionKey` 对应的辅助逻辑，供 `DataSnapshot` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `toConditionKey` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
     static AlarmConditionFilterKey toConditionKey(EntityKey key) {
         return new AlarmConditionFilterKey(toConditionKeyType(key.getType()), key.getKey());
     }
 
     /**
-     * 方法说明：执行 `toConditionKeyType` 对应的辅助逻辑，供 `DataSnapshot` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `toConditionKeyType` 对应的处理。
+     * 参数：
+     * - `keyType`：类型。
+     * 返回：处理结果。
      */
     static AlarmConditionKeyType toConditionKeyType(EntityKeyType keyType) {
         switch (keyType) {
@@ -85,24 +91,34 @@ class DataSnapshot {
     }
 
     /**
-     * 方法说明：从集合、缓存或配置结构中移除数据，供 `DataSnapshot` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：删除或清理值。
+     * 参数：
+     * - `key`：键。
+     * 返回：无。
      */
     void removeValue(EntityKey key) {
         values.remove(toConditionKey(key));
     }
 
     /**
-     * 方法说明：执行 `putValue` 对应的辅助逻辑，供 `DataSnapshot` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `putValue` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `newTs`：时间戳。
+     * - `value`：值。
+     * 返回：判断结果。
      */
     boolean putValue(AlarmConditionFilterKey key, long newTs, EntityKeyValue value) {
         return putIfKeyExists(key, value, ts != newTs);
     }
 
     /**
-     * 方法说明：执行 `putIfKeyExists` 对应的辅助逻辑，供 `DataSnapshot` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `putIfKeyExists` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * - `updateOfTs`：时间戳。
+     * 返回：判断结果。
      */
     private boolean putIfKeyExists(AlarmConditionFilterKey key, EntityKeyValue value, boolean updateOfTs) {
         if (keys.contains(key)) {
@@ -118,8 +134,10 @@ class DataSnapshot {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `DataSnapshot` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
     EntityKeyValue getValue(AlarmConditionFilterKey key) {
         return values.get(key);

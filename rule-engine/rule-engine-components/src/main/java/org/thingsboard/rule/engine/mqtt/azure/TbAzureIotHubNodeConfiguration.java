@@ -18,16 +18,16 @@ package org.thingsboard.rule.engine.mqtt.azure;
 import lombok.Data;
 import org.thingsboard.rule.engine.mqtt.TbMqttNodeConfiguration;
 
-@Data
 /**
- * Azure IoT Hub 节点配置，继承通用 MQTT 配置并提供 Azure 默认值。
- * 配置类本身不直接建立 MQTT 连接、不发布消息，也不处理 Rule Engine 确认或失败路由。
+ * `TbAzureIotHubNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbAzureIotHubNodeConfiguration extends TbMqttNodeConfiguration {
 
     /**
-     * 构造 Azure IoT Hub 的默认 MQTT 配置。
-     * Topic、host、port、SSL 和 SAS 凭据默认值会被 TbAzureIotHubNode 用于初始化 MQTT 客户端。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbAzureIotHubNodeConfiguration defaultConfiguration() {

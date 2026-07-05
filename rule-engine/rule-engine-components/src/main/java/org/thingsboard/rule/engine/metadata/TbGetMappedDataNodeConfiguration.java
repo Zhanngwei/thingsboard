@@ -20,13 +20,13 @@ import lombok.EqualsAndHashCode;
 
 import java.util.Map;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
 /**
  * 中文说明：`TbGetMappedDataNodeConfiguration` 是获取映射数据节点配置对象，用于承载规则节点 JSON 中的配置项和默认值。
  * 配置来源：实例字段通常由前端规则节点配置 JSON 反序列化得到，`defaultConfiguration` 提供缺省配置。
  * 调用边界：本类本身不直接涉及数据库、缓存、MQTT、Actor 或事务；具体实现和调用链可能在使用这些配置的节点中涉及。
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
 public abstract class TbGetMappedDataNodeConfiguration extends TbAbstractFetchToNodeConfiguration {
 
     private Map<String, String> dataMapping;

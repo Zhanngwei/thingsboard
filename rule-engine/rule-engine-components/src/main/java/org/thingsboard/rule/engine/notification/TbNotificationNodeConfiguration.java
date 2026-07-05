@@ -24,27 +24,27 @@ import javax.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 
-@Data
 /**
- * 通知发送节点配置，保存通知目标和模板 ID。
- * 配置类本身不直接发送通知、不访问数据库/缓存，也不涉及异步回调。
+ * `TbNotificationNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbNotificationNodeConfiguration implements NodeConfiguration<TbNotificationNodeConfiguration> {
 
     /**
-     * 通知目标 UUID 列表。
+     * `targets`列表，用于保存一组待处理对象。
      */
     @NotEmpty
     private List<UUID> targets;
     /**
-     * 通知模板 ID。
+     * `templateId`ID，用于定位对应业务对象。
      */
     @NotNull
     private NotificationTemplateId templateId;
 
     /**
-     * 构造通知节点默认配置。
-     * 本方法只返回空配置对象，不直接读取模板或发送通知。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbNotificationNodeConfiguration defaultConfiguration() {

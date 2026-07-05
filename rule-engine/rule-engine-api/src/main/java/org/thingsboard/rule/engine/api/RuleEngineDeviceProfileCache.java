@@ -39,54 +39,40 @@ import java.util.function.Consumer;
 public interface RuleEngineDeviceProfileCache {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按设备配置 ID 获取设备配置。
-     * 2. 输入参数：tenantId 是租户边界，deviceProfileId 是设备配置标识。
-     * 3. 返回值：对应 DeviceProfile。
-     * 4. 调用时机：规则节点需要根据配置 ID 读取设备配置时调用。
-     * 5. 调用方：设备配置相关节点、设备状态处理流程。
-     * 6. 使用流程：属于 Rule Engine 配置读取流程。
-     * 7. 线程安全：接口无状态，实现应保证缓存并发访问安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现涉及缓存，可能访问数据库，不在接口层声明事务。
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceProfileId`：设备配置ID。
+     * 返回：处理结果。
      */
     DeviceProfile get(TenantId tenantId, DeviceProfileId deviceProfileId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按设备 ID 获取其关联的设备配置。
-     * 2. 输入参数：tenantId 是租户边界，deviceId 是设备标识。
-     * 3. 返回值：设备当前关联的 DeviceProfile。
-     * 4. 调用时机：规则节点只有设备 ID、需要配置上下文时调用。
-     * 5. 调用方：设备状态节点、设备配置节点和其它设备相关规则节点。
-     * 6. 使用流程：属于 Rule Engine 设备上下文补全流程。
-     * 7. 线程安全：实现应保证缓存和设备到配置映射的并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及 MQTT/Actor；实现涉及缓存，可能访问数据库，服务 Rule Engine。
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceId`：设备IDID。
+     * 返回：处理结果。
      */
     DeviceProfile get(TenantId tenantId, DeviceId deviceId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：注册设备配置变更监听器。
-     * 2. 输入参数：tenantId 是租户，listenerId 是监听者标识，profileListener 处理配置变更，devicelistener 处理设备到配置关系变更。
-     * 3. 返回值：无。
-     * 4. 调用时机：规则节点初始化或需要感知配置变化时调用。
-     * 5. 调用方：设备状态节点、设备配置相关节点。
-     * 6. 使用流程：属于 Rule Engine 节点生命周期中的缓存监听注册流程。
-     * 7. 线程安全：实现需支持多个节点并发注册和回调。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不直接涉及事务、MQTT、Actor、数据库；实现直接涉及缓存监听，服务 Rule Engine。
+     * 功能：保存或创建监听器。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `listenerId`：监听器ID。
+     * - `profileListener`：`profileListener` 参数。
+     * - `devicelistener`：设备信息或设备标识。
+     * 返回：无。
      */
     void addListener(TenantId tenantId, EntityId listenerId, Consumer<DeviceProfile> profileListener, BiConsumer<DeviceId, DeviceProfile> devicelistener);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：移除指定监听者的设备配置监听。
-     * 2. 输入参数：tenantId 是租户，listenerId 是注册时使用的监听者标识。
-     * 3. 返回值：无。
-     * 4. 调用时机：规则节点销毁或不再需要配置监听时调用。
-     * 5. 调用方：设备配置相关节点的 destroy 生命周期。
-     * 6. 使用流程：属于 Rule Engine 节点资源清理流程。
-     * 7. 线程安全：实现需支持并发移除和回调中的一致性。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及事务、MQTT、Actor、数据库；实现涉及缓存监听清理，服务 Rule Engine。
+     * 功能：删除或清理监听器。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `listenerId`：监听器ID。
+     * 返回：无。
      */
     void removeListener(TenantId tenantId, EntityId listenerId);
 

@@ -49,7 +49,6 @@ import java.util.stream.Collectors;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`AbstractNotifyEntityTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -60,60 +59,41 @@ import static org.mockito.Mockito.times;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@Slf4j
 public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
 
-    @SpyBean
     /**
-     * 字段说明：
-     * 1. 保存 `tbClusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @SpyBean
     protected TbClusterService tbClusterService;
 
-    @SpyBean
     /**
-     * 字段说明：
-     * 1. 保存 `auditLogService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @SpyBean
     protected AuditLogService auditLogService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `msgErrorPermission` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     protected final String msgErrorPermission = "You don't have permission to perform this operation!";
     protected final String msgErrorShouldBeSpecified = "should be specified";
     /**
-     * 字段说明：
-     * 1. 保存 `msgErrorNotFound` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 消息，承载当前步骤需要处理的内容。
      */
     protected final String msgErrorNotFound = "Requested item wasn't found!";
 
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityAllOneTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityAllOneTime(HasName entity, EntityId entityId, EntityId originatorId,
                                               TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -127,14 +107,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyAssignUnassignEntityAllOneTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyAssignUnassignEntityAllOneTime(HasName entity, EntityId entityId, EntityId originatorId,
                                                             TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -148,14 +128,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityAllOneTimeRelation` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `relation`：`relation` 参数。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `userId`：用户ID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityAllOneTimeRelation(EntityRelation relation,
                                                       TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -179,14 +159,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityAllManyRelation` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `relation`：`relation` 参数。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `userId`：用户ID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityAllManyRelation(EntityRelation relation,
                                                    TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -207,14 +187,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityAllOneTimeLogEntityActionEntityEqClass` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityAllOneTimeLogEntityActionEntityEqClass(HasName entity, EntityId entityId, EntityId originatorId,
                                                                           TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -228,14 +208,13 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityNeverMsgToEdgeServiceOneTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `tenantId`：租户IDID。
+     * - `actionType`：类型。
+     * 返回：无。
      */
     protected void testNotifyEntityNeverMsgToEdgeServiceOneTime(HasName entity, EntityId entityId, TenantId tenantId,
                                                                 ActionType actionType) {
@@ -246,14 +225,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityOneTimeMsgToEdgeServiceNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityOneTimeMsgToEdgeServiceNever(HasName entity, EntityId entityId, EntityId originatorId,
                                                                 TenantId tenantId, CustomerId customerId, UserId userId,
@@ -267,14 +246,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyManyEntityManyTimeMsgToEdgeServiceEntityEqAny` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `originator`：`originator` 参数。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyManyEntityManyTimeMsgToEdgeServiceEntityEqAny(HasName entity, HasName originator,
                                                                            TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -294,14 +273,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyManyEntityManyTimeMsgToEdgeServiceEntityEqAnyAdditionalInfoAny` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证扩展信息相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `originator`：`originator` 参数。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyManyEntityManyTimeMsgToEdgeServiceEntityEqAnyAdditionalInfoAny(HasName entity, HasName originator,
                                                                                             TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -321,14 +300,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyManyEntityManyTimeMsgToEdgeServiceNeverAdditionalInfoAny` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证扩展信息相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `originator`：`originator` 参数。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyManyEntityManyTimeMsgToEdgeServiceNeverAdditionalInfoAny(HasName entity, HasName originator,
                                                                                       TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -349,14 +328,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityBroadcastEntityStateChangeEventOneTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityBroadcastEntityStateChangeEventOneTime(HasName entity, EntityId entityId, EntityId originatorId,
                                                                           TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -371,14 +350,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityBroadcastEntityStateChangeEventOneTimeMsgToEdgeServiceNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityBroadcastEntityStateChangeEventOneTimeMsgToEdgeServiceNever(HasName entity, EntityId entityId, EntityId originatorId,
                                                                                                TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -393,14 +372,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityBroadcastEntityStateChangeEventMany` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `originator`：`originator` 参数。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityBroadcastEntityStateChangeEventMany(HasName entity, HasName originator,
                                                                        TenantId tenantId, CustomerId customerId,
@@ -424,14 +403,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityMsgToEdgePushMsgToCoreOneTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `entityId`：实体IDID。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityMsgToEdgePushMsgToCoreOneTime(HasName entity, EntityId entityId, EntityId originatorId,
                                                                  TenantId tenantId, CustomerId customerId, UserId userId, String userName,
@@ -444,14 +423,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityEqualsOneTimeServiceNeverError` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `tenantId`：租户IDID。
+     * - `userId`：用户ID。
+     * - `userName`：名称。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityEqualsOneTimeServiceNeverError(HasName entity, TenantId tenantId,
                                                                   UserId userId, String userName, ActionType actionType, Exception exp,
@@ -468,14 +447,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityIsNullOneTimeEdgeServiceNeverError` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `tenantId`：租户IDID。
+     * - `userId`：用户ID。
+     * - `userName`：名称。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testNotifyEntityIsNullOneTimeEdgeServiceNeverError(HasName entity, TenantId tenantId,
                                                                       UserId userId, String userName, ActionType actionType, Exception exp,
@@ -492,14 +471,11 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotifyEntityNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `entity`：实体对象。
+     * 返回：无。
      */
     protected void testNotifyEntityNever(EntityId entityId, HasName entity) {
         entityId = entityId == null ? createEntityId_NULL_UUID(entity) : entityId;
@@ -510,14 +486,11 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationMsgToEdgeServiceNeverWithActionType` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证通知服务相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `actionType`：类型。
+     * 返回：无。
      */
     private void testNotificationMsgToEdgeServiceNeverWithActionType(EntityId entityId, ActionType actionType) {
         EdgeEventActionType edgeEventActionType = ActionType.CREDENTIALS_UPDATED.equals(actionType) ?
@@ -527,14 +500,10 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationMsgToEdgeServiceNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证通知服务相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：无。
      */
     private void testNotificationMsgToEdgeServiceNever(EntityId entityId) {
         Mockito.verify(tbClusterService, never()).sendNotificationMsgToEdge(Mockito.any(), Mockito.any(),
@@ -542,14 +511,11 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testLogEntityActionNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `entity`：实体对象。
+     * 返回：无。
      */
     private void testLogEntityActionNever(EntityId entityId, HasName entity) {
         ArgumentMatcher<HasName> matcherEntity = entity == null ? Objects::isNull :
@@ -560,14 +526,10 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushMsgToRuleEngineNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证规则引擎相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：无。
      */
     private void testPushMsgToRuleEngineNever(EntityId entityId) {
         Mockito.verify(tbClusterService, never()).pushMsgToRuleEngine(Mockito.any(),
@@ -575,14 +537,10 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testBroadcastEntityStateChangeEventNever` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * 返回：无。
      */
     protected void testBroadcastEntityStateChangeEventNever(EntityId entityId) {
         Mockito.verify(tbClusterService, never()).broadcastEntityStateChangeEvent(Mockito.any(),
@@ -590,14 +548,13 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushMsgToRuleEngineTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证规则引擎相关场景。
+     * 参数：
+     * - `matcherOriginatorId`：`matcherOriginatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - `entity`：实体对象。
+     * - `cntTime`：`cntTime` 参数。
+     * 返回：无。
      */
     private void testPushMsgToRuleEngineTime(ArgumentMatcher<EntityId> matcherOriginatorId, TenantId tenantId, HasName entity, int cntTime) {
         tenantId = tenantId.isNullUid() && ((HasTenantId) entity).getTenantId() != null ? ((HasTenantId) entity).getTenantId() : tenantId;
@@ -606,14 +563,13 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationMsgToEdgeServiceTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证通知服务相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `tenantId`：租户IDID。
+     * - `actionType`：类型。
+     * - `cntTime`：`cntTime` 参数。
+     * 返回：无。
      */
     private void testNotificationMsgToEdgeServiceTime(EntityId entityId, TenantId tenantId, ActionType actionType, int cntTime) {
         EdgeEventActionType edgeEventActionType = ActionType.CREDENTIALS_UPDATED.equals(actionType) ?
@@ -626,14 +582,12 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testSendNotificationMsgToEdgeServiceTimeEntityEqAny` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证通知服务相关场景。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `actionType`：类型。
+     * - `cntTime`：`cntTime` 参数。
+     * 返回：无。
      */
     private void testSendNotificationMsgToEdgeServiceTimeEntityEqAny(TenantId tenantId, ActionType actionType, int cntTime) {
         Mockito.verify(tbClusterService, times(cntTime)).sendNotificationMsgToEdge(Mockito.eq(tenantId),
@@ -642,14 +596,12 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testBroadcastEntityStateChangeEventTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `tenantId`：租户IDID。
+     * - `cntTime`：`cntTime` 参数。
+     * 返回：无。
      */
     protected void testBroadcastEntityStateChangeEventTime(EntityId entityId, TenantId tenantId, int cntTime) {
         ArgumentMatcher<TenantId> matcherTenantIdId = cntTime > 1 || tenantId == null ? argument -> argument.getClass().equals(TenantId.class) :
@@ -659,29 +611,24 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testPushMsgToCoreTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证时间相关场景。
+     * 参数：
+     * - `cntTime`：`cntTime` 参数。
+     * 返回：无。
      */
     private void testPushMsgToCoreTime(int cntTime) {
-        // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
         Mockito.verify(tbClusterService, times(cntTime)).pushMsgToCore(Mockito.any(ToDeviceActorNotificationMsg.class), Mockito.isNull());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testLogEntityAction` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testLogEntityAction(HasName entity, EntityId originatorId, TenantId tenantId,
                                        CustomerId customerId, UserId userId, String userName,
@@ -697,14 +644,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testLogEntityActionEntityEqClass` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     protected void testLogEntityActionEntityEqClass(HasName entity, EntityId originatorId, TenantId tenantId,
                                                     CustomerId customerId, UserId userId, String userName,
@@ -720,20 +667,19 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testLogEntityActionAdditionalInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证扩展信息相关场景。
+     * 参数：
+     * - `matcherEntity`：实体对象。
+     * - `matcherOriginatorId`：`matcherOriginatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - `matcherCustomerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void testLogEntityActionAdditionalInfo(ArgumentMatcher<HasName> matcherEntity, ArgumentMatcher<EntityId> matcherOriginatorId,
                                                    TenantId tenantId, ArgumentMatcher<CustomerId> matcherCustomerId,
                                                    ArgumentMatcher<UserId> matcherUserId, String userName, ActionType actionType,
                                                    int cntTime, List<ArgumentMatcher<Object>> matcherAdditionalInfos) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (matcherAdditionalInfos.size()) {
             case 1:
                 Mockito.verify(auditLogService, times(cntTime))
@@ -788,20 +734,19 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testLogEntityActionAdditionalInfoAny` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证扩展信息相关场景。
+     * 参数：
+     * - `matcherEntity`：实体对象。
+     * - `matcherOriginatorId`：`matcherOriginatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - `matcherCustomerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void testLogEntityActionAdditionalInfoAny(ArgumentMatcher<HasName> matcherEntity, ArgumentMatcher<EntityId> matcherOriginatorId,
                                                       TenantId tenantId, ArgumentMatcher<CustomerId> matcherCustomerId,
                                                       ArgumentMatcher<UserId> matcherUserId, String userName,
                                                       ActionType actionType, int cntTime, int cntAdditionalInfo) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (cntAdditionalInfo) {
             case 1:
                 Mockito.verify(auditLogService, times(cntTime))
@@ -856,14 +801,14 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testLogEntityActionErrorAdditionalInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证扩展信息相关场景。
+     * 参数：
+     * - `matcherEntity`：实体对象。
+     * - `originatorId`：`originatorId`ID。
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
     private void testLogEntityActionErrorAdditionalInfo(ArgumentMatcher<HasName> matcherEntity, EntityId originatorId, TenantId tenantId,
                                                         CustomerId customerId, UserId userId, String userName, ActionType actionType,
@@ -871,7 +816,6 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
                                                         List<ArgumentMatcher<Object>> matcherAdditionalInfos) {
         ArgumentMatcher<UserId> matcherUserId = userId == null ? argument -> argument.getClass().equals(UserId.class) :
                 argument -> argument.equals(userId);
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (matcherAdditionalInfos.size()) {
             case 1:
                 Mockito.verify(auditLogService, times(cntTime))
@@ -925,18 +869,13 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractMatcherAdditionalInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractMatcherAdditionalInfo` 对应的处理。
+     * 参数：
+     * - `additionalInfos`：`additionalInfos` 参数。
+     * 返回：匹配的数据集合。
      */
     private List<ArgumentMatcher<Object>> extractMatcherAdditionalInfo(Object... additionalInfos) {
         List<ArgumentMatcher<Object>> matcherAdditionalInfos = new ArrayList<>(additionalInfos.length);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Object additionalInfo : additionalInfos) {
             matcherAdditionalInfos.add(argument -> argument.equals(extractParameter(additionalInfo.getClass(), additionalInfo)));
         }
@@ -944,18 +883,13 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractMatcherAdditionalInfoClass` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractMatcherAdditionalInfoClass` 对应的处理。
+     * 参数：
+     * - `additionalInfos`：`additionalInfos` 参数。
+     * 返回：匹配的数据集合。
      */
     private List<ArgumentMatcher<Object>> extractMatcherAdditionalInfoClass(Object... additionalInfos) {
         List<ArgumentMatcher<Object>> matcherAdditionalInfos = new ArrayList<>(additionalInfos.length);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Object additionalInfo : additionalInfos) {
             matcherAdditionalInfos.add(argument -> argument.getClass().equals(extractParameter(additionalInfo.getClass(), additionalInfo).getClass()));
         }
@@ -963,21 +897,16 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractParameter` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractParameter` 对应的处理。
+     * 参数：
+     * - `clazz`：`clazz` 参数。
+     * - `additionalInfo`：`additionalInfo` 参数。
+     * 返回：处理结果。
      */
     private <T> T extractParameter(Class<T> clazz, Object additionalInfo) {
         T result = null;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (additionalInfo != null) {
             Object paramObject = additionalInfo;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (clazz.isInstance(paramObject)) {
                 result = clazz.cast(paramObject);
             }
@@ -986,56 +915,41 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createEntityId_NULL_UUID` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建实体ID。
+     * 参数：
+     * - `entity`：实体对象。
+     * 返回：处理结果。
      */
     protected EntityId createEntityId_NULL_UUID(HasName entity) {
         return EntityIdFactory.getByTypeAndUuid(entityClassToEntityTypeName(entity), ModelConstants.NULL_UUID);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `msgErrorFieldLength` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `msgErrorFieldLength` 对应的处理。
+     * 参数：
+     * - `fieldName`：名称。
+     * 返回：文本结果。
      */
     protected String msgErrorFieldLength(String fieldName) {
         return fieldName + " length must be equal or less than 255";
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `msgErrorNoFound` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `msgErrorNoFound` 对应的处理。
+     * 参数：
+     * - `entityClassName`：实体对象。
+     * - `entityIdStr`：实体对象。
+     * 返回：文本结果。
      */
     protected String msgErrorNoFound(String entityClassName, String entityIdStr) {
         return entityClassName + " with id [" + entityIdStr + "] is not found";
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `entityClassToEntityTypeName` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `entityClassToEntityTypeName` 对应的处理。
+     * 参数：
+     * - `entity`：实体对象。
+     * 返回：文本结果。
      */
     private String entityClassToEntityTypeName(HasName entity) {
         String entityType =  entityClassToString(entity);
@@ -1044,14 +958,10 @@ public abstract class AbstractNotifyEntityTest extends AbstractWebTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `entityClassToString` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `entityClassToString` 对应的处理。
+     * 参数：
+     * - `entity`：实体对象。
+     * 返回：文本结果。
      */
     private String entityClassToString(HasName entity) {
         String className = entity.getClass().toString()

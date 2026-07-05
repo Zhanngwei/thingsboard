@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbPubSubAdmin` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -47,59 +46,37 @@ import java.util.concurrent.ConcurrentHashMap;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class TbPubSubAdmin implements TbQueueAdmin {
     /**
-     * 字段说明：
-     * 1. 保存 `ACK_DEADLINE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `ACK_DEADLINE`常量，用于统一引用固定值。
      */
     private static final String ACK_DEADLINE = "ackDeadlineInSec";
     private static final String MESSAGE_RETENTION = "messageRetentionInSec";
 
     /**
-     * 字段说明：
-     * 1. 保存 `topicAdminClient` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主题，用于发起外部调用或协议交互。
      */
     private final TopicAdminClient topicAdminClient;
     private final SubscriptionAdminClient subscriptionAdminClient;
 
     /**
-     * 字段说明：
-     * 1. 保存 `pubSubSettings` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
     private final TbPubSubSettings pubSubSettings;
     private final Set<String> topicSet = ConcurrentHashMap.newKeySet();
     private final Set<String> subscriptionSet = ConcurrentHashMap.newKeySet();
     /**
-     * 字段说明：
-     * 1. 保存 `subscriptionProperties` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 订阅映射关系，用于按键查找对应值。
      */
     private final Map<String, String> subscriptionProperties;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbPubSubAdmin` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbPubSubAdmin` 实例，并初始化必要字段。
+     * 参数：
+     * - `pubSubSettings`：配置对象。
+     * - `subscriptionSettings`：配置对象。
+     * 返回：新创建的对象实例。
      */
     public TbPubSubAdmin(TbPubSubSettings pubSubSettings, Map<String, String> subscriptionSettings) {
         this.pubSubSettings = pubSubSettings;
@@ -108,7 +85,6 @@ public class TbPubSubAdmin implements TbQueueAdmin {
         TopicAdminSettings topicAdminSettings;
         try {
             topicAdminSettings = TopicAdminSettings.newBuilder().setCredentialsProvider(pubSubSettings.getCredentialsProvider()).build();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.error("Failed to create TopicAdminSettings");
             throw new RuntimeException("Failed to create TopicAdminSettings.");
@@ -117,7 +93,6 @@ public class TbPubSubAdmin implements TbQueueAdmin {
         SubscriptionAdminSettings subscriptionAdminSettings;
         try {
             subscriptionAdminSettings = SubscriptionAdminSettings.newBuilder().setCredentialsProvider(pubSubSettings.getCredentialsProvider()).build();
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.error("Failed to create SubscriptionAdminSettings");
             throw new RuntimeException("Failed to create SubscriptionAdminSettings.");
@@ -129,11 +104,9 @@ public class TbPubSubAdmin implements TbQueueAdmin {
             ListTopicsRequest listTopicsRequest =
                     ListTopicsRequest.newBuilder().setProject(ProjectName.format(pubSubSettings.getProjectId())).build();
             TopicAdminClient.ListTopicsPagedResponse response = topicAdminClient.listTopics(listTopicsRequest);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (Topic topic : response.iterateAll()) {
                 topicSet.add(topic.getName());
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.error("Failed to get topics.", e);
             throw new RuntimeException("Failed to get topics.", e);
@@ -149,35 +122,29 @@ public class TbPubSubAdmin implements TbQueueAdmin {
             SubscriptionAdminClient.ListSubscriptionsPagedResponse response =
                     subscriptionAdminClient.listSubscriptions(listSubscriptionsRequest);
 
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (Subscription subscription : response.iterateAll()) {
                 subscriptionSet.add(subscription.getName());
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.error("Failed to get subscriptions.", e);
             throw new RuntimeException("Failed to get subscriptions.", e);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createTopicIfNotExists` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建主题。
+     * 参数：
+     * - `partition`：分区标识或分区信息。
+     * - `properties`：`properties` 参数。
+     * 返回：无。
      */
+    @Override
     public void createTopicIfNotExists(String partition, String properties) {
         TopicName topicName = TopicName.newBuilder()
                 .setTopic(partition)
                 .setProject(pubSubSettings.getProjectId())
                 .build();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (topicSet.contains(topicName.toString())) {
             createSubscriptionIfNotExists(partition, topicName);
             return;
@@ -186,9 +153,7 @@ public class TbPubSubAdmin implements TbQueueAdmin {
         ListTopicsRequest listTopicsRequest =
                 ListTopicsRequest.newBuilder().setProject(ProjectName.format(pubSubSettings.getProjectId())).build();
         TopicAdminClient.ListTopicsPagedResponse response = topicAdminClient.listTopics(listTopicsRequest);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (Topic topic : response.iterateAll()) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (topic.getName().contains(topicName.toString())) {
                 topicSet.add(topic.getName());
                 createSubscriptionIfNotExists(partition, topicName);
@@ -199,7 +164,6 @@ public class TbPubSubAdmin implements TbQueueAdmin {
         try {
             topicAdminClient.createTopic(topicName);
             log.info("Created new topic: [{}]", topicName.toString());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (AlreadyExistsException e) {
             log.info("[{}] Topic already exist.", topicName.toString());
         } finally {
@@ -208,17 +172,13 @@ public class TbPubSubAdmin implements TbQueueAdmin {
         createSubscriptionIfNotExists(partition, topicName);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteTopic` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理主题。
+     * 参数：
+     * - `topic`：主题名称或主题对象。
+     * 返回：无。
      */
+    @Override
     public void deleteTopic(String topic) {
         TopicName topicName = TopicName.newBuilder()
                 .setTopic(topic)
@@ -228,11 +188,9 @@ public class TbPubSubAdmin implements TbQueueAdmin {
         ProjectSubscriptionName subscriptionName =
                 ProjectSubscriptionName.of(pubSubSettings.getProjectId(), topic);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (topicSet.contains(topicName.toString())) {
             topicAdminClient.deleteTopic(topicName);
         } else {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (topicAdminClient.getTopic(topicName) != null) {
                 topicAdminClient.deleteTopic(topicName);
             } else {
@@ -252,14 +210,11 @@ public class TbPubSubAdmin implements TbQueueAdmin {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createSubscriptionIfNotExists` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建订阅。
+     * 参数：
+     * - `partition`：分区标识或分区信息。
+     * - `topicName`：主题名称或主题对象。
+     * 返回：无。
      */
     private void createSubscriptionIfNotExists(String partition, TopicName topicName) {
         ProjectSubscriptionName subscriptionName =
@@ -298,14 +253,10 @@ public class TbPubSubAdmin implements TbQueueAdmin {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setAckDeadline` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Ack Deadline`。
+     * 参数：
+     * - `builder`：`builder` 参数。
+     * 返回：无。
      */
     private void setAckDeadline(Subscription.Builder builder) {
         if (subscriptionProperties.containsKey(ACK_DEADLINE)) {
@@ -314,14 +265,10 @@ public class TbPubSubAdmin implements TbQueueAdmin {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setMessageRetention` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新消息。
+     * 参数：
+     * - `builder`：`builder` 参数。
+     * 返回：无。
      */
     private void setMessageRetention(Subscription.Builder builder) {
         if (subscriptionProperties.containsKey(MESSAGE_RETENTION)) {
@@ -333,17 +280,12 @@ public class TbPubSubAdmin implements TbQueueAdmin {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void destroy() {
         if (topicAdminClient != null) {
             topicAdminClient.close();

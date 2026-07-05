@@ -27,13 +27,6 @@ import lombok.ToString;
 
 import java.util.List;
 
-@EqualsAndHashCode
-@Data
-@ToString(exclude = {"clientSecret"})
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@ApiModel
 /**
  * 中文说明：
  * 1. 类目的：`OAuth2RegistrationInfo` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -44,146 +37,83 @@ import java.util.List;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@EqualsAndHashCode
+@Data
+@ToString(exclude = {"clientSecret"})
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ApiModel
 public class OAuth2RegistrationInfo {
+    /**
+     * 配置映射关系，用于按键查找对应值。
+     */
     @ApiModelProperty(value = "Config for mapping OAuth2 log in response to platform entities", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `mapperConfig` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private OAuth2MapperConfig mapperConfig;
+    /**
+     * 客户端ID，用于定位对应业务对象。
+     */
     @ApiModelProperty(value = "OAuth2 client ID. Cannot be empty", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `clientId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String clientId;
+    /**
+     * 客户端，用于发起外部调用或协议交互。
+     */
     @ApiModelProperty(value = "OAuth2 client secret. Cannot be empty", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `clientSecret` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String clientSecret;
+    /**
+     * URI 地址，用于定位外部资源或本地资源。
+     */
     @ApiModelProperty(value = "Authorization URI of the OAuth2 provider. Cannot be empty", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `authorizationUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String authorizationUri;
+    /**
+     * URI 地址，用于定位外部资源或本地资源。
+     */
     @ApiModelProperty(value = "Access token URI of the OAuth2 provider. Cannot be empty", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `accessTokenUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String accessTokenUri;
+    /**
+     * `scope`列表，用于保存一组待处理对象。
+     */
     @ApiModelProperty(value = "OAuth scopes that will be requested from OAuth2 platform. Cannot be empty", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `scope` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private List<String> scope;
+    /**
+     * 用户对象，用于描述当前业务场景。
+     */
     @ApiModelProperty(value = "User info URI of the OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `userInfoUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String userInfoUri;
+    /**
+     * 用户，用于标识或展示当前对象。
+     */
     @ApiModelProperty(value = "Name of the username attribute in OAuth2 provider response. Cannot be empty")
-    /**
-     * 字段说明：
-     * 1. 保存 `userNameAttributeName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String userNameAttributeName;
+    /**
+     * URI 地址，用于定位外部资源或本地资源。
+     */
     @ApiModelProperty(value = "JSON Web Key URI of the OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `jwkSetUri` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String jwkSetUri;
+    /**
+     * 客户端，用于发起外部调用或协议交互。
+     */
     @ApiModelProperty(value = "Client authentication method to use: 'BASIC' or 'POST'. Cannot be empty", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `clientAuthenticationMethod` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String clientAuthenticationMethod;
+    /**
+     * 显示标签，用于展示或标识当前对象。
+     */
     @ApiModelProperty(value = "OAuth2 provider label. Cannot be empty", required = true)
-    /**
-     * 字段说明：
-     * 1. 保存 `loginButtonLabel` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String loginButtonLabel;
+    /**
+     * `loginButtonIcon` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(value = "Log in button icon for OAuth2 provider")
-    /**
-     * 字段说明：
-     * 1. 保存 `loginButtonIcon` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String loginButtonIcon;
+    /**
+     * `platforms`列表，用于保存一组待处理对象。
+     */
     @ApiModelProperty(value = "List of platforms for which usage of the OAuth2 client is allowed (empty for all allowed)")
-    /**
-     * 字段说明：
-     * 1. 保存 `platforms` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private List<PlatformType> platforms;
-    @ApiModelProperty(value = "Additional info of OAuth2 client (e.g. providerName)", required = true)
     /**
-     * 字段说明：
-     * 1. 保存 `additionalInfo` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 扩展信息，表示当前对象的对应属性。
      */
+    @ApiModelProperty(value = "Additional info of OAuth2 client (e.g. providerName)", required = true)
     private JsonNode additionalInfo;
 }
 

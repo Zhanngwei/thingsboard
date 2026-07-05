@@ -21,7 +21,6 @@ import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`BulkImportResult` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -32,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@Data
 public class BulkImportResult<E> {
     private AtomicInteger created = new AtomicInteger();
     private AtomicInteger updated = new AtomicInteger();

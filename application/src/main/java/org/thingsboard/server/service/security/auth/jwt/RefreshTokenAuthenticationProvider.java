@@ -45,8 +45,6 @@ import org.thingsboard.server.service.security.model.token.RawAccessJwtToken;
 
 import java.util.UUID;
 
-@Component
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`RefreshTokenAuthenticationProvider` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
@@ -57,39 +55,27 @@ import java.util.UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Strategy。
  */
+@Component
+@RequiredArgsConstructor
 public class RefreshTokenAuthenticationProvider implements AuthenticationProvider {
     /**
-     * 字段说明：
-     * 1. 保存 `tokenFactory` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 工厂，用于按场景创建或提供目标对象。
      */
     private final JwtTokenFactory tokenFactory;
     private final UserService userService;
     /**
-     * 字段说明：
-     * 1. 保存 `customerService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户，提供当前类调用的业务操作。
      */
     private final CustomerService customerService;
     private final TokenOutdatingService tokenOutdatingService;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `authenticate` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `authenticate` 对应的处理。
+     * 参数：
+     * - `authentication`：`authentication` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         Assert.notNull(authentication, "No authentication data provided");
         RawAccessJwtToken rawAccessToken = (RawAccessJwtToken) authentication.getCredentials();
@@ -97,14 +83,12 @@ public class RefreshTokenAuthenticationProvider implements AuthenticationProvide
         UserPrincipal principal = unsafeUser.getUserPrincipal();
 
         SecurityUser securityUser;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (principal.getType() == UserPrincipal.Type.USER_NAME) {
             securityUser = authenticateByUserId(unsafeUser.getId());
         } else {
             securityUser = authenticateByPublicId(principal.getValue());
         }
         securityUser.setSessionId(unsafeUser.getSessionId());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tokenOutdatingService.isOutdated(rawAccessToken.getToken(), securityUser.getId())) {
             throw new CredentialsExpiredException("Token is outdated");
         }
@@ -113,35 +97,27 @@ public class RefreshTokenAuthenticationProvider implements AuthenticationProvide
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `authenticateByUserId` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `authenticateByUserId` 对应的处理。
+     * 参数：
+     * - `userId`：用户ID。
+     * 返回：处理结果。
      */
     private SecurityUser authenticateByUserId(UserId userId) {
         TenantId systemId = TenantId.SYS_TENANT_ID;
         User user = userService.findUserById(systemId, userId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (user == null) {
             throw new UsernameNotFoundException("User not found by refresh token");
         }
 
         UserCredentials userCredentials = userService.findUserCredentialsByUserId(systemId, user.getId());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (userCredentials == null) {
             throw new UsernameNotFoundException("User credentials not found");
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!userCredentials.isEnabled()) {
             throw new DisabledException("User is not active");
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (user.getAuthority() == null) throw new InsufficientAuthenticationException("User has no authority assigned");
 
         UserPrincipal userPrincipal = new UserPrincipal(UserPrincipal.Type.USER_NAME, user.getEmail());
@@ -151,31 +127,24 @@ public class RefreshTokenAuthenticationProvider implements AuthenticationProvide
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `authenticateByPublicId` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `authenticateByPublicId` 对应的处理。
+     * 参数：
+     * - `publicId`：`publicId`ID。
+     * 返回：处理结果。
      */
     private SecurityUser authenticateByPublicId(String publicId) {
         TenantId systemId = TenantId.SYS_TENANT_ID;
         CustomerId customerId;
         try {
             customerId = new CustomerId(UUID.fromString(publicId));
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             throw new BadCredentialsException("Refresh token is not valid");
         }
         Customer publicCustomer = customerService.findCustomerById(systemId, customerId);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (publicCustomer == null) {
             throw new UsernameNotFoundException("Public entity not found by refresh token");
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!publicCustomer.isPublic()) {
             throw new BadCredentialsException("Refresh token is not valid");
         }
@@ -195,17 +164,13 @@ public class RefreshTokenAuthenticationProvider implements AuthenticationProvide
         return securityUser;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `supports` 对应的安全认证服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `supports` 对应的处理。
+     * 参数：
+     * - `authentication`：`authentication` 参数。
+     * 返回：判断结果。
      */
+    @Override
     public boolean supports(Class<?> authentication) {
         return (RefreshAuthenticationToken.class.isAssignableFrom(authentication));
     }

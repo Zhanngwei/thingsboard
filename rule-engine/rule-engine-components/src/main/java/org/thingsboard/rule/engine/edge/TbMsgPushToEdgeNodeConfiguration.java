@@ -19,17 +19,17 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.thingsboard.server.common.data.DataConstants;
 
+/**
+ * `TbMsgPushToEdgeNodeConfiguration` 类，封装当前模块中的一组相关职责。
+ */
 @EqualsAndHashCode(callSuper = true)
 @Data
-/**
- * Push to Edge 节点配置，继承基础 scope 配置。
- * 配置类本身不直接保存 EdgeEvent、不访问数据库/缓存，也不涉及异步回调。
- */
 public class TbMsgPushToEdgeNodeConfiguration extends BaseTbMsgPushNodeConfiguration {
 
     /**
-     * 构造 Push to Edge 节点默认配置。
-     * 本方法只设置 SERVER_SCOPE，不直接查询 Edge 或保存事件。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbMsgPushToEdgeNodeConfiguration defaultConfiguration() {

@@ -104,10 +104,6 @@ import static org.thingsboard.server.controller.ControllerConstants.SORT_PROPERT
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_AUTHORITY_PARAGRAPH;
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 
-@Slf4j
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
 /**
  * 中文说明：
  * 1. 类目的：`RuleChainController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -118,48 +114,32 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@Slf4j
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
 public class RuleChainController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `RULE_CHAIN_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 规则链常量，用于统一引用固定值。
      */
     public static final String RULE_CHAIN_ID = "ruleChainId";
     public static final String RULE_NODE_ID = "ruleNodeId";
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEFAULT_PAGE_SIZE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `DEFAULT_PAGE_SIZE`常量，用于统一引用固定值。
      */
     private static final int DEFAULT_PAGE_SIZE = 1000;
 
     /**
-     * 字段说明：
-     * 1. 保存 `TIMEOUT` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间常量，用于统一引用固定值。
      */
     public static final int TIMEOUT = 20;
 
     private static final String RULE_CHAIN_DESCRIPTION = "The rule chain object is lightweight and contains general information about the rule chain. " +
             "List of rule nodes and their connection is stored in a separate 'metadata' object.";
     /**
-     * 字段说明：
-     * 1. 保存 `RULE_CHAIN_METADATA_DESCRIPTION` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 规则链常量，用于统一引用固定值。
      */
     private static final String RULE_CHAIN_METADATA_DESCRIPTION = "The metadata object contains information about the rule nodes and their connections.";
     private static final String TEST_SCRIPT_FUNCTION = "Execute the Script function and return the result. The format of request: \n\n"
@@ -178,98 +158,59 @@ public class RuleChainController extends BaseController {
             + MARKDOWN_CODE_BLOCK_END
             + "\n\n Expected result JSON contains \"output\" and \"error\".";
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tbRuleChainService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 规则链，提供当前类调用的业务操作。
      */
+    @Autowired
     protected TbRuleChainService tbRuleChainService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `eventService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 事件，提供当前类调用的业务操作。
      */
+    @Autowired
     private EventService eventService;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `jsInvokeService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private JsInvokeService jsInvokeService;
 
-    @Autowired(required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `tbelInvokeService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired(required = false)
     private TbelInvokeService tbelInvokeService;
 
-    @Autowired(required = false)
     /**
-     * 字段说明：
-     * 1. 保存 `actorContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
+    @Autowired(required = false)
     private ActorSystemContext actorContext;
 
-    @Value("${actors.rule.chain.debug_mode_rate_limits_per_tenant.enabled}")
     /**
-     * 字段说明：
-     * 1. 保存 `debugPerTenantEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否启用租户。
      */
+    @Value("${actors.rule.chain.debug_mode_rate_limits_per_tenant.enabled}")
     private boolean debugPerTenantEnabled;
 
-    @Value("${tbel.enabled:true}")
     /**
-     * 字段说明：
-     * 1. 保存 `tbelEnabled` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否启用`tbel`。
      */
+    @Value("${tbel.enabled:true}")
     private boolean tbelEnabled;
 
+    /**
+     * 功能：获取规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Rule Chain (getRuleChainById)",
             notes = "Fetch the Rule Chain object based on the provided Rule Chain Id. " + RULE_CHAIN_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleChainById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain getRuleChainById(
             @ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
             @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
@@ -278,22 +219,18 @@ public class RuleChainController extends BaseController {
         return checkRuleChain(ruleChainId, Operation.READ);
     }
 
+    /**
+     * 功能：获取规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Rule Chain output labels (getRuleChainOutputLabels)",
             notes = "Fetch the unique labels for the \"output\" Rule Nodes that belong to the Rule Chain based on the provided Rule Chain Id. "
                     + RULE_CHAIN_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}/output/labels", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleChainOutputLabels` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Set<String> getRuleChainOutputLabels(
             @ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
             @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
@@ -303,22 +240,18 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.getRuleChainOutputLabels(getTenantId(), ruleChainId);
     }
 
+    /**
+     * 功能：获取规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get output labels usage (getRuleChainOutputLabelsUsage)",
             notes = "Fetch the list of rule chains and the relation types (labels) they use to process output of the current rule chain based on the provided Rule Chain Id. "
                     + RULE_CHAIN_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}/output/labels/usage", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleChainOutputLabelsUsage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<RuleChainOutputLabelsUsage> getRuleChainOutputLabelsUsage(
             @ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
             @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
@@ -328,21 +261,17 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.getOutputLabelUsage(getCurrentUser().getTenantId(), ruleChainId);
     }
 
+    /**
+     * 功能：获取规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Rule Chain (getRuleChainById)",
             notes = "Fetch the Rule Chain Metadata object based on the provided Rule Chain Id. " + RULE_CHAIN_METADATA_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}/metadata", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleChainMetaData` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChainMetaData getRuleChainMetaData(
             @ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
             @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
@@ -352,6 +281,12 @@ public class RuleChainController extends BaseController {
         return ruleChainService.loadRuleChainMetaData(getTenantId(), ruleChainId);
     }
 
+    /**
+     * 功能：保存或创建规则链。
+     * 参数：
+     * - `ruleChain`：`ruleChain` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create Or Update Rule Chain (saveRuleChain)",
             notes = "Create or update the Rule Chain. When creating Rule Chain, platform generates Rule Chain Id as " + UUID_WIKI_LINK +
                     "The newly created Rule Chain Id will be present in the response. " +
@@ -363,16 +298,6 @@ public class RuleChainController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveRuleChain` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain saveRuleChain(
             @ApiParam(value = "A JSON value representing the rule chain.")
             @RequestBody RuleChain ruleChain) throws Exception {
@@ -381,22 +306,18 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.save(ruleChain, getCurrentUser());
     }
 
+    /**
+     * 功能：保存或创建规则链。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create Default Rule Chain",
             notes = "Create rule chain from template, based on the specified name in the request. " +
                     "Creates the rule chain based on the template that is used to create root rule chain. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/device/default", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveRuleChain` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain saveRuleChain(
             @ApiParam(value = "A JSON value representing the request.")
             @RequestBody DefaultRuleChainCreateRequest request) throws Exception {
@@ -405,21 +326,17 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.saveDefaultByName(getTenantId(), request, getCurrentUser());
     }
 
+    /**
+     * 功能：更新规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Set Root Rule Chain (setRootRuleChain)",
             notes = "Makes the rule chain to be root rule chain. Updates previous root rule chain as well. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}/root", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `setRootRuleChain` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain setRootRuleChain(
             @ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
             @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
@@ -429,21 +346,20 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.setRootRuleChain(getTenantId(), ruleChain, getCurrentUser());
     }
 
+    /**
+     * 功能：保存或创建规则链。
+     * 参数：
+     * - `ruleChainMetaData`：待处理数据。
+     * - `updateRelated`：`updateRelated` 参数。
+     * - `false`：`false` 参数。
+     * - `updateRelated`：`updateRelated` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Update Rule Chain Metadata",
             notes = "Updates the rule chain metadata. " + RULE_CHAIN_METADATA_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/metadata", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveRuleChainMetaData` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChainMetaData saveRuleChainMetaData(
             @ApiParam(value = "A JSON value representing the rule chain metadata.")
             @RequestBody RuleChainMetaData ruleChainMetaData,
@@ -451,11 +367,9 @@ public class RuleChainController extends BaseController {
             @RequestParam(value = "updateRelated", required = false, defaultValue = "true") boolean updateRelated
     ) throws Exception {
         TenantId tenantId = getTenantId();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (debugPerTenantEnabled) {
             ConcurrentMap<TenantId, DebugTbRateLimits> debugPerTenantLimits = actorContext.getDebugPerTenantLimits();
             DebugTbRateLimits debugTbRateLimits = debugPerTenantLimits.getOrDefault(tenantId, null);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (debugTbRateLimits != null) {
                 debugPerTenantLimits.remove(tenantId, debugTbRateLimits);
             }
@@ -465,21 +379,21 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.saveRuleChainMetaData(tenantId, ruleChain, ruleChainMetaData, updateRelated, getCurrentUser());
     }
 
+    /**
+     * 功能：获取`Rule Chains`。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Rule Chains (getRuleChains)",
             notes = "Returns a page of Rule Chains owned by tenant. " + RULE_CHAIN_DESCRIPTION + PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChains", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getRuleChains` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<RuleChain> getRuleChains(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -496,29 +410,24 @@ public class RuleChainController extends BaseController {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
         RuleChainType type = RuleChainType.CORE;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (typeStr != null && typeStr.trim().length() > 0) {
             type = RuleChainType.valueOf(typeStr);
         }
         return checkNotNull(ruleChainService.findTenantRuleChainsByType(tenantId, type, pageLink));
     }
 
+    /**
+     * 功能：删除或清理规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete rule chain (deleteRuleChain)",
             notes = "Deletes the rule chain. Referencing non-existing rule chain Id will cause an error. " +
                     "Referencing rule chain that is used in the device profiles will cause an error." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteRuleChain` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteRuleChain(
             @ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
             @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
@@ -528,22 +437,18 @@ public class RuleChainController extends BaseController {
         tbRuleChainService.delete(ruleChain, getCurrentUser());
     }
 
+    /**
+     * 功能：获取规则节点。
+     * 参数：
+     * - `strRuleNodeId`：规则节点ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get latest input message (getLatestRuleNodeDebugInput)",
             notes = "Gets the input message from the debug events for specified Rule Chain Id. " +
                     "Referencing non-existing rule chain Id will cause an error. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleNode/{ruleNodeId}/debugIn", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getLatestRuleNodeDebugInput` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public JsonNode getLatestRuleNodeDebugInput(
             @ApiParam(value = RULE_NODE_ID_PARAM_DESCRIPTION)
             @PathVariable(RULE_NODE_ID) String strRuleNodeId) throws ThingsboardException {
@@ -553,12 +458,9 @@ public class RuleChainController extends BaseController {
         TenantId tenantId = getCurrentUser().getTenantId();
         List<EventInfo> events = eventService.findLatestEvents(tenantId, ruleNodeId, EventType.DEBUG_RULE_NODE, 2);
         JsonNode result = null;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (events != null) {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (EventInfo event : events) {
                 JsonNode body = event.getBody();
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (body.has("type") && body.get("type").asText().equals("IN")) {
                     result = body;
                     break;
@@ -568,40 +470,32 @@ public class RuleChainController extends BaseController {
         return result;
     }
 
+    /**
+     * 功能：判断`Tbel Enabled`。
+     * 参数：无。
+     * 返回：判断结果。
+     */
     @ApiOperation(value = "Is TBEL script executor enabled",
             notes = "Returns 'True' if the TBEL script execution is enabled" + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/tbelEnabled", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `isTbelEnabled` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Boolean isTbelEnabled() {
         return tbelEnabled;
     }
 
+    /**
+     * 功能：验证`Script`相关场景。
+     * 参数：
+     * - `scriptLang`：`scriptLang` 参数。
+     * - `inputParams`：`inputParams` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Test Script function",
             notes = TEST_SCRIPT_FUNCTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/testScript", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `testScript` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public JsonNode testScript(
             @ApiParam(value = "Script language: JS or TBEL")
             @RequestParam(required = false) ScriptLanguage scriptLang,
@@ -621,22 +515,18 @@ public class RuleChainController extends BaseController {
         String errorText = "";
         ScriptEngine engine = null;
         try {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (scriptLang == null) {
                 scriptLang = ScriptLanguage.JS;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (ScriptLanguage.JS.equals(scriptLang)) {
                 engine = new RuleNodeJsScriptEngine(getTenantId(), jsInvokeService, script, argNames);
             } else {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (tbelInvokeService == null) {
                     throw new IllegalArgumentException("TBEL script engine is disabled!");
                 }
                 engine = new RuleNodeTbelScriptEngine(getTenantId(), tbelInvokeService, script, argNames);
             }
             TbMsg inMsg = TbMsg.newMsg(msgType, null, new TbMsgMetaData(metadata), TbMsgDataType.JSON, data);
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (scriptType) {
                 case "update":
                     output = msgToOutput(engine.executeUpdateAsync(inMsg).get(TIMEOUT, TimeUnit.SECONDS));
@@ -662,12 +552,10 @@ public class RuleChainController extends BaseController {
                 default:
                     throw new IllegalArgumentException("Unsupported script type: " + scriptType);
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("Error evaluating JS function", e);
             errorText = e.getMessage();
         } finally {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (engine != null) {
                 engine.destroy();
             }
@@ -678,20 +566,17 @@ public class RuleChainController extends BaseController {
         return result;
     }
 
+    /**
+     * 功能：执行 `exportRuleChains` 对应的处理。
+     * 参数：
+     * - `export`：`export` 参数。
+     * - `limit`：数量限制。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Export Rule Chains", notes = "Exports all tenant rule chains as one JSON." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChains/export", params = {"limit"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `exportRuleChains` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChainData exportRuleChains(
             @ApiParam(value = "A limit of rule chains to export.", required = true)
             @RequestParam("limit") int limit) throws ThingsboardException {
@@ -700,20 +585,18 @@ public class RuleChainController extends BaseController {
         return checkNotNull(ruleChainService.exportTenantRuleChains(tenantId, pageLink));
     }
 
+    /**
+     * 功能：执行 `importRuleChains` 对应的处理。
+     * 参数：
+     * - `ruleChainData`：待处理数据。
+     * - `false`：`false` 参数。
+     * - `overwrite`：`overwrite` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Import Rule Chains", notes = "Imports all tenant rule chains as one JSON." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChains/import", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `importRuleChains` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<RuleChainImportResult> importRuleChains(
             @ApiParam(value = "A JSON value representing the rule chains.")
             @RequestBody RuleChainData ruleChainData,
@@ -731,14 +614,10 @@ public class RuleChainController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `msgToOutput` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `msgToOutput` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：文本结果。
      */
     private String msgToOutput(TbMsg msg) throws Exception {
         JsonNode resultNode = convertMsgToOut(msg);
@@ -746,14 +625,10 @@ public class RuleChainController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `msgToOutput` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `msgToOutput` 对应的处理。
+     * 参数：
+     * - `msgs`：待处理消息。
+     * 返回：文本结果。
      */
     private String msgToOutput(List<TbMsg> msgs) throws Exception {
         JsonNode resultNode;
@@ -770,14 +645,10 @@ public class RuleChainController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertMsgToOut` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换消息。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private JsonNode convertMsgToOut(TbMsg msg) throws Exception {
         ObjectNode msgData = JacksonUtil.newObjectNode();
@@ -790,6 +661,13 @@ public class RuleChainController extends BaseController {
         return msgData;
     }
 
+    /**
+     * 功能：执行 `assignRuleChainToEdge` 对应的处理。
+     * 参数：
+     * - `strEdgeId`：边缘节点ID。
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Assign rule chain to edge (assignRuleChainToEdge)",
             notes = "Creates assignment of an existing rule chain to an instance of The Edge. " +
                     EDGE_ASSIGN_ASYNC_FIRST_STEP_DESCRIPTION +
@@ -801,16 +679,6 @@ public class RuleChainController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/edge/{edgeId}/ruleChain/{ruleChainId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignRuleChainToEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain assignRuleChainToEdge(@PathVariable("edgeId") String strEdgeId,
                                            @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
         checkParameter("edgeId", strEdgeId);
@@ -824,6 +692,13 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.assignRuleChainToEdge(getTenantId(), ruleChain, edge, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `unassignRuleChainFromEdge` 对应的处理。
+     * 参数：
+     * - `strEdgeId`：边缘节点ID。
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Unassign rule chain from edge (unassignRuleChainFromEdge)",
             notes = "Clears assignment of the rule chain to the edge. " +
                     EDGE_UNASSIGN_ASYNC_FIRST_STEP_DESCRIPTION +
@@ -834,16 +709,6 @@ public class RuleChainController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/edge/{edgeId}/ruleChain/{ruleChainId}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignRuleChainFromEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain unassignRuleChainFromEdge(@PathVariable("edgeId") String strEdgeId,
                                                @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
         checkParameter("edgeId", strEdgeId);
@@ -856,21 +721,21 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.unassignRuleChainFromEdge(getTenantId(), ruleChain, edge, getCurrentUser());
     }
 
+    /**
+     * 功能：获取边缘节点。
+     * 参数：
+     * - `EDGE_ID_PARAM_DESCRIPTION`：`EDGE_ID_PARAM_DESCRIPTION` 参数。
+     * - `strEdgeId`：边缘节点ID。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Edge Rule Chains (getEdgeRuleChains)",
             notes = "Returns a page of Rule Chains assigned to the specified edge. " + RULE_CHAIN_DESCRIPTION + PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/edge/{edgeId}/ruleChains", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getEdgeRuleChains` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<RuleChain> getEdgeRuleChains(
             @ApiParam(value = EDGE_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable(EDGE_ID) String strEdgeId,
@@ -892,22 +757,18 @@ public class RuleChainController extends BaseController {
         return checkNotNull(ruleChainService.findRuleChainsByTenantIdAndEdgeId(tenantId, edgeId, pageLink));
     }
 
+    /**
+     * 功能：更新规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Set Edge Template Root Rule Chain (setEdgeTemplateRootRuleChain)",
             notes = "Makes the rule chain to be root rule chain for any new edge that will be created. " +
                     "Does not update root rule chain for already created edges. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}/edgeTemplateRoot", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `setEdgeTemplateRootRuleChain` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain setEdgeTemplateRootRuleChain(@ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
                                                   @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
         checkParameter(RULE_CHAIN_ID, strRuleChainId);
@@ -916,22 +777,18 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.setEdgeTemplateRootRuleChain(getTenantId(), ruleChain, getCurrentUser());
     }
 
+    /**
+     * 功能：更新规则链。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Set Auto Assign To Edge Rule Chain (setAutoAssignToEdgeRuleChain)",
             notes = "Makes the rule chain to be automatically assigned for any new edge that will be created. " +
                     "Does not assign this rule chain for already created edges. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}/autoAssignToEdge", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `setAutoAssignToEdgeRuleChain` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain setAutoAssignToEdgeRuleChain(@ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
                                                   @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
         checkParameter(RULE_CHAIN_ID, strRuleChainId);
@@ -940,22 +797,18 @@ public class RuleChainController extends BaseController {
         return tbRuleChainService.setAutoAssignToEdgeRuleChain(getTenantId(), ruleChain, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `unsetAutoAssignToEdgeRuleChain` 对应的处理。
+     * 参数：
+     * - `strRuleChainId`：规则链ID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Unset Auto Assign To Edge Rule Chain (unsetAutoAssignToEdgeRuleChain)",
             notes = "Removes the rule chain from the list of rule chains that are going to be automatically assigned for any new edge that will be created. " +
                     "Does not unassign this rule chain for already assigned edges. " + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/{ruleChainId}/autoAssignToEdge", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unsetAutoAssignToEdgeRuleChain` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public RuleChain unsetAutoAssignToEdgeRuleChain(@ApiParam(value = RULE_CHAIN_ID_PARAM_DESCRIPTION)
                                                     @PathVariable(RULE_CHAIN_ID) String strRuleChainId) throws ThingsboardException {
         checkParameter(RULE_CHAIN_ID, strRuleChainId);
@@ -965,21 +818,16 @@ public class RuleChainController extends BaseController {
     }
 
     // TODO: @voba refactor this - add new config to edge rule chain to set it as auto-assign
+    /**
+     * 功能：获取边缘节点。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Auto Assign To Edge Rule Chains (getAutoAssignToEdgeRuleChains)",
             notes = "Returns a list of Rule Chains that will be assigned to a newly created edge. " + RULE_CHAIN_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/ruleChain/autoAssignToEdgeRuleChains", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getAutoAssignToEdgeRuleChains` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<RuleChain> getAutoAssignToEdgeRuleChains() throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         List<RuleChain> result = new ArrayList<>();

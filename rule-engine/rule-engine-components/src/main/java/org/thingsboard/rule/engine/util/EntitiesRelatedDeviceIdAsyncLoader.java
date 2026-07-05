@@ -26,19 +26,17 @@ import org.thingsboard.server.common.data.id.EntityId;
 import org.thingsboard.server.common.data.relation.RelationsSearchParameters;
 
 /**
- * 按关系条件异步查找关联设备 ID 的工具类。
- * 本类不保存状态；关系查询和设备查询由 DeviceService 处理，数据库或缓存读取策略由服务层决定。
+ * `EntitiesRelatedDeviceIdAsyncLoader` 类，封装当前模块中的一组相关职责。
  */
 public class EntitiesRelatedDeviceIdAsyncLoader {
 
     /**
-     * 从指定 originator 出发查找第一条匹配关系上的设备 ID。
-     * 本方法返回异步结果，转换回调在 ctx.getDbCallbackExecutor() 上执行；它不直接发送 Rule Engine 消息，只为调用方提供后续流转所需的实体 ID。
-     *
-     * @param ctx 规则节点上下文，提供租户、设备服务和回调执行器
-     * @param originator 查询起点实体
-     * @param deviceRelationsQuery 设备关系查询配置
-     * @return 第一个匹配设备 ID 的异步结果，未找到时为 null
+     * 功能：获取设备。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `originator`：`originator` 参数。
+     * - `deviceRelationsQuery`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
      */
     public static ListenableFuture<DeviceId> findDeviceAsync(
             TbContext ctx,
@@ -55,12 +53,11 @@ public class EntitiesRelatedDeviceIdAsyncLoader {
     }
 
     /**
-     * 根据规则节点配置构造设备搜索查询。
-     * 本方法只组装内存查询对象，不访问数据库、缓存或 Rule Engine 上下文。
-     *
-     * @param originator 查询起点实体
-     * @param deviceRelationsQuery 设备关系查询配置
-     * @return DeviceService 可消费的查询对象
+     * 功能：构建查询条件。
+     * 参数：
+     * - `originator`：`originator` 参数。
+     * - `deviceRelationsQuery`：设备信息或设备标识。
+     * 返回：处理结果。
      */
     private static DeviceSearchQuery buildQuery(EntityId originator, DeviceRelationsQuery deviceRelationsQuery) {
         var query = new DeviceSearchQuery();

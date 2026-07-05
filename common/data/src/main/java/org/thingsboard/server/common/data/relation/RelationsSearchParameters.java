@@ -29,9 +29,6 @@ import java.util.UUID;
 /**
  * Created by ashvayka on 03.05.17.
  */
-@ApiModel
-@Data
-@AllArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`RelationsSearchParameters` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -42,92 +39,64 @@ import java.util.UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@ApiModel
+@Data
+@AllArgsConstructor
 public class RelationsSearchParameters {
 
+    /**
+     * `rootId`ID，用于定位对应业务对象。
+     */
     @ApiModelProperty(position = 1, value = "Root entity id to start search from.", example = "784f394c-42b6-435a-983c-b7beff2784f9")
-    /**
-     * 字段说明：
-     * 1. 保存 `rootId` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private UUID rootId;
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @ApiModelProperty(position = 2, value = "Type of the root entity.")
-    /**
-     * 字段说明：
-     * 1. 保存 `rootType` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private EntityType rootType;
+    /**
+     * `direction` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(position = 3, value = "Type of the root entity.")
-    /**
-     * 字段说明：
-     * 1. 保存 `direction` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private EntitySearchDirection direction;
+    /**
+     * 关系，用于区分不同处理分支。
+     */
     @ApiModelProperty(position = 4, value = "Type of the relation.")
-    /**
-     * 字段说明：
-     * 1. 保存 `relationTypeGroup` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private RelationTypeGroup relationTypeGroup;
+    /**
+     * `maxLevel` 字段，保存当前对象的对应属性。
+     */
     @ApiModelProperty(position = 5, value = "Maximum level of the search depth.")
-    /**
-     * 字段说明：
-     * 1. 保存 `maxLevel` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int maxLevel = 1;
-    @ApiModelProperty(position = 6, value = "Fetch entities that match the last level of search. Useful to find Devices that are strictly 'maxLevel' relations away from the root entity.")
     /**
-     * 字段说明：
-     * 1. 保存 `fetchLastLevelOnly` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否满足`fetchLastLevelOnly`条件。
      */
+    @ApiModelProperty(position = 6, value = "Fetch entities that match the last level of search. Useful to find Devices that are strictly 'maxLevel' relations away from the root entity.")
     private boolean fetchLastLevelOnly;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `RelationsSearchParameters` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `RelationsSearchParameters` 实例，并初始化必要字段。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `direction`：`direction` 参数。
+     * - `maxLevel`：`maxLevel` 参数。
+     * - `fetchLastLevelOnly`：`fetchLastLevelOnly` 参数。
+     * 返回：新创建的对象实例。
      */
     public RelationsSearchParameters(EntityId entityId, EntitySearchDirection direction, int maxLevel, boolean fetchLastLevelOnly) {
         this(entityId, direction, maxLevel, RelationTypeGroup.COMMON, fetchLastLevelOnly);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `RelationsSearchParameters` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `RelationsSearchParameters` 实例，并初始化必要字段。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `direction`：`direction` 参数。
+     * - `maxLevel`：`maxLevel` 参数。
+     * - `relationTypeGroup`：类型。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public RelationsSearchParameters(EntityId entityId, EntitySearchDirection direction, int maxLevel, RelationTypeGroup relationTypeGroup, boolean fetchLastLevelOnly) {
         this.rootId = entityId.getId();
@@ -138,17 +107,12 @@ public class RelationsSearchParameters {
         this.fetchLastLevelOnly = fetchLastLevelOnly;
     }
 
-    @JsonIgnore
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEntityId` 对应的公共数据模型类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体ID。
+     * 参数：无。
+     * 返回：处理结果。
      */
+    @JsonIgnore
     public EntityId getEntityId() {
         return EntityIdFactory.getByTypeAndUuid(rootType, rootId);
     }

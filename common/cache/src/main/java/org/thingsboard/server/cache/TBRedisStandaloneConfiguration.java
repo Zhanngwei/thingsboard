@@ -25,9 +25,6 @@ import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 
 import java.time.Duration;
 
-@Configuration
-@ConditionalOnMissingBean(TbCaffeineCacheConfiguration.class)
-@ConditionalOnProperty(prefix = "redis.connection", value = "type", havingValue = "standalone")
 /**
  * 中文说明：
  * 1. 类目的：`TBRedisStandaloneConfiguration` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -38,116 +35,69 @@ import java.time.Duration;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Configuration
+@ConditionalOnMissingBean(TbCaffeineCacheConfiguration.class)
+@ConditionalOnProperty(prefix = "redis.connection", value = "type", havingValue = "standalone")
 public class TBRedisStandaloneConfiguration extends TBRedisCacheConfiguration {
 
-    @Value("${redis.standalone.host:localhost}")
     /**
-     * 字段说明：
-     * 1. 保存 `host` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主机地址，用于描述服务监听或访问地址。
      */
+    @Value("${redis.standalone.host:localhost}")
     private String host;
 
-    @Value("${redis.standalone.port:6379}")
     /**
-     * 字段说明：
-     * 1. 保存 `port` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 端口号，用于描述服务监听或访问地址。
      */
+    @Value("${redis.standalone.port:6379}")
     private Integer port;
 
-    @Value("${redis.standalone.clientName:standalone}")
     /**
-     * 字段说明：
-     * 1. 保存 `clientName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 名称，用于发起外部调用或协议交互。
      */
+    @Value("${redis.standalone.clientName:standalone}")
     private String clientName;
 
-    @Value("${redis.standalone.connectTimeout:30000}")
     /**
-     * 字段说明：
-     * 1. 保存 `connectTimeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间，用于控制时间范围或等待时长。
      */
+    @Value("${redis.standalone.connectTimeout:30000}")
     private Long connectTimeout;
 
-    @Value("${redis.standalone.readTimeout:60000}")
     /**
-     * 字段说明：
-     * 1. 保存 `readTimeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间，用于控制时间范围或等待时长。
      */
+    @Value("${redis.standalone.readTimeout:60000}")
     private Long readTimeout;
 
-    @Value("${redis.standalone.useDefaultClientConfig:true}")
     /**
-     * 字段说明：
-     * 1. 保存 `useDefaultClientConfig` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 当前对象是否为默认项。
      */
+    @Value("${redis.standalone.useDefaultClientConfig:true}")
     private boolean useDefaultClientConfig;
 
-    @Value("${redis.standalone.usePoolConfig:false}")
     /**
-     * 字段说明：
-     * 1. 保存 `usePoolConfig` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 是否使用配置。
      */
+    @Value("${redis.standalone.usePoolConfig:false}")
     private boolean usePoolConfig;
 
-    @Value("${redis.db:0}")
     /**
-     * 字段说明：
-     * 1. 保存 `db` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `db` 字段，保存当前对象的对应属性。
      */
+    @Value("${redis.db:0}")
     private Integer db;
 
-    @Value("${redis.password:}")
     /**
-     * 字段说明：
-     * 1. 保存 `password` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 密码，用于认证或安全校验。
      */
+    @Value("${redis.password:}")
     private String password;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `loadFactory` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取工厂。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public JedisConnectionFactory loadFactory() {
         RedisStandaloneConfiguration standaloneConfiguration = new RedisStandaloneConfiguration();
@@ -155,7 +105,6 @@ public class TBRedisStandaloneConfiguration extends TBRedisCacheConfiguration {
         standaloneConfiguration.setPort(port);
         standaloneConfiguration.setDatabase(db);
         standaloneConfiguration.setPassword(password);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (useDefaultClientConfig) {
             return new JedisConnectionFactory(standaloneConfiguration);
         } else {
@@ -164,17 +113,11 @@ public class TBRedisStandaloneConfiguration extends TBRedisCacheConfiguration {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildClientConfig` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建配置。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private JedisClientConfiguration buildClientConfig() {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (usePoolConfig) {
             return JedisClientConfiguration.builder()
                     .clientName(clientName)

@@ -82,10 +82,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.thingsboard.server.service.ws.DefaultWebSocketService.NUMBER_OF_PING_ATTEMPTS;
 
-@Service
-@TbCoreComponent
-@Slf4j
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`TbWebSocketHandler` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -96,91 +92,55 @@ import static org.thingsboard.server.service.ws.DefaultWebSocketService.NUMBER_O
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@Service
+@TbCoreComponent
+@Slf4j
+@RequiredArgsConstructor
 public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocketMsgEndpoint {
 
     private final ConcurrentMap<String, SessionMetaData> internalSessionMap = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> externalSessionMap = new ConcurrentHashMap<>();
 
+    /**
+     * 服务，提供当前类调用的业务操作。
+     */
     @Autowired @Lazy
-    /**
-     * 字段说明：
-     * 1. 保存 `webSocketService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private WebSocketService webSocketService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户对象，用于描述当前业务场景。
      */
+    @Autowired
     private TbTenantProfileCache tenantProfileCache;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `rateLimitService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private RateLimitService rateLimitService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `authenticationProvider` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 提供者，用于按场景创建或提供目标对象。
      */
+    @Autowired
     private JwtAuthenticationProvider authenticationProvider;
 
+    /**
+     * 结束时间戳，用于限定查询或统计的终点。
+     */
     @Value("${server.ws.send_timeout:5000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `sendTimeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long sendTimeout;
+    /**
+     * 超时时间，用于控制时间范围或等待时长。
+     */
     @Value("${server.ws.ping_timeout:30000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `pingTimeout` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private long pingTimeout;
+    /**
+     * 队列，用于标识消息投递或消费的队列。
+     */
     @Value("${server.ws.max_queue_messages_per_session:1000}")
-    /**
-     * 字段说明：
-     * 1. 保存 `wsMaxQueueMessagesPerSession` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private int wsMaxQueueMessagesPerSession;
-    @Value("${server.ws.auth_timeout_ms:10000}")
     /**
-     * 字段说明：
-     * 1. 保存 `authTimeoutMs` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 超时时间，用于控制时间范围或等待时长。
      */
+    @Value("${server.ws.auth_timeout_ms:10000}")
     private int authTimeoutMs;
 
     private final ConcurrentMap<String, WebSocketSessionRef> blacklistedSessions = new ConcurrentHashMap<>();
@@ -191,35 +151,23 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     private final ConcurrentMap<UserId, Set<String>> publicUserSessionsMap = new ConcurrentHashMap<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `pendingSessions` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `pendingSessions` 字段，保存当前对象的对应属性。
      */
     private Cache<String, SessionMetaData> pendingSessions;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     private void init() {
         pendingSessions = Caffeine.newBuilder()
                 .expireAfterWrite(authTimeoutMs, TimeUnit.MILLISECONDS)
                 .<String, SessionMetaData>removalListener((sessionId, sessionMd, removalCause) -> {
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (removalCause == RemovalCause.EXPIRED && sessionMd != null) {
                         try {
                             close(sessionMd.sessionRef, CloseStatus.POLICY_VIOLATION);
-                        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                         } catch (IOException e) {
                             log.warn("IO error", e);
                         }
@@ -228,48 +176,39 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
                 .build();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleTextMessage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `session`：会话对象。
+     * - `message`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void handleTextMessage(WebSocketSession session, TextMessage message) {
         try {
             SessionMetaData sessionMd = getSessionMd(session.getId());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sessionMd == null) {
                 log.trace("[{}] Failed to find session", session.getId());
                 session.close(CloseStatus.SERVER_ERROR.withReason("Session not found!"));
                 return;
             }
             sessionMd.onMsg(message.getPayload());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.warn("IO error", e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processMsg` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `sessionMd`：会话对象。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
     void processMsg(SessionMetaData sessionMd, String msg) throws IOException {
         WebSocketSessionRef sessionRef = sessionMd.sessionRef;
         WsCommandsWrapper cmdsWrapper;
         try {
-            // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
             switch (sessionRef.getSessionType()) {
                 case GENERAL:
                     cmdsWrapper = JacksonUtil.fromString(msg, WsCommandsWrapper.class);
@@ -283,10 +222,8 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
                 default:
                     return;
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.debug("{} Failed to decode subscription cmd: {}", sessionRef, e.getMessage(), e);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sessionRef.getSecurityCtx() != null) {
                 webSocketService.sendError(sessionRef, 1, SubscriptionErrorCode.BAD_REQUEST, "Failed to parse the payload");
             } else {
@@ -295,13 +232,11 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
             return;
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (sessionRef.getSecurityCtx() != null) {
             log.trace("{} Processing {}", sessionRef, msg);
             webSocketService.handleCommands(sessionRef, cmdsWrapper);
         } else {
             AuthCmd authCmd = cmdsWrapper.getAuthCmd();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (authCmd == null) {
                 close(sessionRef, CloseStatus.POLICY_VIOLATION.withReason("Auth cmd is missing"));
                 return;
@@ -310,7 +245,6 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
             SecurityUser securityCtx;
             try {
                 securityCtx = authenticationProvider.authenticate(authCmd.getToken());
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 close(sessionRef, CloseStatus.BAD_DATA.withReason(e.getMessage()));
                 return;
@@ -323,21 +257,17 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handlePongMessage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `session`：会话对象。
+     * - `message`：待处理消息。
+     * 返回：无。
      */
+    @Override
     protected void handlePongMessage(WebSocketSession session, PongMessage message) throws Exception {
         try {
             SessionMetaData sessionMd = getSessionMd(session.getId());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (sessionMd != null) {
                 log.trace("{} Processing pong response {}", sessionMd.sessionRef, message.getPayload());
                 sessionMd.processPongMessage(System.currentTimeMillis());
@@ -345,23 +275,18 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
                 log.trace("[{}] Failed to find session", session.getId());
                 session.close(CloseStatus.SERVER_ERROR.withReason("Session not found!"));
             }
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException e) {
             log.warn("IO error", e);
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterConnectionEstablished` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterConnectionEstablished` 对应的处理。
+     * 参数：
+     * - `session`：会话对象。
+     * 返回：无。
      */
+    @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         super.afterConnectionEstablished(session);
         try {
@@ -387,14 +312,12 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `establishSession` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `establishSession` 对应的处理。
+     * 参数：
+     * - `session`：会话对象。
+     * - `sessionRef`：会话对象。
+     * - `sessionMd`：会话对象。
+     * 返回：无。
      */
     private void establishSession(WebSocketSession session, WebSocketSessionRef sessionRef, SessionMetaData sessionMd) throws IOException {
         if (sessionRef.getSecurityCtx() != null) {
@@ -422,17 +345,14 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleTransportError` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理错误信息。
+     * 参数：
+     * - `session`：会话对象。
+     * - `tError`：错误信息。
+     * 返回：无。
      */
+    @Override
     public void handleTransportError(WebSocketSession session, Throwable tError) throws Exception {
         super.handleTransportError(session, tError);
         SessionMetaData sessionMd = getSessionMd(session.getId());
@@ -444,17 +364,14 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         log.trace("[{}] Session transport error", session.getId(), tError);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `afterConnectionClosed` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `afterConnectionClosed` 对应的处理。
+     * 参数：
+     * - `session`：会话对象。
+     * - `closeStatus`：`closeStatus` 参数。
+     * 返回：无。
      */
+    @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
         super.afterConnectionClosed(session, closeStatus);
         SessionMetaData sessionMd = internalSessionMap.remove(session.getId());
@@ -474,14 +391,11 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `processInWebSocketService` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理服务。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
     private void processInWebSocketService(WebSocketSessionRef sessionRef, SessionEvent event) {
         if (sessionRef.getSecurityCtx() == null) {
@@ -495,14 +409,10 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toRef` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toRef` 对应的处理。
+     * 参数：
+     * - `session`：会话对象。
+     * 返回：处理结果。
      */
     private WebSocketSessionRef toRef(WebSocketSession session) {
         String path = session.getUri().getPath();
@@ -530,14 +440,10 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSessionMd` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取会话。
+     * 参数：
+     * - `internalSessionId`：会话ID。
+     * 返回：处理结果。
      */
     private SessionMetaData getSessionMd(String internalSessionId) {
         SessionMetaData sessionMd = internalSessionMap.get(internalSessionId);
@@ -559,49 +465,29 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
      */
     class SessionMetaData implements SendHandler {
         /**
-         * 字段说明：
-         * 1. 保存 `session` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 会话，保存当前连接或交互过程的会话信息。
          */
         private final WebSocketSession session;
         private final RemoteEndpoint.Async asyncRemote;
         /**
-         * 字段说明：
-         * 1. 保存 `sessionRef` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 会话，保存当前连接或交互过程的会话信息。
          */
         private final WebSocketSessionRef sessionRef;
 
         final AtomicBoolean isSending = new AtomicBoolean(false);
         private final Queue<TbWebSocketMsg<?>> outboundMsgQueue = new ConcurrentLinkedQueue<>();
         private final AtomicInteger outboundMsgQueueSize = new AtomicInteger();
-        @Setter
         /**
-         * 字段说明：
-         * 1. 保存 `maxMsgQueueSize` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 队列，承载当前步骤需要处理的内容。
          */
+        @Setter
         private int maxMsgQueueSize = wsMaxQueueMessagesPerSession;
 
         private final Queue<String> inboundMsgQueue = new ConcurrentLinkedQueue<>();
         private final Lock inboundMsgQueueProcessorLock = new ReentrantLock();
 
         /**
-         * 字段说明：
-         * 1. 保存 `lastActivityTime` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 时间，用于控制时间范围或等待时长。
          */
         private volatile long lastActivityTime;
 
@@ -615,14 +501,10 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `sendPing` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：发送或提交`Ping`。
+         * 参数：
+         * - `currentTime`：`currentTime` 参数。
+         * 返回：无。
          */
         void sendPing(long currentTime) {
             try {
@@ -640,14 +522,10 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `closeSession` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：停止或关闭会话。
+         * 参数：
+         * - `reason`：`reason` 参数。
+         * 返回：无。
          */
         void closeSession(CloseStatus reason) {
             try {
@@ -660,42 +538,30 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `processPongMessage` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理消息。
+         * 参数：
+         * - `currentTime`：`currentTime` 参数。
+         * 返回：无。
          */
         void processPongMessage(long currentTime) {
             lastActivityTime = currentTime;
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `sendMsg` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：发送或提交消息。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
         void sendMsg(String msg) {
             sendMsg(new TbWebSocketTextMsg(msg));
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `sendMsg` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：发送或提交消息。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
         void sendMsg(TbWebSocketMsg<?> msg) {
             if (outboundMsgQueueSize.get() < maxMsgQueueSize) {
@@ -709,14 +575,10 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `sendMsgInternal` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：发送或提交消息。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
         private void sendMsgInternal(TbWebSocketMsg<?> msg) {
             try {
@@ -736,17 +598,13 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onResult` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理`on Result`。
+         * 参数：
+         * - `result`：`result` 参数。
+         * 返回：无。
          */
+        @Override
         public void onResult(SendResult result) {
             if (!result.isOK()) {
                 log.trace("{} Failed to send msg", sessionRef, result.getException());
@@ -759,14 +617,9 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `processNextMsg` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理消息。
+         * 参数：无。
+         * 返回：无。
          */
         private void processNextMsg() {
             if (outboundMsgQueue.isEmpty() || !isSending.compareAndSet(false, true)) {
@@ -782,14 +635,10 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `onMsg` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：处理消息。
+         * 参数：
+         * - `msg`：待处理消息。
+         * 返回：无。
          */
         public void onMsg(String msg) throws IOException {
             inboundMsgQueue.add(msg);
@@ -797,14 +646,9 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `tryProcessInboundMsgs` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：执行 `tryProcessInboundMsgs` 对应的处理。
+         * 参数：无。
+         * 返回：无。
          */
         void tryProcessInboundMsgs() throws IOException {
             while (!inboundMsgQueue.isEmpty()) {
@@ -824,17 +668,15 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `send` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `send` 对应的处理。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `subscriptionId`：订阅ID。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void send(WebSocketSessionRef sessionRef, int subscriptionId, String msg) throws IOException {
         log.debug("{} Sending {}", sessionRef, msg);
         String externalId = sessionRef.getSessionId();
@@ -862,17 +704,14 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendPing` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交`Ping`。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `currentTime`：`currentTime` 参数。
+     * 返回：无。
      */
+    @Override
     public void sendPing(WebSocketSessionRef sessionRef, long currentTime) throws IOException {
         String externalId = sessionRef.getSessionId();
         String internalId = externalSessionMap.get(externalId);
@@ -888,17 +727,14 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `close` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `close` 对应的处理。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * - `reason`：`reason` 参数。
+     * 返回：无。
      */
+    @Override
     public void close(WebSocketSessionRef sessionRef, CloseStatus reason) throws IOException {
         String externalId = sessionRef.getSessionId();
         log.debug("{} Processing close request", sessionRef.toString());
@@ -916,14 +752,11 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkLimits` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验`Limits`。
+     * 参数：
+     * - `session`：会话对象。
+     * - `sessionRef`：会话对象。
+     * 返回：判断结果。
      */
     private boolean checkLimits(WebSocketSession session, WebSocketSessionRef sessionRef) throws IOException {
         var tenantProfileConfiguration = getTenantProfileConfiguration(sessionRef);
@@ -997,14 +830,11 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanupLimits` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Limits`。
+     * 参数：
+     * - `session`：会话对象。
+     * - `sessionRef`：会话对象。
+     * 返回：无。
      */
     private void cleanupLimits(WebSocketSession session, WebSocketSessionRef sessionRef) {
         var tenantProfileConfiguration = getTenantProfileConfiguration(sessionRef);
@@ -1042,14 +872,10 @@ public class TbWebSocketHandler extends TextWebSocketHandler implements WebSocke
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantProfileConfiguration` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户。
+     * 参数：
+     * - `sessionRef`：会话对象。
+     * 返回：处理结果。
      */
     private DefaultTenantProfileConfiguration getTenantProfileConfiguration(WebSocketSessionRef sessionRef) {
         return Optional.ofNullable(tenantProfileCache.get(sessionRef.getSecurityCtx().getTenantId()))

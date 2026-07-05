@@ -22,7 +22,7 @@ package org.thingsboard.rule.engine.math;
 public enum TbMathArgumentType {
 
     /**
-     * 枚举项说明：本行枚举常量定义 `TbMathArgumentType` 支持的取值，用于配置或处理流程中的分支判断。
+     * `CONSTANT`常量，用于统一引用固定值。
      */
     ATTRIBUTE, TIME_SERIES, MESSAGE_BODY, MESSAGE_METADATA, CONSTANT;
 

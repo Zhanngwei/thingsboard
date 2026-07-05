@@ -30,15 +30,10 @@ import org.thingsboard.server.common.data.sms.config.SmsProviderConfiguration;
 public interface SmsSenderFactory {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按供应商配置创建短信发送器。
-     * 2. 输入参数：config 是短信供应商配置，来源于租户或系统短信配置。
-     * 3. 返回值：可发送短信的 SmsSender 实例。
-     * 4. 调用时机：短信服务初始化、配置刷新或测试配置时调用。
-     * 5. 调用方：SmsService 实现和短信配置测试流程。
-     * 6. 使用流程：属于短信外部客户端创建流程。
-     * 7. 线程安全：接口无状态，具体工厂实现应保证配置解析和实例创建并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor、数据库；生成的发送器服务 Rule Engine 短信流程。
+     * 功能：保存或创建`Sms Sender`。
+     * 参数：
+     * - `config`：配置对象。
+     * 返回：处理结果。
      */
     SmsSender createSmsSender(SmsProviderConfiguration config);
 

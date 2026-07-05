@@ -64,26 +64,28 @@ import static org.mockito.Mockito.when;
 import static org.thingsboard.server.common.data.DataConstants.NOTIFY_DEVICE_METADATA_KEY;
 
 /**
- * 测试目标：验证 {@code TbMsgAttributesNodeTest} 覆盖的 遥测与属性节点 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code TbMsgAttributesNode}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：字段上的 Mockito 注解、Mockito.mock/spy、setUp/before/init 中的 stub 和内存 fixture；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `TbMsgAttributesNodeTest` 测试类，用于验证 `TbMsgAttributesNode` 相关行为。
  */
 @Slf4j
 class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
 
-    /** 可变 fixture 字段：{@code tenantId} 保存 {@code TenantId} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 租户ID，用于定位对应业务对象。
+     */
     private TenantId tenantId;
-    /** 可变 fixture 字段：{@code deviceId} 保存 {@code DeviceId} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 设备ID，用于定位对应业务对象。
+     */
     private DeviceId deviceId;
-    /** 可变 fixture 字段：{@code node} 保存 {@code TbMsgAttributesNode} 测试数据或依赖，来源：通常由 setUp/before/init 或测试体赋值，生命周期随单个测试实例。 */
+    /**
+     * 节点实例，表示当前对象的对应属性。
+     */
     private TbMsgAttributesNode node;
 
     /**
-     * 生命周期方法：{@code setUp} 在 JUnit 用例前后准备或清理测试环境。
-     * 输入数据：来自 Mockito 注解、类字段和内存 fixture；输出影响是初始化节点、Mock、执行器或清理资源。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
     @BeforeEach
     void setUp() {
@@ -93,15 +95,12 @@ class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testFilterChangedAttr_whenCurrentAttributesEmpty_thenReturnNewAttributes} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证`Filter Changed Attr when Current Attributes Empty then Return New Attributes`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     void testFilterChangedAttr_whenCurrentAttributesEmpty_thenReturnNewAttributes() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         List<AttributeKvEntry> newAttributes = new ArrayList<>();
 
         List<AttributeKvEntry> filtered = node.filterChangedAttr(Collections.emptyList(), newAttributes);
@@ -109,15 +108,12 @@ class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testFilterChangedAttr_whenCurrentAttributesContainsInAnyOrderNewAttributes_thenReturnEmptyList} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证`Filter Changed Attr when Current Attributes Contains In Any Order New Attributes then Return Empty List`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     void testFilterChangedAttr_whenCurrentAttributesContainsInAnyOrderNewAttributes_thenReturnEmptyList() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         List<AttributeKvEntry> currentAttributes = List.of(
                 new BaseAttributeKvEntry(1694000000L, new StringDataEntry("address", "Peremohy ave 1")),
                 new BaseAttributeKvEntry(1694000000L, new BooleanDataEntry("valid", true)),
@@ -137,15 +133,12 @@ class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testFilterChangedAttr_whenCurrentAttributesContainsInAnyOrderNewAttributes_thenReturnExpectedList} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证`Filter Changed Attr when Current Attributes Contains In Any Order New Attributes then Return Expected List`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     void testFilterChangedAttr_whenCurrentAttributesContainsInAnyOrderNewAttributes_thenReturnExpectedList() {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         List<AttributeKvEntry> currentAttributes = List.of(
                 new BaseAttributeKvEntry(1694000000L, new StringDataEntry("address", "Peremohy ave 1")),
                 new BaseAttributeKvEntry(1694000000L, new BooleanDataEntry("valid", true)),
@@ -171,7 +164,11 @@ class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
     }
 
     // Notify device backward-compatibility test arguments
-    /** 参数源方法：{@code givenNotifyDeviceMdValue_whenSaveAndNotify_thenVerifyExpectedArgumentForNotifyDeviceInSaveAndNotifyMethod} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
+    /**
+     * 功能：验证 `givenNotifyDeviceMdValue_whenSaveAndNotify_thenVerifyExpectedArgumentForNotifyDeviceInSaveAndNotifyMethod` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     private static Stream<Arguments> givenNotifyDeviceMdValue_whenSaveAndNotify_thenVerifyExpectedArgumentForNotifyDeviceInSaveAndNotifyMethod() {
         return Stream.of(
                 Arguments.of(null, true),
@@ -183,16 +180,15 @@ class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
 
     // Notify device backward-compatibility test
     /**
-     * 测试方法：覆盖 {@code givenNotifyDeviceMdValue_whenSaveAndNotify_thenVerifyExpectedArgumentForNotifyDeviceInSaveAndNotifyMethod} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：通过 TbContext、TbMsg、节点初始化或节点处理方法模拟规则链流程。
+     * 功能：验证 `givenNotifyDeviceMdValue_whenSaveAndNotify_thenVerifyExpectedArgumentForNotifyDeviceInSaveAndNotifyMethod` 描述的测试场景。
+     * 参数：
+     * - `mdValue`：值。
+     * - `expectedArgumentValue`：值。
+     * 返回：无。
      */
     @ParameterizedTest
     @MethodSource
     void givenNotifyDeviceMdValue_whenSaveAndNotify_thenVerifyExpectedArgumentForNotifyDeviceInSaveAndNotifyMethod(String mdValue, boolean expectedArgumentValue) throws TbNodeException {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         var ctxMock = mock(TbContext.class);
         var telemetryServiceMock = mock(RuleEngineTelemetryService.class);
         ObjectNode defaultConfig = (ObjectNode) JacksonUtil.valueToTree(new TbMsgAttributesNodeConfiguration().defaultConfiguration());
@@ -230,7 +226,11 @@ class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
 
 
     // Rule nodes upgrade
-    /** 参数源方法：{@code givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
+    /**
+     * 功能：验证 `givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig` 描述的测试场景。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     private static Stream<Arguments> givenFromVersionAndConfig_whenUpgrade_thenVerifyHasChangesAndConfig() {
         return Stream.of(
                 // default config for version 0
@@ -271,7 +271,11 @@ class TbMsgAttributesNodeTest extends AbstractRuleNodeUpgradeTest {
         );
     }
 
-    /** 实现方法：{@code getTestNode} 为测试替身或抽象基类提供最小行为，输入来自调用方，生命周期随 enclosing fixture。 */
+    /**
+     * 功能：获取节点实例。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @Override
     protected TbNode getTestNode() {
         return node;

@@ -59,9 +59,6 @@ import javax.annotation.PostConstruct;
  *     future.addCallback(eventPublisher.publishEvent(...))
  *   }
  * */
-@Component
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`EdgeEventSourcingListener` 是ThingsBoard Application 模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
@@ -72,48 +69,36 @@ import javax.annotation.PostConstruct;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
  */
+@Component
+@RequiredArgsConstructor
+@Slf4j
 public class EdgeEventSourcingListener {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbClusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TbClusterService tbClusterService;
     private final EdgeSynchronizationManager edgeSynchronizationManager;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() {
         log.info("EdgeEventSourcingListener initiated");
     }
 
-    @TransactionalEventListener(fallbackExecution = true)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @TransactionalEventListener(fallbackExecution = true)
     public void handleEvent(SaveEntityEvent<?> event) {
         try {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!isValidSaveEntityEventForEdgeProcessing(event.getEntity(), event.getOldEntity())) {
                 return;
             }
@@ -124,23 +109,18 @@ public class EdgeEventSourcingListener {
             EdgeEventActionType action = getActionForEntityEvent(event.getEntity(), isCreated);
             tbClusterService.sendNotificationMsgToEdge(event.getTenantId(), null, event.getEntityId(),
                     body, type, action, edgeSynchronizationManager.getEdgeId().get());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("[{}] failed to process SaveEntityEvent: {}", event.getTenantId(), event, e);
         }
     }
 
-    @TransactionalEventListener(fallbackExecution = true)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @TransactionalEventListener(fallbackExecution = true)
     public void handleEvent(DeleteEntityEvent<?> event) {
         try {
             log.trace("[{}] DeleteEntityEvent called: {}", event.getTenantId(), event);
@@ -149,76 +129,58 @@ public class EdgeEventSourcingListener {
             tbClusterService.sendNotificationMsgToEdge(event.getTenantId(), null, event.getEntityId(),
                     JacksonUtil.toString(event.getEntity()), type, actionType,
                     edgeSynchronizationManager.getEdgeId().get());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("[{}] failed to process DeleteEntityEvent: {}", event.getTenantId(), event, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEdgeEventActionTypeForEntityEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `entity`：实体对象。
+     * 返回：处理结果。
      */
     private EdgeEventActionType getEdgeEventActionTypeForEntityEvent(Object entity) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (entity instanceof AlarmComment) {
             return EdgeEventActionType.DELETED_COMMENT;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (entity instanceof Alarm) {
             return EdgeEventActionType.ALARM_DELETE;
         }
         return EdgeEventActionType.DELETED;
     }
 
-    @TransactionalEventListener(fallbackExecution = true)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @TransactionalEventListener(fallbackExecution = true)
     public void handleEvent(ActionEntityEvent event) {
         try {
             log.trace("[{}] ActionEntityEvent called: {}", event.getTenantId(), event);
             tbClusterService.sendNotificationMsgToEdge(event.getTenantId(), event.getEdgeId(), event.getEntityId(),
                     event.getBody(), null, EdgeUtils.getEdgeEventActionTypeByActionType(event.getActionType()),
                     edgeSynchronizationManager.getEdgeId().get());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("[{}] failed to process ActionEntityEvent: {}", event.getTenantId(), event, e);
         }
     }
 
-    @TransactionalEventListener(fallbackExecution = true)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理事件。
+     * 参数：
+     * - `event`：`event` 参数。
+     * 返回：无。
      */
+    @TransactionalEventListener(fallbackExecution = true)
     public void handleEvent(RelationActionEvent event) {
         try {
             EntityRelation relation = event.getRelation();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (relation == null) {
                 log.trace("[{}] skipping RelationActionEvent event in case relation is null: {}", event.getTenantId(), event);
                 return;
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!RelationTypeGroup.COMMON.equals(relation.getTypeGroup())) {
                 log.trace("[{}] skipping RelationActionEvent event in case NOT COMMON relation type group: {}", event.getTenantId(), event);
                 return;
@@ -227,32 +189,25 @@ public class EdgeEventSourcingListener {
             tbClusterService.sendNotificationMsgToEdge(event.getTenantId(), null, null,
                     JacksonUtil.toString(relation), EdgeEventType.RELATION, EdgeUtils.getEdgeEventActionTypeByActionType(event.getActionType()),
                     edgeSynchronizationManager.getEdgeId().get());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (Exception e) {
             log.error("[{}] failed to process RelationActionEvent: {}", event.getTenantId(), event, e);
         }
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isValidSaveEntityEventForEdgeProcessing` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断实体。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `oldEntity`：实体对象。
+     * 返回：判断结果。
      */
     private boolean isValidSaveEntityEventForEdgeProcessing(Object entity, Object oldEntity) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (entity instanceof OtaPackageInfo) {
             OtaPackageInfo otaPackageInfo = (OtaPackageInfo) entity;
             return otaPackageInfo.hasUrl() || otaPackageInfo.isHasData();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (entity instanceof RuleChain) {
             RuleChain ruleChain = (RuleChain) entity;
             return RuleChainType.EDGE.equals(ruleChain.getType());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (entity instanceof User) {
             User user = (User) entity;
             if (Authority.SYS_ADMIN.equals(user.getAuthority())) {
@@ -272,14 +227,10 @@ public class EdgeEventSourcingListener {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `cleanUpUserAdditionalInfo` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理扩展信息。
+     * 参数：
+     * - `user`：`user` 参数。
+     * 返回：无。
      */
     private void cleanUpUserAdditionalInfo(User user) {
         // reset FAILED_LOGIN_ATTEMPTS and LAST_LOGIN_TS - edge is not interested in this information
@@ -299,14 +250,10 @@ public class EdgeEventSourcingListener {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getEdgeEventTypeForEntityEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `entity`：实体对象。
+     * 返回：处理结果。
      */
     private EdgeEventType getEdgeEventTypeForEntityEvent(Object entity) {
         if (entity instanceof AlarmComment) {
@@ -316,14 +263,10 @@ public class EdgeEventSourcingListener {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getBodyMsgForEntityEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `entity`：实体对象。
+     * 返回：文本结果。
      */
     private String getBodyMsgForEntityEvent(Object entity) {
         if (entity instanceof AlarmComment) {
@@ -333,14 +276,11 @@ public class EdgeEventSourcingListener {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getActionForEntityEvent` 对应的Edge 同步服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取实体。
+     * 参数：
+     * - `entity`：实体对象。
+     * - `isCreated`：`isCreated` 参数。
+     * 返回：处理结果。
      */
     private EdgeEventActionType getActionForEntityEvent(Object entity, boolean isCreated) {
         if (entity instanceof AlarmComment) {

@@ -19,11 +19,6 @@ import org.junit.extensions.cpsuite.ClasspathSuite;
 import org.junit.extensions.cpsuite.ClasspathSuite.ClassnameFilters;
 import org.junit.runner.RunWith;
 
-@RunWith(ClasspathSuite.class)
-@ClassnameFilters(
-        //All the same tests using redis instead of caffeine.
-        "org.thingsboard.server.dao.service.*ServiceSqlTest"
-)
 /**
  * 中文说明：
  * 1. 类目的：`RedisSqlTestSuite` 是 ThingsBoard DAO 测试模块 中的持久化实现层类型，用于承载服务端实体、关系、属性、遥测、事件和配置数据的持久化访问实现。
@@ -35,6 +30,11 @@ import org.junit.runner.RunWith;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Repository / Service / Template。
  */
+@RunWith(ClasspathSuite.class)
+@ClassnameFilters(
+        //All the same tests using redis instead of caffeine.
+        "org.thingsboard.server.dao.service.*ServiceSqlTest"
+)
 public class RedisSqlTestSuite extends AbstractRedisContainer {
 
 }

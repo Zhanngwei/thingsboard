@@ -42,9 +42,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import static org.thingsboard.server.common.data.ResourceType.LWM2M_MODEL;
 import static org.thingsboard.server.common.data.lwm2m.LwM2mConstants.LWM2M_SEPARATOR_KEY;
 
-@Slf4j
-@Service
-@TbLwM2mTransportComponent
 /**
  * 中文说明：
  * 1. 类目的：`LwM2mVersionedModelProvider` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -55,38 +52,29 @@ import static org.thingsboard.server.common.data.lwm2m.LwM2mConstants.LWM2M_SEPA
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Service
+@TbLwM2mTransportComponent
 public class LwM2mVersionedModelProvider implements LwM2mModelProvider {
 
     /**
-     * 字段说明：
-     * 1. 保存 `lwM2mClientContext` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，用于发起外部调用或协议交互。
      */
     private final LwM2mClientContext lwM2mClientContext;
     private final LwM2mTransportServerHelper helper;
     /**
-     * 字段说明：
-     * 1. 保存 `context` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private final LwM2mTransportContext context;
     private final ConcurrentMap<TenantId, ConcurrentMap<String, ObjectModel>> models;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `LwM2mVersionedModelProvider` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `LwM2mVersionedModelProvider` 实例，并初始化必要字段。
+     * 参数：
+     * - `lwM2mClientContext`：处理上下文。
+     * - `helper`：`helper` 参数。
+     * - `context`：处理上下文。
+     * 返回：新创建的对象实例。
      */
     public LwM2mVersionedModelProvider(@Lazy LwM2mClientContext lwM2mClientContext, LwM2mTransportServerHelper helper, LwM2mTransportContext context) {
         this.lwM2mClientContext = lwM2mClientContext;
@@ -96,46 +84,35 @@ public class LwM2mVersionedModelProvider implements LwM2mModelProvider {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getKeyIdVer` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取键。
+     * 参数：
+     * - `objectId`：`objectId`ID。
+     * - `version`：`version` 参数。
+     * 返回：文本结果。
      */
     private String getKeyIdVer(Integer objectId, String version) {
         return objectId != null ? objectId + LWM2M_SEPARATOR_KEY + ((version == null || version.isEmpty()) ? ObjectModel.DEFAULT_VERSION : version) : null;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getObjectModel` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Object Model`。
+     * 参数：
+     * - `registration`：`registration` 参数。
+     * 返回：处理结果。
      */
+    @Override
     public LwM2mModel getObjectModel(Registration registration) {
         return new DynamicModel(registration);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `key`：键。
+     * 返回：无。
      */
     public void evict(TenantId tenantId, String key) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tenantId.isNullUid()) {
             models.values().forEach(m -> m.remove(key));
         } else {
@@ -155,110 +132,78 @@ public class LwM2mVersionedModelProvider implements LwM2mModelProvider {
      */
     private class DynamicModel implements LwM2mModel {
         /**
-         * 字段说明：
-         * 1. 保存 `registration` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * `registration` 字段，保存当前对象的对应属性。
          */
         private final Registration registration;
         private final TenantId tenantId;
         /**
-         * 字段说明：
-         * 1. 保存 `modelsLock` 对应的配置、依赖、上下文或运行期状态。
-         * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-         * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-         * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-         * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+         * 锁，用于保护并发读写的共享状态。
          */
         private final Lock modelsLock;
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `DynamicModel` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：创建 `LwM2mVersionedModelProvider` 实例，并初始化必要字段。
+         * 参数：
+         * - `registration`：`registration` 参数。
+         * 返回：新创建的对象实例。
          */
         public DynamicModel(Registration registration) {
             this.registration = registration;
             this.tenantId = lwM2mClientContext.getClientByEndpoint(registration.getEndpoint()).getTenantId();
             this.modelsLock = new ReentrantLock();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (tenantId != null) {
                 models.computeIfAbsent(tenantId, t -> new ConcurrentHashMap<>());
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getResourceModel` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取`Resource Model`。
+         * 参数：
+         * - `objectId`：`objectId`ID。
+         * - `resourceId`：`resourceId`ID。
+         * 返回：处理结果。
          */
+        @Override
         public ResourceModel getResourceModel(int objectId, int resourceId) {
             try {
                 ObjectModel objectModel = getObjectModel(objectId);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (objectModel != null)
                     return objectModel.resources.get(resourceId);
                 else
                     log.trace("Tenant hasn't such the TbResources: Object model with id [{}/0/{}].", objectId, resourceId);
                 return null;
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (Exception e) {
                 log.error("", e);
                 return null;
             }
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getObjectModel` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取`Object Model`。
+         * 参数：
+         * - `objectId`：`objectId`ID。
+         * 返回：处理结果。
          */
+        @Override
         public ObjectModel getObjectModel(int objectId) {
             String version = registration.getSupportedVersion(objectId);
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (version != null) {
                 return this.getObjectModelDynamic(objectId, version);
             }
             return null;
         }
 
-        @Override
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getObjectModels` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取`Object Models`。
+         * 参数：无。
+         * 返回：匹配的数据集合。
          */
+        @Override
         public Collection<ObjectModel> getObjectModels() {
             Map<Integer, String> supportedObjects = this.registration.getSupportedObject();
             Collection<ObjectModel> result = new ArrayList<>(supportedObjects.size());
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (Map.Entry<Integer, String> supportedObject : supportedObjects.entrySet()) {
                 ObjectModel objectModel = this.getObjectModelDynamic(supportedObject.getKey(), supportedObject.getValue());
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (objectModel != null) {
                     result.add(objectModel);
                 }
@@ -267,28 +212,22 @@ public class LwM2mVersionedModelProvider implements LwM2mModelProvider {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getObjectModelDynamic` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取`Object Model Dynamic`。
+         * 参数：
+         * - `objectId`：`objectId`ID。
+         * - `version`：`version` 参数。
+         * 返回：处理结果。
          */
         private ObjectModel getObjectModelDynamic(Integer objectId, String version) {
             String key = getKeyIdVer(objectId, version);
             ObjectModel objectModel = tenantId != null ? models.get(tenantId).get(key) : null;
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (tenantId != null && objectModel == null) {
                 modelsLock.lock();
                 try {
                     objectModel = models.get(tenantId).get(key);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (objectModel == null) {
                         objectModel = getObjectModel(key);
                     }
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (objectModel != null) {
                         models.get(tenantId).put(key, objectModel);
                     } else {
@@ -303,17 +242,12 @@ public class LwM2mVersionedModelProvider implements LwM2mModelProvider {
         }
 
         /**
-         * 方法说明：
-         * 1. 职责：执行 `getObjectModel` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-         * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-         * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-         * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-         * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-         * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-         * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+         * 功能：获取`Object Model`。
+         * 参数：
+         * - `key`：键。
+         * 返回：处理结果。
          */
         private ObjectModel getObjectModel(String key) {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             Optional<TbResource> tbResource = context.getTransportResourceCache().get(this.tenantId, LWM2M_MODEL, key);
             return tbResource.map(resource -> helper.parseFromXmlToObjectModel(resource.getData(),
                     key + ".xml")).orElse(null);

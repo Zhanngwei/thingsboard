@@ -45,10 +45,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.thingsboard.server.gen.transport.TransportProtos.KeyValueType.BOOLEAN_V;
 
-@Slf4j
-@Component
-@TbLwM2mTransportComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`LwM2mTransportServerHelper` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -59,85 +55,69 @@ import static org.thingsboard.server.gen.transport.TransportProtos.KeyValueType.
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Component
+@TbLwM2mTransportComponent
+@RequiredArgsConstructor
 public class LwM2mTransportServerHelper {
 
     /**
-     * 字段说明：
-     * 1. 保存 `context` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 上下文，汇总当前处理所需的上下文信息。
      */
     private final LwM2mTransportContext context;
     private final static JsonParser JSON_PARSER = new JsonParser();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendParametersOnThingsboardAttribute` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交属性。
+     * 参数：
+     * - `result`：数据列表。
+     * - `sessionInfo`：会话对象。
+     * 返回：无。
      */
     public void sendParametersOnThingsboardAttribute(List<TransportProtos.KeyValueProto> result, SessionInfoProto sessionInfo) {
         PostAttributeMsg.Builder request = PostAttributeMsg.newBuilder();
         request.addAllKv(result);
         PostAttributeMsg postAttributeMsg = request.build();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         context.getTransportService().process(sessionInfo, postAttributeMsg, TransportServiceCallback.EMPTY);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendParametersOnThingsboardTelemetry` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交遥测。
+     * 参数：
+     * - `kvList`：数据列表。
+     * - `sessionInfo`：会话对象。
+     * 返回：无。
      */
     public void sendParametersOnThingsboardTelemetry(List<TransportProtos.KeyValueProto> kvList, SessionInfoProto sessionInfo) {
         sendParametersOnThingsboardTelemetry(kvList, sessionInfo, null);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendParametersOnThingsboardTelemetry` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交遥测。
+     * 参数：
+     * - `kvList`：数据列表。
+     * - `sessionInfo`：会话对象。
+     * - `keyTsLatestMap`：键。
+     * 返回：无。
      */
     public void sendParametersOnThingsboardTelemetry(List<TransportProtos.KeyValueProto> kvList, SessionInfoProto sessionInfo, @Nullable Map<String, AtomicLong> keyTsLatestMap) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         TransportProtos.TsKvListProto tsKvList = toTsKvList(kvList, keyTsLatestMap);
 
         PostTelemetryMsg postTelemetryMsg = PostTelemetryMsg.newBuilder()
                 .addTsKvList(tsKvList)
                 .build();
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         context.getTransportService().process(sessionInfo, postTelemetryMsg, TransportServiceCallback.EMPTY);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toTsKvList` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toTsKvList` 对应的处理。
+     * 参数：
+     * - `kvList`：数据列表。
+     * - `keyTsLatestMap`：键。
+     * 返回：匹配的数据集合。
      */
     TransportProtos.TsKvListProto toTsKvList(List<TransportProtos.KeyValueProto> kvList, Map<String, AtomicLong> keyTsLatestMap) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         return TransportProtos.TsKvListProto.newBuilder()
                 .setTs(getTs(kvList, keyTsLatestMap))
                 .addAllKv(kvList)
@@ -145,17 +125,13 @@ public class LwM2mTransportServerHelper {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTs` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取当前对象记录的时间戳。
+     * 参数：
+     * - `kvList`：数据列表。
+     * - `keyTsLatestMap`：键。
+     * 返回：数值结果。
      */
     long getTs(List<TransportProtos.KeyValueProto> kvList, Map<String, AtomicLong> keyTsLatestMap) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (keyTsLatestMap == null || kvList == null || kvList.isEmpty()) {
             return getCurrentTimeMillis();
         }
@@ -164,18 +140,15 @@ public class LwM2mTransportServerHelper {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getTsByKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间戳。
+     * 参数：
+     * - `key`：键。
+     * - `keyTsLatestMap`：键。
+     * - `tsNow`：`tsNow` 参数。
+     * 返回：数值结果。
      */
     long getTsByKey(@Nonnull String key, @Nonnull Map<String, AtomicLong> keyTsLatestMap, final long tsNow) {
         AtomicLong tsLatestAtomic = keyTsLatestMap.putIfAbsent(key, new AtomicLong(tsNow));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tsLatestAtomic == null) {
             return tsNow; // it is a first known timestamp for this key. return as the latest
         }
@@ -190,20 +163,15 @@ public class LwM2mTransportServerHelper {
      * In normal environment without race conditions method will return current ts (wall-clock)
      * */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `compareAndSwapOrIncrementTsAtomically` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `compareAndSwapOrIncrementTsAtomically` 对应的处理。
+     * 参数：
+     * - `tsLatestAtomic`：`tsLatestAtomic` 参数。
+     * - `tsNow`：`tsNow` 参数。
+     * 返回：数值结果。
      */
     long compareAndSwapOrIncrementTsAtomically(AtomicLong tsLatestAtomic, final long tsNow) {
         long tsLatest;
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         while ((tsLatest = tsLatestAtomic.get()) < tsNow) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (tsLatestAtomic.compareAndSet(tsLatest, tsNow)) {
                 return tsNow; //swap successful
             }
@@ -215,14 +183,9 @@ public class LwM2mTransportServerHelper {
      * For the test ability to mock system timer
      * */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCurrentTimeMillis` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取时间。
+     * 参数：无。
+     * 返回：数值结果。
      */
     long getCurrentTimeMillis() {
         return System.currentTimeMillis();
@@ -232,14 +195,12 @@ public class LwM2mTransportServerHelper {
      * @return - sessionInfo after access connect client
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getValidateSessionInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取会话。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `mostSignificantBits`：`mostSignificantBits` 参数。
+     * - `leastSignificantBits`：`leastSignificantBits` 参数。
+     * 返回：处理结果。
      */
     public SessionInfoProto getValidateSessionInfo(ValidateDeviceCredentialsResponse msg, long mostSignificantBits, long leastSignificantBits) {
         return SessionInfoProto.newBuilder()
@@ -260,20 +221,16 @@ public class LwM2mTransportServerHelper {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `parseFromXmlToObjectModel` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：解析`From Xml To Object Model`。
+     * 参数：
+     * - `xmlByte`：`xmlByte` 参数。
+     * - `streamName`：名称。
+     * 返回：处理结果。
      */
     public ObjectModel parseFromXmlToObjectModel(byte[] xmlByte, String streamName) {
         try {
             TbDDFFileParser ddfFileParser = new TbDDFFileParser();
             return ddfFileParser.parse(new ByteArrayInputStream(xmlByte), streamName).get(0);
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (IOException | InvalidDDFFileException e) {
             log.error("Could not parse the XML file [{}]", streamName, e);
             return null;
@@ -285,23 +242,17 @@ public class LwM2mTransportServerHelper {
      * @return- KeyValueProto for telemetry (Logs)
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getKvStringtoThingsboard` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Kv Stringto Thingsboard`。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：匹配的数据集合。
      */
     public List<TransportProtos.KeyValueProto> getKvStringtoThingsboard(String key, String value) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         List<TransportProtos.KeyValueProto> result = new ArrayList<>();
         value = value.replaceAll("<", "").replaceAll(">", "");
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         result.add(TransportProtos.KeyValueProto.newBuilder()
                 .setKey(key)
-                // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
                 .setType(TransportProtos.KeyValueType.STRING_V)
                 .setStringV(value).build());
         return result;
@@ -313,14 +264,13 @@ public class LwM2mTransportServerHelper {
      */
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getKvAttrTelemetryToThingsboard` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取遥测。
+     * 参数：
+     * - `resourceType`：类型。
+     * - `resourceName`：名称。
+     * - `value`：值。
+     * - `isMultiInstances`：`isMultiInstances` 参数。
+     * 返回：处理结果。
      */
     public TransportProtos.KeyValueProto getKvAttrTelemetryToThingsboard(ResourceModel.Type resourceType, String resourceName, Object value, boolean isMultiInstances) {
         TransportProtos.KeyValueProto.Builder kvProto = TransportProtos.KeyValueProto.newBuilder().setKey(resourceName);
@@ -354,14 +304,11 @@ public class LwM2mTransportServerHelper {
      * @return
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getResourceModelTypeEqualsKvProtoValueType` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `currentType`：类型。
+     * - `resourcePath`：文件或资源路径。
+     * 返回：处理结果。
      */
     public static ResourceModel.Type getResourceModelTypeEqualsKvProtoValueType(ResourceModel.Type currentType, String resourcePath) {
         switch (currentType) {
@@ -382,14 +329,10 @@ public class LwM2mTransportServerHelper {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getValueFromKvProto` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取值。
+     * 参数：
+     * - `kv`：`kv` 参数。
+     * 返回：处理结果。
      */
     public static Object getValueFromKvProto(TransportProtos.KeyValueProto kv) {
         switch (kv.getType()) {

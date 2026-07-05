@@ -21,10 +21,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@ApiModel(value = "JWT Settings")
-@AllArgsConstructor
-@NoArgsConstructor
-@Data
 /**
  * 中文说明：
  * 1. 类目的：`JwtSettings` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
@@ -35,63 +31,47 @@ import lombok.NoArgsConstructor;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Value Object / Builder。
  */
+@ApiModel(value = "JWT Settings")
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class JwtSettings {
 
     /**
      * {@link JwtToken} will expire after this time.
      */
-    @ApiModelProperty(position = 1, value = "The JWT will expire after seconds.", example = "9000")
     /**
-     * 字段说明：
-     * 1. 保存 `tokenExpirationTime` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 过期时间，用于判断当前对象是否仍然有效。
      */
+    @ApiModelProperty(position = 1, value = "The JWT will expire after seconds.", example = "9000")
     private Integer tokenExpirationTime;
 
     /**
      * {@link JwtToken} can be refreshed during this timeframe.
      */
-    @ApiModelProperty(position = 2, value = "The JWT can be refreshed during seconds.", example = "604800")
     /**
-     * 字段说明：
-     * 1. 保存 `refreshTokenExpTime` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 刷新令牌过期时间，用于控制时间范围或等待时长。
      */
+    @ApiModelProperty(position = 2, value = "The JWT can be refreshed during seconds.", example = "604800")
     private Integer refreshTokenExpTime;
 
     /**
      * Token issuer.
      */
-    @ApiModelProperty(position = 3, value = "The JWT issuer.", example = "thingsboard.io")
     /**
-     * 字段说明：
-     * 1. 保存 `tokenIssuer` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 令牌，用于认证或安全校验。
      */
+    @ApiModelProperty(position = 3, value = "The JWT issuer.", example = "thingsboard.io")
     private String tokenIssuer;
 
     /**
      * Key is used to sign {@link JwtToken}.
      * Base64 encoded
      */
-    @ApiModelProperty(position = 4, value = "The JWT key is used to sing token. Base64 encoded.", example = "cTU4WnNqemI2aU5wbWVjdm1vYXRzanhjNHRUcXliMjE=")
     /**
-     * 字段说明：
-     * 1. 保存 `tokenSigningKey` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 键，用于定位映射、配置或数据项。
      */
+    @ApiModelProperty(position = 4, value = "The JWT key is used to sing token. Base64 encoded.", example = "cTU4WnNqemI2aU5wbWVjdm1vYXRzanhjNHRUcXliMjE=")
     private String tokenSigningKey;
 
 }

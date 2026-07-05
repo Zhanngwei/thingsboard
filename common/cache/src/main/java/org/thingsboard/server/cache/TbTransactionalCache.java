@@ -34,98 +34,68 @@ import java.util.function.Supplier;
 public interface TbTransactionalCache<K extends Serializable, V extends Serializable> {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getCacheName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String getCacheName();
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `get` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `get` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
     TbCacheValueWrapper<V> get(K key);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `put` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `put` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
     void put(K key, V value);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `putIfAbsent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `putIfAbsent` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
     void putIfAbsent(K key, V value);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：无。
      */
     void evict(K key);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `keys`：键。
+     * 返回：无。
      */
     void evict(Collection<K> keys);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evictOrPut` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Or Put`。
+     * 参数：
+     * - `key`：键。
+     * - `value`：值。
+     * 返回：无。
      */
     void evictOrPut(K key, V value);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newTransactionForKey` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newTransactionForKey` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：处理结果。
      */
     TbCacheTransaction<K, V> newTransactionForKey(K key);
 
@@ -136,38 +106,28 @@ public interface TbTransactionalCache<K extends Serializable, V extends Serializ
      * @return transaction object
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newTransactionForKeys` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newTransactionForKeys` 对应的处理。
+     * 参数：
+     * - `keys`：键。
+     * 返回：处理结果。
      */
     TbCacheTransaction<K, V> newTransactionForKeys(List<K> keys);
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrFetchFromDB` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Or Fetch From DB`。
+     * 参数：
+     * - `key`：键。
+     * - `dbCall`：`dbCall` 参数。
+     * - `cacheNullValue`：值。
+     * - `putToCache`：`putToCache` 参数。
+     * 返回：处理结果。
      */
     default V getOrFetchFromDB(K key, Supplier<V> dbCall, boolean cacheNullValue, boolean putToCache) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         if (putToCache) {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             return getAndPutInTransaction(key, dbCall, cacheNullValue);
         } else {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             TbCacheValueWrapper<V> cacheValueWrapper = get(key);
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             if (cacheValueWrapper != null) {
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 return cacheValueWrapper.get();
             }
             return dbCall.get();
@@ -175,32 +135,23 @@ public interface TbTransactionalCache<K extends Serializable, V extends Serializ
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAndPutInTransaction` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`And Put In Transaction`。
+     * 参数：
+     * - `key`：键。
+     * - `dbCall`：`dbCall` 参数。
+     * - `cacheNullValue`：值。
+     * 返回：处理结果。
      */
     default V getAndPutInTransaction(K key, Supplier<V> dbCall, boolean cacheNullValue) {
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         TbCacheValueWrapper<V> cacheValueWrapper = get(key);
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         if (cacheValueWrapper != null) {
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             return cacheValueWrapper.get();
         }
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         var cacheTransaction = newTransactionForKey(key);
         try {
             V dbValue = dbCall.get();
-            // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
             if (dbValue != null || cacheNullValue) {
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 cacheTransaction.putIfAbsent(key, dbValue);
-                // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
                 cacheTransaction.commit();
                 return dbValue;
             } else {
@@ -214,14 +165,14 @@ public interface TbTransactionalCache<K extends Serializable, V extends Serializ
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrFetchFromDB` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Or Fetch From DB`。
+     * 参数：
+     * - `key`：键。
+     * - `dbCall`：`dbCall` 参数。
+     * - `cacheValueToResult`：值。
+     * - `dbValueToCacheValue`：值。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     default <R> R getOrFetchFromDB(K key, Supplier<R> dbCall, Function<V, R> cacheValueToResult, Function<R, V> dbValueToCacheValue, boolean cacheNullValue, boolean putToCache) {
         if (putToCache) {
@@ -237,14 +188,14 @@ public interface TbTransactionalCache<K extends Serializable, V extends Serializ
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAndPutInTransaction` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`And Put In Transaction`。
+     * 参数：
+     * - `key`：键。
+     * - `dbCall`：`dbCall` 参数。
+     * - `cacheValueToResult`：值。
+     * - `dbValueToCacheValue`：值。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     default <R> R getAndPutInTransaction(K key, Supplier<R> dbCall, Function<V, R> cacheValueToResult, Function<R, V> dbValueToCacheValue, boolean cacheNullValue) {
         TbCacheValueWrapper<V> cacheValueWrapper = get(key);

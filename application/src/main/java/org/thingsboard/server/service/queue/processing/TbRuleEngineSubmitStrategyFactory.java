@@ -19,8 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.queue.SubmitStrategy;
 
-@Component
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbRuleEngineSubmitStrategyFactory` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
@@ -31,20 +29,18 @@ import org.thingsboard.server.common.data.queue.SubmitStrategy;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
  */
+@Component
+@Slf4j
 public class TbRuleEngineSubmitStrategyFactory {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newInstance` 对应的队列服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newInstance` 对应的处理。
+     * 参数：
+     * - `name`：名称。
+     * - `submitStrategy`：`submitStrategy` 参数。
+     * 返回：处理结果。
      */
     public TbRuleEngineSubmitStrategy newInstance(String name, SubmitStrategy submitStrategy) {
-        // 根据枚举、状态或协议版本分支，保持不同业务路径的处理语义独立。
         switch (submitStrategy.getType()) {
             case BURST:
                 return new BurstTbRuleEngineSubmitStrategy(name);

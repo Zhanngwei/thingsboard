@@ -48,18 +48,16 @@ import org.thingsboard.server.common.data.rule.RuleNode;
 import java.util.UUID;
 
 /**
- * 按任意实体 ID 同步解析所属租户 ID 的工具类。
- * 本类不保存共享状态；不同实体类型会调用对应服务或缓存，数据库读取和缓存命中由这些服务实现决定。
+ * `TenantIdLoader` 类，封装当前模块中的一组相关职责。
  */
 public class TenantIdLoader {
 
     /**
-     * 查找实体所属租户 ID。
-     * 本方法只返回租户归属信息，不直接发送 Rule Engine 消息；同步服务调用可能读取数据库或命中缓存，ASSET_PROFILE、DEVICE_PROFILE 分支会直接访问上下文缓存。
-     *
-     * @param ctx 规则节点上下文，提供租户、服务和缓存访问入口
-     * @param entityId 待解析租户归属的实体 ID
-     * @return 实体所属租户 ID，实体不存在时可能返回 null
+     * 功能：获取租户ID。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
     public static TenantId findTenantId(TbContext ctx, EntityId entityId) {
         UUID id = entityId.getId();
@@ -69,7 +67,6 @@ public class TenantIdLoader {
         HasTenantId tenantEntity;
         switch (entityType) {
             case TENANT:
-                // 租户实体自身的 ID 即为租户 ID，不需要数据库或缓存读取。
                 return new TenantId(id);
             case CUSTOMER:
                 tenantEntity = ctx.getCustomerService().findCustomerById(ctxTenantId, new CustomerId(id));
@@ -102,11 +99,9 @@ public class TenantIdLoader {
                 tenantEntity = ctx.getOtaPackageService().findOtaPackageInfoById(ctxTenantId, new OtaPackageId(id));
                 break;
             case ASSET_PROFILE:
-                // Profile 信息从上下文缓存读取，是否回源由缓存实现决定。
                 tenantEntity = ctx.getAssetProfileCache().get(ctxTenantId, new AssetProfileId(id));
                 break;
             case DEVICE_PROFILE:
-                // Device Profile 同样通过缓存入口读取，避免本类直接感知数据库细节。
                 tenantEntity = ctx.getDeviceProfileCache().get(ctxTenantId, new DeviceProfileId(id));
                 break;
             case WIDGET_TYPE:
@@ -128,7 +123,6 @@ public class TenantIdLoader {
                 tenantEntity = ctx.getResourceService().findResourceInfoById(ctxTenantId, new TbResourceId(id));
                 break;
             case RULE_NODE:
-                // RuleNode 本身不直接携带租户 ID，先查节点再通过所属规则链解析租户归属。
                 RuleNode ruleNode = ctx.getRuleChainService().findRuleNodeById(ctxTenantId, new RuleNodeId(id));
                 if (ruleNode != null) {
                     tenantEntity = ctx.getRuleChainService().findRuleChainById(ctxTenantId, ruleNode.getRuleChainId());
@@ -138,7 +132,6 @@ public class TenantIdLoader {
                 break;
             case TENANT_PROFILE:
                 if (ctx.getTenantProfile().getId().equals(entityId)) {
-                    // 当前租户配置来自上下文，匹配时直接返回上下文租户 ID。
                     return ctxTenantId;
                 } else {
                     tenantEntity = null;

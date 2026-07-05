@@ -28,7 +28,6 @@ import org.thingsboard.server.dao.queue.QueueDao;
 import org.thingsboard.server.dao.service.DataValidator;
 import org.thingsboard.server.dao.tenant.TbTenantProfileCache;
 
-@Component
 /**
  * 中文说明：
  * 1. 类目的：`QueueValidator` 是 ThingsBoard DAO 模块 中的DAO 服务测试或服务支撑类型，用于组织 DAO 层测试、共享服务夹具或持久化服务的公共执行流程。
@@ -40,105 +39,72 @@ import org.thingsboard.server.dao.tenant.TbTenantProfileCache;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Template Method / Service。
  */
+@Component
 public class QueueValidator extends DataValidator<Queue> {
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `queueDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 队列，用于读取或保存对应领域对象。
      */
+    @Autowired
     private QueueDao queueDao;
 
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `tenantProfileCache` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 租户对象，用于描述当前业务场景。
      */
+    @Autowired
     private TbTenantProfileCache tenantProfileCache;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateCreate` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验`Create`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `queue`：队列名称或队列对象。
+     * 返回：无。
      */
+    @Override
     protected void validateCreate(TenantId tenantId, Queue queue) {
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         if (queueDao.findQueueByTenantIdAndName(tenantId, queue.getName()) != null) {
             throw new DataValidationException(String.format("Queue with name: %s already exists!", queue.getName()));
         }
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         if (queueDao.findQueueByTenantIdAndTopic(tenantId, queue.getTopic()) != null) {
             throw new DataValidationException(String.format("Queue with topic: %s already exists!", queue.getTopic()));
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateUpdate` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验`Update`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `queue`：队列名称或队列对象。
+     * 返回：判断结果。
      */
+    @Override
     protected Queue validateUpdate(TenantId tenantId, Queue queue) {
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         Queue foundQueue = queueDao.findById(tenantId, queue.getUuidId());
-        // DAO 委派用于复用底层持久化实现，上层方法只保留领域校验和流程编排职责。
         if (queueDao.findById(tenantId, queue.getUuidId()) == null) {
             throw new DataValidationException(String.format("Queue with id: %s does not exists!", queue.getId()));
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (!foundQueue.getName().equals(queue.getName())) {
             throw new DataValidationException("Queue name can't be changed!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (!foundQueue.getTopic().equals(queue.getTopic())) {
             throw new DataValidationException("Queue topic can't be changed!");
         }
         return foundQueue;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `validateDataImpl` 对应的DAO 服务测试或服务支撑类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：在测试套件或服务调用期间创建，负责准备上下文、执行 DAO 调用并清理状态时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：初始化测试或服务依赖，执行 DAO 契约调用，最后校验数据库、缓存或事件状态。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：校验数据。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `queue`：队列名称或队列对象。
+     * 返回：无。
      */
+    @Override
     protected void validateDataImpl(TenantId tenantId, Queue queue) {
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (!tenantId.equals(TenantId.SYS_TENANT_ID)) {
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             TenantProfile tenantProfile = tenantProfileCache.get(tenantId);
 
-            // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
             if (!tenantProfile.isIsolatedTbRuleEngine()) {
                 throw new DataValidationException("Tenant should be isolated!");
             }
@@ -147,25 +113,20 @@ public class QueueValidator extends DataValidator<Queue> {
         validateQueueName(queue.getName());
         validateQueueTopic(queue.getTopic());
 
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (queue.getPollInterval() < 1) {
             throw new DataValidationException("Queue poll interval should be more then 0!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (queue.getPartitions() < 1) {
             throw new DataValidationException("Queue partitions should be more then 0!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (queue.getPackProcessingTimeout() < 1) {
             throw new DataValidationException("Queue pack processing timeout should be more then 0!");
         }
 
         SubmitStrategy submitStrategy = queue.getSubmitStrategy();
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (submitStrategy == null) {
             throw new DataValidationException("Queue submit strategy can't be null!");
         }
-        // 条件分支用于保护租户、实体状态、参数合法性或数据库结果边界，避免无效数据继续流转。
         if (submitStrategy.getType() == null) {
             throw new DataValidationException("Queue submit strategy type can't be null!");
         }

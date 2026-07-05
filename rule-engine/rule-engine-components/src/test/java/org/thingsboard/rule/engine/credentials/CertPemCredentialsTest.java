@@ -37,33 +37,34 @@ import static org.thingsboard.rule.engine.credentials.CertPemCredentials.CERT_AL
 import static org.thingsboard.rule.engine.credentials.CertPemCredentials.PRIVATE_KEY_ALIAS;
 
 /**
- * 测试目标：验证 {@code CertPemCredentialsTest} 覆盖的 凭证解析组件 行为，重点说明配置、消息和断言路径。
- * 所属生产节点/组件：{@code CertPemCredentials}，用于守护对应 Rule Engine 组件的兼容性和边界条件。
- * Mock 依赖来源：内存 fixture、参数化数据源，以及测试体按需创建的 Mockito mock/spy；测试不启动真实外部服务。
- * 被验证流程：准备 fixture，初始化节点或工具对象，触发被测调用，再断言输出、异常或 Mock 交互。
- * 存在原因：防止规则引擎组件在升级、消息处理、异步回调或数据映射场景中发生回归。
+ * `CertPemCredentialsTest` 测试类，用于验证 `CertPemCredentials` 相关行为。
  */
 public class CertPemCredentialsTest {
 
-    /** 测试常量字段：{@code PASS} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `PASS`常量，用于统一引用固定值。
+     */
     private static final String PASS = "test";
-    /** 测试常量字段：{@code EMPTY_PASS} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `EMPTY_PASS`常量，用于统一引用固定值。
+     */
     private static final String EMPTY_PASS = "";
-    /** 测试常量字段：{@code RSA} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `RSA`常量，用于统一引用固定值。
+     */
     private static final String RSA = "RSA";
-    /** 测试常量字段：{@code EC} 保存 {@code String} 测试数据或依赖，来源：由类加载时构造，生命周期覆盖整个测试类执行过程。 */
+    /**
+     * `EC`常量，用于统一引用固定值。
+     */
     private static final String EC = "EC";
 
     /**
-     * 测试方法：覆盖 {@code testChainOfCertificates} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证`Chain Of Certificates`相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testChainOfCertificates() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         String fileContent = fileContent("pem/tb-cloud-chain.pem");
 
         List<X509Certificate> x509Certificates = SslUtil.readCertFile(fileContent);
@@ -80,15 +81,12 @@ public class CertPemCredentialsTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testSingleCertificate} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证证书相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testSingleCertificate() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         String fileContent = fileContent("pem/tb-cloud.pem");
 
         List<X509Certificate> x509Certificates = SslUtil.readCertFile(fileContent);
@@ -99,15 +97,12 @@ public class CertPemCredentialsTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testEmptyFileContent} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证文件相关场景。
+     * 参数：无。
+     * 返回：无。
      */
     @Test
     public void testEmptyFileContent() throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         String fileContent = fileContent("pem/empty.pem");
 
         List<X509Certificate> x509Certificates = SslUtil.readCertFile(fileContent);
@@ -115,7 +110,11 @@ public class CertPemCredentialsTest {
         Assert.assertEquals(0, x509Certificates.size());
     }
 
-    /** 参数源方法：{@code testLoadKeyStore} 生成参数化测试输入组合，期望由消费它的测试方法断言。 */
+    /**
+     * 功能：验证键相关场景。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     private static Stream<Arguments> testLoadKeyStore() {
         return Stream.of(
                 Arguments.of("pem/rsa_cert.pem", "pem/rsa_key.pem", EMPTY_PASS, RSA),
@@ -126,16 +125,17 @@ public class CertPemCredentialsTest {
     }
 
     /**
-     * 测试方法：覆盖 {@code testLoadKeyStore} 场景，方法名中的 given/when/then 描述输入、触发动作和期望结果。
-     * 输入数据：由方法体、参数化来源、类级 fixture 和 Mockito stub 共同构造，重点服务当前场景。
-     * 期望输出：断言返回值、异常、转发关系、消息内容或 Mock 交互符合当前场景的 then 语义。
-     * 调用时机：JUnit 在 before/setUp 完成后执行；若调用 init/onMsg/upgrade，则模拟规则节点初始化、消息处理或配置升级时机。
-     * 外部系统：数据库、缓存、MQTT、Actor 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及；Rule Engine：测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：验证键相关场景。
+     * 参数：
+     * - `certPath`：文件或资源路径。
+     * - `keyPath`：键。
+     * - `password`：`password` 参数。
+     * - `algorithm`：`algorithm` 参数。
+     * 返回：无。
      */
     @ParameterizedTest
     @MethodSource
     public void testLoadKeyStore(String certPath, String keyPath, String password, String algorithm) throws Exception {
-        // 流程说明：准备输入与 Mock，触发被测逻辑，再验证输出、异常或交互。
         CertPemCredentials certPemCredentials = new CertPemCredentials();
         String certContent = fileContent(certPath);
         certPemCredentials.setCert(certContent);
@@ -157,9 +157,10 @@ public class CertPemCredentialsTest {
     }
 
     /**
-     * 辅助方法：{@code fileContent} 复用本类测试的 fixture 构造、Mock 配置或断言逻辑。
-     * 输入数据：来自调用方参数、类字段和内存对象；输出影响由调用它的测试方法验证。
-     * 外部系统：数据库、缓存、MQTT、Actor、Rule Engine 测试本身不直接涉及，Mock 或被测生产逻辑可能涉及。
+     * 功能：执行 `fileContent` 对应的处理。
+     * 参数：
+     * - `fileName`：名称。
+     * 返回：文本结果。
      */
     private String fileContent(String fileName) throws IOException {
         ClassLoader classLoader = getClass().getClassLoader();

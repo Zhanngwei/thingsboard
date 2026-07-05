@@ -60,7 +60,6 @@ import static org.thingsboard.common.util.DonAsynchron.withCallback;
 import static org.thingsboard.server.common.data.msg.TbNodeConnectionType.FAILURE;
 import static org.thingsboard.server.common.data.msg.TbNodeConnectionType.SUCCESS;
 
-@Slf4j
 /**
  * 中文说明：`TbAbstractRelationActionNode` 是抽象关系Action节点规则节点，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
  * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
@@ -69,20 +68,24 @@ import static org.thingsboard.server.common.data.msg.TbNodeConnectionType.SUCCES
  * 配置对象：`TbAbstractRelationActionNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
  * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
  */
+@Slf4j
 public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationActionNodeConfiguration> implements TbNode {
 
     /**
-     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     * 配置，保存当前对象的配置选项。
      */
     protected C config;
 
     private LoadingCache<EntityKey, EntityContainer> entityIdCache;
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = loadEntityNodeActionConfig(configuration);
         CacheBuilder<Object, Object> cacheBuilder = CacheBuilder.newBuilder();
@@ -92,24 +95,26 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
         entityIdCache = cacheBuilder.build(new EntityCacheLoader(ctx, createEntityIfNotExists()));
     }
 
-    @Override
     /**
-     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
-     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
-     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         String relationType = processPattern(msg, config.getRelationType());
-        // 异步回调用于把服务或转换结果映射为规则链成功/失败关系。
         withCallback(processEntityRelationAction(ctx, msg, relationType),
                 filterResult -> ctx.tellNext(filterResult.getMsg(), filterResult.isResult() ? SUCCESS : FAILURE), t -> ctx.tellFailure(msg, t), ctx.getDbCallbackExecutor());
     }
 
-    @Override
     /**
-     * 方法说明：在节点生命周期销毁阶段释放缓存、脚本引擎、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void destroy() {
         if (entityIdCache != null) {
             entityIdCache.invalidateAll();
@@ -117,35 +122,49 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理实体。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `relationType`：类型。
+     * 返回：匹配的数据集合。
      */
     protected ListenableFuture<RelationContainer> processEntityRelationAction(TbContext ctx, TbMsg msg, String relationType) {
-        // 异步串联后续服务调用，避免阻塞当前规则节点处理线程。
         return Futures.transformAsync(getEntity(ctx, msg), entityContainer -> doProcessEntityRelationAction(ctx, msg, entityContainer, relationType), ctx.getDbCallbackExecutor());
     }
 
     /**
-     * 方法说明：创建实体、告警、关系或辅助对象，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建实体。
+     * 参数：无。
+     * 返回：判断结果。
      */
     protected abstract boolean createEntityIfNotExists();
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `doProcessEntityRelationAction` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `entityContainer`：实体对象。
+     * - `relationType`：类型。
+     * 返回：匹配的数据集合。
      */
     protected abstract ListenableFuture<RelationContainer> doProcessEntityRelationAction(TbContext ctx, TbMsg msg, EntityContainer entityContainer, String relationType);
 
     /**
-     * 方法说明：加载或解析本类处理所需的配置、实体或辅助数据，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取实体。
+     * 参数：
+     * - `configuration`：配置对象。
+     * 返回：处理结果。
      */
     protected abstract C loadEntityNodeActionConfig(TbNodeConfiguration configuration) throws TbNodeException;
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取实体。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     protected ListenableFuture<EntityContainer> getEntity(TbContext ctx, TbMsg msg) {
         String entityName = processPattern(msg, this.config.getEntityNamePattern());
@@ -157,7 +176,6 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
         }
         EntityType entityType = EntityType.valueOf(this.config.getEntityType());
         EntityKey key = new EntityKey(entityName, type, entityType);
-        // 脚本执行交给规则节点脚本引擎，异常会通过回调进入失败关系。
         return ctx.getDbCallbackExecutor().executeAsync(() -> {
             EntityContainer entityContainer = entityIdCache.get(key);
             if (entityContainer.getEntityId() == null) {
@@ -168,8 +186,11 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理`Single Search Direction`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `entityContainer`：实体对象。
+     * 返回：处理结果。
      */
     protected SearchDirectionIds processSingleSearchDirection(TbMsg msg, EntityContainer entityContainer) {
         SearchDirectionIds searchDirectionIds = new SearchDirectionIds();
@@ -186,64 +207,68 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `RelationService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理`List Search Direction`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
     protected ListenableFuture<List<EntityRelation>> processListSearchDirection(TbContext ctx, TbMsg msg) {
         if (EntitySearchDirection.FROM.name().equals(this.config.getDirection())) {
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             return ctx.getRelationService().findByToAndTypeAsync(ctx.getTenantId(), msg.getOriginator(), processPattern(msg, this.config.getRelationType()), RelationTypeGroup.COMMON);
         } else {
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             return ctx.getRelationService().findByFromAndTypeAsync(ctx.getTenantId(), msg.getOriginator(), processPattern(msg, this.config.getRelationType()), RelationTypeGroup.COMMON);
         }
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbAbstractRelationActionNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理`Pattern`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `pattern`：`pattern` 参数。
+     * 返回：文本结果。
      */
     protected String processPattern(TbMsg msg, String pattern) {
         return TbNodeUtils.processPattern(pattern, msg);
     }
 
-    @Data
-    @AllArgsConstructor
     /**
      * 中文说明：`EntityKey` 是实体键辅助类，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
      * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
      */
+    @Data
+    @AllArgsConstructor
     private static class EntityKey {
         /**
-         * 字段说明：保存 `entityName`，表示目标实体类型、名称或标识，供本类方法在规则节点处理流程中使用。
+         * 实体，用于标识或展示当前对象。
          */
         private String entityName;
         /**
-         * 字段说明：保存 `type`，表示类型匹配条件，供本类方法在规则节点处理流程中使用。
+         * 类型，用于区分不同处理分支。
          */
         private String type;
         /**
-         * 字段说明：保存 `entityType`，表示目标实体类型、名称或标识，供本类方法在规则节点处理流程中使用。
+         * 实体，用于区分不同处理分支。
          */
         private EntityType entityType;
     }
 
-    @Data
     /**
      * 中文说明：`SearchDirectionIds` 是SearchDirectionIds辅助类，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
      * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
      */
+    @Data
     protected static class SearchDirectionIds {
         /**
-         * 字段说明：保存 `fromId`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+         * `fromId`ID，用于定位对应业务对象。
          */
         private EntityId fromId;
         /**
-         * 字段说明：保存 `toId`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+         * `toId`ID，用于定位对应业务对象。
          */
         private EntityId toId;
         /**
-         * 字段说明：保存 `originatorDirectionFrom`，表示关系方向，供本类方法在规则节点处理流程中使用。
+         * 是否满足`originatorDirectionFrom`条件。
          */
         private boolean originatorDirectionFrom;
     }
@@ -255,35 +280,42 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     private static class EntityCacheLoader extends CacheLoader<EntityKey, EntityContainer> {
 
         /**
-         * 字段说明：保存 Rule Engine 上下文引用；本字段本身不直接代表数据库、MQTT 或事务资源。
+         * 上下文，汇总当前处理所需的上下文信息。
          */
         private final TbContext ctx;
         /**
-         * 字段说明：保存 `createIfNotExists`，表示时间戳，供本类方法在规则节点处理流程中使用。
+         * 是否满足`createIfNotExists`条件。
          */
         private final boolean createIfNotExists;
 
         /**
-         * 方法说明：构造 `EntityCacheLoader` 实例并初始化必要字段。
-         * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+         * 功能：创建 `TbAbstractRelationActionNode` 实例，并初始化必要字段。
+         * 参数：
+         * - `ctx`：处理上下文。
+         * - `createIfNotExists`：`createIfNotExists` 参数。
+         * 返回：新创建的对象实例。
          */
         private EntityCacheLoader(TbContext ctx, boolean createIfNotExists) {
             this.ctx = ctx;
             this.createIfNotExists = createIfNotExists;
         }
 
-        @Override
         /**
-         * 方法说明：加载或解析本类处理所需的配置、实体或辅助数据，供 `EntityCacheLoader` 的规则节点处理或辅助流程调用。
-         * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+         * 功能：执行 `load` 对应的处理。
+         * 参数：
+         * - `key`：键。
+         * 返回：处理结果。
          */
+        @Override
         public EntityContainer load(EntityKey key) {
             return loadEntity(key);
         }
 
         /**
-         * 方法说明：加载或解析本类处理所需的配置、实体或辅助数据，供 `EntityCacheLoader` 的规则节点处理或辅助流程调用。
-         * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AssetService`, `ClusterService`, `CustomerService`, `DashboardService`, `DeviceService`, `EdgeService` 等服务，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+         * 功能：获取实体。
+         * 参数：
+         * - `entitykey`：实体对象。
+         * 返回：处理结果。
          */
         private EntityContainer loadEntity(EntityKey entitykey) {
             EntityType type = entitykey.getEntityType();
@@ -379,21 +411,21 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
         }
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
     /**
      * 中文说明：`RelationContainer` 是关系Container辅助类，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
      * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
      */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
     protected static class RelationContainer {
 
         /**
-         * 字段说明：保存 `msg`，表示当前规则链消息，供本类方法在规则节点处理流程中使用。
+         * 消息，承载当前步骤需要处理的内容。
          */
         private TbMsg msg;
         /**
-         * 字段说明：保存 `result`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+         * 是否满足`result`条件。
          */
         private boolean result;
 

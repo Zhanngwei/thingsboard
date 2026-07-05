@@ -33,27 +33,32 @@ import org.thingsboard.server.common.data.util.TbPair;
 public abstract class TbAbstractTransformNodeWithTbMsgSource implements TbNode {
 
     /**
-     * 常量字段：定义 `FROM_METADATA_PROPERTY`，用于消息元数据，本身不触发外部系统调用。
+     * `FROM_METADATA_PROPERTY`常量，用于统一引用固定值。
      */
     protected static final String FROM_METADATA_PROPERTY = "fromMetadata";
 
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbAbstractTransformNodeWithTbMsgSource` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取键。
+     * 参数：无。
+     * 返回：文本结果。
      */
     protected abstract String getNewKeyForUpgradeFromVersionZero();
 
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbAbstractTransformNodeWithTbMsgSource` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取键。
+     * 参数：无。
+     * 返回：文本结果。
      */
     protected abstract String getKeyToUpgradeFromVersionOne();
 
-    @Override
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `upgrade` 对应的处理。
+     * 参数：
+     * - `fromVersion`：`fromVersion` 参数。
+     * - `oldConfiguration`：配置对象。
+     * 返回：处理结果。
      */
+    @Override
     public TbPair<Boolean, JsonNode> upgrade(int fromVersion, JsonNode oldConfiguration) throws TbNodeException {
         ObjectNode configToUpdate = (ObjectNode) oldConfiguration;
         switch (fromVersion) {
@@ -67,8 +72,10 @@ public abstract class TbAbstractTransformNodeWithTbMsgSource implements TbNode {
     }
 
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbAbstractTransformNodeWithTbMsgSource` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `upgradeToUseTbMsgSource` 对应的处理。
+     * 参数：
+     * - `configToUpdate`：配置对象。
+     * 返回：处理结果。
      */
     private TbPair<Boolean, JsonNode> upgradeToUseTbMsgSource(ObjectNode configToUpdate) throws TbNodeException {
         if (!configToUpdate.has(FROM_METADATA_PROPERTY)) {
@@ -90,8 +97,10 @@ public abstract class TbAbstractTransformNodeWithTbMsgSource implements TbNode {
     }
 
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbAbstractTransformNodeWithTbMsgSource` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `upgradeNodesWithVersionOneToUseTbMsgSource` 对应的处理。
+     * 参数：
+     * - `configToUpdate`：配置对象。
+     * 返回：处理结果。
      */
     private TbPair<Boolean, JsonNode> upgradeNodesWithVersionOneToUseTbMsgSource(ObjectNode configToUpdate) throws TbNodeException {
         if (configToUpdate.has(getNewKeyForUpgradeFromVersionZero())) {
@@ -101,8 +110,11 @@ public abstract class TbAbstractTransformNodeWithTbMsgSource implements TbNode {
     }
 
     /**
-     * 方法说明：迁移旧版本规则节点 JSON 配置结构，供 `TbAbstractTransformNodeWithTbMsgSource` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `upgradeTbMsgSourceKey` 对应的处理。
+     * 参数：
+     * - `configToUpdate`：配置对象。
+     * - `oldPropertyKey`：键。
+     * 返回：处理结果。
      */
     private TbPair<Boolean, JsonNode> upgradeTbMsgSourceKey(ObjectNode configToUpdate, String oldPropertyKey) throws TbNodeException {
         if (!configToUpdate.has(oldPropertyKey)) {

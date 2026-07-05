@@ -37,8 +37,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-@Slf4j
-@Getter
 /**
  * 中文说明：
  * 1. 类目的：`NotificationApiWsClient` 是ThingsBoard Application 测试模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -49,62 +47,41 @@ import java.util.UUID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Slf4j
+@Getter
 public class NotificationApiWsClient extends TbTestWebSocketClient {
 
     /**
-     * 字段说明：
-     * 1. 保存 `lastDataUpdate` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数据，保存当前步骤读取或计算得到的内容。
      */
     private UnreadNotificationsUpdate lastDataUpdate;
     private UnreadNotificationsCountUpdate lastCountUpdate;
 
     /**
-     * 字段说明：
-     * 1. 保存 `limit` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数量限制，用于控制数量、位置或分页范围。
      */
     private int limit;
     private int unreadCount;
     /**
-     * 字段说明：
-     * 1. 保存 `notifications` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `notifications`列表，用于保存一组待处理对象。
      */
     private List<Notification> notifications;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `NotificationApiWsClient` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `NotificationApiWsClient` 实例，并初始化必要字段。
+     * 参数：
+     * - `wsUrl`：`wsUrl` 参数。
+     * 返回：新创建的对象实例。
      */
     public NotificationApiWsClient(String wsUrl) throws URISyntaxException {
         super(new URI(wsUrl + "/api/ws"));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `subscribeForUnreadNotifications` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：订阅`For Unread Notifications`。
+     * 参数：
+     * - `limit`：数量限制。
+     * 返回：处理结果。
      */
     public NotificationApiWsClient subscribeForUnreadNotifications(int limit) {
         send(new NotificationsSubCmd(1, limit));
@@ -113,14 +90,9 @@ public class NotificationApiWsClient extends TbTestWebSocketClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `subscribeForUnreadNotificationsCount` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：订阅数量。
+     * 参数：无。
+     * 返回：处理结果。
      */
     public NotificationApiWsClient subscribeForUnreadNotificationsCount() {
         send(new NotificationsCountSubCmd(2));
@@ -128,94 +100,70 @@ public class NotificationApiWsClient extends TbTestWebSocketClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `markNotificationAsRead` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `markNotificationAsRead` 对应的处理。
+     * 参数：
+     * - `notifications`：`notifications` 参数。
+     * 返回：无。
      */
     public void markNotificationAsRead(UUID... notifications) {
         send(new MarkNotificationsAsReadCmd(newCmdId(), Arrays.asList(notifications)));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `markAllNotificationsAsRead` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `markAllNotificationsAsRead` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void markAllNotificationsAsRead() {
         send(new MarkAllNotificationsAsReadCmd(newCmdId()));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `registerWaitForUpdate` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Wait For Update`。
+     * 参数：
+     * - `count`：`count` 参数。
+     * 返回：无。
      */
+    @Override
     public void registerWaitForUpdate(int count) {
         lastDataUpdate = null;
         lastCountUpdate = null;
         super.registerWaitForUpdate(count);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onMessage` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理消息。
+     * 参数：
+     * - `s`：`s` 参数。
+     * 返回：无。
      */
+    @Override
     public void onMessage(String s) {
         JsonNode update = JacksonUtil.toJsonNode(s);
         CmdUpdateType updateType = CmdUpdateType.valueOf(update.get("cmdUpdateType").asText());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (updateType == CmdUpdateType.NOTIFICATIONS) {
             lastDataUpdate = JacksonUtil.treeToValue(update, UnreadNotificationsUpdate.class);
             unreadCount = lastDataUpdate.getTotalUnreadCount();
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (lastDataUpdate.getNotifications() != null) {
                 notifications = new ArrayList<>(lastDataUpdate.getNotifications());
             } else {
                 Notification notificationUpdate = lastDataUpdate.getUpdate();
                 boolean updated = false;
-                // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
                 for (int i = 0; i < notifications.size(); i++) {
                     Notification existing = notifications.get(i);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (existing.getId().equals(notificationUpdate.getId())) {
                         notifications.set(i, notificationUpdate);
                         updated = true;
                         break;
                     }
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (!updated) {
                     notifications.add(0, notificationUpdate);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (notifications.size() > limit) {
                         notifications = notifications.subList(0, limit);
                     }
                 }
             }
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (updateType == CmdUpdateType.NOTIFICATIONS_COUNT) {
             lastCountUpdate = JacksonUtil.treeToValue(update, UnreadNotificationsCountUpdate.class);
             unreadCount = lastCountUpdate.getTotalUnreadCount();
@@ -224,14 +172,9 @@ public class NotificationApiWsClient extends TbTestWebSocketClient {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `newCmdId` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `newCmdId` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     private static int newCmdId() {
         return RandomUtils.nextInt(1, 1000);

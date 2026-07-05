@@ -60,270 +60,197 @@ public interface RuleEngineAlarmService {
      */
 
     /**
-     * Designed for atomic operations over active alarms.
-     * Only one active alarm may exist for the pair {originatorId, alarmType}
-     *
-     * 中文说明：
-     * 1. 方法职责：创建新告警或更新同一 originator/type 下已有活跃告警。
-     * 2. 输入参数：request 包含租户、发起实体、告警类型、严重级别、详情和时间戳等数据。
-     * 3. 返回值：AlarmApiCallResult，表示创建/更新后的告警和操作结果。
-     * 4. 调用时机：告警节点根据规则消息触发告警创建或活跃告警更新时调用。
-     * 5. 调用方：告警创建规则节点、告警相关服务。
-     * 6. 使用流程：属于 Rule Engine 告警状态迁移流程。
-     * 7. 线程安全：接口无状态；实现必须保证同一 originator/type 活跃告警的并发原子性。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常涉及数据库事务、缓存刷新和 Rule Engine 告警处理。
+     * 功能：保存或创建告警。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：键值映射结果。
      */
     AlarmApiCallResult createAlarm(AlarmCreateOrUpdateActiveRequest request);
 
     /**
-     * Designed to update existing alarm. Accepts only part of the alarm fields.
-     *
-     * 中文说明：
-     * 1. 方法职责：按请求更新已存在告警的部分字段。
-     * 2. 输入参数：request 包含告警 ID、租户和需要更新的字段。
-     * 3. 返回值：AlarmApiCallResult，表示更新结果和告警数据。
-     * 4. 调用时机：规则节点需要修改告警详情、状态或相关属性时调用。
-     * 5. 调用方：告警更新规则节点。
-     * 6. 使用流程：属于 Rule Engine 告警更新流程。
-     * 7. 线程安全：接口无状态；实现需保证并发更新一致性。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常涉及数据库事务和缓存/通知刷新。
+     * 功能：更新告警。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：键值映射结果。
      */
     AlarmApiCallResult updateAlarm(AlarmUpdateRequest request);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：确认指定告警。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警标识，ackTs 是确认时间戳。
-     * 3. 返回值：AlarmApiCallResult，表示确认后的告警结果。
-     * 4. 调用时机：告警确认节点或用户操作触发确认时调用。
-     * 5. 调用方：告警规则节点、告警管理流程。
-     * 6. 使用流程：属于 Rule Engine 告警状态迁移流程。
-     * 7. 线程安全：实现需保证并发确认/清除的一致性。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库并可能使用事务和缓存。
+     * 功能：执行 `acknowledgeAlarm` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * - `ackTs`：时间戳。
+     * 返回：键值映射结果。
      */
     AlarmApiCallResult acknowledgeAlarm(TenantId tenantId, AlarmId alarmId, long ackTs);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：清除指定告警并记录清除详情。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警标识，clearTs 是清除时间戳，details 是清除详情。
-     * 3. 返回值：AlarmApiCallResult，表示清除后的告警结果。
-     * 4. 调用时机：告警清除节点或用户清除操作触发时调用。
-     * 5. 调用方：告警规则节点、告警管理流程。
-     * 6. 使用流程：属于 Rule Engine 告警关闭流程。
-     * 7. 线程安全：实现需保证并发清除、确认、分配操作一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常涉及数据库、事务和缓存刷新。
+     * 功能：删除或清理告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * - `clearTs`：时间戳。
+     * - `details`：`details` 参数。
+     * 返回：键值映射结果。
      */
     AlarmApiCallResult clearAlarm(TenantId tenantId, AlarmId alarmId, long clearTs, JsonNode details);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：把告警分配给指定用户。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警，assigneeId 是负责人，assignTs 是分配时间戳。
-     * 3. 返回值：AlarmApiCallResult，表示分配后的告警结果。
-     * 4. 调用时机：告警分配节点或用户操作触发时调用。
-     * 5. 调用方：告警管理流程、告警规则节点。
-     * 6. 使用流程：属于告警负责人状态变更流程。
-     * 7. 线程安全：实现需保证负责人变更并发一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库并可能触发通知。
+     * 功能：执行 `assignAlarm` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * - `assigneeId`：`assigneeId`ID。
+     * - `assignTs`：时间戳。
+     * 返回：键值映射结果。
      */
     AlarmApiCallResult assignAlarm(TenantId tenantId, AlarmId alarmId, UserId assigneeId, long assignTs);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：取消告警负责人。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警，assignTs 是取消分配时间戳。
-     * 3. 返回值：AlarmApiCallResult，表示取消分配后的告警结果。
-     * 4. 调用时机：告警取消分配节点或用户操作触发时调用。
-     * 5. 调用方：告警管理流程、告警规则节点。
-     * 6. 使用流程：属于告警负责人状态变更流程。
-     * 7. 线程安全：实现需保证并发状态变更一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库并可能触发通知。
+     * 功能：执行 `unassignAlarm` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * - `assignTs`：时间戳。
+     * 返回：键值映射结果。
      */
     AlarmApiCallResult unassignAlarm(TenantId tenantId, AlarmId alarmId, long assignTs);
 
     // Other API
     /**
-     * 中文说明：
-     * 1. 方法职责：删除指定告警。
-     * 2. 输入参数：tenantId 是租户边界，alarmId 是告警标识。
-     * 3. 返回值：Boolean 表示是否删除成功。
-     * 4. 调用时机：告警删除节点或管理流程触发时调用。
-     * 5. 调用方：告警规则节点、告警管理 API。
-     * 6. 使用流程：属于告警生命周期终止流程。
-     * 7. 线程安全：实现需保证删除与查询/更新并发一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常涉及数据库和缓存清理。
+     * 功能：删除或清理告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * 返回：判断结果。
      */
     Boolean deleteAlarm(TenantId tenantId, AlarmId alarmId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步按 ID 查询告警。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警标识。
-     * 3. 返回值：ListenableFuture 包装的 Alarm。
-     * 4. 调用时机：节点或服务需要非阻塞读取告警时调用。
-     * 5. 调用方：告警规则节点、异步服务流程。
-     * 6. 使用流程：属于 Rule Engine 告警查询流程。
-     * 7. 线程安全：接口无状态；实现需保证异步 DAO/缓存并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现可能访问数据库和缓存。
+     * 功能：获取告警ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * 返回：匹配的数据集合。
      */
     ListenableFuture<Alarm> findAlarmByIdAsync(TenantId tenantId, AlarmId alarmId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：同步按 ID 查询告警。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警标识。
-     * 3. 返回值：匹配的 Alarm。
-     * 4. 调用时机：节点需要立即获得告警数据时调用。
-     * 5. 调用方：告警规则节点、告警管理流程。
-     * 6. 使用流程：属于 Rule Engine 告警查询流程。
-     * 7. 线程安全：接口无状态；实现需保证 DAO/缓存并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库或缓存。
+     * 功能：获取告警ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * 返回：处理结果。
      */
     Alarm findAlarmById(TenantId tenantId, AlarmId alarmId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：查询指定发起实体和类型的最新活跃告警。
-     * 2. 输入参数：tenantId 是租户，originator 是告警发起实体，type 是告警类型。
-     * 3. 返回值：最新活跃 Alarm，未找到时由实现决定返回 null。
-     * 4. 调用时机：创建或更新告警前需要判断是否已有活跃告警时调用。
-     * 5. 调用方：告警规则节点和告警服务实现。
-     * 6. 使用流程：属于活跃告警去重和更新流程。
-     * 7. 线程安全：实现需保证与 createAlarm 的并发一致。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库和缓存。
+     * 功能：获取类型。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `originator`：`originator` 参数。
+     * - `type`：类型。
+     * 返回：处理结果。
      */
     Alarm findLatestActiveByOriginatorAndType(TenantId tenantId, EntityId originator, String type);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：查询指定发起实体和类型的最新告警，不限活跃状态。
-     * 2. 输入参数：tenantId 是租户，originator 是告警发起实体，type 是告警类型。
-     * 3. 返回值：最新 Alarm。
-     * 4. 调用时机：规则节点需要读取最近告警历史状态时调用。
-     * 5. 调用方：告警规则节点、告警查询流程。
-     * 6. 使用流程：属于 Rule Engine 告警查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库。
+     * 功能：获取类型。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `originator`：`originator` 参数。
+     * - `type`：类型。
+     * 返回：处理结果。
      */
     Alarm findLatestByOriginatorAndType(TenantId tenantId, EntityId originator, String type);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按 ID 查询告警扩展信息。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警标识。
-     * 3. 返回值：AlarmInfo，包含告警及扩展展示信息。
-     * 4. 调用时机：节点或 UI/API 需要告警详情信息时调用。
-     * 5. 调用方：告警规则节点、告警查询流程。
-     * 6. 使用流程：属于告警详情查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库和实体信息缓存。
+     * 功能：获取告警ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * 返回：处理结果。
      */
     AlarmInfo findAlarmInfoById(TenantId tenantId, AlarmId alarmId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：异步按 ID 查询告警扩展信息。
-     * 2. 输入参数：tenantId 是租户，alarmId 是告警标识。
-     * 3. 返回值：ListenableFuture 包装的 AlarmInfo。
-     * 4. 调用时机：调用方需要异步接口但当前默认实现只提供同步查询包装时调用。
-     * 5. 调用方：异步告警处理流程。
-     * 6. 使用流程：属于 Rule Engine 告警查询兼容流程。
-     * 7. 线程安全：默认实现无共享状态，线程安全；实际查询线程安全取决于 findAlarmInfoById 实现。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：默认实现不直接涉及 MQTT/Actor；底层同步查询可能访问数据库/缓存。
+     * 功能：获取告警ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `alarmId`：告警IDID。
+     * 返回：匹配的数据集合。
      */
     default ListenableFuture<AlarmInfo> findAlarmInfoByIdAsync(TenantId tenantId, AlarmId alarmId) {
         return Futures.immediateFuture(findAlarmInfoById(tenantId, alarmId));
     }
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按 AlarmQuery 分页查询租户告警。
-     * 2. 输入参数：tenantId 是租户，query 是告警查询条件。
-     * 3. 返回值：分页 AlarmInfo。
-     * 4. 调用时机：规则节点或管理流程需要查询告警列表时调用。
-     * 5. 调用方：告警查询节点、告警管理 API。
-     * 6. 使用流程：属于 Rule Engine/管理端告警分页查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库。
+     * 功能：获取`Alarms`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `query`：`query` 参数。
+     * 返回：匹配的数据集合。
      */
     PageData<AlarmInfo> findAlarms(TenantId tenantId, AlarmQuery query);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按客户和 AlarmQuery 分页查询告警。
-     * 2. 输入参数：tenantId 是租户，customerId 是客户，query 是查询条件。
-     * 3. 返回值：分页 AlarmInfo。
-     * 4. 调用时机：客户视角查询告警列表时调用。
-     * 5. 调用方：告警管理 API、客户级规则流程。
-     * 6. 使用流程：属于客户隔离的告警查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库。
+     * 功能：获取客户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `query`：`query` 参数。
+     * 返回：匹配的数据集合。
      */
     PageData<AlarmInfo> findCustomerAlarms(TenantId tenantId, CustomerId customerId, AlarmQuery query);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按新版 AlarmQueryV2 分页查询租户告警。
-     * 2. 输入参数：tenantId 是租户，query 是新版告警查询条件。
-     * 3. 返回值：分页 AlarmInfo。
-     * 4. 调用时机：需要使用 V2 查询能力时调用。
-     * 5. 调用方：告警管理 API、规则节点查询流程。
-     * 6. 使用流程：属于新版告警查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库。
+     * 功能：获取`Alarms V2`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `query`：`query` 参数。
+     * 返回：匹配的数据集合。
      */
     PageData<AlarmInfo> findAlarmsV2(TenantId tenantId, AlarmQueryV2 query);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按客户和新版 AlarmQueryV2 分页查询告警。
-     * 2. 输入参数：tenantId 是租户，customerId 是客户，query 是新版查询条件。
-     * 3. 返回值：分页 AlarmInfo。
-     * 4. 调用时机：客户视角需要使用 V2 查询能力时调用。
-     * 5. 调用方：告警管理 API、客户级规则流程。
-     * 6. 使用流程：属于客户隔离的新版告警查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库。
+     * 功能：获取客户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `customerId`：客户IDID。
+     * - `query`：`query` 参数。
+     * 返回：匹配的数据集合。
      */
     PageData<AlarmInfo> findCustomerAlarmsV2(TenantId tenantId, CustomerId customerId, AlarmQueryV2 query);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：查询实体当前满足条件的最高告警严重级别。
-     * 2. 输入参数：tenantId 是租户，entityId 是实体，alarmSearchStatus/alarmStatus 是状态过滤，assigneeId 是负责人过滤。
-     * 3. 返回值：最高 AlarmSeverity，未命中时由实现返回空或默认值。
-     * 4. 调用时机：规则节点或 UI 需要计算实体告警摘要时调用。
-     * 5. 调用方：告警查询流程、实体状态展示流程。
-     * 6. 使用流程：属于告警聚合查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库，可能使用缓存。
+     * 功能：获取告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `alarmSearchStatus`：`alarmSearchStatus` 参数。
+     * - `alarmStatus`：`alarmStatus` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：处理结果。
      */
     AlarmSeverity findHighestAlarmSeverity(TenantId tenantId, EntityId entityId, AlarmSearchStatus alarmSearchStatus, AlarmStatus alarmStatus, String assigneeId);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：按实体集合和 AlarmDataQuery 查询告警数据。
-     * 2. 输入参数：tenantId 是租户，query 是告警数据查询条件，orderedEntityIds 是按调用方顺序排列的实体集合。
-     * 3. 返回值：分页 AlarmData。
-     * 4. 调用时机：仪表盘、规则节点或 API 需要按实体批量查询告警数据时调用。
-     * 5. 调用方：告警数据查询流程。
-     * 6. 使用流程：属于 Rule Engine/查询层告警数据聚合流程。
-     * 7. 线程安全：实现需保证批量查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库和实体查询服务。
+     * 功能：获取告警。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `query`：`query` 参数。
+     * - `orderedEntityIds`：实体对象。
+     * 返回：匹配的数据集合。
      */
     PageData<AlarmData> findAlarmDataByQueryForEntities(TenantId tenantId, AlarmDataQuery query, Collection<EntityId> orderedEntityIds);
 
     /**
-     * 中文说明：
-     * 1. 方法职责：分页查询租户下存在的告警类型。
-     * 2. 输入参数：tenantId 是租户，pageLink 是分页和搜索条件。
-     * 3. 返回值：分页 EntitySubtype，表示告警类型集合。
-     * 4. 调用时机：规则节点配置、UI 查询或过滤条件构建时调用。
-     * 5. 调用方：告警管理 API、规则节点配置流程。
-     * 6. 使用流程：属于告警元数据查询流程。
-     * 7. 线程安全：实现需保证查询并发安全。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：接口不涉及 MQTT/Actor；实现通常访问数据库，可能使用缓存。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `pageLink`：`pageLink` 参数。
+     * 返回：匹配的数据集合。
      */
     PageData<EntitySubtype> findAlarmTypesByTenantId(TenantId tenantId, PageLink pageLink);
 }

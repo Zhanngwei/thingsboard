@@ -86,7 +86,6 @@ import static org.thingsboard.server.service.state.DefaultDeviceStateService.LAS
 import static org.thingsboard.server.service.state.DefaultDeviceStateService.LAST_CONNECT_TIME;
 import static org.thingsboard.server.service.state.DefaultDeviceStateService.LAST_DISCONNECT_TIME;
 
-@ExtendWith(MockitoExtension.class)
 /**
  * 中文说明：
  * 1. 类目的：`DefaultDeviceStateServiceTest` 是ThingsBoard Application 测试模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -97,142 +96,78 @@ import static org.thingsboard.server.service.state.DefaultDeviceStateService.LAS
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@ExtendWith(MockitoExtension.class)
 public class DefaultDeviceStateServiceTest {
 
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `deviceService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
+    @Mock
     DeviceService deviceService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `attributesService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Mock
     AttributesService attributesService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `tsService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 时间戳，提供当前类调用的业务操作。
      */
+    @Mock
     TimeseriesService tsService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `clusterService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Mock
     TbClusterService clusterService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `partitionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 分区，提供当前类调用的业务操作。
      */
+    @Mock
     PartitionService partitionService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `deviceStateDataMock` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，表示当前对象所处状态。
      */
+    @Mock
     DeviceStateData deviceStateDataMock;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `entityQueryRepository` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 实体，用于读取或保存对应领域对象。
      */
+    @Mock
     EntityQueryRepository entityQueryRepository;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `telemetrySubscriptionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 订阅，提供当前类调用的业务操作。
      */
+    @Mock
     TelemetrySubscriptionService telemetrySubscriptionService;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRuleProcessor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 处理器，负责处理对应任务或消息。
      */
+    @Mock
     NotificationRuleProcessor notificationRuleProcessor;
-    @Mock
     /**
-     * 字段说明：
-     * 1. 保存 `defaultTbApiUsageReportClient` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 客户端，用于发起外部调用或协议交互。
      */
+    @Mock
     DefaultTbApiUsageReportClient defaultTbApiUsageReportClient;
 
     TenantId tenantId = new TenantId(UUID.fromString("00797a3b-7aeb-4b5b-b57a-c2a810d0f112"));
     DeviceId deviceId = DeviceId.fromString("00797a3b-7aeb-4b5b-b57a-c2a810d0f112");
     /**
-     * 字段说明：
-     * 1. 保存 `tpi` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `tpi` 字段，保存当前对象的对应属性。
      */
     TopicPartitionInfo tpi;
 
     /**
-     * 字段说明：
-     * 1. 保存 `service` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     DefaultDeviceStateService service;
 
-    @BeforeEach
     /**
-     * 方法说明：
-     * 1. 职责：执行 `setUp` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化当前测试或组件需要的对象。
+     * 参数：无。
+     * 返回：无。
      */
+    @BeforeEach
     public void setUp() {
         service = spy(new DefaultDeviceStateService(deviceService, attributesService, tsService, clusterService, partitionService, entityQueryRepository, null, defaultTbApiUsageReportClient, notificationRuleProcessor));
         ReflectionTestUtils.setField(service, "tsSubService", telemetrySubscriptionService);
@@ -243,17 +178,12 @@ public class DefaultDeviceStateServiceTest {
         tpi = TopicPartitionInfo.builder().myPartition(true).build();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceBelongsToExternalPartition_whenOnDeviceConnect_thenCleansStateAndDoesNotReportConnect` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceBelongsToExternalPartition_whenOnDeviceConnect_thenCleansStateAndDoesNotReportConnect` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceBelongsToExternalPartition_whenOnDeviceConnect_thenCleansStateAndDoesNotReportConnect() {
         // GIVEN
         doReturn(true).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -270,18 +200,14 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
+    /**
+     * 功能：验证 `givenNegativeLastConnectTime_whenOnDeviceConnect_thenSkipsThisEvent` 描述的测试场景。
+     * 参数：
+     * - `negativeLastConnectTime`：`negativeLastConnectTime` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @ValueSource(longs = {Long.MIN_VALUE, -100, -1})
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNegativeLastConnectTime_whenOnDeviceConnect_thenSkipsThisEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenNegativeLastConnectTime_whenOnDeviceConnect_thenSkipsThisEvent(long negativeLastConnectTime) {
         // GIVEN
         doReturn(false).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -297,18 +223,15 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
+    /**
+     * 功能：验证 `givenOutdatedLastConnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent` 描述的测试场景。
+     * 参数：
+     * - `outdatedLastConnectTime`：`outdatedLastConnectTime` 参数。
+     * - `currentLastConnectTime`：`currentLastConnectTime` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideOutdatedTimestamps")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenOutdatedLastConnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenOutdatedLastConnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent(long outdatedLastConnectTime, long currentLastConnectTime) {
         // GIVEN
         doReturn(false).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -330,17 +253,12 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceBelongsToMyPartition_whenOnDeviceConnect_thenReportsConnect` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceBelongsToMyPartition_whenOnDeviceConnect_thenReportsConnect` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceBelongsToMyPartition_whenOnDeviceConnect_thenReportsConnect() {
         // GIVEN
         var deviceStateData = DeviceStateData.builder()
@@ -370,17 +288,12 @@ public class DefaultDeviceStateServiceTest {
         assertThat(actualMsg.getOriginator()).isEqualTo(deviceId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceBelongsToExternalPartition_whenOnDeviceDisconnect_thenCleansStateAndDoesNotReportDisconnect` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceBelongsToExternalPartition_whenOnDeviceDisconnect_thenCleansStateAndDoesNotReportDisconnect` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceBelongsToExternalPartition_whenOnDeviceDisconnect_thenCleansStateAndDoesNotReportDisconnect() {
         // GIVEN
         doReturn(true).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -396,18 +309,14 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
+    /**
+     * 功能：验证 `givenNegativeLastDisconnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent` 描述的测试场景。
+     * 参数：
+     * - `negativeLastDisconnectTime`：`negativeLastDisconnectTime` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @ValueSource(longs = {Long.MIN_VALUE, -100, -1})
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNegativeLastDisconnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenNegativeLastDisconnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent(long negativeLastDisconnectTime) {
         // GIVEN
         doReturn(false).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -422,18 +331,15 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
+    /**
+     * 功能：验证 `givenOutdatedLastDisconnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent` 描述的测试场景。
+     * 参数：
+     * - `outdatedLastDisconnectTime`：`outdatedLastDisconnectTime` 参数。
+     * - `currentLastDisconnectTime`：`currentLastDisconnectTime` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideOutdatedTimestamps")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenOutdatedLastDisconnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenOutdatedLastDisconnectTime_whenOnDeviceDisconnect_thenSkipsThisEvent(long outdatedLastDisconnectTime, long currentLastDisconnectTime) {
         // GIVEN
         doReturn(false).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -454,17 +360,12 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceBelongsToMyPartition_whenOnDeviceDisconnect_thenReportsDisconnect` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceBelongsToMyPartition_whenOnDeviceDisconnect_thenReportsDisconnect` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceBelongsToMyPartition_whenOnDeviceDisconnect_thenReportsDisconnect() {
         // GIVEN
         var deviceStateData = DeviceStateData.builder()
@@ -495,17 +396,12 @@ public class DefaultDeviceStateServiceTest {
         assertThat(actualMsg.getOriginator()).isEqualTo(deviceId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceBelongsToExternalPartition_whenOnDeviceInactivity_thenCleansStateAndDoesNotReportInactivity` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceBelongsToExternalPartition_whenOnDeviceInactivity_thenCleansStateAndDoesNotReportInactivity` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceBelongsToExternalPartition_whenOnDeviceInactivity_thenCleansStateAndDoesNotReportInactivity() {
         // GIVEN
         doReturn(true).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -521,18 +417,14 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
+    /**
+     * 功能：验证 `givenNegativeLastInactivityTime_whenOnDeviceInactivity_thenSkipsThisEvent` 描述的测试场景。
+     * 参数：
+     * - `negativeLastInactivityTime`：`negativeLastInactivityTime` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @ValueSource(longs = {Long.MIN_VALUE, -100, -1})
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNegativeLastInactivityTime_whenOnDeviceInactivity_thenSkipsThisEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenNegativeLastInactivityTime_whenOnDeviceInactivity_thenSkipsThisEvent(long negativeLastInactivityTime) {
         // GIVEN
         doReturn(false).when(service).cleanDeviceStateIfBelongsToExternalPartition(tenantId, deviceId);
@@ -547,18 +439,15 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
+    /**
+     * 功能：验证 `givenReceivedInactivityTimeIsLessThanOrEqualToCurrentInactivityTime_whenOnDeviceInactivity_thenSkipsThisEvent` 描述的测试场景。
+     * 参数：
+     * - `outdatedLastInactivityTime`：`outdatedLastInactivityTime` 参数。
+     * - `currentLastInactivityTime`：`currentLastInactivityTime` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideOutdatedTimestamps")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenReceivedInactivityTimeIsLessThanOrEqualToCurrentInactivityTime_whenOnDeviceInactivity_thenSkipsThisEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenReceivedInactivityTimeIsLessThanOrEqualToCurrentInactivityTime_whenOnDeviceInactivity_thenSkipsThisEvent(
             long outdatedLastInactivityTime, long currentLastInactivityTime
     ) {
@@ -581,18 +470,15 @@ public class DefaultDeviceStateServiceTest {
         then(telemetrySubscriptionService).shouldHaveNoInteractions();
     }
 
+    /**
+     * 功能：验证 `givenReceivedInactivityTimeIsLessThanOrEqualToCurrentActivityTime_whenOnDeviceInactivity_thenSkipsThisEvent` 描述的测试场景。
+     * 参数：
+     * - `outdatedLastInactivityTime`：`outdatedLastInactivityTime` 参数。
+     * - `currentLastActivityTime`：`currentLastActivityTime` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideOutdatedTimestamps")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenReceivedInactivityTimeIsLessThanOrEqualToCurrentActivityTime_whenOnDeviceInactivity_thenSkipsThisEvent` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenReceivedInactivityTimeIsLessThanOrEqualToCurrentActivityTime_whenOnDeviceInactivity_thenSkipsThisEvent(
             long outdatedLastInactivityTime, long currentLastActivityTime
     ) {
@@ -616,14 +502,9 @@ public class DefaultDeviceStateServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provideOutdatedTimestamps` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provideOutdatedTimestamps` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> provideOutdatedTimestamps() {
         return Stream.of(
@@ -635,17 +516,12 @@ public class DefaultDeviceStateServiceTest {
         );
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceBelongsToMyPartition_whenOnDeviceInactivity_thenReportsInactivity` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceBelongsToMyPartition_whenOnDeviceInactivity_thenReportsInactivity` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceBelongsToMyPartition_whenOnDeviceInactivity_thenReportsInactivity() {
         // GIVEN
         var deviceStateData = DeviceStateData.builder()
@@ -688,17 +564,12 @@ public class DefaultDeviceStateServiceTest {
         assertThat(actualNotification.isActive()).isFalse();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenInactivityTimeoutReached_whenUpdateInactivityStateIfExpired_thenReportsInactivity` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenInactivityTimeoutReached_whenUpdateInactivityStateIfExpired_thenReportsInactivity` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenInactivityTimeoutReached_whenUpdateInactivityStateIfExpired_thenReportsInactivity() {
         // GIVEN
         var deviceStateData = DeviceStateData.builder()
@@ -738,17 +609,12 @@ public class DefaultDeviceStateServiceTest {
         assertThat(actualNotification.isActive()).isFalse();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceIdFromDeviceStatesMap_whenGetOrFetchDeviceStateData_thenNoStackOverflow` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceIdFromDeviceStatesMap_whenGetOrFetchDeviceStateData_thenNoStackOverflow` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceIdFromDeviceStatesMap_whenGetOrFetchDeviceStateData_thenNoStackOverflow() {
         service.deviceStates.put(deviceId, deviceStateDataMock);
         DeviceStateData deviceStateData = service.getOrFetchDeviceStateData(deviceId);
@@ -756,17 +622,12 @@ public class DefaultDeviceStateServiceTest {
         verify(service, never()).fetchDeviceStateDataUsingSeparateRequests(deviceId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenDeviceIdWithoutDeviceStateInMap_whenGetOrFetchDeviceStateData_thenFetchDeviceStateData` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenDeviceIdWithoutDeviceStateInMap_whenGetOrFetchDeviceStateData_thenFetchDeviceStateData` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenDeviceIdWithoutDeviceStateInMap_whenGetOrFetchDeviceStateData_thenFetchDeviceStateData() {
         service.deviceStates.clear();
         willReturn(deviceStateDataMock).given(service).fetchDeviceStateDataUsingSeparateRequests(deviceId);
@@ -775,17 +636,12 @@ public class DefaultDeviceStateServiceTest {
         verify(service).fetchDeviceStateDataUsingSeparateRequests(deviceId);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenPersistToTelemetryAndDefaultInactivityTimeoutFetched_whenTransformingToDeviceStateData_thenTryGetInactivityFromAttribute` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenPersistToTelemetryAndDefaultInactivityTimeoutFetched_whenTransformingToDeviceStateData_thenTryGetInactivityFromAttribute` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenPersistToTelemetryAndDefaultInactivityTimeoutFetched_whenTransformingToDeviceStateData_thenTryGetInactivityFromAttribute() {
         var defaultInactivityTimeoutInSec = 60L;
         var latest =
@@ -797,17 +653,12 @@ public class DefaultDeviceStateServiceTest {
         process(latest, defaultInactivityTimeoutInSec);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenPersistToTelemetryAndNoInactivityTimeoutFetchedFromTimeSeries_whenTransformingToDeviceStateData_thenTryGetInactivityFromAttribute` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenPersistToTelemetryAndNoInactivityTimeoutFetchedFromTimeSeries_whenTransformingToDeviceStateData_thenTryGetInactivityFromAttribute` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenPersistToTelemetryAndNoInactivityTimeoutFetchedFromTimeSeries_whenTransformingToDeviceStateData_thenTryGetInactivityFromAttribute() {
         var defaultInactivityTimeoutInSec = 60L;
         var latest =
@@ -819,14 +670,11 @@ public class DefaultDeviceStateServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `process` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `process` 对应的处理。
+     * 参数：
+     * - `latest`：键值映射。
+     * - `defaultInactivityTimeoutInSec`：`defaultInactivityTimeoutInSec` 参数。
+     * 返回：无。
      */
     private void process(Map<EntityKeyType, Map<String, TsValue>> latest, long defaultInactivityTimeoutInSec) {
         service.setDefaultInactivityTimeoutInSec(defaultInactivityTimeoutInSec);
@@ -842,14 +690,10 @@ public class DefaultDeviceStateServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initStateService` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动状态。
+     * 参数：
+     * - `timeout`：`timeout` 参数。
+     * 返回：无。
      */
     private void initStateService(long timeout) throws InterruptedException {
         service.stop();
@@ -857,7 +701,6 @@ public class DefaultDeviceStateServiceTest {
         service.setDefaultInactivityTimeoutMs(timeout);
         service.init();
         when(partitionService.resolve(ServiceType.TB_CORE, tenantId, deviceId)).thenReturn(tpi);
-        // DAO 调用是数据库访问边界，事务和缓存一致性由上层服务约定控制。
         when(entityQueryRepository.findEntityDataByQueryInternal(any())).thenReturn(new PageData<>());
         var deviceIdInfo = new DeviceIdInfo(tenantId.getId(), null, deviceId.getId());
         when(deviceService.findDeviceIdInfos(any()))
@@ -869,17 +712,12 @@ public class DefaultDeviceStateServiceTest {
         Thread.sleep(100);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `increaseInactivityForInactiveDeviceTest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `increaseInactivityForInactiveDeviceTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void increaseInactivityForInactiveDeviceTest() throws Exception {
         final long defaultTimeout = 1;
         initStateService(defaultTimeout);
@@ -920,17 +758,12 @@ public class DefaultDeviceStateServiceTest {
         activityVerify(false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `increaseInactivityForActiveDeviceTest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `increaseInactivityForActiveDeviceTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void increaseInactivityForActiveDeviceTest() throws Exception {
         final long defaultTimeout = 1000;
         initStateService(defaultTimeout);
@@ -968,17 +801,12 @@ public class DefaultDeviceStateServiceTest {
         activityVerify(false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `increaseSmallInactivityForInactiveDeviceTest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `increaseSmallInactivityForInactiveDeviceTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void increaseSmallInactivityForInactiveDeviceTest() throws Exception {
         final long defaultTimeout = 1;
         initStateService(defaultTimeout);
@@ -1006,17 +834,12 @@ public class DefaultDeviceStateServiceTest {
         verify(telemetrySubscriptionService, never()).saveAttrAndNotify(any(), eq(deviceId), any(), eq(ACTIVITY_STATE), any(), any());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `decreaseInactivityForActiveDeviceTest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `decreaseInactivityForActiveDeviceTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void decreaseInactivityForActiveDeviceTest() throws Exception {
         final long defaultTimeout = 1000;
         initStateService(defaultTimeout);
@@ -1050,17 +873,12 @@ public class DefaultDeviceStateServiceTest {
         activityVerify(false);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `decreaseInactivityForInactiveDeviceTest` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `decreaseInactivityForInactiveDeviceTest` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void decreaseInactivityForInactiveDeviceTest() throws Exception {
         final long defaultTimeout = 1000;
         initStateService(defaultTimeout);
@@ -1089,30 +907,21 @@ public class DefaultDeviceStateServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `activityVerify` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `activityVerify` 对应的处理。
+     * 参数：
+     * - `isActive`：`isActive` 参数。
+     * 返回：无。
      */
     private void activityVerify(boolean isActive) {
         verify(telemetrySubscriptionService).saveAttrAndNotify(any(), eq(deviceId), any(), eq(ACTIVITY_STATE), eq(isActive), any());
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenStateDataIsNull_whenUpdateActivityState_thenShouldCleanupDevice` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenStateDataIsNull_whenUpdateActivityState_thenShouldCleanupDevice` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenStateDataIsNull_whenUpdateActivityState_thenShouldCleanupDevice() {
         // GIVEN
         service.deviceStates.put(deviceId, deviceStateDataMock);
@@ -1127,18 +936,18 @@ public class DefaultDeviceStateServiceTest {
     }
 
 
+    /**
+     * 功能：验证 `givenTestParameters_whenUpdateActivityState_thenShouldBeInTheExpectedStateAndPerformExpectedActions` 描述的测试场景。
+     * 参数：
+     * - `activityState`：`activityState` 参数。
+     * - `previousActivityTime`：`previousActivityTime` 参数。
+     * - `lastReportedActivity`：`lastReportedActivity` 参数。
+     * - `inactivityAlarmTime`：`inactivityAlarmTime` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideParametersForUpdateActivityState")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenTestParameters_whenUpdateActivityState_thenShouldBeInTheExpectedStateAndPerformExpectedActions` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenTestParameters_whenUpdateActivityState_thenShouldBeInTheExpectedStateAndPerformExpectedActions(
             boolean activityState, long previousActivityTime, long lastReportedActivity, long inactivityAlarmTime,
             long expectedInactivityAlarmTime, boolean shouldSetInactivityAlarmTimeToZero,
@@ -1170,14 +979,12 @@ public class DefaultDeviceStateServiceTest {
         );
 
         assertThat(deviceState.getLastInactivityAlarmTime()).isEqualTo(expectedInactivityAlarmTime);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (shouldSetInactivityAlarmTimeToZero) {
             then(telemetrySubscriptionService).should().saveAttrAndNotify(
                     any(), eq(deviceId), any(), eq(INACTIVITY_ALARM_TIME), eq(0L), any()
             );
         }
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (shouldUpdateActivityStateToActive) {
             then(telemetrySubscriptionService).should().saveAttrAndNotify(
                     eq(TenantId.SYS_TENANT_ID), eq(deviceId), eq(SERVER_SCOPE), eq(ACTIVITY_STATE), eq(true), any()
@@ -1199,14 +1006,9 @@ public class DefaultDeviceStateServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provideParametersForUpdateActivityState` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provideParametersForUpdateActivityState` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> provideParametersForUpdateActivityState() {
         return Stream.of(
@@ -1235,18 +1037,17 @@ public class DefaultDeviceStateServiceTest {
         );
     }
 
+    /**
+     * 功能：验证 `givenTestParameters_whenOnDeviceInactivityTimeout_thenShouldBeInTheExpectedStateAndPerformExpectedActions` 描述的测试场景。
+     * 参数：
+     * - `activityState`：`activityState` 参数。
+     * - `newInactivityTimeout`：`newInactivityTimeout` 参数。
+     * - `timeIncrement`：`timeIncrement` 参数。
+     * - `expectedActivityState`：`expectedActivityState` 参数。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideParametersForDecreaseInactivityTimeout")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenTestParameters_whenOnDeviceInactivityTimeout_thenShouldBeInTheExpectedStateAndPerformExpectedActions` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenTestParameters_whenOnDeviceInactivityTimeout_thenShouldBeInTheExpectedStateAndPerformExpectedActions(
             boolean activityState, long newInactivityTimeout, long timeIncrement, boolean expectedActivityState
     ) throws Exception {
@@ -1280,7 +1081,6 @@ public class DefaultDeviceStateServiceTest {
         // THEN
         assertThat(deviceState.getInactivityTimeout()).isEqualTo(newInactivityTimeout);
         assertThat(deviceState.isActive()).isEqualTo(expectedActivityState);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (activityState && !expectedActivityState) {
             then(telemetrySubscriptionService).should().saveAttrAndNotify(
                     any(), eq(deviceId), any(), eq(ACTIVITY_STATE), eq(false), any()
@@ -1289,14 +1089,9 @@ public class DefaultDeviceStateServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provideParametersForDecreaseInactivityTimeout` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provideParametersForDecreaseInactivityTimeout` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> provideParametersForDecreaseInactivityTimeout() {
         return Stream.of(
@@ -1306,17 +1101,12 @@ public class DefaultDeviceStateServiceTest {
         );
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenStateDataIsNull_whenUpdateInactivityTimeoutIfExpired_thenShouldCleanupDevice` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenStateDataIsNull_whenUpdateInactivityTimeoutIfExpired_thenShouldCleanupDevice` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenStateDataIsNull_whenUpdateInactivityTimeoutIfExpired_thenShouldCleanupDevice() {
         // GIVEN
         service.deviceStates.put(deviceId, deviceStateDataMock);
@@ -1330,17 +1120,12 @@ public class DefaultDeviceStateServiceTest {
         assertThat(service.deviceStates.isEmpty()).isTrue();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenNotMyPartition_whenUpdateInactivityTimeoutIfExpired_thenShouldCleanupDevice` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenNotMyPartition_whenUpdateInactivityTimeoutIfExpired_thenShouldCleanupDevice` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenNotMyPartition_whenUpdateInactivityTimeoutIfExpired_thenShouldCleanupDevice() {
         // GIVEN
         long currentTime = System.currentTimeMillis();
@@ -1375,18 +1160,18 @@ public class DefaultDeviceStateServiceTest {
         assertThat(service.deviceStates.isEmpty()).isTrue();
     }
 
+    /**
+     * 功能：验证 `givenTestParameters_whenUpdateInactivityStateIfExpired_thenShouldBeInTheExpectedStateAndPerformExpectedActions` 描述的测试场景。
+     * 参数：
+     * - `activityState`：`activityState` 参数。
+     * - `ts`：时间戳。
+     * - `lastActivityTime`：`lastActivityTime` 参数。
+     * - `lastInactivityAlarmTime`：`lastInactivityAlarmTime` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
+     */
     @ParameterizedTest
     @MethodSource("provideParametersForUpdateInactivityStateIfExpired")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `givenTestParameters_whenUpdateInactivityStateIfExpired_thenShouldBeInTheExpectedStateAndPerformExpectedActions` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void givenTestParameters_whenUpdateInactivityStateIfExpired_thenShouldBeInTheExpectedStateAndPerformExpectedActions(
             boolean activityState, long ts, long lastActivityTime, long lastInactivityAlarmTime, long inactivityTimeout, long deviceCreationTime,
             boolean expectedActivityState, long expectedLastInactivityAlarmTime, boolean shouldUpdateActivityStateToInactive
@@ -1407,7 +1192,6 @@ public class DefaultDeviceStateServiceTest {
                 .state(state)
                 .build();
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (shouldUpdateActivityStateToInactive) {
             given(partitionService.resolve(ServiceType.TB_CORE, tenantId, deviceId)).willReturn(tpi);
         }
@@ -1419,7 +1203,6 @@ public class DefaultDeviceStateServiceTest {
         assertThat(state.isActive()).isEqualTo(expectedActivityState);
         assertThat(state.getLastInactivityAlarmTime()).isEqualTo(expectedLastInactivityAlarmTime);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (shouldUpdateActivityStateToInactive) {
             then(telemetrySubscriptionService).should().saveAttrAndNotify(
                     eq(TenantId.SYS_TENANT_ID), eq(deviceId), eq(SERVER_SCOPE), eq(ACTIVITY_STATE), eq(false), any()
@@ -1446,14 +1229,9 @@ public class DefaultDeviceStateServiceTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `provideParametersForUpdateInactivityStateIfExpired` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `provideParametersForUpdateInactivityStateIfExpired` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private static Stream<Arguments> provideParametersForUpdateInactivityStateIfExpired() {
         return Stream.of(
@@ -1517,17 +1295,12 @@ public class DefaultDeviceStateServiceTest {
         );
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `givenConcurrentAccess_whenGetOrFetchDeviceStateData_thenFetchDeviceStateDataInvokedOnce` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证 `givenConcurrentAccess_whenGetOrFetchDeviceStateData_thenFetchDeviceStateDataInvokedOnce` 描述的测试场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void givenConcurrentAccess_whenGetOrFetchDeviceStateData_thenFetchDeviceStateDataInvokedOnce() {
         doAnswer(invocation -> {
             Thread.sleep(100);
@@ -1540,13 +1313,11 @@ public class DefaultDeviceStateServiceTest {
         ExecutorService executor = null;
         try {
             executor = Executors.newFixedThreadPool(numberOfThreads);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (int i = 0; i < numberOfThreads; i++) {
                 executor.submit(() -> {
                     allThreadsReadyLatch.countDown();
                     try {
                         allThreadsReadyLatch.await();
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
@@ -1557,7 +1328,6 @@ public class DefaultDeviceStateServiceTest {
             executor.shutdown();
             await().atMost(10, TimeUnit.SECONDS).until(executor::isTerminated);
         } finally {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (executor != null) {
                 executor.shutdownNow();
             }

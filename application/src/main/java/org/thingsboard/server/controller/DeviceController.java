@@ -121,11 +121,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TENANT_OR_CU
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 import static org.thingsboard.server.controller.EdgeController.EDGE_ID;
 
-@RestController
-@TbCoreComponent
-@RequestMapping("/api")
-@RequiredArgsConstructor
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`DeviceController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -136,38 +131,34 @@ import static org.thingsboard.server.controller.EdgeController.EDGE_ID;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequestMapping("/api")
+@RequiredArgsConstructor
+@Slf4j
 public class DeviceController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `DEVICE_NAME` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备常量，用于统一引用固定值。
      */
     protected static final String DEVICE_NAME = "deviceName";
 
     /**
-     * 字段说明：
-     * 1. 保存 `deviceBulkImportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
     private final DeviceBulkImportService deviceBulkImportService;
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbDeviceService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
     private final TbDeviceService tbDeviceService;
 
+    /**
+     * 功能：获取设备ID。
+     * 参数：
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Device (getDeviceById)",
             notes = "Fetch the Device object based on the provided Device Id. " +
                     "If the user has the authority of 'TENANT_ADMIN', the server checks that the device is owned by the same tenant. " +
@@ -176,16 +167,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/device/{deviceId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device getDeviceById(@ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
                                 @PathVariable(DEVICE_ID) String strDeviceId) throws ThingsboardException {
         checkParameter(DEVICE_ID, strDeviceId);
@@ -193,6 +174,12 @@ public class DeviceController extends BaseController {
         return checkDeviceId(deviceId, Operation.READ);
     }
 
+    /**
+     * 功能：获取设备ID。
+     * 参数：
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Device Info (getDeviceInfoById)",
             notes = "Fetch the Device Info object based on the provided Device Id. " +
                     "If the user has the authority of 'Tenant Administrator', the server checks that the device is owned by the same tenant. " +
@@ -201,16 +188,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/device/info/{deviceId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceInfo getDeviceInfoById(@ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
                                         @PathVariable(DEVICE_ID) String strDeviceId) throws ThingsboardException {
         checkParameter(DEVICE_ID, strDeviceId);
@@ -218,6 +195,15 @@ public class DeviceController extends BaseController {
         return checkDeviceInfoId(deviceId, Operation.READ);
     }
 
+    /**
+     * 功能：保存或创建设备。
+     * 参数：
+     * - `device`：设备信息或设备标识。
+     * - `omitted`：`omitted` 参数。
+     * - `accessToken`：`accessToken` 参数。
+     * - `accessToken`：`accessToken` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create Or Update Device (saveDevice)",
             notes = "Create or update the Device. When creating device, platform generates Device Id as " + UUID_WIKI_LINK +
                     "Device credentials are also generated if not provided in the 'accessToken' request parameter. " +
@@ -230,22 +216,11 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/device", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device saveDevice(@ApiParam(value = "A JSON value representing the device.") @RequestBody Device device,
                              @ApiParam(value = "Optional value of the device credentials to be used during device creation. " +
                                      "If omitted, access token will be auto-generated.") @RequestParam(name = "accessToken", required = false) String accessToken) throws Exception {
         device.setTenantId(getCurrentUser().getTenantId());
         Device oldDevice = null;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (device.getId() != null) {
             oldDevice = checkDeviceId(device.getId(), Operation.WRITE);
         } else {
@@ -254,6 +229,11 @@ public class DeviceController extends BaseController {
         return tbDeviceService.save(device, oldDevice, accessToken, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `method` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @ApiOperation(value = "Create Device (saveDevice) with credentials ",
             notes = "Create or update the Device. When creating device, platform generates Device Id as " + UUID_WIKI_LINK +
                     "Requires to provide the Device Credentials object as well as an existing device profile ID or use \"default\".\n" +
@@ -275,16 +255,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/device-with-credentials", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDeviceWithCredentials` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device saveDeviceWithCredentials(@ApiParam(value = "The JSON object with device and credentials. See method description above for example.")
                                             @Valid @RequestBody SaveDeviceWithCredentialsRequest deviceAndCredentials) throws ThingsboardException {
         Device device = deviceAndCredentials.getDevice();
@@ -299,16 +269,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/device/{deviceId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteDevice(@ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
                              @PathVariable(DEVICE_ID) String strDeviceId) throws Exception {
         checkParameter(DEVICE_ID, strDeviceId);
@@ -317,21 +277,18 @@ public class DeviceController extends BaseController {
         tbDeviceService.delete(device, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `assignDeviceToCustomer` 对应的处理。
+     * 参数：
+     * - `strCustomerId`：客户IDID。
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Assign device to customer (assignDeviceToCustomer)",
             notes = "Creates assignment of the device to customer. Customer will be able to query device afterwards." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/{customerId}/device/{deviceId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDeviceToCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device assignDeviceToCustomer(@ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION)
                                          @PathVariable("customerId") String strCustomerId,
                                          @ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
@@ -345,27 +302,22 @@ public class DeviceController extends BaseController {
         return tbDeviceService.assignDeviceToCustomer(getTenantId(), deviceId, customer, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `unassignDeviceFromCustomer` 对应的处理。
+     * 参数：
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Unassign device from customer (unassignDeviceFromCustomer)",
             notes = "Clears assignment of the device to customer. Customer will not be able to query device afterwards." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/device/{deviceId}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDeviceFromCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device unassignDeviceFromCustomer(@ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
                                              @PathVariable(DEVICE_ID) String strDeviceId) throws ThingsboardException {
         checkParameter(DEVICE_ID, strDeviceId);
         DeviceId deviceId = new DeviceId(toUUID(strDeviceId));
         Device device = checkDeviceId(deviceId, Operation.UNASSIGN_FROM_CUSTOMER);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (device.getCustomerId() == null || device.getCustomerId().getId().equals(ModelConstants.NULL_UUID)) {
             throw new IncorrectParameterException("Device isn't assigned to any customer!");
         }
@@ -375,6 +327,12 @@ public class DeviceController extends BaseController {
         return tbDeviceService.unassignDeviceFromCustomer(device, customer, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `assignDeviceToPublicCustomer` 对应的处理。
+     * 参数：
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Make device publicly available (assignDeviceToPublicCustomer)",
             notes = "Device will be available for non-authorized (not logged-in) users. " +
                     "This is useful to create dashboards that you plan to share/embed on a publicly available website. " +
@@ -382,16 +340,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/public/device/{deviceId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDeviceToPublicCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device assignDeviceToPublicCustomer(@ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
                                                @PathVariable(DEVICE_ID) String strDeviceId) throws ThingsboardException {
         checkParameter(DEVICE_ID, strDeviceId);
@@ -400,21 +348,17 @@ public class DeviceController extends BaseController {
         return tbDeviceService.assignDeviceToPublicCustomer(getTenantId(), deviceId, getCurrentUser());
     }
 
+    /**
+     * 功能：获取设备凭据。
+     * 参数：
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Device Credentials (getDeviceCredentialsByDeviceId)",
             notes = "If during device creation there wasn't specified any credentials, platform generates random 'ACCESS_TOKEN' credentials." + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/device/{deviceId}/credentials", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceCredentialsByDeviceId` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceCredentials getDeviceCredentialsByDeviceId(@ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
                                                             @PathVariable(DEVICE_ID) String strDeviceId) throws ThingsboardException {
         checkParameter(DEVICE_ID, strDeviceId);
@@ -423,6 +367,11 @@ public class DeviceController extends BaseController {
         return tbDeviceService.getDeviceCredentialsByDeviceId(device, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `method` 对应的处理。
+     * 参数：无。
+     * 返回：无。
+     */
     @ApiOperation(value = "Update device credentials (updateDeviceCredentials)",
             notes = "During device creation, platform generates random 'ACCESS_TOKEN' credentials. \" +\n" +
                     "Use this method to update the device credentials. First use 'getDeviceCredentialsByDeviceId' to get the credentials id and value.\n" +
@@ -447,16 +396,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/device/credentials", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `updateDeviceCredentials` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeviceCredentials updateDeviceCredentials(
             @ApiParam(value = "A JSON value representing the device credentials.")
             @RequestBody DeviceCredentials deviceCredentials) throws ThingsboardException {
@@ -471,16 +410,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/devices", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantDevices` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<Device> getTenantDevices(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -496,7 +425,6 @@ public class DeviceController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (type != null && type.trim().length() > 0) {
             return checkNotNull(deviceService.findDevicesByTenantIdAndType(tenantId, type, pageLink));
         } else {
@@ -504,22 +432,22 @@ public class DeviceController extends BaseController {
         }
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Tenant Device Infos (getTenantDeviceInfos)",
             notes = "Returns a page of devices info objects owned by tenant. " +
                     PAGE_DATA_PARAMETERS + DEVICE_INFO_DESCRIPTION + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/deviceInfos", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantDeviceInfos` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DeviceInfo> getTenantDeviceInfos(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -543,32 +471,26 @@ public class DeviceController extends BaseController {
         DeviceInfoFilter.DeviceInfoFilterBuilder filter = DeviceInfoFilter.builder();
         filter.tenantId(tenantId);
         filter.active(active);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (type != null && type.trim().length() > 0) {
             filter.type(type);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (deviceProfileId != null && deviceProfileId.length() > 0) {
             filter.deviceProfileId(new DeviceProfileId(toUUID(deviceProfileId)));
         }
         return checkNotNull(deviceService.findDeviceInfosByFilter(filter.build(), pageLink));
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Tenant Device (getTenantDevice)",
             notes = "Requested device must be owned by tenant that the user belongs to. " +
                     "Device name is an unique property of device. So it can be used to identify the device." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/devices", params = {"deviceName"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device getTenantDevice(
             @ApiParam(value = DEVICE_NAME_DESCRIPTION)
             @RequestParam String deviceName) throws ThingsboardException {
@@ -576,22 +498,22 @@ public class DeviceController extends BaseController {
         return checkNotNull(deviceService.findDeviceByTenantIdAndName(tenantId, deviceName));
     }
 
+    /**
+     * 功能：获取客户。
+     * 参数：
+     * - `CUSTOMER_ID_PARAM_DESCRIPTION`：`CUSTOMER_ID_PARAM_DESCRIPTION` 参数。
+     * - `strCustomerId`：客户IDID。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Customer Devices (getCustomerDevices)",
             notes = "Returns a page of devices objects assigned to customer. " +
                     PAGE_DATA_PARAMETERS + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/{customerId}/devices", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomerDevices` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<Device> getCustomerDevices(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable(CUSTOMER_ID) String strCustomerId,
@@ -612,7 +534,6 @@ public class DeviceController extends BaseController {
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (type != null && type.trim().length() > 0) {
             return checkNotNull(deviceService.findDevicesByTenantIdAndCustomerIdAndType(tenantId, customerId, type, pageLink));
         } else {
@@ -620,22 +541,22 @@ public class DeviceController extends BaseController {
         }
     }
 
+    /**
+     * 功能：获取客户。
+     * 参数：
+     * - `CUSTOMER_ID_PARAM_DESCRIPTION`：`CUSTOMER_ID_PARAM_DESCRIPTION` 参数。
+     * - `strCustomerId`：客户IDID。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Customer Device Infos (getCustomerDeviceInfos)",
             notes = "Returns a page of devices info objects assigned to customer. " +
                     PAGE_DATA_PARAMETERS + DEVICE_INFO_DESCRIPTION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/{customerId}/deviceInfos", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomerDeviceInfos` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DeviceInfo> getCustomerDeviceInfos(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable("customerId") String strCustomerId,
@@ -664,31 +585,26 @@ public class DeviceController extends BaseController {
         filter.tenantId(tenantId);
         filter.customerId(customerId);
         filter.active(active);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (type != null && type.trim().length() > 0) {
             filter.type(type);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (deviceProfileId != null && deviceProfileId.length() > 0) {
             filter.deviceProfileId(new DeviceProfileId(toUUID(deviceProfileId)));
         }
         return checkNotNull(deviceService.findDeviceInfosByFilter(filter.build(), pageLink));
     }
 
+    /**
+     * 功能：获取`Devices By Ids`。
+     * 参数：
+     * - `ids`：数据列表。
+     * - `strDeviceIds`：设备信息或设备标识。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Devices By Ids (getDevicesByIds)",
             notes = "Requested devices must be owned by tenant or assigned to customer which user is performing the request. " + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/devices", params = {"deviceIds"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDevicesByIds` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<Device> getDevicesByIds(
             @ApiParam(value = "A list of devices ids, separated by comma ','")
             @RequestParam("deviceIds") String[] strDeviceIds) throws ThingsboardException, ExecutionException, InterruptedException {
@@ -697,13 +613,10 @@ public class DeviceController extends BaseController {
         TenantId tenantId = user.getTenantId();
         CustomerId customerId = user.getCustomerId();
         List<DeviceId> deviceIds = new ArrayList<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (String strDeviceId : strDeviceIds) {
             deviceIds.add(new DeviceId(toUUID(strDeviceId)));
         }
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         ListenableFuture<List<Device>> devices;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (customerId == null || customerId.isNullUid()) {
             devices = deviceService.findDevicesByTenantIdAndIdsAsync(tenantId, deviceIds);
         } else {
@@ -712,6 +625,12 @@ public class DeviceController extends BaseController {
         return checkNotNull(devices.get());
     }
 
+    /**
+     * 功能：获取查询条件。
+     * 参数：
+     * - `query`：`query` 参数。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Find related devices (findByQuery)",
             notes = "Returns all devices that are related to the specific entity. " +
                     "The entity id, relation type, device types, depth of the search, and other query parameters defined using complex 'DeviceSearchQuery' object. " +
@@ -719,16 +638,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/devices", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `findByQuery` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<Device> findByQuery(
             @ApiParam(value = "The device search query JSON")
             @RequestBody DeviceSearchQuery query) throws ThingsboardException, ExecutionException, InterruptedException {
@@ -741,7 +650,6 @@ public class DeviceController extends BaseController {
             try {
                 accessControlService.checkPermission(getCurrentUser(), Resource.DEVICE, Operation.READ, device.getId(), device);
                 return true;
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (ThingsboardException e) {
                 return false;
             }
@@ -749,6 +657,11 @@ public class DeviceController extends BaseController {
         return devices;
     }
 
+    /**
+     * 功能：获取设备。
+     * 参数：无。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Device Types (getDeviceTypes)",
             notes = "Deprecated. See 'getDeviceProfileNames' API from Device Profile Controller instead." + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -756,16 +669,6 @@ public class DeviceController extends BaseController {
     @RequestMapping(value = "/device/types", method = RequestMethod.GET)
     @ResponseBody
     @Deprecated(since = "3.6.2")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDeviceTypes` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public List<EntitySubtype> getDeviceTypes() throws ThingsboardException, ExecutionException, InterruptedException {
         SecurityUser user = getCurrentUser();
         TenantId tenantId = user.getTenantId();
@@ -773,6 +676,13 @@ public class DeviceController extends BaseController {
         return checkNotNull(deviceTypes.get());
     }
 
+    /**
+     * 功能：执行 `claimDevice` 对应的处理。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * - `claimRequest`：请求对象。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Claim device (claimDevice)",
             notes = "Claiming makes it possible to assign a device to the specific customer using device/server side claiming data (in the form of secret key)." +
                     "To make this happen you have to provide unique device name and optional claiming data (it is needed only for device-side claiming)." +
@@ -783,16 +693,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAuthority('CUSTOMER_USER')")
     @RequestMapping(value = "/customer/device/{deviceName}/claim", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `claimDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> claimDevice(@ApiParam(value = "Unique name of the device which is going to be claimed")
                                                       @PathVariable(DEVICE_NAME) String deviceName,
                                                       @ApiParam(value = "Claiming request which can optionally contain secret key")
@@ -836,22 +736,18 @@ public class DeviceController extends BaseController {
         return deferredResult;
     }
 
+    /**
+     * 功能：执行 `reClaimDevice` 对应的处理。
+     * 参数：
+     * - `deviceName`：设备信息或设备标识。
+     * 返回：响应结果。
+     */
     @ApiOperation(value = "Reclaim device (reClaimDevice)",
             notes = "Reclaiming means the device will be unassigned from the customer and the device will be available for claiming again."
                     + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/device/{deviceName}/claim", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `reClaimDevice` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DeferredResult<ResponseEntity> reClaimDevice(@ApiParam(value = "Unique name of the device which is going to be reclaimed")
                                                         @PathVariable(DEVICE_NAME) String deviceName) throws ThingsboardException {
         checkParameter(DEVICE_NAME, deviceName);
@@ -880,14 +776,10 @@ public class DeviceController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getSecretKey` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取键。
+     * 参数：
+     * - `claimRequest`：请求对象。
+     * 返回：文本结果。
      */
     private String getSecretKey(ClaimRequest claimRequest) {
         String secretKey = claimRequest.getSecretKey();
@@ -897,21 +789,18 @@ public class DeviceController extends BaseController {
         return DataConstants.DEFAULT_SECRET_KEY;
     }
 
+    /**
+     * 功能：执行 `assignDeviceToTenant` 对应的处理。
+     * 参数：
+     * - `strTenantId`：租户IDID。
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Assign device to tenant (assignDeviceToTenant)",
             notes = "Creates assignment of the device to tenant. Thereafter tenant will be able to reassign the device to a customer." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/{tenantId}/device/{deviceId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDeviceToTenant` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device assignDeviceToTenant(@ApiParam(value = TENANT_ID_PARAM_DESCRIPTION)
                                        @PathVariable(TENANT_ID) String strTenantId,
                                        @ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
@@ -929,6 +818,13 @@ public class DeviceController extends BaseController {
         return tbDeviceService.assignDeviceToTenant(device, newTenant, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `assignDeviceToEdge` 对应的处理。
+     * 参数：
+     * - `strEdgeId`：边缘节点ID。
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Assign device to edge (assignDeviceToEdge)",
             notes = "Creates assignment of an existing device to an instance of The Edge. " +
                     EDGE_ASSIGN_ASYNC_FIRST_STEP_DESCRIPTION +
@@ -939,16 +835,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/edge/{edgeId}/device/{deviceId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDeviceToEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device assignDeviceToEdge(@ApiParam(value = EDGE_ID_PARAM_DESCRIPTION)
                                      @PathVariable(EDGE_ID) String strEdgeId,
                                      @ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
@@ -964,6 +850,13 @@ public class DeviceController extends BaseController {
         return tbDeviceService.assignDeviceToEdge(getTenantId(), deviceId, edge, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `unassignDeviceFromEdge` 对应的处理。
+     * 参数：
+     * - `strEdgeId`：边缘节点ID。
+     * - `strDeviceId`：设备IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Unassign device from edge (unassignDeviceFromEdge)",
             notes = "Clears assignment of the device to the edge. " +
                     EDGE_UNASSIGN_ASYNC_FIRST_STEP_DESCRIPTION +
@@ -974,16 +867,6 @@ public class DeviceController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/edge/{edgeId}/device/{deviceId}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDeviceFromEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Device unassignDeviceFromEdge(@ApiParam(value = EDGE_ID_PARAM_DESCRIPTION)
                                          @PathVariable(EDGE_ID) String strEdgeId,
                                          @ApiParam(value = DEVICE_ID_PARAM_DESCRIPTION)
@@ -998,22 +881,22 @@ public class DeviceController extends BaseController {
         return tbDeviceService.unassignDeviceFromEdge(device, edge, getCurrentUser());
     }
 
+    /**
+     * 功能：获取边缘节点。
+     * 参数：
+     * - `EDGE_ID_PARAM_DESCRIPTION`：`EDGE_ID_PARAM_DESCRIPTION` 参数。
+     * - `strEdgeId`：边缘节点ID。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get devices assigned to edge (getEdgeDevices)",
             notes = "Returns a page of devices assigned to edge. " +
                     PAGE_DATA_PARAMETERS + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/edge/{edgeId}/devices", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getEdgeDevices` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DeviceInfo> getEdgeDevices(
             @ApiParam(value = EDGE_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable(EDGE_ID) String strEdgeId,
@@ -1075,20 +958,16 @@ public class DeviceController extends BaseController {
                 OtaPackageType.valueOf(otaPackageType));
     }
 
+    /**
+     * 功能：处理`Devices Bulk Import`。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Import the bulk of devices (processDevicesBulkImport)",
             notes = "There's an ability to import the bulk of devices using the only .csv file." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN')")
     @PostMapping("/device/bulk_import")
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `processDevicesBulkImport` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public BulkImportResult<Device> processDevicesBulkImport(@RequestBody BulkImportRequest request) throws
             Exception {
         SecurityUser user = getCurrentUser();

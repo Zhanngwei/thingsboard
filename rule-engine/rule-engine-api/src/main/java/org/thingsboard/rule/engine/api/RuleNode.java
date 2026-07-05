@@ -41,102 +41,142 @@ import java.lang.annotation.Target;
 public @interface RuleNode {
 
     /**
-     * 中文说明：声明节点组件类型，来源于节点实现类的静态元数据；用于 UI 分类和 Rule Engine 注册。
+     * 功能：执行 `type` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     ComponentType type();
 
     /**
-     * 中文说明：声明节点显示名称，来源于节点实现类；用于规则链编辑器和节点定义列表。
+     * 功能：执行 `name` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String name();
 
     /**
-     * 中文说明：声明节点简短描述，来源于节点实现类；用于 UI 帮助文本和节点目录。
+     * 功能：执行 `nodeDescription` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String nodeDescription();
 
     /**
-     * 中文说明：声明节点详细说明，来源于节点实现类；用于 UI 展示更完整的行为解释。
+     * 功能：执行 `nodeDetails` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String nodeDetails();
 
     /**
-     * 中文说明：声明节点配置类，来源于节点实现类；Rule Engine 用它生成默认配置并反序列化节点配置 JSON。
+     * 功能：执行 `configClazz` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     Class<? extends NodeConfiguration> configClazz();
 
     /**
-     * 中文说明：声明集群模式，来源于节点实现类；用于决定节点是否支持在集群中分布式执行。
+     * 功能：执行 `clusteringMode` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     ComponentClusteringMode clusteringMode() default ComponentClusteringMode.ENABLED;
 
     /**
-     * 中文说明：声明节点是否支持自定义队列名，来源于节点实现类；用于 Rule Engine 队列路由配置。
+     * 功能：判断队列名称。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean hasQueueName() default false;
 
     /**
-     * 中文说明：声明节点是否允许入边，来源于节点实现类；用于规则链 UI 和节点连接校验。
+     * 功能：执行 `inEnabled` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean inEnabled() default true;
 
     /**
-     * 中文说明：声明节点是否允许出边，来源于节点实现类；用于规则链 UI 和消息路由校验。
+     * 功能：执行 `outEnabled` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean outEnabled() default true;
 
     /**
-     * 中文说明：声明节点作用域，来源于节点实现类；用于区分系统级、租户级等组件可见性。
+     * 功能：执行 `scope` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     ComponentScope scope() default ComponentScope.TENANT;
 
     /**
-     * 中文说明：声明节点默认输出关系类型，来源于节点实现类；用于规则链连接建议和消息路由约束。
+     * 功能：执行 `relationTypes` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     String[] relationTypes() default {TbNodeConnectionType.SUCCESS, TbNodeConnectionType.FAILURE};
 
     /**
-     * 中文说明：声明节点 UI 资源，来源于节点实现类；用于加载规则链编辑器所需的前端资源。
+     * 功能：执行 `uiResources` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     String[] uiResources() default {};
 
     /**
-     * 中文说明：声明节点配置指令，来源于节点实现类；用于前端选择对应的配置表单。
+     * 功能：执行 `configDirective` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String configDirective() default "";
 
     /**
-     * 中文说明：声明节点图标名称，来源于节点实现类；用于规则链 UI 展示。
+     * 功能：执行 `icon` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String icon() default "";
 
     /**
-     * 中文说明：声明节点图标 URL，来源于节点实现类；用于自定义或外部图标展示。
+     * 功能：执行 `iconUrl` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String iconUrl() default "";
 
     /**
-     * 中文说明：声明节点文档地址，来源于节点实现类；用于 UI 跳转到官方或扩展文档。
+     * 功能：执行 `docUrl` 对应的处理。
+     * 参数：无。
+     * 返回：文本结果。
      */
     String docUrl() default "";
 
     /**
-     * 中文说明：声明节点是否允许自定义关系，来源于节点实现类；用于决定 UI 是否限制 relationTypes。
+     * 功能：执行 `customRelations` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean customRelations() default false;
 
     /**
-     * 中文说明：声明节点是否代表嵌套规则链节点，来源于节点实现类；用于 Rule Engine 处理输入/输出栈。
+     * 功能：执行 `ruleChainNode` 对应的处理。
+     * 参数：无。
+     * 返回：判断结果。
      */
     boolean ruleChainNode() default false;
 
     /**
-     * 中文说明：声明节点支持的规则链类型，来源于节点实现类；用于区分 Core 与 Edge 规则链可用性。
+     * 功能：执行 `ruleChainTypes` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     RuleChainType[] ruleChainTypes() default {RuleChainType.CORE, RuleChainType.EDGE};
 
     /**
-     * 中文说明：声明节点配置版本，来源于节点实现类；用于 {@link TbNode#upgrade(int, com.fasterxml.jackson.databind.JsonNode)} 配置升级流程。
+     * 功能：执行 `version` 对应的处理。
+     * 参数：无。
+     * 返回：数值结果。
      */
     int version() default 0;
 

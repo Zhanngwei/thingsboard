@@ -17,18 +17,18 @@ package org.thingsboard.rule.engine.geo;
 
 import lombok.Data;
 
-@Data
 /**
  * 中文说明：`Coordinates` 是坐标辅助类，用于执行 GPS 地理围栏、距离和多边形判断及状态跟踪。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Data
 public class Coordinates {
     /**
-     * 字段说明：保存 `latitude`，表示纬度，供本类方法在规则节点处理流程中使用。
+     * `latitude` 字段，保存当前对象的对应属性。
      */
     private final double latitude;
     /**
-     * 字段说明：保存 `longitude`，表示经度，供本类方法在规则节点处理流程中使用。
+     * `longitude` 字段，保存当前对象的对应属性。
      */
     private final double longitude;
     /*

@@ -19,42 +19,42 @@ import lombok.Data;
 import org.thingsboard.rule.engine.api.NodeConfiguration;
 import org.thingsboard.server.common.data.StringUtils;
 
-@Data
 /**
- * RPC 回复节点配置，定义从消息元数据中读取会话标识的字段名。
- * 配置类本身不直接发送 RPC、不访问数据库/缓存，也不涉及异步回调。
+ * `TbSendRpcReplyNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbSendRpcReplyNodeConfiguration implements NodeConfiguration<TbSendRpcReplyNodeConfiguration> {
 
     /**
-     * 默认 serviceId 元数据字段名。
+     * 服务常量，用于统一引用固定值。
      */
     public static final String SERVICE_ID = "serviceId";
     /**
-     * 默认 sessionId 元数据字段名。
+     * 会话常量，用于统一引用固定值。
      */
     public static final String SESSION_ID = "sessionId";
     /**
-     * 默认 requestId 元数据字段名。
+     * 请求常量，用于统一引用固定值。
      */
     public static final String REQUEST_ID = "requestId";
 
     /**
-     * 配置的 serviceId 元数据字段名。
+     * 属性，提供当前类调用的业务操作。
      */
     private String serviceIdMetaDataAttribute;
     /**
-     * 配置的 sessionId 元数据字段名。
+     * 会话，保存当前步骤读取或计算得到的内容。
      */
     private String sessionIdMetaDataAttribute;
     /**
-     * 配置的 requestId 元数据字段名。
+     * 当前请求对象，封装本次处理需要的输入信息。
      */
     private String requestIdMetaDataAttribute;
 
     /**
-     * 构造 RPC 回复节点默认配置。
-     * 本方法只设置默认元数据字段名，不直接调用 RpcService。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbSendRpcReplyNodeConfiguration defaultConfiguration() {
@@ -66,24 +66,27 @@ public class TbSendRpcReplyNodeConfiguration implements NodeConfiguration<TbSend
     }
 
     /**
-     * 返回 serviceId 元数据字段名，空配置时回退到默认值。
-     * 本方法只读取本地配置，不直接涉及外部调用。
+     * 功能：获取属性。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getServiceIdMetaDataAttribute() {
         return !StringUtils.isEmpty(serviceIdMetaDataAttribute) ? serviceIdMetaDataAttribute : SERVICE_ID;
     }
 
     /**
-     * 返回 sessionId 元数据字段名，空配置时回退到默认值。
-     * 本方法只读取本地配置，不直接涉及外部调用。
+     * 功能：获取会话。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getSessionIdMetaDataAttribute() {
         return !StringUtils.isEmpty(sessionIdMetaDataAttribute) ? sessionIdMetaDataAttribute : SESSION_ID;
     }
 
     /**
-     * 返回 requestId 元数据字段名，空配置时回退到默认值。
-     * 本方法只读取本地配置，不直接涉及外部调用。
+     * 功能：获取属性。
+     * 参数：无。
+     * 返回：文本结果。
      */
     public String getRequestIdMetaDataAttribute() {
         return !StringUtils.isEmpty(requestIdMetaDataAttribute) ? requestIdMetaDataAttribute : REQUEST_ID;

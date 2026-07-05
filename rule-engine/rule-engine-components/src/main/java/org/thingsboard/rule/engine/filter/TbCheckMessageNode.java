@@ -30,6 +30,14 @@ import org.thingsboard.server.common.msg.TbMsg;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 中文说明：`TbCheckMessageNode` 是检查消息节点规则节点，用于根据消息类型、实体类型、关系、脚本或告警状态判断消息路由。
+ * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
+ * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
+ * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
+ * 配置对象：`TbCheckMessageNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
+ * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ */
 @Slf4j
 @RuleNode(
         type = ComponentType.FILTER,
@@ -42,51 +50,48 @@ import java.util.Map;
                 "Output connections: <code>True</code>, <code>False</code>, <code>Failure</code>",
         uiResources = {"static/rulenode/rulenode-core-config.js"},
         configDirective = "tbFilterNodeCheckMessageConfig")
-/**
- * 中文说明：`TbCheckMessageNode` 是检查消息节点规则节点，用于根据消息类型、实体类型、关系、脚本或告警状态判断消息路由。
- * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
- * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
- * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
- * 配置对象：`TbCheckMessageNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
- * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
- */
 public class TbCheckMessageNode implements TbNode {
 
     /**
-     * 常量字段：定义 `gson`，用于与本类处理流程相关的运行时值，本身不触发外部系统调用。
+     * `gson`常量，用于统一引用固定值。
      */
     private static final Gson gson = new Gson();
 
     /**
-     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     * 配置，保存当前对象的配置选项。
      */
     private TbCheckMessageNodeConfiguration config;
     /**
-     * 字段说明：保存 `messageNamesList`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 消息列表，用于保存一组待处理对象。
      */
     private List<String> messageNamesList;
     /**
-     * 字段说明：保存 `metadataNamesList`，表示消息元数据，供本类方法在规则节点处理流程中使用。
+     * `metadataNamesList`列表，用于保存一组待处理对象。
      */
     private List<String> metadataNamesList;
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `tbContext`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void init(TbContext tbContext, TbNodeConfiguration configuration) throws TbNodeException {
         this.config = TbNodeUtils.convert(configuration, TbCheckMessageNodeConfiguration.class);
         messageNamesList = config.getMessageNames();
         metadataNamesList = config.getMetadataNames();
     }
 
-    @Override
     /**
-     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
-     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
-     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
         try {
             String relationType = config.isCheckAllKeys() ?
@@ -99,8 +104,10 @@ public class TbCheckMessageNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `allKeysData` 对应的辅助逻辑，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `allKeysData` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean allKeysData(TbMsg msg) {
         if (!messageNamesList.isEmpty()) {
@@ -111,8 +118,10 @@ public class TbCheckMessageNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `allKeysMetadata` 对应的辅助逻辑，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `allKeysMetadata` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean allKeysMetadata(TbMsg msg) {
         if (!metadataNamesList.isEmpty()) {
@@ -123,8 +132,10 @@ public class TbCheckMessageNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `atLeastOneData` 对应的辅助逻辑，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `atLeastOneData` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean atLeastOneData(TbMsg msg) {
         if (!messageNamesList.isEmpty()) {
@@ -135,8 +146,10 @@ public class TbCheckMessageNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `atLeastOneMetadata` 对应的辅助逻辑，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `atLeastOneMetadata` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：判断结果。
      */
     private boolean atLeastOneMetadata(TbMsg msg) {
         if (!metadataNamesList.isEmpty()) {
@@ -147,8 +160,11 @@ public class TbCheckMessageNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理`All Keys`。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `map`：键值映射。
+     * 返回：判断结果。
      */
     private boolean processAllKeys(List<String> data, Map<String, String> map) {
         for (String field : data) {
@@ -160,8 +176,11 @@ public class TbCheckMessageNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理`At Least One`。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `map`：键值映射。
+     * 返回：判断结果。
      */
     private boolean processAtLeastOne(List<String> data, Map<String, String> map) {
         for (String field : data) {
@@ -173,18 +192,22 @@ public class TbCheckMessageNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `metadataToMap` 对应的辅助逻辑，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `metadataToMap` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private Map<String, String> metadataToMap(TbMsg msg) {
         return msg.getMetaData().getData();
     }
 
-    @SuppressWarnings("unchecked")
     /**
-     * 方法说明：执行 `dataToMap` 对应的辅助逻辑，供 `TbCheckMessageNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `dataToMap` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
+    @SuppressWarnings("unchecked")
     private Map<String, String> dataToMap(TbMsg msg) {
         return (Map<String, String>) gson.fromJson(msg.getData(), Map.class);
     }

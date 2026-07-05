@@ -53,46 +53,52 @@ import java.util.function.Function;
 import static org.thingsboard.server.common.data.StringUtils.equalsAny;
 import static org.thingsboard.server.common.data.StringUtils.splitByCommaWithoutQuotes;
 
-@Data
-@Slf4j
 /**
  * 中文说明：`AlarmRuleState` 是告警规则状态辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Data
+@Slf4j
 class AlarmRuleState {
 
     /**
-     * 字段说明：保存 `severity`，表示告警严重级别，供本类方法在规则节点处理流程中使用。
+     * `severity` 字段，保存当前对象的对应属性。
      */
     private final AlarmSeverity severity;
     /**
-     * 字段说明：保存 `alarmRule`，表示告警类型、严重级别或详情，供本类方法在规则节点处理流程中使用。
+     * 告警对象，用于描述当前业务场景。
      */
     private final AlarmRule alarmRule;
     /**
-     * 字段说明：保存 `spec`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * `spec` 字段，保存当前对象的对应属性。
      */
     private final AlarmConditionSpec spec;
     /**
-     * 字段说明：保存 `entityKeys`，表示消息体、元数据、属性或遥测中的键名，供本类方法在规则节点处理流程中使用。
+     * 实体集合，用于去重保存或快速判断对象是否存在。
      */
     private final Set<AlarmConditionFilterKey> entityKeys;
     /**
-     * 字段说明：保存 `state`，表示运行状态，供本类方法在规则节点处理流程中使用。
+     * 状态，表示当前对象所处状态。
      */
     private PersistedAlarmRuleState state;
     /**
-     * 字段说明：保存 `updateFlag`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 是否满足`updateFlag`条件。
      */
     private boolean updateFlag;
     /**
-     * 字段说明：保存 `dynamicPredicateValueCtx`，表示规则引擎上下文，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
     private final DynamicPredicateValueCtx dynamicPredicateValueCtx;
 
     /**
-     * 方法说明：构造 `AlarmRuleState` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `AlarmRuleState` 实例，并初始化必要字段。
+     * 参数：
+     * - `severity`：`severity` 参数。
+     * - `alarmRule`：`alarmRule` 参数。
+     * - `entityKeys`：实体对象。
+     * - `state`：`state` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     AlarmRuleState(AlarmSeverity severity, AlarmRule alarmRule, Set<AlarmConditionFilterKey> entityKeys, PersistedAlarmRuleState state, DynamicPredicateValueCtx dynamicPredicateValueCtx) {
         this.severity = severity;
@@ -108,8 +114,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：校验配置或数据是否满足节点要求，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：校验时间戳。
+     * 参数：
+     * - `changedKeys`：键。
+     * 返回：判断结果。
      */
     public boolean validateTsUpdate(Set<AlarmConditionFilterKey> changedKeys) {
         for (AlarmConditionFilterKey key : changedKeys) {
@@ -121,8 +129,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：校验配置或数据是否满足节点要求，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：校验`Attr Update`。
+     * 参数：
+     * - `changedKeys`：键。
+     * 返回：判断结果。
      */
     public boolean validateAttrUpdate(Set<AlarmConditionFilterKey> changedKeys) {
         //If the attribute was updated, but no new telemetry arrived - we ignore this until new telemetry is there.
@@ -140,8 +150,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Spec`。
+     * 参数：
+     * - `alarmRule`：`alarmRule` 参数。
+     * 返回：处理结果。
      */
     public AlarmConditionSpec getSpec(AlarmRule alarmRule) {
         AlarmConditionSpec spec = alarmRule.getCondition().getSpec();
@@ -152,8 +164,9 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：检查状态、关系、配置或数据合法性，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：校验`Update`。
+     * 参数：无。
+     * 返回：判断结果。
      */
     public boolean checkUpdate() {
         if (updateFlag) {
@@ -165,8 +178,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `eval` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `eval` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：处理结果。
      */
     public AlarmEvalResult eval(DataSnapshot data) {
         boolean active = isActive(data, data.getTs());
@@ -183,8 +198,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `isActive` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：判断`Active`。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `eventTs`：时间戳。
+     * 返回：判断结果。
      */
     private boolean isActive(DataSnapshot data, long eventTs) {
         if (eventTs == 0L) {
@@ -206,8 +224,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Schedule`。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `alarmRule`：`alarmRule` 参数。
+     * 返回：处理结果。
      */
     private AlarmSchedule getSchedule(DataSnapshot data, AlarmRule alarmRule) {
         AlarmSchedule schedule = alarmRule.getSchedule();
@@ -224,8 +245,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `isActiveSpecific` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：判断`Active Specific`。
+     * 参数：
+     * - `schedule`：`schedule` 参数。
+     * - `eventTs`：时间戳。
+     * 返回：判断结果。
      */
     private boolean isActiveSpecific(SpecificTimeSchedule schedule, long eventTs) {
         ZoneId zoneId = SchedulerUtils.getZoneId(schedule.getTimezone());
@@ -246,8 +270,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `isActiveCustom` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：判断`Active Custom`。
+     * 参数：
+     * - `schedule`：`schedule` 参数。
+     * - `eventTs`：时间戳。
+     * 返回：判断结果。
      */
     private boolean isActiveCustom(CustomTimeSchedule schedule, long eventTs) {
         ZoneId zoneId = SchedulerUtils.getZoneId(schedule.getTimezone());
@@ -271,8 +298,14 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `isActive` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：判断`Active`。
+     * 参数：
+     * - `eventTs`：时间戳。
+     * - `zoneId`：`zoneId`ID。
+     * - `zdt`：`zdt` 参数。
+     * - `startsOn`：`startsOn` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：判断结果。
      */
     private boolean isActive(long eventTs, ZoneId zoneId, ZonedDateTime zdt, long startsOn, long endsOn) {
         long startOfDay = zdt.toLocalDate().atStartOfDay(zoneId).toInstant().toEpochMilli();
@@ -285,8 +318,9 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：清除告警或本地状态，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `clear` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     public void clear() {
         if (state.getEventCount() > 0 || state.getLastEventTs() > 0 || state.getDuration() > 0) {
@@ -298,8 +332,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `evalRepeating` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `evalRepeating` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `active`：`active` 参数。
+     * 返回：处理结果。
      */
     private AlarmEvalResult evalRepeating(DataSnapshot data, boolean active) {
         if (active && eval(alarmRule.getCondition(), data)) {
@@ -313,8 +350,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `evalDuration` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `evalDuration` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `active`：`active` 参数。
+     * 返回：处理结果。
      */
     private AlarmEvalResult evalDuration(DataSnapshot data, boolean active) {
         if (active && eval(alarmRule.getCondition(), data)) {
@@ -337,8 +377,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：解析配置模板、消息字段或参数值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `resolveRequiredRepeats` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：数值结果。
      */
     private long resolveRequiredRepeats(DataSnapshot data) {
         long repeatingTimes = 0;
@@ -353,8 +395,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：解析配置模板、消息字段或参数值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `resolveRequiredDurationInMs` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：数值结果。
      */
     private long resolveRequiredDurationInMs(DataSnapshot data) {
         long durationTimeInMs = 0;
@@ -370,8 +414,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：解析配置模板、消息字段或参数值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `resolveDynamicValue` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `predicate`：`predicate` 参数。
+     * 返回：数值结果。
      */
     private Long resolveDynamicValue(DataSnapshot data, FilterPredicateValue<? extends Number> predicate) {
         DynamicValue<?> dynamicValue = predicate.getDynamicValue();
@@ -394,8 +441,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `eval` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `eval` 对应的处理。
+     * 参数：
+     * - `ts`：时间戳。
+     * - `dataSnapshot`：待处理数据。
+     * 返回：处理结果。
      */
     public AlarmEvalResult eval(long ts, DataSnapshot dataSnapshot) {
         switch (spec.getType()) {
@@ -418,8 +468,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `eval` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `eval` 对应的处理。
+     * 参数：
+     * - `condition`：`condition` 参数。
+     * - `data`：待处理数据。
+     * 返回：判断结果。
      */
     private boolean eval(AlarmCondition condition, DataSnapshot data) {
         boolean eval = true;
@@ -444,8 +497,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `filter`：`filter` 参数。
+     * 返回：处理结果。
      */
     private EntityKeyValue getConstantValue(AlarmConditionFilter filter) {
         EntityKeyValue value = new EntityKeyValue();
@@ -468,8 +523,13 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `eval` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `eval` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `value`：值。
+     * - `predicate`：`predicate` 参数。
+     * - `filter`：`filter` 参数。
+     * 返回：判断结果。
      */
     private boolean eval(DataSnapshot data, EntityKeyValue value, KeyFilterPredicate predicate, AlarmConditionFilter filter) {
         switch (predicate.getType()) {
@@ -487,8 +547,13 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `evalComplexPredicate` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `evalComplexPredicate` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `ekv`：`ekv` 参数。
+     * - `predicate`：`predicate` 参数。
+     * - `filter`：`filter` 参数。
+     * 返回：判断结果。
      */
     private boolean evalComplexPredicate(DataSnapshot data, EntityKeyValue ekv, ComplexFilterPredicate predicate, AlarmConditionFilter filter) {
         switch (predicate.getOperation()) {
@@ -512,8 +577,13 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `evalBoolPredicate` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `evalBoolPredicate` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `ekv`：`ekv` 参数。
+     * - `predicate`：`predicate` 参数。
+     * - `filter`：`filter` 参数。
+     * 返回：判断结果。
      */
     private boolean evalBoolPredicate(DataSnapshot data, EntityKeyValue ekv, BooleanFilterPredicate predicate, AlarmConditionFilter filter) {
         Boolean val = getBoolValue(ekv);
@@ -535,8 +605,13 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `evalNumPredicate` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `evalNumPredicate` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `ekv`：`ekv` 参数。
+     * - `predicate`：`predicate` 参数。
+     * - `filter`：`filter` 参数。
+     * 返回：判断结果。
      */
     private boolean evalNumPredicate(DataSnapshot data, EntityKeyValue ekv, NumericFilterPredicate predicate, AlarmConditionFilter filter) {
         Double val = getDblValue(ekv);
@@ -566,8 +641,13 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：执行 `evalStrPredicate` 对应的辅助逻辑，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `evalStrPredicate` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `ekv`：`ekv` 参数。
+     * - `predicate`：`predicate` 参数。
+     * - `filter`：`filter` 参数。
+     * 返回：判断结果。
      */
     private boolean evalStrPredicate(DataSnapshot data, EntityKeyValue ekv, StringFilterPredicate predicate, AlarmConditionFilter filter) {
         String val = getStrValue(ekv);
@@ -605,8 +685,13 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `value`：值。
+     * - `filter`：`filter` 参数。
+     * - `transformFunction`：`transformFunction` 参数。
+     * 返回：处理结果。
      */
     private <T> T getPredicateValue(DataSnapshot data, FilterPredicateValue<T> value, AlarmConditionFilter filter, Function<EntityKeyValue, T> transformFunction) {
         EntityKeyValue ekv = getDynamicPredicateValue(data, value.getDynamicValue());
@@ -624,8 +709,11 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `data`：待处理数据。
+     * - `value`：值。
+     * 返回：处理结果。
      */
     private <T> EntityKeyValue getDynamicPredicateValue(DataSnapshot data, DynamicValue<T> value) {
         EntityKeyValue ekv = null;
@@ -649,8 +737,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `ekv`：`ekv` 参数。
+     * 返回：文本结果。
      */
     private static String getStrValue(EntityKeyValue ekv) {
         switch (ekv.getDataType()) {
@@ -670,8 +760,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `ekv`：`ekv` 参数。
+     * 返回：数值结果。
      */
     private static Double getDblValue(EntityKeyValue ekv) {
         switch (ekv.getDataType()) {
@@ -699,8 +791,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `ekv`：`ekv` 参数。
+     * 返回：判断结果。
      */
     private static Boolean getBoolValue(EntityKeyValue ekv) {
         switch (ekv.getDataType()) {
@@ -728,8 +822,10 @@ class AlarmRuleState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmRuleState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `ekv`：`ekv` 参数。
+     * 返回：数值结果。
      */
     private static Long getLongValue(EntityKeyValue ekv) {
         switch (ekv.getDataType()) {

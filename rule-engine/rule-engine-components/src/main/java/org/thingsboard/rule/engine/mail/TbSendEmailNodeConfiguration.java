@@ -18,73 +18,73 @@ package org.thingsboard.rule.engine.mail;
 import lombok.Data;
 import org.thingsboard.rule.engine.api.NodeConfiguration;
 
-@Data
 /**
- * 邮件发送节点配置模型，保存系统 SMTP 开关、自定义 SMTP、TLS 和代理参数。
- * 配置类本身不直接发送邮件、不访问数据库或缓存，也不涉及异步回调。
+ * `TbSendEmailNodeConfiguration` 类，封装当前模块中的一组相关职责。
  */
+@Data
 public class TbSendEmailNodeConfiguration implements NodeConfiguration {
 
     /**
-     * 是否使用系统级 SMTP 设置。
+     * 是否使用配置。
      */
     private boolean useSystemSmtpSettings;
     /**
-     * 自定义 SMTP 主机。
+     * 主机地址，用于描述服务监听或访问地址。
      */
     private String smtpHost;
     /**
-     * 自定义 SMTP 端口。
+     * 端口号，用于描述服务监听或访问地址。
      */
     private int smtpPort;
     /**
-     * SMTP 用户名。
+     * 用户名，用于认证或安全校验。
      */
     private String username;
     /**
-     * SMTP 密码。
+     * 密码，用于认证或安全校验。
      */
     private String password;
     /**
-     * SMTP 协议名称。
+     * `smtpProtocol` 字段，保存当前对象的对应属性。
      */
     private String smtpProtocol;
     /**
-     * SMTP 超时时间，单位毫秒。
+     * 超时时间，用于控制时间范围或等待时长。
      */
     private int timeout;
     /**
-     * 是否启用 STARTTLS。
+     * 是否启用`tls`。
      */
     private boolean enableTls;
     /**
-     * TLS 协议版本。
+     * 版本号，表示当前对象的对应属性。
      */
     private String tlsVersion;
     /**
-     * 是否启用 SMTP 代理。
+     * 是否启用`proxy`。
      */
     private boolean enableProxy;
     /**
-     * SMTP 代理主机。
+     * 主机地址，用于描述服务监听或访问地址。
      */
     private String proxyHost;
     /**
-     * SMTP 代理端口。
+     * 端口号，用于描述服务监听或访问地址。
      */
     private String proxyPort;
     /**
-     * SMTP 代理用户名。
+     * 用户对象，用于描述当前业务场景。
      */
     private String proxyUser;
     /**
-     * SMTP 代理密码。
+     * 密码，用于认证或安全校验。
      */
     private String proxyPassword;
 
     /**
-     * 构造邮件发送节点默认配置。
-     * 本方法只设置默认值，不直接创建 JavaMailSender 或发送邮件。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public TbSendEmailNodeConfiguration defaultConfiguration() {

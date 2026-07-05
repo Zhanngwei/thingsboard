@@ -29,12 +29,7 @@ package org.thingsboard.monitoring.data;
 public class MonitoredServiceKey {
 
     /**
-     * 字段说明：
-     * 1. 保存 `GENERAL` 对应的配置、客户端、通道、测试夹具、页面元素、回调或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、协议事件、Selenium 定位、Docker 环境或测试数据。
-     * 3. 生命周期与持有对象一致；单例服务字段随应用存在，连接/测试字段随单次会话或测试用例存在。
-     * 4. 设计为字段是为了复用连接、配置、页面对象或异步状态，减少重复初始化和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Netty 通道、异步 Future、WebDriver 和集合状态需要遵守各自的并发模型。
+     * `GENERAL`常量，用于统一引用固定值。
      */
     public static final String GENERAL = "Monitoring";
 

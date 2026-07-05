@@ -24,10 +24,6 @@ import org.thingsboard.server.transport.lwm2m.server.client.LwM2mClient;
 
 import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.LOG_LWM2M_TELEMETRY;
 
-@Slf4j
-@Service
-@TbLwM2mTransportComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`DefaultLwM2MTelemetryLogService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -38,33 +34,27 @@ import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.LO
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Service
+@TbLwM2mTransportComponent
+@RequiredArgsConstructor
 public class DefaultLwM2MTelemetryLogService implements LwM2MTelemetryLogService {
 
     /**
-     * 字段说明：
-     * 1. 保存 `helper` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `helper` 字段，保存当前对象的对应属性。
      */
     private final LwM2mTransportServerHelper helper;
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `log` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `log` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `logMsg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void log(LwM2mClient client, String logMsg) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (logMsg != null && client != null && client.getSession() != null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (logMsg.length() > 1024) {
                 logMsg = logMsg.substring(0, 1024);
             }

@@ -41,7 +41,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`RuleNodeTbelScriptEngine` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -52,128 +51,98 @@ import java.util.stream.Collectors;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@Slf4j
 public class RuleNodeTbelScriptEngine extends RuleNodeScriptEngine<TbelInvokeService, Object> {
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `RuleNodeTbelScriptEngine` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `RuleNodeTbelScriptEngine` 实例，并初始化必要字段。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `scriptInvokeService`：服务对象。
+     * - `script`：`script` 参数。
+     * - `argNames`：名称。
+     * 返回：新创建的对象实例。
      */
     public RuleNodeTbelScriptEngine(TenantId tenantId, TbelInvokeService scriptInvokeService, String script, String... argNames) {
         super(tenantId, scriptInvokeService, script, argNames);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeFilterTransform` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Filter Transform`。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected ListenableFuture<Boolean> executeFilterTransform(Object result) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (result instanceof Boolean) {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return Futures.immediateFuture((Boolean) result);
         }
         return wrongResultType(result);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeUpdateTransform` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Update Transform`。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `result`：`result` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected ListenableFuture<List<TbMsg>> executeUpdateTransform(TbMsg msg, Object result) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (result instanceof Map) {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return Futures.immediateFuture(Collections.singletonList(unbindMsg((Map) result, msg)));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (result instanceof Collection) {
             List<TbMsg> res = new ArrayList<>();
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (Object resObject : (Collection) result) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (resObject instanceof Map) {
                     res.add(unbindMsg((Map) resObject, msg));
                 } else {
                     return wrongResultType(resObject);
                 }
             }
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return Futures.immediateFuture(res);
         }
         return wrongResultType(result);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeGenerateTransform` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Generate Transform`。
+     * 参数：
+     * - `prevMsg`：待处理消息。
+     * - `result`：`result` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected ListenableFuture<TbMsg> executeGenerateTransform(TbMsg prevMsg, Object result) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (result instanceof Map) {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return Futures.immediateFuture(unbindMsg((Map) result, prevMsg));
         }
         return wrongResultType(result);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeToStringTransform` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`To String Transform`。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected ListenableFuture<String> executeToStringTransform(Object result) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (result instanceof String) {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return Futures.immediateFuture((String) result);
         } else {
             return Futures.immediateFuture(JacksonUtil.toString(result));
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeSwitchTransform` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Switch Transform`。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected ListenableFuture<Set<String>> executeSwitchTransform(Object result) {
         if (result instanceof String) {
             return Futures.immediateFuture(Collections.singleton((String) result));
@@ -191,48 +160,36 @@ public class RuleNodeTbelScriptEngine extends RuleNodeScriptEngine<TbelInvokeSer
         return wrongResultType(result);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeJsonAsync` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行JSON。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<JsonNode> executeJsonAsync(TbMsg msg) {
         return Futures.transform(executeScriptAsync(msg), JacksonUtil::valueToTree, MoreExecutors.directExecutor());
 
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `convertResult` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：转换`Result`。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：处理结果。
      */
+    @Override
     protected Object convertResult(Object result) {
         return result;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `prepareArgs` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `prepareArgs` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
+    @Override
     protected Object[] prepareArgs(TbMsg msg) {
         Object[] args = new Object[3];
         if (msg.getData() != null) {
@@ -246,14 +203,11 @@ public class RuleNodeTbelScriptEngine extends RuleNodeScriptEngine<TbelInvokeSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `unbindMsg` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `unbindMsg` 对应的处理。
+     * 参数：
+     * - `msgData`：待处理消息。
+     * - `msg`：待处理消息。
+     * 返回：处理结果。
      */
     private static TbMsg unbindMsg(Map msgData, TbMsg msg) {
         String data = null;
@@ -282,14 +236,10 @@ public class RuleNodeTbelScriptEngine extends RuleNodeScriptEngine<TbelInvokeSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `wrongResultType` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `wrongResultType` 对应的处理。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：匹配的数据集合。
      */
     private static <T> ListenableFuture<T> wrongResultType(Object result) {
         String className = toClassName(result);
@@ -298,14 +248,10 @@ public class RuleNodeTbelScriptEngine extends RuleNodeScriptEngine<TbelInvokeSer
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toClassName` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toClassName` 对应的处理。
+     * 参数：
+     * - `result`：`result` 参数。
+     * 返回：文本结果。
      */
     private static String toClassName(Object result) {
         return result != null ? result.getClass().getSimpleName() : "null";

@@ -122,11 +122,6 @@ import static org.thingsboard.server.common.data.notification.rule.trigger.confi
 import static org.thingsboard.server.common.data.notification.rule.trigger.config.DeviceActivityNotificationRuleTriggerConfig.DeviceEvent.ACTIVE;
 import static org.thingsboard.server.common.data.notification.rule.trigger.config.DeviceActivityNotificationRuleTriggerConfig.DeviceEvent.INACTIVE;
 
-@DaoSqlTest
-@TestPropertySource(properties = {
-        "transport.http.enabled=true",
-        "notification_system.rules.deduplication_durations=RATE_LIMITS:10000"
-})
 /**
  * 中文说明：
  * 1. 类目的：`NotificationRuleApiTest` 是ThingsBoard Application 测试模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
@@ -137,105 +132,65 @@ import static org.thingsboard.server.common.data.notification.rule.trigger.confi
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 Service / Facade。
  */
+@DaoSqlTest
+@TestPropertySource(properties = {
+        "transport.http.enabled=true",
+        "notification_system.rules.deduplication_durations=RATE_LIMITS:10000"
+})
 public class NotificationRuleApiTest extends AbstractNotificationApiTest {
 
+    /**
+     * 告警，提供当前类调用的业务操作。
+     */
     @SpyBean
-    /**
-     * 字段说明：
-     * 1. 保存 `alarmSubscriptionService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private AlarmSubscriptionService alarmSubscriptionService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRequestService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private NotificationRequestService notificationRequestService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `rateLimitService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
+    @Autowired
     private RateLimitService rateLimitService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `ruleChainService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 规则链，提供当前类调用的业务操作。
      */
+    @Autowired
     private RuleChainService ruleChainService;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRuleProcessor` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 处理器，负责处理对应任务或消息。
      */
+    @Autowired
     private NotificationRuleProcessor notificationRuleProcessor;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `notificationRulesCache` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 通知，表示当前对象的对应属性。
      */
+    @Autowired
     private DefaultNotificationRulesCache notificationRulesCache;
-    @Autowired
     /**
-     * 字段说明：
-     * 1. 保存 `deviceStateService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 设备，提供当前类调用的业务操作。
      */
+    @Autowired
     private DeviceStateService deviceStateService;
 
-    @Before
     /**
-     * 方法说明：
-     * 1. 职责：执行 `beforeEach` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `beforeEach` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Before
     public void beforeEach() throws Exception {
         loginTenantAdmin();
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_entityActionTrigger` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证实体相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_entityActionTrigger() throws Exception {
         EntityActionNotificationRuleTriggerConfig triggerConfig = new EntityActionNotificationRuleTriggerConfig();
         triggerConfig.setEntityTypes(Set.of(EntityType.DEVICE));
@@ -266,17 +221,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_alarmTrigger` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证告警相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_alarmTrigger() throws Exception {
         String notificationSubject = "Alarm type: ${alarmType}, status: ${alarmStatus}, " +
                 "severity: ${alarmSeverity}, deviceId: ${alarmOriginatorId}";
@@ -300,7 +250,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         Map<Integer, List<UUID>> escalationTable = new HashMap<>();
         recipientsConfig.setEscalationTable(escalationTable);
         Map<Integer, NotificationApiWsClient> clients = new HashMap<>();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int delay = 0; delay <= 5; delay++) {
             Pair<User, NotificationApiWsClient> userAndClient = createUserAndConnectWsClient(Authority.TENANT_ADMIN);
             NotificationTarget notificationTarget = createNotificationTarget(userAndClient.getFirst().getId());
@@ -364,23 +313,17 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_alarmTrigger_createViaRestApi` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证告警相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_alarmTrigger_createViaRestApi() throws Exception {
         Device device = createDevice("Device with alarm", "233");
         NotificationTarget target = createNotificationTarget(tenantAdminUserId);
         defaultNotifications.create(tenantId, DefaultNotifications.newAlarm, target.getId());
         defaultNotifications.create(tenantId, DefaultNotifications.entityAction, target.getId());
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         notificationRulesCache.evict(tenantId);
 
         Alarm alarm = new Alarm();
@@ -400,17 +343,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
                 });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_alarmTrigger_clearRule` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证告警相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_alarmTrigger_clearRule() throws Exception {
         String notificationSubject = "${alarmSeverity} alarm '${alarmType}' is ${alarmStatus}";
         String notificationText = "${alarmId}";
@@ -480,17 +418,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_entitiesLimit` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证数量限制相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_entitiesLimit() throws Exception {
         int limit = 5;
         updateDefaultTenantProfileConfig(profileConfiguration -> {
@@ -512,7 +445,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         loginTenantAdmin();
 
         checkNotificationAfter(() -> {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (int i = 1; i <= threshold; i++) {
                 createDevice(i + "", i + "");
             }
@@ -521,7 +453,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
 
         checkNotificationAfter(() -> {
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (int i = 1; i <= threshold; i++) {
                 Asset asset = new Asset();
                 asset.setType("Test");
@@ -534,7 +465,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
 
         checkNotificationAfter(() -> {
             long present = ruleChainService.countByTenantId(tenantId);
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             for (int i = 1; i <= threshold - present; i++) {
                 RuleChain ruleChain = new RuleChain();
                 ruleChain.setName(i + "");
@@ -563,17 +493,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_exceededRateLimits` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证频率相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_exceededRateLimits() throws Exception {
         loginSysAdmin();
         NotificationTarget sysadmins = createNotificationTarget(new SystemAdministratorsFilter());
@@ -581,7 +506,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         defaultNotifications.create(TenantId.SYS_TENANT_ID, DefaultNotifications.exceededRateLimitsForSysadmin, sysadmins.getId());
         defaultNotifications.create(TenantId.SYS_TENANT_ID, DefaultNotifications.exceededRateLimits, affectedTenantAdmins.getId());
         defaultNotifications.create(TenantId.SYS_TENANT_ID, DefaultNotifications.exceededPerEntityRateLimits, affectedTenantAdmins.getId());
-        // 缓存读写用于降低重复查询成本，需要注意失效策略和多节点一致性。
         notificationRulesCache.evict(TenantId.SYS_TENANT_ID);
 
         int n = 10;
@@ -589,14 +513,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
             profileConfiguration.setTenantEntityExportRateLimit(n + ":600");
             profileConfiguration.setCustomerServerRestLimitsConfiguration(n + ":600");
             profileConfiguration.setTenantNotificationRequestsPerRuleRateLimit(n + ":600");
-            // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
             profileConfiguration.setTransportDeviceTelemetryMsgRateLimit(n + ":600");
         });
         loginTenantAdmin();
         NotificationRule rule = createNotificationRule(AlarmCommentNotificationRuleTriggerConfig.builder()
                 .alarmTypes(Set.of("weklfjkwefa"))
                 .build(), "Test", "Test", createNotificationTarget(tenantAdminUserId).getId());
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 1; i <= n * 2; i++) {
             rateLimitService.checkRateLimit(LimitedApi.ENTITY_EXPORT, tenantId);
             rateLimitService.checkRateLimit(LimitedApi.REST_REQUESTS_PER_CUSTOMER, tenantId, customerId);
@@ -635,17 +557,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_alarmAssignment` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证告警相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_alarmAssignment() throws Exception {
         AlarmAssignmentNotificationRuleTriggerConfig triggerConfig = AlarmAssignmentNotificationRuleTriggerConfig.builder()
                 .alarmTypes(Set.of("test"))
@@ -685,17 +602,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_alarmComment` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证告警相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_alarmComment() throws Exception {
         AlarmCommentNotificationRuleTriggerConfig triggerConfig = AlarmCommentNotificationRuleTriggerConfig.builder()
                 .alarmTypes(Set.of("test"))
@@ -742,17 +654,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleProcessing_deviceActivity` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证设备相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleProcessing_deviceActivity() throws Exception {
         DeviceActivityNotificationRuleTriggerConfig triggerConfig = DeviceActivityNotificationRuleTriggerConfig.builder()
                 .notifyOn(Set.of(ACTIVE, INACTIVE))
@@ -766,7 +673,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         device.setLabel("Test Device A");
         device.setType("test");
         DeviceData deviceData = new DeviceData();
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         deviceData.setTransportConfiguration(new DefaultDeviceTransportConfiguration());
         deviceData.setConfiguration(new DefaultDeviceConfiguration());
         device.setDeviceData(deviceData);
@@ -782,17 +688,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleInfo` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证信息对象相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleInfo() throws Exception {
         NotificationDeliveryMethod[] deliveryMethods = {NotificationDeliveryMethod.WEB, NotificationDeliveryMethod.EMAIL};
         NotificationTemplate template = createNotificationTemplate(NotificationType.ENTITY_ACTION, "Subject", "Text", deliveryMethods);
@@ -818,17 +719,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         assertThat(ruleInfo.getDeliveryMethods()).containsOnly(deliveryMethods);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRequestsPerRuleRateLimits` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证频率相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRequestsPerRuleRateLimits() throws Exception {
         int notificationRequestsLimit = 10;
         updateDefaultTenantProfileConfig(profileConfiguration -> {
@@ -855,7 +751,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
 
         getWsClient().subscribeForUnreadNotificationsCount().waitForReply();
         getWsClient().registerWaitForUpdate(notificationRequestsLimit);
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < notificationRequestsLimit; i++) {
             String name = "device " + i;
             createDevice(name, name);
@@ -864,7 +759,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         getWsClient().waitForUpdate(true);
         assertThat(getWsClient().getLastCountUpdate().getTotalUnreadCount()).isEqualTo(notificationRequestsLimit);
 
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 0; i < 5; i++) {
             String name = "device " + (notificationRequestsLimit + i);
             createDevice(name, name);
@@ -877,17 +771,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         assertThat(getWsClient().getLastCountUpdate().getTotalUnreadCount()).isEqualTo(notificationRequestsLimit);
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationsDeduplication_newPlatformVersion` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证版本号相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationsDeduplication_newPlatformVersion() throws Exception {
         loginSysAdmin();
         NewPlatformVersionNotificationRuleTriggerConfig triggerConfig = new NewPlatformVersionNotificationRuleTriggerConfig();
@@ -895,7 +784,6 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
         loginTenantAdmin();
 
         assertThat(getMyNotifications(false, 100)).size().isZero();
-        // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
         for (int i = 1; i <= 10; i++) {
             notificationRuleProcessor.process(NewPlatformVersionTrigger.builder()
                     .updateInfo(new UpdateMessage(true, "test", "test",
@@ -916,17 +804,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
                 });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationsDeduplication_exceededRateLimits` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证频率相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationsDeduplication_exceededRateLimits() throws Exception {
         RateLimitsNotificationRuleTriggerConfig triggerConfig = new RateLimitsNotificationRuleTriggerConfig();
         triggerConfig.setApis(Set.of(LimitedApi.ENTITY_EXPORT, LimitedApi.TRANSPORT_MESSAGES_PER_DEVICE));
@@ -988,17 +871,12 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
                 });
     }
 
-    @Test
     /**
-     * 方法说明：
-     * 1. 职责：执行 `testNotificationRuleDisabling` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：验证通知相关场景。
+     * 参数：无。
+     * 返回：无。
      */
+    @Test
     public void testNotificationRuleDisabling() throws Exception {
         EntityActionNotificationRuleTriggerConfig triggerConfig = new EntityActionNotificationRuleTriggerConfig();
         triggerConfig.setEntityTypes(Set.of(EntityType.DEVICE));
@@ -1033,14 +911,11 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkNotificationAfter` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验通知。
+     * 参数：
+     * - `action`：`action` 参数。
+     * - `check`：`check` 参数。
+     * 返回：判断结果。
      */
     private <R> R checkNotificationAfter(Callable<R> action, BiConsumer<Notification, R> check) throws Exception {
         if (getWsClient().getLastDataUpdate() == null) {
@@ -1054,14 +929,11 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `checkNotificationAfter` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：校验通知。
+     * 参数：
+     * - `action`：`action` 参数。
+     * - `check`：`check` 参数。
+     * 返回：无。
      */
     private void checkNotificationAfter(ThrowingRunnable action, Consumer<Notification> check) throws Exception {
         checkNotificationAfter(() -> {
@@ -1075,28 +947,20 @@ public class NotificationRuleApiTest extends AbstractNotificationApiTest {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findNotificationRequests` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取通知。
+     * 参数：
+     * - `originatorType`：类型。
+     * 返回：匹配的数据集合。
      */
     private PageData<NotificationRequestInfo> findNotificationRequests(EntityType originatorType) {
         return notificationRequestService.findNotificationRequestsInfosByTenantIdAndOriginatorType(tenantId, originatorType, new PageLink(100));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createDeviceProfileWithAlarmRules` 对应的业务服务类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建设备配置。
+     * 参数：
+     * - `alarmType`：类型。
+     * 返回：处理结果。
      */
     private DeviceProfile createDeviceProfileWithAlarmRules(String alarmType) {
         DeviceProfile deviceProfile = createDeviceProfile("For notification rule test");

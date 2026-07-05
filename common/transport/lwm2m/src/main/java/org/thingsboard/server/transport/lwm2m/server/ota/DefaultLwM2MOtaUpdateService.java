@@ -79,10 +79,6 @@ import static org.thingsboard.server.transport.lwm2m.server.ota.software.Softwar
 import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.LOG_LWM2M_TELEMETRY;
 import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.convertObjectIdToVersionedId;
 
-@Slf4j
-@Service
-@TbLwM2mTransportComponent
-@RequiredArgsConstructor
 /**
  * 中文说明：
  * 1. 类目的：`DefaultLwM2MOtaUpdateService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -93,6 +89,10 @@ import static org.thingsboard.server.transport.lwm2m.utils.LwM2MTransportUtil.co
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
+@Service
+@TbLwM2mTransportComponent
+@RequiredArgsConstructor
 public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService implements LwM2MOtaUpdateService {
 
     public static final String FIRMWARE_VERSION = getAttributeKey(OtaPackageType.FIRMWARE, OtaPackageKey.VERSION);
@@ -105,52 +105,27 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     public static final String SOFTWARE_URL = getAttributeKey(OtaPackageType.SOFTWARE, OtaPackageKey.URL);
 
     /**
-     * 字段说明：
-     * 1. 保存 `FIRMWARE_UPDATE_COAP_RESOURCE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `FIRMWARE_UPDATE_COAP_RESOURCE`常量，用于统一引用固定值。
      */
     public static final String FIRMWARE_UPDATE_COAP_RESOURCE = "tbfw";
     public static final String SOFTWARE_UPDATE_COAP_RESOURCE = "tbsw";
     /**
-     * 字段说明：
-     * 1. 保存 `FW_PACKAGE_5_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `FW_PACKAGE_5_ID`常量，用于统一引用固定值。
      */
     private static final String FW_PACKAGE_5_ID = "/5/0/0";
     private static final String FW_PACKAGE_19_ID = "/19/0/0";
     /**
-     * 字段说明：
-     * 1. 保存 `FW_URL_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * URL 地址常量，用于统一引用固定值。
      */
     private static final String FW_URL_ID = "/5/0/1";
     private static final String FW_EXECUTE_ID = "/5/0/2";
     /**
-     * 字段说明：
-     * 1. 保存 `FW_STATE_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 状态常量，用于统一引用固定值。
      */
     public static final String FW_STATE_ID = "/5/0/3";
     public static final String FW_RESULT_ID = "/5/0/5";
     /**
-     * 字段说明：
-     * 1. 保存 `FW_NAME_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 名称常量，用于统一引用固定值。
      */
     public static final String FW_NAME_ID = "/5/0/6";
     public static final String FW_VER_ID = "/5/0/7";
@@ -159,63 +134,33 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
      * Revision:BC68JAR01A10
      */
     /**
-     * 字段说明：
-     * 1. 保存 `FW_3_VER_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `FW_3_VER_ID`常量，用于统一引用固定值。
      */
     public static final String FW_3_VER_ID = "/3/0/3";
     public static final String FW_DELIVERY_METHOD = "/5/0/9";
 
     /**
-     * 字段说明：
-     * 1. 保存 `SW_3_VER_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `SW_3_VER_ID`常量，用于统一引用固定值。
      */
     public static final String SW_3_VER_ID = "/3/0/19";
 
     /**
-     * 字段说明：
-     * 1. 保存 `SW_NAME_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 名称常量，用于统一引用固定值。
      */
     public static final String SW_NAME_ID = "/9/0/0";
     public static final String SW_VER_ID = "/9/0/1";
     /**
-     * 字段说明：
-     * 1. 保存 `SW_PACKAGE_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `SW_PACKAGE_ID`常量，用于统一引用固定值。
      */
     public static final String SW_PACKAGE_ID = "/9/0/2";
     public static final String SW_PACKAGE_URI_ID = "/9/0/3";
     /**
-     * 字段说明：
-     * 1. 保存 `SW_INSTALL_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `SW_INSTALL_ID`常量，用于统一引用固定值。
      */
     public static final String SW_INSTALL_ID = "/9/0/4";
     public static final String SW_STATE_ID = "/9/0/7";
     /**
-     * 字段说明：
-     * 1. 保存 `SW_RESULT_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `SW_RESULT_ID`常量，用于统一引用固定值。
      */
     public static final String SW_RESULT_ID = "/9/0/9";
     public static final String SW_UN_INSTALL_ID = "/9/0/6";
@@ -224,146 +169,91 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     private final Map<String, LwM2MClientSwOtaInfo> swStates = new ConcurrentHashMap<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `transportService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final TransportService transportService;
     private final LwM2mClientContext clientContext;
     /**
-     * 字段说明：
-     * 1. 保存 `config` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置，保存当前对象的配置选项。
      */
     private final LwM2MTransportServerConfig config;
     private final LwM2mUplinkMsgHandler uplinkHandler;
     /**
-     * 字段说明：
-     * 1. 保存 `downlinkHandler` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 处理器，负责处理对应任务或消息。
      */
     private final LwM2mDownlinkMsgHandler downlinkHandler;
     private final OtaPackageDataCache otaPackageDataCache;
     /**
-     * 字段说明：
-     * 1. 保存 `logService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 服务，提供当前类调用的业务操作。
      */
     private final LwM2MTelemetryLogService logService;
     private final LwM2mTransportServerHelper helper;
     /**
-     * 字段说明：
-     * 1. 保存 `otaInfoStore` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 信息对象，表示当前对象的对应属性。
      */
     private final TbLwM2MClientOtaInfoStore otaInfoStore;
 
+    /**
+     * 服务，提供当前类调用的业务操作。
+     */
     @Autowired
     @Lazy
-    /**
-     * 字段说明：
-     * 1. 保存 `attributesService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private LwM2MAttributesService attributesService;
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() {
         super.init();
     }
 
-    @PreDestroy
     /**
-     * 方法说明：
-     * 1. 职责：执行 `destroy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PreDestroy
     public void destroy() {
         log.trace("Destroying {}", getClass().getSimpleName());
         super.destroy();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getExecutorSize` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取执行器。
+     * 参数：无。
+     * 返回：数值结果。
      */
+    @Override
     protected int getExecutorSize() {
         return config.getOtaPoolSize();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getExecutorName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取名称。
+     * 参数：无。
+     * 返回：文本结果。
      */
+    @Override
     protected String getExecutorName() {
         return "LwM2M OTA";
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：无。
      */
+    @Override
     public void init(LwM2mClient client) {
         //TODO: add locks by client fwInfo.
         //TODO: check that the client supports FW and SW by checking the supported objects in the model.
         List<String> attributesToFetch = new ArrayList<>();
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (fwInfo.isSupported()) {
             attributesToFetch.add(FIRMWARE_TITLE);
             attributesToFetch.add(FIRMWARE_VERSION);
@@ -372,7 +262,6 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         }
 
         LwM2MClientSwOtaInfo swInfo = getOrInitSwInfo(client);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (swInfo.isSupported()) {
             attributesToFetch.add(SOFTWARE_TITLE);
             attributesToFetch.add(SOFTWARE_VERSION);
@@ -384,36 +273,28 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         initFwStrategy(client, clientSettings);
         initSwStrategy(client, clientSettings);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!attributesToFetch.isEmpty()) {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             var future = attributesService.getSharedAttributes(client, attributesToFetch);
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             DonAsynchron.withCallback(future, attrs -> {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (fwInfo.isSupported()) {
                     Optional<String> newFwTitle = getAttributeValue(attrs, FIRMWARE_TITLE);
                     Optional<String> newFwVersion = getAttributeValue(attrs, FIRMWARE_VERSION);
                     Optional<String> newFwTag = getAttributeValue(attrs, FIRMWARE_TAG);
                     Optional<String> newFwUrl = getAttributeValue(attrs, FIRMWARE_URL);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (newFwTitle.isPresent() && newFwVersion.isPresent() && !isOtaDownloading(client) && !UPDATING.equals(fwInfo.status)) {
                         onTargetFirmwareUpdate(client, newFwTitle.get(), newFwVersion.get(), newFwUrl, newFwTag);
                     }
                 }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (swInfo.isSupported()) {
                     Optional<String> newSwTitle = getAttributeValue(attrs, SOFTWARE_TITLE);
                     Optional<String> newSwVersion = getAttributeValue(attrs, SOFTWARE_VERSION);
                     Optional<String> newSwTag = getAttributeValue(attrs, SOFTWARE_TAG);
                     Optional<String> newSwUrl = getAttributeValue(attrs, SOFTWARE_URL);
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (newSwTitle.isPresent() && newSwVersion.isPresent()) {
                         onTargetSoftwareUpdate(client, newSwTitle.get(), newSwVersion.get(), newSwUrl, newSwTag);
                     }
                 }
             }, throwable -> {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (fwInfo.isSupported()) {
                     update(fwInfo);
                 }
@@ -421,17 +302,13 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `forceFirmwareUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `forceFirmwareUpdate` 对应的处理。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：无。
      */
+    @Override
     public void forceFirmwareUpdate(LwM2mClient client) {
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
         fwInfo.setRetryAttempts(0);
@@ -439,17 +316,17 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         startFirmwareUpdateIfNeeded(client, fwInfo);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onTargetFirmwareUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理目标对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `newFirmwareTitle`：`newFirmwareTitle` 参数。
+     * - `newFirmwareVersion`：`newFirmwareVersion` 参数。
+     * - `newFirmwareUrl`：`newFirmwareUrl` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void onTargetFirmwareUpdate(LwM2mClient client, String newFirmwareTitle, String newFirmwareVersion, Optional<String> newFirmwareUrl, Optional<String> newFirmwareTag) {
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
         fwInfo.updateTarget(newFirmwareTitle, newFirmwareVersion, newFirmwareUrl, newFirmwareTag);
@@ -457,63 +334,51 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         startFirmwareUpdateIfNeeded(client, fwInfo);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentFirmwareNameUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理名称。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `name`：名称。
+     * 返回：无。
      */
+    @Override
     public void onCurrentFirmwareNameUpdate(LwM2mClient client, String name) {
         log.debug("[{}] Current fw name: {}", client.getEndpoint(), name);
         getOrInitFwInfo(client).setCurrentName(name);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentSoftwareNameUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理名称。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `name`：名称。
+     * 返回：无。
      */
+    @Override
     public void onCurrentSoftwareNameUpdate(LwM2mClient client, String name) {
         log.debug("[{}] Current sw name: {}", client.getEndpoint(), name);
         getOrInitSwInfo(client).setCurrentName(name);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onFirmwareStrategyUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理策略对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void onFirmwareStrategyUpdate(LwM2mClient client, OtherConfiguration configuration) {
         log.debug("[{}] Current fw strategy: {}", client.getEndpoint(), configuration.getFwUpdateStrategy());
         startFirmwareUpdateIfNeeded(client, initFwStrategy(client, configuration));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initFwStrategy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动策略对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `configuration`：配置对象。
+     * 返回：处理结果。
      */
     private LwM2MClientFwOtaInfo initFwStrategy(LwM2mClient client, OtherConfiguration configuration) {
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
@@ -522,31 +387,25 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         return fwInfo;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentSoftwareStrategyUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理策略对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void onCurrentSoftwareStrategyUpdate(LwM2mClient client, OtherConfiguration configuration) {
         log.debug("[{}] Current sw strategy: {}", client.getEndpoint(), configuration.getSwUpdateStrategy());
         startSoftwareUpdateIfNeeded(client, initSwStrategy(client, configuration));
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `initSwStrategy` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动策略对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `configuration`：配置对象。
+     * 返回：处理结果。
      */
     private LwM2MClientSwOtaInfo initSwStrategy(LwM2mClient client, OtherConfiguration configuration) {
         LwM2MClientSwOtaInfo swInfo = getOrInitSwInfo(client);
@@ -555,63 +414,52 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         return swInfo;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentFirmwareVersion3Update` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Current Firmware Version3 Update`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `version`：`version` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentFirmwareVersion3Update(LwM2mClient client, String version) {
         log.debug("[{}] Current fw version(3): {}", client.getEndpoint(), version);
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
         fwInfo.setCurrentVersion3(version);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentFirmwareVersionUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理版本号。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `version`：`version` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentFirmwareVersionUpdate(LwM2mClient client, String version) {
         log.debug("[{}] Current fw version(5): {}", client.getEndpoint(), version);
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
         fwInfo.setCurrentVersion(version);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentFirmwareStateUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理状态。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `stateCode`：`stateCode` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentFirmwareStateUpdate(LwM2mClient client, Long stateCode) {
         log.debug("[{}] Current fw state: {}", client.getEndpoint(), stateCode);
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
         FirmwareUpdateState state = FirmwareUpdateState.fromStateFwByCode(stateCode.intValue());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (FirmwareUpdateState.DOWNLOADED.equals(state)) {
             executeFwUpdate(client);
         }
         fwInfo.setUpdateState(state);
         Optional<OtaPackageUpdateStatus> status = toOtaPackageUpdateStatus(state);
 
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (FirmwareUpdateState.IDLE.equals(state) && DOWNLOADING.equals(fwInfo.getStatus())) {
             fwInfo.setFailedPackageId(fwInfo.getTargetPackageId());
             status = Optional.of(FAILED);
@@ -625,17 +473,14 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         update(fwInfo);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentFirmwareResultUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Current Firmware Result Update`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `code`：`code` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentFirmwareResultUpdate(LwM2mClient client, Long code) {
         log.debug("[{}] Current fw result: {}", client.getEndpoint(), code);
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
@@ -664,66 +509,54 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         update(fwInfo);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentFirmwareDeliveryMethodUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Current Firmware Delivery Method Update`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `value`：值。
+     * 返回：无。
      */
+    @Override
     public void onCurrentFirmwareDeliveryMethodUpdate(LwM2mClient client, Long value) {
         log.debug("[{}] Current fw delivery method: {}", client.getEndpoint(), value);
         LwM2MClientFwOtaInfo fwInfo = getOrInitFwInfo(client);
         fwInfo.setDeliveryMethod(value.intValue());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentSoftwareVersion3Update` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Current Software Version3 Update`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `version`：`version` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentSoftwareVersion3Update(LwM2mClient client, String version) {
         log.debug("[{}] Current sw version(3): {}", client.getEndpoint(), version);
         getOrInitSwInfo(client).setCurrentVersion3(version);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentSoftwareVersionUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理版本号。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `version`：`version` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentSoftwareVersionUpdate(LwM2mClient client, String version) {
         log.debug("[{}] Current sw version(9): {}", client.getEndpoint(), version);
         getOrInitSwInfo(client).setCurrentVersion(version);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentSoftwareStateUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理状态。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `stateCode`：`stateCode` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentSoftwareStateUpdate(LwM2mClient client, Long stateCode) {
         log.debug("[{}] Current sw state: {}", client.getEndpoint(), stateCode);
         LwM2MClientSwOtaInfo swInfo = getOrInitSwInfo(client);
@@ -741,17 +574,14 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onCurrentSoftwareResultUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`on Current Software Result Update`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `code`：`code` 参数。
+     * 返回：无。
      */
+    @Override
     public void onCurrentSoftwareResultUpdate(LwM2mClient client, Long code) {
         log.debug("[{}] Current sw result: {}", client.getEndpoint(), code);
         LwM2MClientSwOtaInfo swInfo = getOrInitSwInfo(client);
@@ -768,17 +598,17 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         update(swInfo);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `onTargetSoftwareUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理目标对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `newSoftwareTitle`：`newSoftwareTitle` 参数。
+     * - `newSoftwareVersion`：`newSoftwareVersion` 参数。
+     * - `newSoftwareUrl`：`newSoftwareUrl` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：无。
      */
+    @Override
     public void onTargetSoftwareUpdate(LwM2mClient client, String newSoftwareTitle, String newSoftwareVersion, Optional<String> newSoftwareUrl, Optional<String> newSoftwareTag) {
         LwM2MClientSwOtaInfo fwInfo = getOrInitSwInfo(client);
         fwInfo.updateTarget(newSoftwareTitle, newSoftwareVersion, newSoftwareUrl, newSoftwareTag);
@@ -786,17 +616,13 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
         startSoftwareUpdateIfNeeded(client, fwInfo);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isOtaDownloading` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Ota Downloading`。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：判断结果。
      */
+    @Override
     public boolean isOtaDownloading(LwM2mClient client) {
         String endpoint = client.getEndpoint();
         LwM2MClientFwOtaInfo fwInfo = fwStates.get(endpoint);
@@ -813,14 +639,11 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startFirmwareUpdateIfNeeded` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Firmware Update If Needed`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `fwInfo`：`fwInfo` 参数。
+     * 返回：无。
      */
     private void startFirmwareUpdateIfNeeded(LwM2mClient client, LwM2MClientFwOtaInfo fwInfo) {
         try {
@@ -846,14 +669,11 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startSoftwareUpdateIfNeeded` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Software Update If Needed`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `swInfo`：`swInfo` 参数。
+     * 返回：无。
      */
     private void startSoftwareUpdateIfNeeded(LwM2mClient client, LwM2MClientSwOtaInfo swInfo) {
         try {
@@ -884,14 +704,11 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startUpdateUsingBinary` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Update Using Binary`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `swInfo`：`swInfo` 参数。
+     * 返回：无。
      */
     public void startUpdateUsingBinary(LwM2mClient client, LwM2MClientSwOtaInfo swInfo) {
         this.transportService.process(client.getSession(), createOtaPackageRequestMsg(client.getSession(), swInfo.getType().name()),
@@ -909,14 +726,12 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startUpdateUsingUrl` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动URL 地址。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `id`：`id`ID。
+     * - `url`：`url` 参数。
+     * 返回：无。
      */
     private void startUpdateUsingUrl(LwM2mClient client, String id, String url) {
         String targetIdVer = convertObjectIdToVersionedId(id, client.getRegistration());
@@ -925,14 +740,11 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startUpdateUsingBinary` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Update Using Binary`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `fwInfo`：`fwInfo` 参数。
+     * 返回：无。
      */
     public void startUpdateUsingBinary(LwM2mClient client, LwM2MClientFwOtaInfo fwInfo) {
         this.transportService.process(client.getSession(), createOtaPackageRequestMsg(client.getSession(), fwInfo.getType().name()),
@@ -950,14 +762,12 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doUpdateFirmwareUsingBinary` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doUpdateFirmwareUsingBinary` 对应的处理。
+     * 参数：
+     * - `response`：响应对象。
+     * - `info`：`info` 参数。
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     private void doUpdateFirmwareUsingBinary(TransportProtos.GetOtaPackageResponseMsg response, LwM2MClientFwOtaInfo info, LwM2mClient client) {
         if (TransportProtos.ResponseStatus.SUCCESS.equals(response.getResponseStatus())) {
@@ -987,14 +797,12 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doUpdateSoftwareUsingBinary` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doUpdateSoftwareUsingBinary` 对应的处理。
+     * 参数：
+     * - `response`：响应对象。
+     * - `info`：`info` 参数。
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     private void doUpdateSoftwareUsingBinary(TransportProtos.GetOtaPackageResponseMsg response, LwM2MClientSwOtaInfo info, LwM2mClient client) {
         if (TransportProtos.ResponseStatus.SUCCESS.equals(response.getResponseStatus())) {
@@ -1016,14 +824,12 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `startUpdateUsingBinary` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：初始化或启动`Update Using Binary`。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `versionedId`：`versionedId`ID。
+     * - `otaPackageId`：`otaPackageId`ID。
+     * 返回：无。
      */
     private void startUpdateUsingBinary(LwM2mClient client, String versionedId, UUID otaPackageId) {
         byte[] firmwareChunk = otaPackageDataCache.get(otaPackageId.toString(), 0, 0);
@@ -1034,14 +840,11 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createOtaPackageRequestMsg` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建消息。
+     * 参数：
+     * - `sessionInfo`：会话对象。
+     * - `nameFwSW`：名称。
+     * 返回：处理结果。
      */
     private TransportProtos.GetOtaPackageRequestMsg createOtaPackageRequestMsg(TransportProtos.SessionInfoProto sessionInfo, String nameFwSW) {
         return TransportProtos.GetOtaPackageRequestMsg.newBuilder()
@@ -1054,14 +857,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeFwUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Fw Update`。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     private void executeFwUpdate(LwM2mClient client) {
         TbLwM2MExecuteRequest request = TbLwM2MExecuteRequest.builder().versionedId(FW_EXECUTE_ID).timeout(clientContext.getRequestTimeout(client)).build();
@@ -1069,14 +868,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeSwInstall` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Sw Install`。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     private void executeSwInstall(LwM2mClient client) {
         TbLwM2MExecuteRequest request = TbLwM2MExecuteRequest.builder().versionedId(SW_INSTALL_ID).timeout(clientContext.getRequestTimeout(client)).build();
@@ -1084,14 +879,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `executeSwUninstallForUpdate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行`Sw Uninstall For Update`。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：无。
      */
     private void executeSwUninstallForUpdate(LwM2mClient client) {
         TbLwM2MExecuteRequest request = TbLwM2MExecuteRequest.builder().versionedId(SW_UN_INSTALL_ID).params("1").timeout(clientContext.getRequestTimeout(client)).build();
@@ -1099,14 +890,11 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAttributeValue` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取属性。
+     * 参数：
+     * - `attrs`：数据列表。
+     * - `keyName`：名称。
+     * 返回：可能存在的结果。
      */
     private Optional<String> getAttributeValue(List<TransportProtos.TsKvProto> attrs, String keyName) {
         for (TransportProtos.TsKvProto attr : attrs) {
@@ -1122,14 +910,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrInitFwInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取信息对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：处理结果。
      */
     private LwM2MClientFwOtaInfo getOrInitFwInfo(LwM2mClient client) {
         return this.fwStates.computeIfAbsent(client.getEndpoint(), endpoint -> {
@@ -1145,14 +929,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOrInitSwInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取信息对象。
+     * 参数：
+     * - `client`：客户端对象。
+     * 返回：处理结果。
      */
     private LwM2MClientSwOtaInfo getOrInitSwInfo(LwM2mClient client) {
         return this.swStates.computeIfAbsent(client.getEndpoint(), endpoint -> {
@@ -1168,42 +948,33 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `update` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `update` 对应的处理。
+     * 参数：
+     * - `info`：`info` 参数。
+     * 返回：无。
      */
     private void update(LwM2MClientFwOtaInfo info) {
         otaInfoStore.putFw(info);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `update` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `update` 对应的处理。
+     * 参数：
+     * - `info`：`info` 参数。
+     * 返回：无。
      */
     private void update(LwM2MClientSwOtaInfo info) {
         otaInfoStore.putSw(info);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `sendStateUpdateToTelemetry` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交遥测。
+     * 参数：
+     * - `client`：客户端对象。
+     * - `fwInfo`：`fwInfo` 参数。
+     * - `status`：`status` 参数。
+     * - `log`：`log` 参数。
+     * 返回：无。
      */
     private void sendStateUpdateToTelemetry(LwM2mClient client, LwM2MClientOtaInfo<?, ?, ?> fwInfo, OtaPackageUpdateStatus status, String log) {
         List<TransportProtos.KeyValueProto> result = new ArrayList<>();
@@ -1217,14 +988,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOtaPackageUpdateStatus` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toOtaPackageUpdateStatus` 对应的处理。
+     * 参数：
+     * - `fwUpdateResult`：`fwUpdateResult` 参数。
+     * 返回：可能存在的结果。
      */
     private static Optional<OtaPackageUpdateStatus> toOtaPackageUpdateStatus(FirmwareUpdateResult fwUpdateResult) {
         switch (fwUpdateResult) {
@@ -1247,14 +1014,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOtaPackageUpdateStatus` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toOtaPackageUpdateStatus` 对应的处理。
+     * 参数：
+     * - `firmwareUpdateState`：`firmwareUpdateState` 参数。
+     * 返回：可能存在的结果。
      */
     private static Optional<OtaPackageUpdateStatus> toOtaPackageUpdateStatus(FirmwareUpdateState firmwareUpdateState) {
         switch (firmwareUpdateState) {
@@ -1272,14 +1035,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOtaPackageUpdateStatus` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toOtaPackageUpdateStatus` 对应的处理。
+     * 参数：
+     * - `swUpdateState`：`swUpdateState` 参数。
+     * 返回：可能存在的结果。
      */
     private static Optional<OtaPackageUpdateStatus> toOtaPackageUpdateStatus(SoftwareUpdateState swUpdateState) {
         switch (swUpdateState) {
@@ -1303,14 +1062,10 @@ public class DefaultLwM2MOtaUpdateService extends LwM2MExecutorAwareService impl
      * DOWNLOADING, DOWNLOADED, VERIFIED, UPDATING, UPDATED, FAILED
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toOtaPackageUpdateStatus` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toOtaPackageUpdateStatus` 对应的处理。
+     * 参数：
+     * - `softwareUpdateResult`：`softwareUpdateResult` 参数。
+     * 返回：可能存在的结果。
      */
     public static Optional<OtaPackageUpdateStatus> toOtaPackageUpdateStatus(SoftwareUpdateResult softwareUpdateResult) {
         switch (softwareUpdateResult) {

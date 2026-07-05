@@ -28,15 +28,9 @@ package org.thingsboard.rule.engine.api;
 public interface NodeConfiguration<T extends NodeConfiguration> {
 
     /**
-     * 中文说明：
-     * 1. 方法职责：返回当前配置类型的默认配置实例。
-     * 2. 输入参数：无。
-     * 3. 返回值：类型参数 T 对应的默认配置对象。
-     * 4. 调用时机：Rule Engine 构建节点定义、初始化节点配置或 UI 需要默认 JSON 时调用。
-     * 5. 调用方：节点定义扫描、规则节点配置转换和管理端配置渲染流程。
-     * 6. 使用流程：被 Rule Engine 节点配置生命周期使用。
-     * 7. 线程安全：接口不保存状态；线程安全取决于实现类是否返回共享可变对象，推荐返回新实例。
-     * 8. 事务/缓存/MQTT/Actor/数据库/Rule Engine：不直接涉及事务、缓存、MQTT、Actor 通信和数据库；直接涉及 Rule Engine。
+     * 功能：执行 `defaultConfiguration` 对应的处理。
+     * 参数：无。
+     * 返回：处理结果。
      */
     T defaultConfiguration();
 

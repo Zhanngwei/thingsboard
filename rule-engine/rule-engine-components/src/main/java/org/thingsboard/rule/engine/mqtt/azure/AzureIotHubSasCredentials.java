@@ -28,23 +28,22 @@ import org.thingsboard.rule.engine.credentials.CredentialsType;
 
 import java.security.Security;
 
+/**
+ * `AzureIotHubSasCredentials` 类，封装当前模块中的一组相关职责。
+ */
 @Data
 @Slf4j
 @JsonIgnoreProperties(ignoreUnknown = true)
-/**
- * Azure IoT Hub SAS 凭据模型，继承 PEM 证书凭据并补充 SAS Key。
- * 本类只负责凭据和 TLS 上下文构造，不直接发布 MQTT 消息、不管理 Rule Engine 消息确认。
- */
 public class AzureIotHubSasCredentials extends CertPemCredentials {
     /**
-     * 用于生成 Azure IoT Hub SAS Token 的共享访问密钥。
+     * 键，用于定位映射、配置或数据项。
      */
     private String sasKey;
 
     /**
-     * 初始化 Azure IoT Hub 所需的客户端 SSL 上下文。
-     * 本方法本身不直接连接 MQTT Broker；调用方会把返回的 SslContext 写入 MQTT 客户端配置。
-     * 证书默认值来自 Azure 工具类，不直接访问数据库或缓存。
+     * 功能：初始化或启动上下文。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public SslContext initSslContext() {
@@ -64,8 +63,9 @@ public class AzureIotHubSasCredentials extends CertPemCredentials {
     }
 
     /**
-     * 返回 SAS 凭据类型，供 MQTT/Azure 节点选择认证分支。
-     * 本方法不直接涉及外部调用、线程调度或 Rule Engine 消息路由。
+     * 功能：获取类型。
+     * 参数：无。
+     * 返回：处理结果。
      */
     @Override
     public CredentialsType getType() {

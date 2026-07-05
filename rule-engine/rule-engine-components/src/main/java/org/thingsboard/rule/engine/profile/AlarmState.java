@@ -46,66 +46,72 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
 
-@Data
-@Slf4j
 /**
  * 中文说明：`AlarmState` 是告警状态辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
  * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
  */
+@Data
+@Slf4j
 class AlarmState {
 
     /**
-     * 常量字段：定义 `ERROR_MSG`，用于当前规则链消息，本身不触发外部系统调用。
+     * 消息常量，用于统一引用固定值。
      */
     public static final String ERROR_MSG = "Failed to process alarm rule for Device [%s]: %s";
     /**
-     * 字段说明：保存 `deviceProfile`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 设备配置，保存当前对象的配置选项。
      */
     private final ProfileState deviceProfile;
     /**
-     * 字段说明：保存 `originator`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * `originator` 字段，保存当前对象的对应属性。
      */
     private final EntityId originator;
     /**
-     * 字段说明：保存 `alarmDefinition`，表示告警类型、严重级别或详情，供本类方法在规则节点处理流程中使用。
+     * 告警对象，用于描述当前业务场景。
      */
     private DeviceProfileAlarm alarmDefinition;
     /**
-     * 字段说明：保存 `createRulesSortedBySeverityDesc`，表示告警严重级别，供本类方法在规则节点处理流程中使用。
+     * `createRulesSortedBySeverityDesc`列表，用于保存一组待处理对象。
      */
     private volatile List<AlarmRuleState> createRulesSortedBySeverityDesc;
     /**
-     * 字段说明：保存 `clearState`，表示运行状态，供本类方法在规则节点处理流程中使用。
+     * 状态，表示当前对象所处状态。
      */
     private volatile AlarmRuleState clearState;
     /**
-     * 字段说明：保存 `currentAlarm`，表示告警类型、严重级别或详情，供本类方法在规则节点处理流程中使用。
+     * 告警对象，用于描述当前业务场景。
      */
     private volatile Alarm currentAlarm;
     /**
-     * 字段说明：保存 `initialFetchDone`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 当前处理是否已经完成。
      */
     private volatile boolean initialFetchDone;
     /**
-     * 字段说明：保存 `lastMsgMetaData`，表示消息元数据，供本类方法在规则节点处理流程中使用。
+     * 消息，承载当前步骤需要处理的内容。
      */
     private volatile TbMsgMetaData lastMsgMetaData;
     /**
-     * 字段说明：保存 `lastMsgQueueName` 本地缓存、队列或并发状态，用于协调本类处理流程。
+     * 队列名称，用于标识或展示当前对象。
      */
     private volatile String lastMsgQueueName;
     /**
-     * 字段说明：保存 `dataSnapshot`，表示消息体数据，供本类方法在规则节点处理流程中使用。
+     * 数据，保存当前步骤读取或计算得到的内容。
      */
     private volatile DataSnapshot dataSnapshot;
     /**
-     * 字段说明：保存 `dynamicPredicateValueCtx`，表示规则引擎上下文，供本类方法在规则节点处理流程中使用。
+     * 值，保存当前处理得到的具体内容。
      */
     private final DynamicPredicateValueCtx dynamicPredicateValueCtx;
 
     /**
-     * 方法说明：构造 `AlarmState` 实例并初始化必要字段。
-     * 调用边界：构造过程本身不直接参与 Rule Engine 消息投递，不直接发布 MQTT，也不直接开启事务。
+     * 功能：创建 `AlarmState` 实例，并初始化必要字段。
+     * 参数：
+     * - `deviceProfile`：设备信息或设备标识。
+     * - `originator`：`originator` 参数。
+     * - `alarmDefinition`：`alarmDefinition` 参数。
+     * - `alarmState`：`alarmState` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     AlarmState(ProfileState deviceProfile, EntityId originator, DeviceProfileAlarm alarmDefinition, PersistedAlarmState alarmState, DynamicPredicateValueCtx dynamicPredicateValueCtx) {
         this.deviceProfile = deviceProfile;
@@ -115,8 +121,13 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `process` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `data`：待处理数据。
+     * - `update`：`update` 参数。
+     * 返回：判断结果。
      */
     public boolean process(TbContext ctx, TbMsg msg, DataSnapshot data, SnapshotUpdate update) throws ExecutionException, InterruptedException {
         initCurrentAlarm(ctx);
@@ -131,8 +142,11 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `process` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `ts`：时间戳。
+     * 返回：判断结果。
      */
     public boolean process(TbContext ctx, long ts) throws ExecutionException, InterruptedException {
         initCurrentAlarm(ctx);
@@ -144,8 +158,14 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：创建实体、告警、关系或辅助对象，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AlarmService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建`Or Clear Alarms`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `data`：待处理数据。
+     * - `update`：`update` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：判断结果。
      */
     public <T> boolean createOrClearAlarms(TbContext ctx, TbMsg msg, T data, SnapshotUpdate update, BiFunction<AlarmRuleState, T, AlarmEvalResult> evalFunction) {
         boolean stateUpdate = false;
@@ -197,8 +217,11 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：清除告警或本地状态，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：删除或清理告警。
+     * 参数：
+     * - `stateUpdate`：`stateUpdate` 参数。
+     * - `state`：`state` 参数。
+     * 返回：判断结果。
      */
     public boolean clearAlarmState(boolean stateUpdate, AlarmRuleState state) {
         if (state != null) {
@@ -209,8 +232,11 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：校验配置或数据是否满足节点要求，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：校验`Update`。
+     * 参数：
+     * - `update`：`update` 参数。
+     * - `state`：`state` 参数。
+     * 返回：判断结果。
      */
     public boolean validateUpdate(SnapshotUpdate update, AlarmRuleState state) {
         if (update != null) {
@@ -225,12 +251,13 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AlarmService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：初始化或启动告警。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * 返回：无。
      */
     public void initCurrentAlarm(TbContext ctx) {
         if (!initialFetchDone) {
-            // 通过 `TbContext` 暴露的服务层访问数据，具体持久化和缓存由服务实现负责。
             Alarm alarm = ctx.getAlarmService().findLatestActiveByOriginatorAndType(ctx.getTenantId(), originator, alarmDefinition.getAlarmType());
             if (alarm != null && !alarm.getStatus().isCleared()) {
                 currentAlarm = alarm;
@@ -240,8 +267,13 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：执行 `pushMsg` 对应的辅助逻辑，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：发送或提交消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * - `alarmResult`：`alarmResult` 参数。
+     * - `ruleState`：`ruleState` 参数。
+     * 返回：无。
      */
     public void pushMsg(TbContext ctx, TbMsg msg, TbAlarmResult alarmResult, AlarmRuleState ruleState) {
         JsonNode jsonNodes = JacksonUtil.valueToTree(alarmResult.getAlarm());
@@ -265,13 +297,15 @@ class AlarmState {
         setAlarmConditionMetadata(ruleState, metaData);
         TbMsg newMsg = ctx.newMsg(lastMsgQueueName != null ? lastMsgQueueName : null, TbMsgType.ALARM,
                 originator, msg != null ? msg.getCustomerId() : null, metaData, data);
-        // 通过规则引擎上下文安排后续消息投递或自身定时消息。
         ctx.enqueueForTellNext(newMsg, relationType);
     }
 
     /**
-     * 方法说明：写入本地对象字段或构造输出数据，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新告警。
+     * 参数：
+     * - `ruleState`：`ruleState` 参数。
+     * - `metaData`：待处理数据。
+     * 返回：无。
      */
     protected void setAlarmConditionMetadata(AlarmRuleState ruleState, TbMsgMetaData metaData) {
         if (ruleState.getSpec().getType() == AlarmConditionSpecType.REPEATING) {
@@ -283,8 +317,11 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：执行 `updateState` 对应的辅助逻辑，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：更新状态。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * - `alarmState`：`alarmState` 参数。
+     * 返回：无。
      */
     public void updateState(DeviceProfileAlarm alarm, PersistedAlarmState alarmState) {
         this.alarmDefinition = alarm;
@@ -309,8 +346,11 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：执行数学或业务结果计算，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，涉及 `AlarmService`，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `calculateAlarmResult` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `ruleState`：`ruleState` 参数。
+     * 返回：处理结果。
      */
     private TbAlarmResult calculateAlarmResult(TbContext ctx, AlarmRuleState ruleState) {
         AlarmSeverity severity = ruleState.getSeverity();
@@ -357,8 +397,10 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：创建实体、告警、关系或辅助对象，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建`Details`。
+     * 参数：
+     * - `ruleState`：`ruleState` 参数。
+     * 返回：处理结果。
      */
     private JsonNode createDetails(AlarmRuleState ruleState) {
         JsonNode alarmDetails;
@@ -390,8 +432,10 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取值。
+     * 参数：
+     * - `entityKeyValue`：实体对象。
+     * 返回：文本结果。
      */
     private static String getValueAsString(EntityKeyValue entityKeyValue) {
         Object result = null;
@@ -416,8 +460,11 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理告警。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `alarmNf`：`alarmNf` 参数。
+     * 返回：判断结果。
      */
     public boolean processAlarmClear(TbContext ctx, Alarm alarmNf) {
         boolean updated = false;
@@ -431,8 +478,10 @@ class AlarmState {
     }
 
     /**
-     * 方法说明：执行本类核心处理流程，供 `AlarmState` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理告警。
+     * 参数：
+     * - `alarm`：`alarm` 参数。
+     * 返回：无。
      */
     public void processAckAlarm(Alarm alarm) {
         if (currentAlarm != null && currentAlarm.getId().equals(alarm.getId())) {

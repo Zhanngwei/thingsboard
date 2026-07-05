@@ -52,8 +52,6 @@ import java.util.stream.Collectors;
 
 import static org.thingsboard.server.common.data.DataConstants.MAIN_QUEUE_NAME;
 
-@Service
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`HashPartitionService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -64,86 +62,48 @@ import static org.thingsboard.server.common.data.DataConstants.MAIN_QUEUE_NAME;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Service
+@Slf4j
 public class HashPartitionService implements PartitionService {
 
+    /**
+     * 主题，用于匹配或发送对应主题的数据。
+     */
     @Value("${queue.core.topic}")
-    /**
-     * 字段说明：
-     * 1. 保存 `coreTopic` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String coreTopic;
+    /**
+     * `corePartitions` 字段，保存当前对象的对应属性。
+     */
     @Value("${queue.core.partitions:100}")
-    /**
-     * 字段说明：
-     * 1. 保存 `corePartitions` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer corePartitions;
+    /**
+     * 主题，用于匹配或发送对应主题的数据。
+     */
     @Value("${queue.vc.topic:tb_version_control}")
-    /**
-     * 字段说明：
-     * 1. 保存 `vcTopic` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private String vcTopic;
+    /**
+     * `vcPartitions` 字段，保存当前对象的对应属性。
+     */
     @Value("${queue.vc.partitions:10}")
-    /**
-     * 字段说明：
-     * 1. 保存 `vcPartitions` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
-     */
     private Integer vcPartitions;
-    @Value("${queue.partitions.hash_function_name:murmur3_128}")
     /**
-     * 字段说明：
-     * 1. 保存 `hashFunctionName` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 名称，用于标识或展示当前对象。
      */
+    @Value("${queue.partitions.hash_function_name:murmur3_128}")
     private String hashFunctionName;
 
     /**
-     * 字段说明：
-     * 1. 保存 `applicationEventPublisher` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 事件，表示当前对象的对应属性。
      */
     private final ApplicationEventPublisher applicationEventPublisher;
     private final TbServiceInfoProvider serviceInfoProvider;
     /**
-     * 字段说明：
-     * 1. 保存 `tenantRoutingInfoService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 租户，提供当前类调用的业务操作。
      */
     private final TenantRoutingInfoService tenantRoutingInfoService;
     private final QueueRoutingInfoService queueRoutingInfoService;
     /**
-     * 字段说明：
-     * 1. 保存 `topicService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 主题，提供当前类调用的业务操作。
      */
     private final TopicService topicService;
 
@@ -155,36 +115,26 @@ public class HashPartitionService implements PartitionService {
     private final ConcurrentMap<TenantId, TenantRoutingInfo> tenantRoutingInfoMap = new ConcurrentHashMap<>();
 
     /**
-     * 字段说明：
-     * 1. 保存 `currentOtherServices` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `currentOtherServices`列表，用于保存一组待处理对象。
      */
     private List<ServiceInfo> currentOtherServices;
     private final Map<String, List<ServiceInfo>> tbTransportServicesByType = new HashMap<>();
     private volatile Map<TenantProfileId, List<ServiceInfo>> responsibleServices = Collections.emptyMap();
 
     /**
-     * 字段说明：
-     * 1. 保存 `hashFunction` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `hashFunction` 字段，保存当前对象的对应属性。
      */
     private HashFunction hashFunction;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `HashPartitionService` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `HashPartitionService` 实例，并初始化必要字段。
+     * 参数：
+     * - `serviceInfoProvider`：服务对象。
+     * - `tenantRoutingInfoService`：租户信息或租户标识。
+     * - `applicationEventPublisher`：`applicationEventPublisher` 参数。
+     * - `queueRoutingInfoService`：服务对象。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public HashPartitionService(TbServiceInfoProvider serviceInfoProvider,
                                 TenantRoutingInfoService tenantRoutingInfoService,
@@ -198,17 +148,12 @@ public class HashPartitionService implements PartitionService {
         this.topicService = topicService;
     }
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() {
         this.hashFunction = forName(hashFunctionName);
         QueueKey coreKey = new QueueKey(ServiceType.TB_CORE);
@@ -219,54 +164,38 @@ public class HashPartitionService implements PartitionService {
         partitionSizesMap.put(vcKey, vcPartitions);
         partitionTopicsMap.put(vcKey, vcTopic);
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         if (!isTransport(serviceInfoProvider.getServiceType())) {
             doInitRuleEnginePartitions();
         }
     }
 
-    @AfterStartUp(order = AfterStartUp.QUEUE_INFO_INITIALIZATION)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `partitionsInit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `partitionsInit` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @AfterStartUp(order = AfterStartUp.QUEUE_INFO_INITIALIZATION)
     public void partitionsInit() {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         if (isTransport(serviceInfoProvider.getServiceType())) {
             doInitRuleEnginePartitions();
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getMyPartitions` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`My Partitions`。
+     * 参数：
+     * - `queueKey`：队列名称或队列对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<Integer> getMyPartitions(QueueKey queueKey) {
         return myPartitions.get(queueKey);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doInitRuleEnginePartitions` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doInitRuleEnginePartitions` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
     private void doInitRuleEnginePartitions() {
         List<QueueRoutingInfo> queueRoutingInfoList = getQueueRoutingInfos();
@@ -278,39 +207,29 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getQueueRoutingInfos` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取队列。
+     * 参数：无。
+     * 返回：匹配的数据集合。
      */
     private List<QueueRoutingInfo> getQueueRoutingInfos() {
         List<QueueRoutingInfo> queueRoutingInfoList;
         String serviceType = serviceInfoProvider.getServiceType();
 
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         if (isTransport(serviceType)) {
             //If transport started earlier than tb-core
             int getQueuesRetries = 10;
-            // 循环处理批量实体或消息集合，需关注单项失败对整体流程的影响。
             while (true) {
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (getQueuesRetries > 0) {
                     log.info("Try to get queue routing info.");
                     try {
                         queueRoutingInfoList = queueRoutingInfoService.getAllQueuesRoutingInfo();
                         break;
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (Exception e) {
                         log.info("Failed to get queues routing info: {}!", e.getMessage());
                         getQueuesRetries--;
                     }
                     try {
                         Thread.sleep(10000);
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (InterruptedException e) {
                         log.info("Failed to await queues routing info!", e);
                     }
@@ -325,55 +244,41 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isTransport` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断传输层。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * 返回：判断结果。
      */
     private boolean isTransport(String serviceType) {
         return "tb-transport".equals(serviceType);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `updateQueues` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：更新`Queues`。
+     * 参数：
+     * - `queueUpdateMsgs`：队列名称或队列对象。
+     * 返回：无。
      */
+    @Override
     public void updateQueues(List<TransportProtos.QueueUpdateMsg> queueUpdateMsgs) {
-        // 传输层调用会影响设备会话或协议响应，需要与消息确认语义保持一致。
         for (TransportProtos.QueueUpdateMsg queueUpdateMsg : queueUpdateMsgs) {
             TenantId tenantId = TenantId.fromUUID(new UUID(queueUpdateMsg.getTenantIdMSB(), queueUpdateMsg.getTenantIdLSB()));
             QueueKey queueKey = new QueueKey(ServiceType.TB_RULE_ENGINE, queueUpdateMsg.getQueueName(), tenantId);
             partitionTopicsMap.put(queueKey, queueUpdateMsg.getQueueTopic());
             partitionSizesMap.put(queueKey, queueUpdateMsg.getPartitions());
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (!tenantId.isSysTenantId()) {
                 tenantRoutingInfoMap.remove(tenantId);
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeQueues` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理`Queues`。
+     * 参数：
+     * - `queueDeleteMsgs`：队列名称或队列对象。
+     * 返回：无。
      */
+    @Override
     public void removeQueues(List<TransportProtos.QueueDeleteMsg> queueDeleteMsgs) {
         List<QueueKey> queueKeys = queueDeleteMsgs.stream()
                 .map(queueDeleteMsg -> {
@@ -387,24 +292,19 @@ public class HashPartitionService implements PartitionService {
             partitionSizesMap.remove(queueKey);
             evictTenantInfo(queueKey.getTenantId());
         });
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (serviceInfoProvider.isService(ServiceType.TB_RULE_ENGINE)) {
             publishPartitionChangeEvent(ServiceType.TB_RULE_ENGINE, queueKeys.stream()
                     .collect(Collectors.toMap(k -> k, k -> Collections.emptySet())));
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeTenant` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理租户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
+    @Override
     public void removeTenant(TenantId tenantId) {
         List<QueueKey> queueKeys = partitionSizesMap.keySet().stream()
                 .filter(queueKey -> tenantId.equals(queueKey.getTenantId()))
@@ -417,19 +317,14 @@ public class HashPartitionService implements PartitionService {
         evictTenantInfo(tenantId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isManagedByCurrentService` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断服务。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：判断结果。
      */
+    @Override
     public boolean isManagedByCurrentService(TenantId tenantId) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (serviceInfoProvider.isService(ServiceType.TB_CORE) || !serviceInfoProvider.isService(ServiceType.TB_RULE_ENGINE)) {
             return true;
         }
@@ -437,7 +332,6 @@ public class HashPartitionService implements PartitionService {
         boolean isManaged;
         Set<UUID> assignedTenantProfiles = serviceInfoProvider.getAssignedTenantProfiles();
         boolean isRegular = assignedTenantProfiles.isEmpty();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (tenantId.isSysTenantId()) {
             // All system queues are always processed on regular rule engines.
             return isRegular;
@@ -461,30 +355,25 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hasDedicatedService` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断服务。
+     * 参数：
+     * - `profileId`：配置ID。
+     * 返回：判断结果。
      */
     private boolean hasDedicatedService(TenantProfileId profileId) {
         return CollectionsUtil.isEmpty(responsibleServices.get(profileId));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolve` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resolve` 对应的处理。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * - `queueName`：队列名称或队列对象。
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
+    @Override
     public TopicPartitionInfo resolve(ServiceType serviceType, String queueName, TenantId tenantId, EntityId entityId) {
         TenantId isolatedOrSystemTenantId = getIsolatedOrSystemTenantId(serviceType, tenantId);
         if (queueName == null) {
@@ -505,32 +394,28 @@ public class HashPartitionService implements PartitionService {
         return resolve(queueKey, entityId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolve` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resolve` 对应的处理。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
+    @Override
     public TopicPartitionInfo resolve(ServiceType serviceType, TenantId tenantId, EntityId entityId) {
         return resolve(serviceType, null, tenantId, entityId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isMyPartition` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断分区。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * 返回：判断结果。
      */
+    @Override
     public boolean isMyPartition(ServiceType serviceType, TenantId tenantId, EntityId entityId) {
         try {
             return resolve(serviceType, tenantId, entityId).isMyPartition();
@@ -541,14 +426,11 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolve` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resolve` 对应的处理。
+     * 参数：
+     * - `queueKey`：队列名称或队列对象。
+     * - `entityId`：实体IDID。
+     * 返回：处理结果。
      */
     private TopicPartitionInfo resolve(QueueKey queueKey, EntityId entityId) {
         Integer partitionSize = partitionSizesMap.get(queueKey);
@@ -562,17 +444,14 @@ public class HashPartitionService implements PartitionService {
         return buildTopicPartitionInfo(queueKey, partition);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `recalculatePartitions` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `recalculatePartitions` 对应的处理。
+     * 参数：
+     * - `currentService`：服务对象。
+     * - `otherServices`：服务对象。
+     * 返回：无。
      */
+    @Override
     public synchronized void recalculatePartitions(ServiceInfo currentService, List<ServiceInfo> otherServices) {
         log.info("Recalculating partitions");
         tbTransportServicesByType.clear();
@@ -673,14 +552,11 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `publishPartitionChangeEvent` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：发送或提交分区。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * - `partitionsMap`：分区标识或分区信息。
+     * 返回：无。
      */
     private void publishPartitionChangeEvent(ServiceType serviceType, Map<QueueKey, Set<TopicPartitionInfo>> partitionsMap) {
         log.info("Partitions changed: {}", System.lineSeparator() + partitionsMap.entrySet().stream()
@@ -696,32 +572,24 @@ public class HashPartitionService implements PartitionService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAllServiceIds` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取服务。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Set<String> getAllServiceIds(ServiceType serviceType) {
         return getAllServices(serviceType).stream().map(ServiceInfo::getServiceId).collect(Collectors.toSet());
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getAllServices` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`All Services`。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Set<ServiceInfo> getAllServices(ServiceType serviceType) {
         Set<ServiceInfo> result = getOtherServices(serviceType);
         ServiceInfo current = serviceInfoProvider.getServiceInfo();
@@ -731,17 +599,13 @@ public class HashPartitionService implements PartitionService {
         return result;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getOtherServices` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取`Other Services`。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public Set<ServiceInfo> getOtherServices(ServiceType serviceType) {
         Set<ServiceInfo> result = new HashSet<>();
         if (currentOtherServices != null) {
@@ -755,62 +619,47 @@ public class HashPartitionService implements PartitionService {
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolvePartitionIndex` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resolvePartitionIndex` 对应的处理。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `partitions`：分区标识或分区信息。
+     * 返回：数值结果。
      */
+    @Override
     public int resolvePartitionIndex(UUID entityId, int partitions) {
         int hash = hash(entityId);
         return Math.abs(hash % partitions);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evictTenantInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：删除或清理租户。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：无。
      */
+    @Override
     public void evictTenantInfo(TenantId tenantId) {
         tenantRoutingInfoMap.remove(tenantId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `countTransportsByType` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：统计类型数量。
+     * 参数：
+     * - `type`：类型。
+     * 返回：数值结果。
      */
+    @Override
     public int countTransportsByType(String type) {
         var list = tbTransportServicesByType.get(type);
         return list == null ? 0 : list.size();
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getServiceKeyListMap` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取键。
+     * 参数：
+     * - `services`：服务对象。
+     * 返回：匹配的数据集合。
      */
     private Map<QueueKey, List<ServiceInfo>> getServiceKeyListMap(List<ServiceInfo> services) {
         final Map<QueueKey, List<ServiceInfo>> currentMap = new HashMap<>();
@@ -830,14 +679,11 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `buildTopicPartitionInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：构建主题。
+     * 参数：
+     * - `queueKey`：队列名称或队列对象。
+     * - `partition`：分区标识或分区信息。
+     * 返回：处理结果。
      */
     private TopicPartitionInfo buildTopicPartitionInfo(QueueKey queueKey, int partition) {
         TopicPartitionInfo.TopicPartitionInfoBuilder tpi = TopicPartitionInfo.builder();
@@ -855,14 +701,11 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `isIsolated` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：判断`Isolated`。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * - `tenantId`：租户IDID。
+     * 返回：判断结果。
      */
     private boolean isIsolated(ServiceType serviceType, TenantId tenantId) {
         if (TenantId.SYS_TENANT_ID.equals(tenantId)) {
@@ -881,56 +724,43 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getRoutingInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取信息对象。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * 返回：处理结果。
      */
     private TenantRoutingInfo getRoutingInfo(TenantId tenantId) {
         return tenantRoutingInfoMap.computeIfAbsent(tenantId, tenantRoutingInfoService::getRoutingInfo);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getIsolatedOrSystemTenantId` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：获取租户ID。
+     * 参数：
+     * - `serviceType`：服务对象。
+     * - `tenantId`：租户IDID。
+     * 返回：处理结果。
      */
     private TenantId getIsolatedOrSystemTenantId(ServiceType serviceType, TenantId tenantId) {
         return isIsolated(serviceType, tenantId) ? tenantId : TenantId.SYS_TENANT_ID;
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `logServiceInfo` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `logServiceInfo` 对应的处理。
+     * 参数：
+     * - `server`：`server` 参数。
+     * 返回：无。
      */
     private void logServiceInfo(TransportProtos.ServiceInfo server) {
         log.info("[{}] Found common server: {}", server.getServiceId(), server.getServiceTypesList());
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `addNode` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建节点实例。
+     * 参数：
+     * - `instance`：`instance` 参数。
+     * - `queueServiceList`：服务对象。
+     * - `responsibleServices`：服务对象。
+     * 返回：无。
      */
     private void addNode(ServiceInfo instance, Map<QueueKey, List<ServiceInfo>> queueServiceList, Map<TenantProfileId, List<ServiceInfo>> responsibleServices) {
         for (String serviceTypeStr : instance.getServiceTypesList()) {
@@ -965,14 +795,13 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `resolveByPartitionIdx` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `resolveByPartitionIdx` 对应的处理。
+     * 参数：
+     * - `servers`：数据列表。
+     * - `queueKey`：队列名称或队列对象。
+     * - `partition`：分区标识或分区信息。
+     * - `responsibleServices`：服务对象。
+     * 返回：处理结果。
      */
     protected ServiceInfo resolveByPartitionIdx(List<ServiceInfo> servers, QueueKey queueKey, int partition,
                                                 Map<TenantProfileId, List<ServiceInfo>> responsibleServices) {
@@ -1018,14 +847,10 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `hash` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `hash` 对应的处理。
+     * 参数：
+     * - `key`：键。
+     * 返回：数值结果。
      */
     private int hash(UUID key) {
         return hashFunction.newHasher()
@@ -1035,14 +860,10 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `forName` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `forName` 对应的处理。
+     * 参数：
+     * - `name`：名称。
+     * 返回：处理结果。
      */
     public static HashFunction forName(String name) {
         switch (name) {
@@ -1058,14 +879,10 @@ public class HashPartitionService implements PartitionService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `toServiceIds` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `toServiceIds` 对应的处理。
+     * 参数：
+     * - `serviceInfos`：服务对象。
+     * 返回：匹配的数据集合。
      */
     private List<String> toServiceIds(Collection<ServiceInfo> serviceInfos) {
         return serviceInfos.stream().map(ServiceInfo::getServiceId).collect(Collectors.toList());

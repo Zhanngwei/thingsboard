@@ -53,10 +53,6 @@ import java.util.stream.Collectors;
 
 import static org.thingsboard.server.dao.attributes.AttributeUtils.validate;
 
-@Service
-@ConditionalOnProperty(prefix = "cache.attributes", value = "enabled", havingValue = "true")
-@Primary
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`CachedAttributesService` 是 ThingsBoard DAO 模块 中的DAO 缓存和失效事件类型，用于保存实体、配置、类型或会话相关数据的缓存键、缓存值和跨节点失效事件。
@@ -68,90 +64,57 @@ import static org.thingsboard.server.dao.attributes.AttributeUtils.validate;
  * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
  * 8. 设计模式：主要体现 Cache-Aside / Observer / Value Object。
  */
+@Service
+@ConditionalOnProperty(prefix = "cache.attributes", value = "enabled", havingValue = "true")
+@Primary
+@Slf4j
 public class CachedAttributesService implements AttributesService {
     /**
-     * 字段说明：
-     * 1. 保存 `STATS_NAME` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 名称常量，用于统一引用固定值。
      */
     private static final String STATS_NAME = "attributes.cache";
     public static final String LOCAL_CACHE_TYPE = "caffeine";
 
     /**
-     * 字段说明：
-     * 1. 保存 `attributesDao` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 存取组件，用于读取或保存对应领域对象。
      */
     private final AttributesDao attributesDao;
     private final JpaExecutorService jpaExecutorService;
     /**
-     * 字段说明：
-     * 1. 保存 `cacheExecutorService` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 服务，提供当前类调用的业务操作。
      */
     private final CacheExecutorService cacheExecutorService;
     private final DefaultCounter hitCounter;
     /**
-     * 字段说明：
-     * 1. 保存 `missCounter` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 计数器，用于控制处理规模或位置。
      */
     private final DefaultCounter missCounter;
     private final TbTransactionalCache<AttributeCacheKey, AttributeKvEntry> cache;
     /**
-     * 字段说明：
-     * 1. 保存 `cacheExecutor` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 执行器列表，用于保存一组待处理对象。
      */
     private ListeningExecutorService cacheExecutor;
 
+    /**
+     * 类型，用于区分不同处理分支。
+     */
     @Value("${cache.type:caffeine}")
-    /**
-     * 字段说明：
-     * 1. 保存 `cacheType` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
-     */
     private String cacheType;
-    @Value("${sql.attributes.value_no_xss_validation:false}")
     /**
-     * 字段说明：
-     * 1. 保存 `valueNoXssValidation` 对应的 DAO 依赖、Repository、缓存、配置、上下文或测试状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、数据库查询结果、缓存事件或测试夹具。
-     * 3. 生命周期与持有对象一致：单例 Bean 字段随 Spring 容器存在，查询/测试字段随单次调用或测试用例存在。
-     * 4. 设计为字段是为了复用数据库访问组件、缓存组件或上下文，减少重复查找和跨方法参数传递。
-     * 5. 线程安全取决于字段类型；Repository、DAO Bean 通常由 Spring 管理，可变集合或异步状态需要调用方保证并发边界。
+     * 是否满足值条件。
      */
+    @Value("${sql.attributes.value_no_xss_validation:false}")
     private boolean valueNoXssValidation;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `CachedAttributesService` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：创建 `CachedAttributesService` 实例，并初始化必要字段。
+     * 参数：
+     * - `attributesDao`：`attributesDao` 参数。
+     * - `jpaExecutorService`：服务对象。
+     * - `statsFactory`：`statsFactory` 参数。
+     * - `cacheExecutorService`：服务对象。
+     * - 其余参数：补充处理条件。
+     * 返回：新创建的对象实例。
      */
     public CachedAttributesService(AttributesDao attributesDao,
                                    JpaExecutorService jpaExecutorService,
@@ -160,32 +123,20 @@ public class CachedAttributesService implements AttributesService {
                                    TbTransactionalCache<AttributeCacheKey, AttributeKvEntry> cache) {
         this.attributesDao = attributesDao;
         this.jpaExecutorService = jpaExecutorService;
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         this.cacheExecutorService = cacheExecutorService;
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         this.cache = cache;
 
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         this.hitCounter = statsFactory.createDefaultCounter(STATS_NAME, "result", "hit");
-        // 时序数据读写量大，单独处理时间窗口、分区和聚合可以避免污染普通实体 DAO 流程。
         this.missCounter = statsFactory.createDefaultCounter(STATS_NAME, "result", "miss");
     }
 
-    @PostConstruct
     /**
-     * 方法说明：
-     * 1. 职责：执行 `init` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @PostConstruct
     public void init() {
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         this.cacheExecutor = getExecutor(cacheType, cacheExecutorService);
     }
 
@@ -195,58 +146,41 @@ public class CachedAttributesService implements AttributesService {
      * - for the <b>remote</b> cache: dedicated thread pool for the cache IO calls to unblock any caller thread
      */
     /**
-     * 方法说明：
-     * 1. 职责：执行 `getExecutor` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取执行器。
+     * 参数：
+     * - `cacheType`：类型。
+     * - `cacheExecutorService`：服务对象。
+     * 返回：匹配的数据集合。
      */
     ListeningExecutorService getExecutor(String cacheType, CacheExecutorService cacheExecutorService) {
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         if (StringUtils.isEmpty(cacheType) || LOCAL_CACHE_TYPE.equals(cacheType)) {
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             log.info("Going to use directExecutor for the local cache type {}", cacheType);
             return MoreExecutors.newDirectExecutorService();
         }
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         log.info("Going to use cacheExecutorService for the remote cache type {}", cacheType);
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         return cacheExecutorService.executor();
     }
 
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `find` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `find` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributeKey`：键。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<Optional<AttributeKvEntry>> find(TenantId tenantId, EntityId entityId, String scope, String attributeKey) {
         validate(entityId, scope);
         Validator.validateString(attributeKey, "Incorrect attribute key " + attributeKey);
 
-        // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
         return cacheExecutor.submit(() -> {
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             AttributeCacheKey attributeCacheKey = new AttributeCacheKey(scope, entityId, attributeKey);
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             TbCacheValueWrapper<AttributeKvEntry> cachedAttributeValue = cache.get(attributeCacheKey);
-            // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
             if (cachedAttributeValue != null) {
                 hitCounter.increment();
-                // 缓存读写或失效用于降低重复数据库访问成本，必须和实体变更顺序保持一致。
                 AttributeKvEntry cachedAttributeKvEntry = cachedAttributeValue.get();
                 return Optional.ofNullable(cachedAttributeKvEntry);
             } else {
@@ -266,19 +200,16 @@ public class CachedAttributesService implements AttributesService {
         });
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `find` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `find` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributeKeysNonUnique`：键。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<AttributeKvEntry>> find(TenantId tenantId, EntityId entityId, String scope, final Collection<String> attributeKeysNonUnique) {
         validate(entityId, scope);
         final var attributeKeys = new LinkedHashSet<>(attributeKeysNonUnique); // deduplicate the attributes
@@ -332,16 +263,12 @@ public class CachedAttributesService implements AttributesService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findCachedAttributes` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`Cached Attributes`。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributeKeys`：键。
+     * 返回：处理结果。
      */
     private Map<String, TbCacheValueWrapper<AttributeKvEntry>> findCachedAttributes(EntityId entityId, String scope, Collection<String> attributeKeys) {
         Map<String, TbCacheValueWrapper<AttributeKvEntry>> cachedAttributes = new HashMap<>();
@@ -357,72 +284,56 @@ public class CachedAttributesService implements AttributesService {
         return cachedAttributes;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAll` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取`All`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<AttributeKvEntry>> findAll(TenantId tenantId, EntityId entityId, String scope) {
         validate(entityId, scope);
         // We can`t watch on cache because the keys are unknown.
         return jpaExecutorService.submit(() -> attributesDao.findAll(tenantId, entityId, scope));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAllKeysByDeviceProfileId` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取设备配置。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `deviceProfileId`：设备配置ID。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<String> findAllKeysByDeviceProfileId(TenantId tenantId, DeviceProfileId deviceProfileId) {
         return attributesDao.findAllKeysByDeviceProfileId(tenantId, deviceProfileId);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAllKeysByEntityIds` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityType`：实体对象。
+     * - `entityIds`：实体对象。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<String> findAllKeysByEntityIds(TenantId tenantId, EntityType entityType, List<EntityId> entityIds) {
         return attributesDao.findAllKeysByEntityIds(tenantId, entityType, entityIds);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `findAllKeysByEntityIds` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：获取实体。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityType`：实体对象。
+     * - `entityIds`：实体对象。
+     * - `scope`：`scope` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public List<String> findAllKeysByEntityIds(TenantId tenantId, EntityType entityType, List<EntityId> entityIds, String scope) {
         if (StringUtils.isEmpty(scope)) {
             return attributesDao.findAllKeysByEntityIds(tenantId, entityType, entityIds);
@@ -431,19 +342,16 @@ public class CachedAttributesService implements AttributesService {
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attribute`：`attribute` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<String> save(TenantId tenantId, EntityId entityId, String scope, AttributeKvEntry attribute) {
         validate(entityId, scope);
         AttributeUtils.validate(attribute, valueNoXssValidation);
@@ -451,19 +359,16 @@ public class CachedAttributesService implements AttributesService {
         return Futures.transform(future, key -> evict(entityId, scope, attribute, key), cacheExecutor);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `save` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributes`：数据列表。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<String>> save(TenantId tenantId, EntityId entityId, String scope, List<AttributeKvEntry> attributes) {
         validate(entityId, scope);
         AttributeUtils.validate(attributes, valueNoXssValidation);
@@ -478,16 +383,13 @@ public class CachedAttributesService implements AttributesService {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `evict` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：执行 `evict` 对应的处理。
+     * 参数：
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attribute`：`attribute` 参数。
+     * - `key`：键。
+     * 返回：文本结果。
      */
     private String evict(EntityId entityId, String scope, AttributeKvEntry attribute, String key) {
         log.trace("[{}][{}][{}] Before cache evict: {}", entityId, scope, key, attribute);
@@ -496,19 +398,16 @@ public class CachedAttributesService implements AttributesService {
         return key;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `removeAll` 对应的DAO 缓存和失效事件类型流程，完成参数校验、作用域判断、缓存处理、数据库访问或测试断言。
-     * 2. 参数：输入参数通常代表租户、客户、实体标识、查询条件、分页信息、领域 DTO、回调句柄或测试数据。
-     * 3. 返回值：返回持久化实体、DTO、分页结果、异步句柄、布尔状态或 `void`；`void` 方法通常通过数据库副作用、缓存失效、事件或断言表达结果。
-     * 4. 调用时机：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播时，由 Application 服务、DAO Service、Repository、定时任务、Rule Engine 相关服务或测试框架调用。
-     * 5. 使用流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
-     * 6. 线程安全：方法本身不额外声明线程安全；单例 DAO 依赖 Spring、数据库连接池、事务管理器和不可变参数约束并发行为。
-     * 7. 事务：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；有 `@Transactional` 或服务层事务时参与同一事务，否则按底层 DAO/Repository 调用语义执行。
-     * 8. 缓存：是否涉及缓存取决于方法体中的 cache、evict、Redis、Caffeine 或缓存服务调用。
-     * 9. MQTT/Actor/数据库/Rule Engine：方法通常直接涉及数据库，通常不直接处理 MQTT/Actor；设备、遥测、属性或规则链数据会被 Transport、Actor 和 Rule Engine 间接使用。
+     * 功能：删除或清理`All`。
+     * 参数：
+     * - `tenantId`：租户IDID。
+     * - `entityId`：实体IDID。
+     * - `scope`：`scope` 参数。
+     * - `attributeKeys`：键。
+     * 返回：匹配的数据集合。
      */
+    @Override
     public ListenableFuture<List<String>> removeAll(TenantId tenantId, EntityId entityId, String scope, List<String> attributeKeys) {
         validate(entityId, scope);
         List<ListenableFuture<String>> futures = attributesDao.removeAll(tenantId, entityId, scope, attributeKeys);

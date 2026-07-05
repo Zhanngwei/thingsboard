@@ -90,10 +90,6 @@ import static org.thingsboard.server.controller.ControllerConstants.TENANT_ID_PA
 import static org.thingsboard.server.controller.ControllerConstants.TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH;
 import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LINK;
 
-@RestController
-@TbCoreComponent
-@RequiredArgsConstructor
-@RequestMapping("/api")
 /**
  * 中文说明：
  * 1. 类目的：`DashboardController` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
@@ -104,69 +100,48 @@ import static org.thingsboard.server.controller.ControllerConstants.UUID_WIKI_LI
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 MVC Controller / Facade。
  */
+@RestController
+@TbCoreComponent
+@RequiredArgsConstructor
+@RequestMapping("/api")
 public class DashboardController extends BaseController {
 
     /**
-     * 字段说明：
-     * 1. 保存 `tbDashboardService` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 仪表盘，提供当前类调用的业务操作。
      */
     private final TbDashboardService tbDashboardService;
     private final ImageService imageService;
     /**
-     * 字段说明：
-     * 1. 保存 `DASHBOARD_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 仪表盘ID常量，用于统一引用固定值。
      */
     public static final String DASHBOARD_ID = "dashboardId";
 
     /**
-     * 字段说明：
-     * 1. 保存 `HOME_DASHBOARD_ID` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 仪表盘ID常量，用于统一引用固定值。
      */
     private static final String HOME_DASHBOARD_ID = "homeDashboardId";
     private static final String HOME_DASHBOARD_HIDE_TOOLBAR = "homeDashboardHideToolbar";
     /**
-     * 字段说明：
-     * 1. 保存 `DASHBOARD_INFO_DEFINITION` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 仪表盘常量，用于统一引用固定值。
      */
     public static final String DASHBOARD_INFO_DEFINITION = "The Dashboard Info object contains lightweight information about the dashboard (e.g. title, image, assigned customers) but does not contain the heavyweight configuration JSON.";
     public static final String DASHBOARD_DEFINITION = "The Dashboard object is a heavyweight object that contains information about the dashboard (e.g. title, image, assigned customers) and also configuration JSON (e.g. layouts, widgets, entity aliases).";
     /**
-     * 字段说明：
-     * 1. 保存 `HIDDEN_FOR_MOBILE` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `HIDDEN_FOR_MOBILE`常量，用于统一引用固定值。
      */
     public static final String HIDDEN_FOR_MOBILE = "Exclude dashboards that are hidden for mobile";
 
-    @Value("${ui.dashboard.max_datapoints_limit}")
     /**
-     * 字段说明：
-     * 1. 保存 `maxDatapointsLimit` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 数量限制，用于控制数量、位置或分页范围。
      */
+    @Value("${ui.dashboard.max_datapoints_limit}")
     private long maxDatapointsLimit;
 
+    /**
+     * 功能：获取时间。
+     * 参数：无。
+     * 返回：数值结果。
+     */
     @ApiOperation(value = "Get server time (getServerTime)",
             notes = "Get the server time (milliseconds since January 1, 1970 UTC). " +
                     "Used to adjust view of the dashboards according to the difference between browser and server time.")
@@ -174,20 +149,15 @@ public class DashboardController extends BaseController {
     @RequestMapping(value = "/dashboard/serverTime", method = RequestMethod.GET)
     @ResponseBody
     @ApiResponse(code = 200, message = "OK", examples = @Example(value = @ExampleProperty(value = "1636023857137", mediaType = "application/json")))
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getServerTime` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public long getServerTime() throws ThingsboardException {
         return System.currentTimeMillis();
     }
 
+    /**
+     * 功能：获取数量限制。
+     * 参数：无。
+     * 返回：数值结果。
+     */
     @ApiOperation(value = "Get max data points limit (getMaxDatapointsLimit)",
             notes = "Get the maximum number of data points that dashboard may request from the server per in a single subscription command. " +
                     "This value impacts the time window behavior. It impacts 'Max values' parameter in case user selects 'None' as 'Data aggregation function'. " +
@@ -197,20 +167,16 @@ public class DashboardController extends BaseController {
     @RequestMapping(value = "/dashboard/maxDatapointsLimit", method = RequestMethod.GET)
     @ResponseBody
     @ApiResponse(code = 200, message = "OK", examples = @Example(value = @ExampleProperty(value = "5000", mediaType = "application/json")))
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getMaxDatapointsLimit` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public long getMaxDatapointsLimit() throws ThingsboardException {
         return maxDatapointsLimit;
     }
 
+    /**
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Dashboard Info (getDashboardInfoById)",
             notes = "Get the information about the dashboard based on 'dashboardId' parameter. " + DASHBOARD_INFO_DEFINITION,
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -218,16 +184,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/dashboard/info/{dashboardId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDashboardInfoById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public DashboardInfo getDashboardInfoById(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId) throws ThingsboardException {
@@ -236,6 +192,14 @@ public class DashboardController extends BaseController {
         return checkDashboardInfoId(dashboardId, Operation.READ);
     }
 
+    /**
+     * 功能：获取仪表盘ID。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * - `INLINE_IMAGES`：`INLINE_IMAGES` 参数。
+     * - `inlineImages`：`inlineImages` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Dashboard (getDashboardById)",
             notes = "Get the dashboard based on 'dashboardId' parameter. " + DASHBOARD_DEFINITION + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -243,16 +207,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/dashboard/{dashboardId}", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getDashboardById` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard getDashboardById(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId,
@@ -261,13 +215,18 @@ public class DashboardController extends BaseController {
         checkParameter(DASHBOARD_ID, strDashboardId);
         DashboardId dashboardId = new DashboardId(toUUID(strDashboardId));
         var result = checkDashboardId(dashboardId, Operation.READ);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (inlineImages) {
             imageService.inlineImages(result);
         }
         return result;
     }
 
+    /**
+     * 功能：保存或创建仪表盘。
+     * 参数：
+     * - `dashboard`：`dashboard` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Create Or Update Dashboard (saveDashboard)",
             notes = "Create or update the Dashboard. When creating dashboard, platform generates Dashboard Id as " + UUID_WIKI_LINK +
                     "The newly created Dashboard id will be present in the response. " +
@@ -280,16 +239,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/dashboard", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `saveDashboard` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard saveDashboard(
             @ApiParam(value = "A JSON value representing the dashboard.")
             @RequestBody Dashboard dashboard) throws Exception {
@@ -298,21 +247,17 @@ public class DashboardController extends BaseController {
         return tbDashboardService.save(dashboard, getCurrentUser());
     }
 
+    /**
+     * 功能：删除或清理仪表盘。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：无。
+     */
     @ApiOperation(value = "Delete the Dashboard (deleteDashboard)",
             notes = "Delete the Dashboard." + TENANT_AUTHORITY_PARAGRAPH)
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/dashboard/{dashboardId}", method = RequestMethod.DELETE)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `deleteDashboard` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void deleteDashboard(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId) throws ThingsboardException {
@@ -322,6 +267,13 @@ public class DashboardController extends BaseController {
         tbDashboardService.delete(dashboard, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `assignDashboardToCustomer` 对应的处理。
+     * 参数：
+     * - `strCustomerId`：客户IDID。
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Assign the Dashboard (assignDashboardToCustomer)",
             notes = "Assign the Dashboard to specified Customer or do nothing if the Dashboard is already assigned to that Customer. " +
                     "Returns the Dashboard object." + TENANT_AUTHORITY_PARAGRAPH,
@@ -329,16 +281,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/{customerId}/dashboard/{dashboardId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDashboardToCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard assignDashboardToCustomer(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION)
             @PathVariable(CUSTOMER_ID) String strCustomerId,
@@ -355,6 +297,13 @@ public class DashboardController extends BaseController {
         return tbDashboardService.assignDashboardToCustomer(dashboard, customer, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `unassignDashboardFromCustomer` 对应的处理。
+     * 参数：
+     * - `strCustomerId`：客户IDID。
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Unassign the Dashboard (unassignDashboardFromCustomer)",
             notes = "Unassign the Dashboard from specified Customer or do nothing if the Dashboard is already assigned to that Customer. " +
                     "Returns the Dashboard object." + TENANT_AUTHORITY_PARAGRAPH,
@@ -362,16 +311,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/{customerId}/dashboard/{dashboardId}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDashboardFromCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard unassignDashboardFromCustomer(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION)
             @PathVariable(CUSTOMER_ID) String strCustomerId,
@@ -386,6 +325,14 @@ public class DashboardController extends BaseController {
         return tbDashboardService.unassignDashboardFromCustomer(dashboard, customer, getCurrentUser());
     }
 
+    /**
+     * 功能：更新仪表盘。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * - `ids`：数据列表。
+     * - `strCustomerIds`：`strCustomerIds` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Update the Dashboard Customers (updateDashboardCustomers)",
             notes = "Updates the list of Customers that this Dashboard is assigned to. Removes previous assignments to customers that are not in the provided list. " +
                     "Returns the Dashboard object. " + TENANT_AUTHORITY_PARAGRAPH,
@@ -395,16 +342,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/dashboard/{dashboardId}/customers", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `updateDashboardCustomers` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard updateDashboardCustomers(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId,
@@ -417,6 +354,13 @@ public class DashboardController extends BaseController {
         return tbDashboardService.updateDashboardCustomers(dashboard, customerIds, getCurrentUser());
     }
 
+    /**
+     * 功能：保存或创建仪表盘。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * - `strCustomerIds`：`strCustomerIds` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Adds the Dashboard Customers (addDashboardCustomers)",
             notes = "Adds the list of Customers to the existing list of assignments for the Dashboard. Keeps previous assignments to customers that are not in the provided list. " +
                     "Returns the Dashboard object." + TENANT_AUTHORITY_PARAGRAPH,
@@ -425,16 +369,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/dashboard/{dashboardId}/customers/add", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `addDashboardCustomers` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard addDashboardCustomers(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId,
@@ -447,6 +381,13 @@ public class DashboardController extends BaseController {
         return tbDashboardService.addDashboardCustomers(dashboard, customerIds, getCurrentUser());
     }
 
+    /**
+     * 功能：删除或清理仪表盘。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * - `strCustomerIds`：`strCustomerIds` 参数。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Remove the Dashboard Customers (removeDashboardCustomers)",
             notes = "Removes the list of Customers from the existing list of assignments for the Dashboard. Keeps other assignments to customers that are not in the provided list. " +
                     "Returns the Dashboard object." + TENANT_AUTHORITY_PARAGRAPH,
@@ -455,16 +396,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/dashboard/{dashboardId}/customers/remove", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `removeDashboardCustomers` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard removeDashboardCustomers(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId,
@@ -477,6 +408,12 @@ public class DashboardController extends BaseController {
         return tbDashboardService.removeDashboardCustomers(dashboard, customerIds, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `assignDashboardToPublicCustomer` 对应的处理。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Assign the Dashboard to Public Customer (assignDashboardToPublicCustomer)",
             notes = "Assigns the dashboard to a special, auto-generated 'Public' Customer. Once assigned, unauthenticated users may browse the dashboard. " +
                     "This method is useful if you like to embed the dashboard on public web pages to be available for users that are not logged in. " +
@@ -488,16 +425,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/public/dashboard/{dashboardId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDashboardToPublicCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard assignDashboardToPublicCustomer(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId) throws ThingsboardException {
@@ -507,6 +434,12 @@ public class DashboardController extends BaseController {
         return tbDashboardService.assignDashboardToPublicCustomer(dashboard, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `unassignDashboardFromPublicCustomer` 对应的处理。
+     * 参数：
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Unassign the Dashboard from Public Customer (unassignDashboardFromPublicCustomer)",
             notes = "Unassigns the dashboard from a special, auto-generated 'Public' Customer. Once unassigned, unauthenticated users may no longer browse the dashboard. " +
                     "Returns the Dashboard object." + TENANT_AUTHORITY_PARAGRAPH,
@@ -514,16 +447,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/customer/public/dashboard/{dashboardId}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDashboardFromPublicCustomer` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard unassignDashboardFromPublicCustomer(
             @ApiParam(value = DASHBOARD_ID_PARAM_DESCRIPTION)
             @PathVariable(DASHBOARD_ID) String strDashboardId) throws ThingsboardException {
@@ -533,6 +456,16 @@ public class DashboardController extends BaseController {
         return tbDashboardService.unassignDashboardFromPublicCustomer(dashboard, getCurrentUser());
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `TENANT_ID_PARAM_DESCRIPTION`：租户信息或租户标识。
+     * - `strTenantId`：租户IDID。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Tenant Dashboards by System Administrator (getTenantDashboards)",
             notes = "Returns a page of dashboard info objects owned by tenant. " + DASHBOARD_INFO_DEFINITION + " " + PAGE_DATA_PARAMETERS +
                     SYSTEM_AUTHORITY_PARAGRAPH,
@@ -540,16 +473,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('SYS_ADMIN')")
     @RequestMapping(value = "/tenant/{tenantId}/dashboards", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantDashboards` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DashboardInfo> getTenantDashboards(
             @ApiParam(value = TENANT_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable(TENANT_ID) String strTenantId,
@@ -569,6 +492,16 @@ public class DashboardController extends BaseController {
         return checkNotNull(dashboardService.findDashboardsByTenantId(tenantId, pageLink));
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - `PAGE_NUMBER_DESCRIPTION`：`PAGE_NUMBER_DESCRIPTION` 参数。
+     * - `page`：`page` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Tenant Dashboards (getTenantDashboards)",
             notes = "Returns a page of dashboard info objects owned by the tenant of a current user. "
                     + DASHBOARD_INFO_DEFINITION + " " + PAGE_DATA_PARAMETERS + TENANT_AUTHORITY_PARAGRAPH,
@@ -576,16 +509,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/dashboards", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantDashboards` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DashboardInfo> getTenantDashboards(
             @ApiParam(value = PAGE_SIZE_DESCRIPTION, required = true)
             @RequestParam int pageSize,
@@ -601,7 +524,6 @@ public class DashboardController extends BaseController {
             @RequestParam(required = false) String sortOrder) throws ThingsboardException {
         TenantId tenantId = getCurrentUser().getTenantId();
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (mobile != null && mobile) {
             return checkNotNull(dashboardService.findMobileDashboardsByTenantId(tenantId, pageLink));
         } else {
@@ -609,6 +531,16 @@ public class DashboardController extends BaseController {
         }
     }
 
+    /**
+     * 功能：获取客户。
+     * 参数：
+     * - `CUSTOMER_ID_PARAM_DESCRIPTION`：`CUSTOMER_ID_PARAM_DESCRIPTION` 参数。
+     * - `strCustomerId`：客户IDID。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Customer Dashboards (getCustomerDashboards)",
             notes = "Returns a page of dashboard info objects owned by the specified customer. "
                     + DASHBOARD_INFO_DEFINITION + " " + PAGE_DATA_PARAMETERS + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -616,16 +548,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/customer/{customerId}/dashboards", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getCustomerDashboards` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DashboardInfo> getCustomerDashboards(
             @ApiParam(value = CUSTOMER_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable(CUSTOMER_ID) String strCustomerId,
@@ -646,7 +568,6 @@ public class DashboardController extends BaseController {
         CustomerId customerId = new CustomerId(toUUID(strCustomerId));
         checkCustomerId(customerId, Operation.READ);
         PageLink pageLink = createPageLink(pageSize, page, textSearch, sortProperty, sortOrder);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (mobile != null && mobile) {
             return checkNotNull(dashboardService.findMobileDashboardsByTenantIdAndCustomerId(tenantId, customerId, pageLink));
         } else {
@@ -654,6 +575,11 @@ public class DashboardController extends BaseController {
         }
     }
 
+    /**
+     * 功能：获取仪表盘。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Home Dashboard (getHomeDashboard)",
             notes = "Returns the home dashboard object that is configured as 'homeDashboardId' parameter in the 'additionalInfo' of the User. " +
                     "If 'homeDashboardId' parameter is not set on the User level and the User has authority 'CUSTOMER_USER', check the same parameter for the corresponding Customer. " +
@@ -663,19 +589,8 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/dashboard/home", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getHomeDashboard` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public HomeDashboard getHomeDashboard() throws ThingsboardException {
         SecurityUser securityUser = getCurrentUser();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (securityUser.isSystemAdmin()) {
             return null;
         }
@@ -683,15 +598,12 @@ public class DashboardController extends BaseController {
         JsonNode additionalInfo = user.getAdditionalInfo();
         HomeDashboard homeDashboard;
         homeDashboard = extractHomeDashboardFromAdditionalInfo(additionalInfo);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (homeDashboard == null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (securityUser.isCustomerUser()) {
                 Customer customer = customerService.findCustomerById(securityUser.getTenantId(), securityUser.getCustomerId());
                 additionalInfo = customer.getAdditionalInfo();
                 homeDashboard = extractHomeDashboardFromAdditionalInfo(additionalInfo);
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (homeDashboard == null) {
                 Tenant tenant = tenantService.findTenantById(securityUser.getTenantId());
                 additionalInfo = tenant.getAdditionalInfo();
@@ -701,6 +613,11 @@ public class DashboardController extends BaseController {
         return homeDashboard;
     }
 
+    /**
+     * 功能：获取仪表盘。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Home Dashboard Info (getHomeDashboardInfo)",
             notes = "Returns the home dashboard info object that is configured as 'homeDashboardId' parameter in the 'additionalInfo' of the User. " +
                     "If 'homeDashboardId' parameter is not set on the User level and the User has authority 'CUSTOMER_USER', check the same parameter for the corresponding Customer. " +
@@ -710,19 +627,8 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/dashboard/home/info", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getHomeDashboardInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public HomeDashboardInfo getHomeDashboardInfo() throws ThingsboardException {
         SecurityUser securityUser = getCurrentUser();
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (securityUser.isSystemAdmin()) {
             return null;
         }
@@ -730,15 +636,12 @@ public class DashboardController extends BaseController {
         JsonNode additionalInfo = user.getAdditionalInfo();
         HomeDashboardInfo homeDashboardInfo;
         homeDashboardInfo = extractHomeDashboardInfoFromAdditionalInfo(additionalInfo);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (homeDashboardInfo == null) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (securityUser.isCustomerUser()) {
                 Customer customer = customerService.findCustomerById(securityUser.getTenantId(), securityUser.getCustomerId());
                 additionalInfo = customer.getAdditionalInfo();
                 homeDashboardInfo = extractHomeDashboardInfoFromAdditionalInfo(additionalInfo);
             }
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (homeDashboardInfo == null) {
                 Tenant tenant = tenantService.findTenantById(securityUser.getTenantId());
                 additionalInfo = tenant.getAdditionalInfo();
@@ -748,6 +651,11 @@ public class DashboardController extends BaseController {
         return homeDashboardInfo;
     }
 
+    /**
+     * 功能：获取租户。
+     * 参数：无。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Get Tenant Home Dashboard Info (getTenantHomeDashboardInfo)",
             notes = "Returns the home dashboard info object that is configured as 'homeDashboardId' parameter in the 'additionalInfo' of the corresponding tenant. " +
                     TENANT_AUTHORITY_PARAGRAPH,
@@ -755,22 +663,11 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/dashboard/home/info", method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getTenantHomeDashboardInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public HomeDashboardInfo getTenantHomeDashboardInfo() throws ThingsboardException {
         Tenant tenant = tenantService.findTenantById(getTenantId());
         JsonNode additionalInfo = tenant.getAdditionalInfo();
         DashboardId dashboardId = null;
         boolean hideDashboardToolbar = true;
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (additionalInfo != null && additionalInfo.has(HOME_DASHBOARD_ID) && !additionalInfo.get(HOME_DASHBOARD_ID).isNull()) {
             String strDashboardId = additionalInfo.get(HOME_DASHBOARD_ID).asText();
             dashboardId = new DashboardId(toUUID(strDashboardId));
@@ -781,6 +678,13 @@ public class DashboardController extends BaseController {
         return new HomeDashboardInfo(dashboardId, hideDashboardToolbar);
     }
 
+    /**
+     * 功能：更新租户。
+     * 参数：
+     * - `parameters`：`parameters` 参数。
+     * - `homeDashboardInfo`：`homeDashboardInfo` 参数。
+     * 返回：无。
+     */
     @ApiOperation(value = "Update Tenant Home Dashboard Info (getTenantHomeDashboardInfo)",
             notes = "Update the home dashboard assignment for the current tenant. " +
                     TENANT_AUTHORITY_PARAGRAPH,
@@ -788,16 +692,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/tenant/dashboard/home/info", method = RequestMethod.POST)
     @ResponseStatus(value = HttpStatus.OK)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `setTenantHomeDashboardInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void setTenantHomeDashboardInfo(
             @ApiParam(value = "A JSON object that represents home dashboard id and other parameters", required = true)
             @RequestBody HomeDashboardInfo homeDashboardInfo) throws ThingsboardException {
@@ -822,14 +716,10 @@ public class DashboardController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractHomeDashboardInfoFromAdditionalInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractHomeDashboardInfoFromAdditionalInfo` 对应的处理。
+     * 参数：
+     * - `additionalInfo`：`additionalInfo` 参数。
+     * 返回：处理结果。
      */
     private HomeDashboardInfo extractHomeDashboardInfoFromAdditionalInfo(JsonNode additionalInfo) {
         try {
@@ -849,14 +739,10 @@ public class DashboardController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `extractHomeDashboardFromAdditionalInfo` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `extractHomeDashboardFromAdditionalInfo` 对应的处理。
+     * 参数：
+     * - `additionalInfo`：`additionalInfo` 参数。
+     * 返回：处理结果。
      */
     private HomeDashboard extractHomeDashboardFromAdditionalInfo(JsonNode additionalInfo) {
         try {
@@ -875,6 +761,13 @@ public class DashboardController extends BaseController {
         return null;
     }
 
+    /**
+     * 功能：执行 `assignDashboardToEdge` 对应的处理。
+     * 参数：
+     * - `strEdgeId`：边缘节点ID。
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Assign dashboard to edge (assignDashboardToEdge)",
             notes = "Creates assignment of an existing dashboard to an instance of The Edge. " +
                     EDGE_ASSIGN_ASYNC_FIRST_STEP_DESCRIPTION +
@@ -886,16 +779,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/edge/{edgeId}/dashboard/{dashboardId}", method = RequestMethod.POST)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `assignDashboardToEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard assignDashboardToEdge(@PathVariable("edgeId") String strEdgeId,
                                            @PathVariable(DASHBOARD_ID) String strDashboardId) throws ThingsboardException {
         checkParameter("edgeId", strEdgeId);
@@ -909,6 +792,13 @@ public class DashboardController extends BaseController {
         return tbDashboardService.asignDashboardToEdge(getTenantId(), dashboardId, edge, getCurrentUser());
     }
 
+    /**
+     * 功能：执行 `unassignDashboardFromEdge` 对应的处理。
+     * 参数：
+     * - `strEdgeId`：边缘节点ID。
+     * - `strDashboardId`：仪表盘IDID。
+     * 返回：处理结果。
+     */
     @ApiOperation(value = "Unassign dashboard from edge (unassignDashboardFromEdge)",
             notes = "Clears assignment of the dashboard to the edge. " +
                     EDGE_UNASSIGN_ASYNC_FIRST_STEP_DESCRIPTION +
@@ -920,16 +810,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAuthority('TENANT_ADMIN')")
     @RequestMapping(value = "/edge/{edgeId}/dashboard/{dashboardId}", method = RequestMethod.DELETE)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `unassignDashboardFromEdge` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public Dashboard unassignDashboardFromEdge(@PathVariable("edgeId") String strEdgeId,
                                                @PathVariable(DASHBOARD_ID) String strDashboardId) throws ThingsboardException {
         checkParameter(EDGE_ID, strEdgeId);
@@ -944,6 +824,16 @@ public class DashboardController extends BaseController {
         return tbDashboardService.unassignDashboardFromEdge(dashboard, edge, getCurrentUser());
     }
 
+    /**
+     * 功能：获取边缘节点。
+     * 参数：
+     * - `EDGE_ID_PARAM_DESCRIPTION`：`EDGE_ID_PARAM_DESCRIPTION` 参数。
+     * - `strEdgeId`：边缘节点ID。
+     * - `PAGE_SIZE_DESCRIPTION`：`PAGE_SIZE_DESCRIPTION` 参数。
+     * - `pageSize`：`pageSize` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：匹配的数据集合。
+     */
     @ApiOperation(value = "Get Edge Dashboards (getEdgeDashboards)",
             notes = "Returns a page of dashboard info objects assigned to the specified edge. "
                     + DASHBOARD_INFO_DEFINITION + " " + PAGE_DATA_PARAMETERS + TENANT_OR_CUSTOMER_AUTHORITY_PARAGRAPH,
@@ -951,16 +841,6 @@ public class DashboardController extends BaseController {
     @PreAuthorize("hasAnyAuthority('TENANT_ADMIN', 'CUSTOMER_USER')")
     @RequestMapping(value = "/edge/{edgeId}/dashboards", params = {"pageSize", "page"}, method = RequestMethod.GET)
     @ResponseBody
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `getEdgeDashboards` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public PageData<DashboardInfo> getEdgeDashboards(
             @ApiParam(value = EDGE_ID_PARAM_DESCRIPTION, required = true)
             @PathVariable(EDGE_ID) String strEdgeId,
@@ -996,14 +876,10 @@ public class DashboardController extends BaseController {
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `customerIdFromStr` 对应的REST/WebSocket 控制层类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `customerIdFromStr` 对应的处理。
+     * 参数：
+     * - `strCustomerIds`：`strCustomerIds` 参数。
+     * 返回：匹配的数据集合。
      */
     private Set<CustomerId> customerIdFromStr(String[] strCustomerIds) {
         Set<CustomerId> customerIds = new HashSet<>();

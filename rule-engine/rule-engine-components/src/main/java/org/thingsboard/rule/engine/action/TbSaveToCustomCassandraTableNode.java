@@ -53,6 +53,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.thingsboard.common.util.DonAsynchron.withCallback;
 
+/**
+ * 中文说明：`TbSaveToCustomCassandraTableNode` 是保存到自定义Cassandra表节点规则节点，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
+ * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
+ * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
+ * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
+ * 配置对象：`TbSaveToCustomCassandraTableNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
+ * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ */
 @Slf4j
 @RuleNode(type = ComponentType.ACTION,
         name = "save to custom table",
@@ -69,60 +77,55 @@ import static org.thingsboard.common.util.DonAsynchron.withCallback;
         configDirective = "tbActionNodeCustomTableConfig",
         icon = "file_upload",
         ruleChainTypes = RuleChainType.CORE)
-/**
- * 中文说明：`TbSaveToCustomCassandraTableNode` 是保存到自定义Cassandra表节点规则节点，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
- * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
- * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
- * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
- * 配置对象：`TbSaveToCustomCassandraTableNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
- * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
- */
 public class TbSaveToCustomCassandraTableNode implements TbNode {
 
     /**
-     * 常量字段：定义 `TABLE_PREFIX`，用于与本类处理流程相关的运行时值，本身不触发外部系统调用。
+     * `TABLE_PREFIX`常量，用于统一引用固定值。
      */
     private static final String TABLE_PREFIX = "cs_tb_";
     /**
-     * 常量字段：定义 `parser`，用于与本类处理流程相关的运行时值，本身不触发外部系统调用。
+     * 解析器常量，用于统一引用固定值。
      */
     private static final JsonParser parser = new JsonParser();
     /**
-     * 常量字段：定义 `ENTITY_ID`，用于目标实体类型、名称或标识，本身不触发外部系统调用。
+     * 实体ID常量，用于统一引用固定值。
      */
     private static final String ENTITY_ID = "$entityId";
 
     /**
-     * 字段说明：保存从规则节点 JSON 转换得到的配置对象，供消息处理和生命周期方法复用。
+     * 配置，保存当前对象的配置选项。
      */
     private TbSaveToCustomCassandraTableNodeConfiguration config;
     /**
-     * 字段说明：保存 `session`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * 会话，保存当前连接或交互过程的会话信息。
      */
     private GuavaSession session;
     /**
-     * 字段说明：保存 `cassandraCluster`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * Cassandra 集群，用于支撑当前网络或外部服务交互。
      */
     private CassandraCluster cassandraCluster;
     /**
-     * 字段说明：保存 `defaultWriteLevel`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * `defaultWriteLevel` 字段，保存当前对象的对应属性。
      */
     private ConsistencyLevel defaultWriteLevel;
     /**
-     * 字段说明：保存 `saveStmt`，表示与本类处理流程相关的运行时值，供本类方法在规则节点处理流程中使用。
+     * `saveStmt` 字段，保存当前对象的对应属性。
      */
     private PreparedStatement saveStmt;
     /**
-     * 字段说明：保存 `readResultsProcessingExecutor` 服务层引用；具体服务实现可能访问数据库或缓存，本字段本身不管理事务。
+     * 执行器，负责处理对应任务或消息。
      */
     private ExecutorService readResultsProcessingExecutor;
     private Map<String, String> fieldsMap;
 
-    @Override
     /**
-     * 方法说明：在节点生命周期初始化阶段加载规则节点 JSON 配置并准备脚本、缓存、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `init` 对应的处理。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `configuration`：配置对象。
+     * 返回：无。
      */
+    @Override
     public void init(TbContext ctx, TbNodeConfiguration configuration) throws TbNodeException {
         config = TbNodeUtils.convert(configuration, TbSaveToCustomCassandraTableNodeConfiguration.class);
         cassandraCluster = ctx.getCassandraCluster();
@@ -134,38 +137,42 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
         }
     }
 
-    @Override
     /**
-     * 方法说明：作为规则链消息处理入口接收上游 TbMsg 并按节点配置输出到后续关系。
-     * 输入输出：输入为上游规则链传入的 `TbMsg`；成功时交给成功、布尔或命名关系，异常时交给失败关系。
-     * 数据库/缓存/Rule Engine/Actor/MQTT/事务：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：由规则节点运行时调用或通过 `ctx` 投递、确认、调度消息，通常处于 Actor 调度链路；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：处理消息。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `msg`：待处理消息。
+     * 返回：无。
      */
+    @Override
     public void onMsg(TbContext ctx, TbMsg msg) {
-        // 异步回调用于把服务或转换结果映射为规则链成功/失败关系。
         withCallback(save(msg, ctx), aVoid -> ctx.tellSuccess(msg), e -> ctx.tellFailure(msg, e), ctx.getDbCallbackExecutor());
     }
 
-    @Override
     /**
-     * 方法说明：在节点生命周期销毁阶段释放缓存、脚本引擎、监听器或本地状态。
-     * 调用边界：由规则节点生命周期、配置升级流程或配置默认值创建流程调用；数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `destroy` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     public void destroy() {
         stopExecutor();
         saveStmt = null;
     }
 
     /**
-     * 方法说明：执行 `startExecutor` 对应的辅助逻辑，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：使用本地内存缓存、队列或并发结构，本方法本身不直接访问数据库，具体调用链可能涉及缓存；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：初始化或启动执行器。
+     * 参数：无。
+     * 返回：无。
      */
     private void startExecutor() {
         readResultsProcessingExecutor = Executors.newCachedThreadPool();
     }
 
     /**
-     * 方法说明：执行 `stopExecutor` 对应的辅助逻辑，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：停止或关闭执行器。
+     * 参数：无。
+     * 返回：无。
      */
     private void stopExecutor() {
         if (readResultsProcessingExecutor != null) {
@@ -174,16 +181,19 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `prepare` 对应的辅助逻辑，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `prepare` 对应的处理。
+     * 参数：
+     * - `query`：`query` 参数。
+     * 返回：处理结果。
      */
     private PreparedStatement prepare(String query) {
         return getSession().prepare(query);
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取会话。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private GuavaSession getSession() {
         if (session == null) {
@@ -194,8 +204,9 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
     }
 
     /**
-     * 方法说明：通过服务层保存实体、属性、遥测或关系数据，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取`Save Stmt`。
+     * 参数：无。
+     * 返回：处理结果。
      */
     private PreparedStatement getSaveStmt() {
         fieldsMap = config.getFieldsMapping();
@@ -207,16 +218,20 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `prepareStatement` 对应的辅助逻辑，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `prepareStatement` 对应的处理。
+     * 参数：
+     * - `fieldsList`：数据列表。
+     * 返回：处理结果。
      */
     private PreparedStatement prepareStatement(List<String> fieldsList) {
         return prepare(createQuery(fieldsList));
     }
 
     /**
-     * 方法说明：创建实体、告警、关系或辅助对象，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：保存或创建查询条件。
+     * 参数：
+     * - `fieldsList`：数据列表。
+     * 返回：文本结果。
      */
     private String createQuery(List<String> fieldsList) {
         int size = fieldsList.size();
@@ -245,8 +260,11 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
     }
 
     /**
-     * 方法说明：通过服务层保存实体、属性、遥测或关系数据，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `save` 对应的处理。
+     * 参数：
+     * - `msg`：待处理消息。
+     * - `ctx`：处理上下文。
+     * 返回：匹配的数据集合。
      */
     private ListenableFuture<Void> save(TbMsg msg, TbContext ctx) {
         JsonElement data = parser.parse(msg.getData());
@@ -286,23 +304,28 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
                 }
                 i.getAndIncrement();
             });
-            // 脚本执行交给规则节点脚本引擎，异常会通过回调进入失败关系。
             return getFuture(executeAsyncWrite(ctx, stmtBuilder.build()), rs -> null);
         }
     }
 
     /**
-     * 方法说明：执行 `executeAsyncWrite` 对应的辅助逻辑，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行`Async Write`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `statement`：`statement` 参数。
+     * 返回：匹配的数据集合。
      */
     private TbResultSetFuture executeAsyncWrite(TbContext ctx, Statement statement) {
-        // 脚本执行交给规则节点脚本引擎，异常会通过回调进入失败关系。
         return executeAsync(ctx, statement, defaultWriteLevel);
     }
 
     /**
-     * 方法说明：执行 `executeAsync` 对应的辅助逻辑，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：会通过 ThingsBoard 服务层或外部会话发起读写，具体数据库和缓存行为由服务实现负责；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行`Async`。
+     * 参数：
+     * - `ctx`：处理上下文。
+     * - `statement`：`statement` 参数。
+     * - `level`：`level` 参数。
+     * 返回：匹配的数据集合。
      */
     private TbResultSetFuture executeAsync(TbContext ctx, Statement statement, ConsistencyLevel level) {
         if (log.isDebugEnabled()) {
@@ -315,8 +338,10 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
     }
 
     /**
-     * 方法说明：执行 `statementToString` 对应的辅助逻辑，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：执行 `statementToString` 对应的处理。
+     * 参数：
+     * - `statement`：`statement` 参数。
+     * 返回：文本结果。
      */
     private static String statementToString(Statement statement) {
         if (statement instanceof BoundStatement) {
@@ -327,18 +352,22 @@ public class TbSaveToCustomCassandraTableNode implements TbNode {
     }
 
     /**
-     * 方法说明：读取配置、消息字段、实体字段或服务返回值，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-     * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
+     * 功能：获取异步结果。
+     * 参数：
+     * - `future`：`future` 参数。
+     * - `transformer`：`transformer` 参数。
+     * 返回：匹配的数据集合。
      */
     private <T> ListenableFuture<T> getFuture(TbResultSetFuture future, java.util.function.Function<AsyncResultSet, T> transformer) {
-        // 异步聚合或转换服务返回值，完成后再继续规则链处理。
         return Futures.transform(future, new Function<AsyncResultSet, T>() {
+            /**
+             * 功能：执行 `apply` 对应的处理。
+             * 参数：
+             * - `input`：`input` 参数。
+             * 返回：处理结果。
+             */
             @Nullable
             @Override
-            /**
-             * 方法说明：把函数应用到已解析的参数值，供 `TbSaveToCustomCassandraTableNode` 的规则节点处理或辅助流程调用。
-             * 调用边界：数据库/缓存：本方法本身不直接访问数据库或缓存，具体实现/调用链可能涉及；Rule Engine/Actor：本方法本身不直接调度 Actor，若由节点入口调用则处于规则引擎调用链；MQTT：本方法本身不直接发布或订阅 MQTT 消息；事务：本方法本身不直接开启或提交事务。
-             */
             public T apply(@Nullable AsyncResultSet input) {
                 return transformer.apply(input);
             }

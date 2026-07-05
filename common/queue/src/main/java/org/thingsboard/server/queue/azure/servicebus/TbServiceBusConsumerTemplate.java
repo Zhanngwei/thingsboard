@@ -49,7 +49,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Slf4j
 /**
  * 中文说明：
  * 1. 类目的：`TbServiceBusConsumerTemplate` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
@@ -60,58 +59,38 @@ import java.util.stream.Stream;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Contract / Adapter。
  */
+@Slf4j
 public class TbServiceBusConsumerTemplate<T extends TbQueueMsg> extends AbstractTbQueueConsumerTemplate<MessageWithDeliveryTag, T> {
     /**
-     * 字段说明：
-     * 1. 保存 `admin` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `admin` 字段，保存当前对象的对应属性。
      */
     private final TbQueueAdmin admin;
     private final TbQueueMsgDecoder<T> decoder;
     /**
-     * 字段说明：
-     * 1. 保存 `serviceBusSettings` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 配置集合，用于去重保存或快速判断对象是否存在。
      */
     private final TbServiceBusSettings serviceBusSettings;
 
     private final Gson gson = new Gson();
 
     /**
-     * 字段说明：
-     * 1. 保存 `receivers` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * `receivers`集合，用于去重保存或快速判断对象是否存在。
      */
     private Set<CoreMessageReceiver> receivers;
     private final Map<CoreMessageReceiver, Collection<MessageWithDeliveryTag>> pendingMessages = new ConcurrentHashMap<>();
     /**
-     * 字段说明：
-     * 1. 保存 `messagesPerQueue` 对应的配置、依赖、上下文或运行期状态。
-     * 2. 数据来源通常是 Spring 注入、构造参数、配置文件、DAO 查询、队列消息或测试夹具。
-     * 3. 生命周期与持有该字段的对象一致，单例 Bean 字段随应用生命周期存在，消息/测试字段随单次流程存在。
-     * 4. 单独保存该字段可以减少重复查询或参数透传，使 Controller、Service、Actor 和测试代码的职责更清晰。
-     * 5. 并发与缓存语义取决于字段具体类型；可变集合、缓存或异步状态需要由调用方保证线程安全。
+     * 队列，用于标识消息投递或消费的队列。
      */
     private volatile int messagesPerQueue;
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `TbServiceBusConsumerTemplate` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：创建 `TbServiceBusConsumerTemplate` 实例，并初始化必要字段。
+     * 参数：
+     * - `admin`：`admin` 参数。
+     * - `serviceBusSettings`：服务对象。
+     * - `topic`：主题名称或主题对象。
+     * - `decoder`：`decoder` 参数。
+     * 返回：新创建的对象实例。
      */
     public TbServiceBusConsumerTemplate(TbQueueAdmin admin, TbServiceBusSettings serviceBusSettings, String topic, TbQueueMsgDecoder<T> decoder) {
         super(topic);
@@ -120,43 +99,33 @@ public class TbServiceBusConsumerTemplate<T extends TbQueueMsg> extends Abstract
         this.serviceBusSettings = serviceBusSettings;
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doPoll` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doPoll` 对应的处理。
+     * 参数：
+     * - `durationInMillis`：`durationInMillis` 参数。
+     * 返回：匹配的数据集合。
      */
+    @Override
     protected List<MessageWithDeliveryTag> doPoll(long durationInMillis) {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<CompletableFuture<Collection<MessageWithDeliveryTag>>> messageFutures =
                 receivers.stream()
                         .map(receiver -> receiver
                                 .receiveAsync(messagesPerQueue, Duration.ofMillis(durationInMillis))
                                 .whenComplete((messages, err) -> {
-                                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                                     if (!CollectionUtils.isEmpty(messages)) {
                                         pendingMessages.put(receiver, messages);
-                                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                                     } else if (err != null) {
                                         log.error("Failed to receive messages.", err);
                                     }
                                 }))
                         .collect(Collectors.toList());
         try {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             return fromList(messageFutures)
                     .get()
                     .stream()
                     .flatMap(messages -> CollectionUtils.isEmpty(messages) ? Stream.empty() : messages.stream())
                     .collect(Collectors.toList());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (InterruptedException | ExecutionException e) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (stopped) {
                 log.info("[{}] Service Bus consumer is stopped.", getTopic());
             } else {
@@ -166,90 +135,65 @@ public class TbServiceBusConsumerTemplate<T extends TbQueueMsg> extends Abstract
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doSubscribe` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doSubscribe` 对应的处理。
+     * 参数：
+     * - `topicNames`：主题名称或主题对象。
+     * 返回：无。
      */
+    @Override
     protected void doSubscribe(List<String> topicNames) {
         createReceivers();
         messagesPerQueue = receivers.size() / Math.max(partitions.size(), 1);
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doCommit` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doCommit` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     protected void doCommit() {
         pendingMessages.forEach((receiver, msgs) ->
                 msgs.forEach(msg -> receiver.completeMessageAsync(msg.getDeliveryTag(), TransactionContext.NULL_TXN)));
         pendingMessages.clear();
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `doUnsubscribe` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `doUnsubscribe` 对应的处理。
+     * 参数：无。
+     * 返回：无。
      */
+    @Override
     protected void doUnsubscribe() {
         receivers.forEach(CoreMessageReceiver::closeAsync);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createReceivers` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Receivers`。
+     * 参数：无。
+     * 返回：无。
      */
     private void createReceivers() {
-        // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
         List<CompletableFuture<CoreMessageReceiver>> receiverFutures = partitions.stream()
                 .map(TopicPartitionInfo::getFullTopicName)
                 .map(queue -> {
                     MessagingFactory factory;
                     try {
                         factory = MessagingFactory.createFromConnectionStringBuilder(createConnection(queue));
-                    // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
                     } catch (InterruptedException | ExecutionException e) {
                         log.error("Failed to create factory for the queue [{}]", queue);
                         throw new RuntimeException("Failed to create the factory", e);
                     }
 
-                    // 通过 Actor 消息投递切换到目标处理器，线程安全依赖 Actor 邮箱串行化。
                     return CoreMessageReceiver.create(factory, queue, queue, 0,
                             new SettleModePair(SenderSettleMode.UNSETTLED, ReceiverSettleMode.SECOND),
                             MessagingEntityType.QUEUE);
                 }).collect(Collectors.toList());
 
         try {
-            // 异步结果通过回调继续处理，调用线程不会在这里同步等待完整业务链路。
             receivers = new HashSet<>(fromList(receiverFutures).get());
-        // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
         } catch (InterruptedException | ExecutionException e) {
-            // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
             if (stopped) {
                 log.info("[{}] Service Bus consumer is stopped.", getTopic());
             } else {
@@ -259,14 +203,10 @@ public class TbServiceBusConsumerTemplate<T extends TbQueueMsg> extends Abstract
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `createConnection` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：保存或创建`Connection`。
+     * 参数：
+     * - `queue`：队列名称或队列对象。
+     * 返回：处理结果。
      */
     private ConnectionStringBuilder createConnection(String queue) {
         admin.createTopicIfNotExists(queue);
@@ -278,14 +218,10 @@ public class TbServiceBusConsumerTemplate<T extends TbQueueMsg> extends Abstract
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `fromList` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `fromList` 对应的处理。
+     * 参数：
+     * - `futures`：数据列表。
+     * 返回：匹配的数据集合。
      */
     private <V> CompletableFuture<List<V>> fromList(List<CompletableFuture<V>> futures) {
         @SuppressWarnings("unchecked")
@@ -300,17 +236,13 @@ public class TbServiceBusConsumerTemplate<T extends TbQueueMsg> extends Abstract
                         .collect(Collectors.toList()));
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `decode` 对应的公共基础设施类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `decode` 对应的处理。
+     * 参数：
+     * - `data`：待处理数据。
+     * 返回：处理结果。
      */
+    @Override
     protected T decode(MessageWithDeliveryTag data) throws InvalidProtocolBufferException {
         DefaultTbQueueMsg msg = gson.fromJson(new String(((Data) data.getMessage().getBody()).getValue().getArray()), DefaultTbQueueMsg.class);
         return decoder.decode(msg);

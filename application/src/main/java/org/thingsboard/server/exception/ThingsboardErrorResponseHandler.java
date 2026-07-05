@@ -58,9 +58,6 @@ import java.util.Optional;
 
 import static javax.servlet.RequestDispatcher.ERROR_EXCEPTION;
 
-@Slf4j
-@Controller
-@RestControllerAdvice
 /**
  * 中文说明：
  * 1. 类目的：`ThingsboardErrorResponseHandler` 是ThingsBoard Application 模块中的异常与错误响应类型，用于统一表达 ThingsBoard Application 的异常状态和 HTTP 错误响应。
@@ -71,6 +68,9 @@ import static javax.servlet.RequestDispatcher.ERROR_EXCEPTION;
  * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
  * 7. 设计模式：主要体现 DTO / Adapter。
  */
+@Slf4j
+@Controller
+@RestControllerAdvice
 public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHandler implements AccessDeniedHandler, ErrorController {
 
     private static final Map<HttpStatus, ThingsboardErrorCode> statusToErrorCodeMap = new HashMap<>();
@@ -102,44 +102,32 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `statusToErrorCode` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `statusToErrorCode` 对应的处理。
+     * 参数：
+     * - `status`：`status` 参数。
+     * 返回：处理结果。
      */
     private static ThingsboardErrorCode statusToErrorCode(HttpStatus status) {
         return statusToErrorCodeMap.getOrDefault(status, ThingsboardErrorCode.GENERAL);
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `errorCodeToStatus` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `errorCodeToStatus` 对应的处理。
+     * 参数：
+     * - `errorCode`：错误信息。
+     * 返回：处理结果。
      */
     private static HttpStatus errorCodeToStatus(ThingsboardErrorCode errorCode) {
         return errorCodeToStatusMap.getOrDefault(errorCode, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    @RequestMapping("/error")
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleError` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理错误信息。
+     * 参数：
+     * - `request`：请求对象。
+     * 返回：响应结果。
      */
+    @RequestMapping("/error")
     public ResponseEntity<Object> handleError(HttpServletRequest request) {
         HttpStatus httpStatus = Optional.ofNullable(request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE))
                 .map(status -> HttpStatus.resolve(Integer.parseInt(status.toString())))
@@ -150,22 +138,19 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
         return new ResponseEntity<>(ThingsboardErrorResponse.of(errorMessage, statusToErrorCode(httpStatus), httpStatus), httpStatus);
     }
 
+    /**
+     * 功能：执行 `handle` 对应的处理。
+     * 参数：
+     * - `request`：请求对象。
+     * - `response`：响应对象。
+     * - `accessDeniedException`：`accessDeniedException` 参数。
+     * 返回：无。
+     */
     @Override
     @ExceptionHandler(AccessDeniedException.class)
-    /**
-     * 方法说明：
-     * 1. 职责：执行 `handle` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
-     */
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException,
             ServletException {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!response.isCommitted()) {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setStatus(HttpStatus.FORBIDDEN.value());
@@ -175,40 +160,31 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
         }
     }
 
-    @ExceptionHandler(Exception.class)
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handle` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：执行 `handle` 对应的处理。
+     * 参数：
+     * - `exception`：`exception` 参数。
+     * - `response`：响应对象。
+     * 返回：无。
      */
+    @ExceptionHandler(Exception.class)
     public void handle(Exception exception, HttpServletResponse response) {
         log.debug("Processing exception {}", exception.getMessage(), exception);
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (!response.isCommitted()) {
             try {
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 if (exception instanceof ThingsboardException) {
                     ThingsboardException thingsboardException = (ThingsboardException) exception;
-                    // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                     if (thingsboardException.getErrorCode() == ThingsboardErrorCode.SUBSCRIPTION_VIOLATION) {
                         handleSubscriptionException((ThingsboardException) exception, response);
                     } else {
                         handleThingsboardException((ThingsboardException) exception, response);
                     }
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (exception instanceof TbRateLimitsException) {
                     handleRateLimitException(response, (TbRateLimitsException) exception);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (exception instanceof AccessDeniedException) {
                     handleAccessDeniedException(response);
-                // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
                 } else if (exception instanceof AuthenticationException) {
                     handleAuthenticationException((AuthenticationException) exception, response);
                 } else {
@@ -216,29 +192,27 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
                     JacksonUtil.writeValue(response.getWriter(), ThingsboardErrorResponse.of(exception.getMessage(),
                             ThingsboardErrorCode.GENERAL, HttpStatus.INTERNAL_SERVER_ERROR));
                 }
-            // 异常在这里被转换为统一失败路径，避免底层异常直接泄露到调用方。
             } catch (IOException e) {
                 log.error("Can't handle exception", e);
             }
         }
     }
 
-    @Override
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleExceptionInternal` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Exception Internal`。
+     * 参数：
+     * - `ex`：`ex` 参数。
+     * - `body`：`body` 参数。
+     * - `headers`：`headers` 参数。
+     * - `status`：`status` 参数。
+     * - 其余参数：补充处理条件。
+     * 返回：响应结果。
      */
+    @Override
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception ex, @Nullable Object body,
             HttpHeaders headers, HttpStatus status,
             WebRequest request) {
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (HttpStatus.INTERNAL_SERVER_ERROR.equals(status)) {
             request.setAttribute(WebUtils.ERROR_EXCEPTION_ATTRIBUTE, ex, WebRequest.SCOPE_REQUEST);
         }
@@ -247,14 +221,11 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleThingsboardException` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Thingsboard Exception`。
+     * 参数：
+     * - `thingsboardException`：`thingsboardException` 参数。
+     * - `response`：响应对象。
+     * 返回：无。
      */
     private void handleThingsboardException(ThingsboardException thingsboardException, HttpServletResponse response) throws IOException {
         ThingsboardErrorCode errorCode = thingsboardException.getErrorCode();
@@ -264,14 +235,11 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleRateLimitException` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理数量限制。
+     * 参数：
+     * - `response`：响应对象。
+     * - `exception`：`exception` 参数。
+     * 返回：无。
      */
     private void handleRateLimitException(HttpServletResponse response, TbRateLimitsException exception) throws IOException {
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
@@ -282,14 +250,11 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleSubscriptionException` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理订阅。
+     * 参数：
+     * - `subscriptionException`：`subscriptionException` 参数。
+     * - `response`：响应对象。
+     * 返回：无。
      */
     private void handleSubscriptionException(ThingsboardException subscriptionException, HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.FORBIDDEN.value());
@@ -298,14 +263,10 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleAccessDeniedException` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Access Denied Exception`。
+     * 参数：
+     * - `response`：响应对象。
+     * 返回：无。
      */
     private void handleAccessDeniedException(HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.FORBIDDEN.value());
@@ -316,24 +277,18 @@ public class ThingsboardErrorResponseHandler extends ResponseEntityExceptionHand
     }
 
     /**
-     * 方法说明：
-     * 1. 职责：执行 `handleAuthenticationException` 对应的异常与错误响应类型流程，完成参数校验、状态读取、消息路由或结果转换。
-     * 2. 参数：输入参数由调用方提供，通常代表请求 DTO、实体标识、租户/用户上下文、队列消息、Actor 消息或测试数据。
-     * 3. 返回值：返回处理结果、响应 DTO、异步句柄或状态对象；`void` 方法通常通过副作用、回调或异常表达结果。
-     * 4. 调用时机：在请求失败、认证失败或参数校验失败时创建并返回时由 Controller、Service、Actor、队列消费者、Transport 处理器或测试框架调用。
-     * 5. 使用流程：捕获异常后映射错误码、状态码和响应体。
-     * 6. 线程安全：方法本身不隐式保证线程安全；单例 Bean、Actor 消息和异步回调需要依赖外层并发模型。
-     * 7. 事务/缓存/MQTT/Actor/数据库/Rule Engine：是否直接涉及取决于实现体中的 DAO、缓存、队列、Transport、Actor 或规则引擎调用。
+     * 功能：处理`Authentication Exception`。
+     * 参数：
+     * - `authenticationException`：`authenticationException` 参数。
+     * - `response`：响应对象。
+     * 返回：无。
      */
     private void handleAuthenticationException(AuthenticationException authenticationException, HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         if (authenticationException instanceof BadCredentialsException || authenticationException instanceof UsernameNotFoundException) {
             JacksonUtil.writeValue(response.getWriter(), ThingsboardErrorResponse.of("Invalid username or password", ThingsboardErrorCode.AUTHENTICATION, HttpStatus.UNAUTHORIZED));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (authenticationException instanceof DisabledException) {
             JacksonUtil.writeValue(response.getWriter(), ThingsboardErrorResponse.of("User account is not active", ThingsboardErrorCode.AUTHENTICATION, HttpStatus.UNAUTHORIZED));
-        // 条件分支用于保护权限、状态或参数边界，避免无效请求进入后续链路。
         } else if (authenticationException instanceof LockedException) {
             JacksonUtil.writeValue(response.getWriter(), ThingsboardErrorResponse.of("User account is locked due to security policy", ThingsboardErrorCode.AUTHENTICATION, HttpStatus.UNAUTHORIZED));
         } else if (authenticationException instanceof JwtExpiredTokenException) {
