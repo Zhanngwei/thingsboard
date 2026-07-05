@@ -199,13 +199,68 @@ Option: Observe=0
 ## 面试题
 
 1. LwM2M Transport 在 ThingsBoard 通信链路中解决什么问题？
+
+**参考答案：**
+LwM2M Transport 在 ThingsBoard 通信链路中的作用是：LwM2M Transport 解决设备注册、Bootstrap、对象资源管理、Observe、Read/Write/Execute 和 OTA。 面试时可以按“入口、转换、投递、处理、落库”五步回答。第一步，设备或网关先通过对应协议把数据送到服务端；第二步，入口层完成协议字段解析和身份识别；第三步，Transport 层把外部协议负载转换成 ThingsBoard 内部消息；第四步，消息通过 Queue/Core/Actor/Rule Engine 处理；第五步，最终由 DAO 写入遥测、属性、事件、告警或 RPC 状态。
+
+**示例说法：**
+“我理解的 LwM2M Transport 不是一个孤立协议点，而是 ThingsBoard 设备接入链路的一段。设备通过 CoAP/DTLS 向 LwM2M Server 发送 Register、Update、Notify 等请求。 进入平台后，不能直接写业务表，而要先收敛到 Transport 抽象，再进入队列、Actor 和 Rule Engine。这样 HTTP、MQTT、CoAP、LwM2M、SNMP 或工业网关数据最终都能复用同一套设备状态、规则链和存储能力。”
+
 2. 设备身份从报文哪个字段进入平台，最终如何映射到 DeviceId？
+
+**参考答案：**
+设备身份首先来自协议或网关映射层。身份主要来自 LwM2M endpoint name、PSK identity、RPK/X.509 证书信息，并映射到 ThingsBoard 设备凭据。 ThingsBoard 不会只凭 IP 判断设备，因为 IP 可能经过 NAT、网关或负载均衡，不能稳定代表设备。身份字段经过认证服务后，会映射成 TenantId、DeviceId、DeviceProfileId、SessionId 等内部上下文。这些字段后续会进入 Queue 消息、Actor 路由、Rule Engine 的 `TbMsg` metadata，以及 DAO 查询和写入条件。
+
+**示例说法：**
+“我会先看抓包里的身份字段，再看源码里认证发生在哪里。比如 MQTT 是 CONNECT username/access token，HTTP 是 URL path token，LwM2M 是 endpoint/PSK identity。认证成功后，平台拿到 DeviceId，后续队列分区、DeviceActor 路由、规则链 originator 和数据库 entity_id 都围绕这个 DeviceId 展开。”
+
 3. 什么情况下报文已经到达端口，但不会写入数据库？
+
+**参考答案：**
+报文到达端口但不写数据库，通常说明问题发生在网络之后、DAO 之前。常见原因包括：身份认证失败、协议路径或 topic 不匹配、payload 格式无法转换、设备 Profile 或 Transport 配置不允许该消息、限流拒绝、TransportService 投递队列失败、Kafka/内存队列积压、Core Consumer 没消费、Actor mailbox 堆积、Rule Engine 节点失败、规则链没有保存节点、时间戳异常导致页面看不到，或者 DAO 事务/数据库写入失败。
+
+**示例说法：**
+“我不会看到 Wireshark 有包就认为平台应该有数据。抓包只能证明报文到了服务端端口。接下来要看 Handler 是否接受、认证是否成功、是否调用 TransportService、队列是否有消息、DeviceActor 是否处理、Rule Engine 是否执行、最后才看 `ts_kv_latest` 或 `attribute_kv` 是否更新。”
+
 4. 该链路是否经过 Netty？如果不经过，实际入口框架是什么？
+
+**参考答案：**
+是否经过 Netty 要看入口协议。LwM2M 基于 Leshan/Californium，不走 MQTT Netty Handler；核心入口包括 `LwM2mServerListener` 和上下行 Handler。 面试时要避免把所有协议都说成 Netty。Netty 适合 TCP 长连接和自定义二进制协议，但 ThingsBoard 中 HTTP、CoAP、LwM2M、SNMP 等入口可能分别由 Spring MVC、Californium/Leshan、SNMP4J 等框架承接。关键不是框架名字，而是找到“外部报文第一次进入业务代码”的入口类。
+
+**示例说法：**
+“如果是 MQTT，我会直接看 `MqttTransportServerInitializer` 和 `MqttTransportHandler`；如果是 HTTP，我会看 `DeviceApiController`；如果是 LwM2M，我会看 Leshan listener 和上下行 handler。它们入口不同，但最终都会收敛到 TransportService 或平台内部服务。”
+
 5. 该链路是否进入 Actor？进入哪个 Actor？
+
+**参考答案：**
+正常业务链路会进入 Actor，但不是网络包一到就直接进 Actor。注册、Notify、资源值变化会转换成平台消息，经队列进入 DeviceActor；下行 Read/Write/Execute 由 DeviceActor/RPC 服务回到 LwM2M 会话。 Actor 的价值是把设备、租户、规则链等有状态对象串行化处理，降低锁竞争，并保证同一设备或同一规则节点相关状态的一致性。通常路径是：Transport 解析并投递队列，Core Consumer 消费后进入 TenantActor，再路由到 DeviceActor；需要规则处理时进入 RuleChainActor 和 RuleNodeActor。
+
+**示例说法：**
+“我会把 Actor 看成网络层之后的平台状态处理层。比如 MQTT PUBLISH 先由 Netty Handler 解析，再经 TransportService 写队列，Core Consumer 消费后才进入 DeviceActor。这样网络线程不会承担复杂业务，设备状态也不会被多个线程随意修改。”
+
 6. 该链路是否进入 Rule Engine？哪些消息类型会进入？
+
+**参考答案：**
+是否进入 Rule Engine 取决于消息类型。Notify 或资源读取得到的遥测/属性会进入 Rule Engine；设备管理操作、OTA 状态也可转成属性、事件或遥测。 一般来说，遥测上报、属性上报、连接事件、部分 RPC 或生命周期事件可以进入规则链；纯协议握手、订阅请求、ACK、心跳、底层重传通常不会作为业务消息进入 Rule Engine。Rule Engine 处理的是平台标准消息，而不是原始 TCP/UDP/MQTT/CoAP 字节。
+
+**示例说法：**
+“例如 MQTT CONNECT 主要用于认证和 Session 建立，不等于一条业务遥测；PUBLISH 到 telemetry topic 才会转换为遥测消息进入 Rule Engine。进入规则链后，它会成为 `TbMsg`，带有 originator、type、metadata 和 data，规则节点再决定过滤、转换、告警或写库。”
+
 7. 该链路涉及哪些数据库表或缓存？
+
+**参考答案：**
+这条链路涉及的数据库和缓存要按阶段区分。涉及设备凭据、LwM2M 模型/安全配置缓存，遥测属性写 `ts_kv`/`attribute_kv`，OTA 和 RPC 可涉及 `ota_package`、`rpc`、`event`。 另外，ThingsBoard 为了减少高频查询，会使用本地 Caffeine 缓存、Redis 缓存或专门的 Transport 缓存保存设备凭据、设备 Profile、租户 Profile、实体关系、属性和限流状态。回答时不要只说“写数据库”，而要说明读什么、写什么、何时写。
+
+**示例说法：**
+“认证阶段通常读 `device_credentials`；设备上下文会读 `device` 和 `device_profile`；遥测成功后写 `ts_kv_latest` 和历史 `ts_kv`；属性写 `attribute_kv`；RPC 下行可能写 `rpc`；规则链创建告警会写 `alarm`。如果页面没有数据，我会先查 `ts_kv_latest` 是否更新。”
+
 8. 如果生产环境出现延迟，应优先检查哪些指标？
+
+**参考答案：**
+生产延迟要分层定位，不能只看 JVM CPU。优先看 DTLS 握手、Registration lifetime、Observe 队列、下行请求排队、Leshan 线程池、Redis store 和 Queue lag。 一般我会按顺序看：网络 RTT 和重传、协议确认耗时、入口线程或 EventLoop、认证和缓存命中率、Transport 限流、队列发送耗时、Kafka lag、Consumer 处理速率、Actor mailbox、Rule Engine 节点耗时、DAO 慢查询、数据库连接池、WebSocket 推送延迟。这样可以把“设备慢”“平台慢”“规则慢”“数据库慢”区分开。
+
+**示例说法：**
+“如果设备侧显示上报成功但平台 30 秒后才显示，我会先看 Kafka lag。如果 lag 高，说明入口没问题但消费慢；如果 lag 低，再看 Rule Engine 节点耗时和数据库写入；如果数据库已有数据但页面慢，再看 WebSocket 订阅和前端时间窗口。”
 
 ## 本章总结
 
