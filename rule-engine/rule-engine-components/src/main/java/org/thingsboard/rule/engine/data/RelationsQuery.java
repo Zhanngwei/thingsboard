@@ -44,8 +44,3 @@ public class RelationsQuery {
      */
     private boolean fetchLastLevelOnly = false;
 }
-
-/*
- * 本类总结：
- * 本类是关系查询的配置模型，线程安全性取决于调用方如何共享其实例；具体数据库读取、缓存命中和规则链消息流由使用它的服务或节点完成。
- */

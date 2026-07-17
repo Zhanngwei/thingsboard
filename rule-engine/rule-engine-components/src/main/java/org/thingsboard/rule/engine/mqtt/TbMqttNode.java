@@ -218,10 +218,3 @@ public class TbMqttNode extends TbAbstractExternalNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类是 MQTT 外部集成节点，直接管理 MQTT 客户端连接并以 AT_LEAST_ONCE QoS 发布消息。
- * Topic、连接参数、保留消息和认证来自节点配置；Rule Engine 消息确认在发布前通过基类处理，发布回调决定成功或失败路由。
- * 本类本身不直接涉及数据库或缓存，相关能力只可能通过 Rule Engine 上下文、执行器或调用链间接涉及。
- */

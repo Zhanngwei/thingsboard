@@ -31,12 +31,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * 中文说明：
- * 1. 职责：验证 TbNodeUtils 对元数据变量和消息 data 变量模板的替换行为。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的工具类单元测试。
- * 3. 协作对象：与 TbNodeUtils、TbMsg、TbMsgMetaData、JacksonUtil 和 JUnit/Mockito 测试框架协作。
- * 4. 生命周期：由 Maven/JUnit 在测试阶段创建并执行，每个测试方法独立构造输入消息。
- * 5. 设计原因：模板替换被多个规则节点复用，单元测试可固定边界行为，尤其是嵌套对象和数组不替换场景。
- * 6. 技术关联：测试本身不涉及事务、缓存、MQTT、Actor、数据库；直接验证 Rule Engine 模板处理工具。
+ * 1. `TbNodeUtilsTest` 是 ThingsBoard Rule Engine API 中验证 `TbNodeUtils` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 它直接协作于被测类型、测试框架和必要的模拟依赖。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TbNodeUtilsTest {
@@ -193,11 +193,3 @@ public class TbNodeUtilsTest {
         assertThat(TbNodeUtils.formatMetadataVarTemplate(null), is(String.format(METADATA_VARIABLE_TEMPLATE, (String) null)));
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：验证 TbNodeUtils 模板替换和模板格式化行为。
- * 2. 核心流程：每个测试构造 TbMsg 或 key，调用工具方法并断言替换结果。
- * 3. 关键依赖：TbNodeUtils、TbMsg、TbMsgMetaData、JacksonUtil、JUnit 和 Hamcrest。
- * 4. 学习重点：模板工具只支持 metadata 直接替换和 data 对象点路径，数组表达式会保持原样。
- */

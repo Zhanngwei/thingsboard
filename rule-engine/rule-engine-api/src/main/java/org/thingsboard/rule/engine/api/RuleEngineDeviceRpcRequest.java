@@ -27,13 +27,12 @@ import java.util.UUID;
  */
 /**
  * 中文说明：
- * 1. 职责：封装 Rule Engine 向设备发起服务端 RPC 请求所需的全部上下文。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的设备 RPC 数据模型。
- * 3. 协作对象：与 {@link RuleEngineRpcService}、RPC 规则节点、设备会话层和持久化 RPC 流程协作。
- * 4. 生命周期：由 RPC 节点或 REST 调用流程创建，随一次 RPC 请求存在，响应或超时后结束。
- * 5. 设计原因：RPC 请求参数跨 Rule Engine、传输会话和持久化层传递，使用不可变 Builder DTO 可避免参数错位。
- * 6. 设计模式：Builder，用于构建包含多个可选字段的命令对象。
- * 7. 技术关联：本类本身不直接操作事务、缓存、MQTT、Actor、数据库；可能被实现层用于 MQTT/传输下发、RPC 持久化和 Rule Engine 回调。
+ * 1. `RuleEngineDeviceRpcRequest` 是 ThingsBoard Rule Engine API 中承载请求信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 @Data
 @Builder
@@ -92,11 +91,3 @@ public final class RuleEngineDeviceRpcRequest {
      */
     private final Integer retries;
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：作为 Rule Engine 发起设备 RPC 的不可变请求命令对象。
- * 2. 核心流程：RPC 节点构建请求，RuleEngineRpcService 发送到设备传输层并等待响应或超时。
- * 3. 关键依赖：RuleEngineRpcService、DeviceId、TenantId、设备传输会话和持久化 RPC 实现。
- * 4. 学习重点：RPC 请求需要同时支持集群路由、单向/双向模式、持久化和 REST 调用来源。
- */

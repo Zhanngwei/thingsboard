@@ -19,13 +19,12 @@ import org.thingsboard.rule.engine.api.sms.exception.SmsException;
 
 /**
  * 中文说明：
- * 1. 职责：抽象单个短信供应商客户端的发送和销毁能力。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的短信供应商适配层。
- * 3. 协作对象：与 {@link SmsSenderFactory}、{@link org.thingsboard.rule.engine.api.SmsService} 和具体供应商 SDK/HTTP 客户端协作。
- * 4. 生命周期：由工厂根据短信配置创建，随配置实例或发送服务生命周期存在，销毁时释放外部资源。
- * 5. 设计原因：不同短信供应商发送协议不同，通过 Strategy 接口让 SmsService 统一调用。
- * 6. 设计模式：Strategy，具体 SmsSender 实现封装供应商差异。
- * 7. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor、数据库；实现会调用外部短信服务，可能被 Rule Engine 短信节点触发。
+ * 1. `SmsSender` 是 ThingsBoard Rule Engine API 中定义 `Sms Sender` 能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface SmsSender {
 
@@ -46,11 +45,3 @@ public interface SmsSender {
     void destroy();
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：统一不同短信供应商的发送接口。
- * 2. 核心流程：SmsService 通过工厂创建 SmsSender，调用 sendSms 发送，配置变化或关闭时调用 destroy。
- * 3. 关键依赖：SmsException、SmsSenderFactory、SmsService 和具体短信供应商实现。
- * 4. 学习重点：短信供应商差异通过 Strategy 接口隔离，规则节点不直接感知供应商细节。
- */

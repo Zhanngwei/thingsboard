@@ -27,13 +27,12 @@ import java.util.concurrent.ExecutionException;
  */
 /**
  * 中文说明：
- * 1. 职责：定义所有 Rule Engine 规则节点必须实现的生命周期和消息处理契约。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的核心节点抽象。
- * 3. 协作对象：与 {@link TbContext}、{@link TbNodeConfiguration}、{@link org.thingsboard.server.common.msg.TbMsg}、规则链 Actor 和节点注解 {@link RuleNode} 协作。
- * 4. 生命周期：节点实例由 Rule Engine 创建，先 init 初始化，再多次 onMsg 处理消息，分区变化时可接收通知，销毁时调用 destroy。
- * 5. 设计原因：Rule Engine 需要统一调度不同类型节点，用接口约束生命周期可避免运行时反射调用不稳定。
- * 6. 设计模式：Strategy/Template，运行时按统一模板调用节点生命周期，具体节点提供不同策略。
- * 7. 技术关联：接口本身不直接涉及事务、缓存、MQTT、数据库；通过 Rule Engine Actor 调度节点，具体实现可能涉及这些能力。
+ * 1. `TbNode` 是 ThingsBoard Rule Engine API 中定义所有规则节点统一行为的核心接口。
+ * 2. 它规定节点初始化、消息处理、配置升级、分区变化和资源释放等基本契约。
+ * 3. 具体节点实现通过这些方法接收 `TbMsg`，并使用上下文继续路由处理结果。
+ * 4. 它直接协作于 `TbContext`、`TbNodeConfiguration`、`TbMsg` 和分区变化消息。
+ * 5. 统一接口使规则引擎可以用相同方式创建、调用和销毁不同节点实现。
+ * 6. 阅读时重点关注必须实现的方法、默认方法以及节点实现需要遵守的返回语义。
  */
 public interface TbNode {
 
@@ -85,11 +84,3 @@ public interface TbNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：定义所有规则节点统一的初始化、消息处理、分区变化和销毁生命周期。
- * 2. 核心流程：Rule Engine 创建节点并调用 init，消息进入时调用 onMsg，分区变化时调用 onPartitionChangeMsg，停止时调用 destroy。
- * 3. 关键依赖：TbContext、TbNodeConfiguration、TbMsg、PartitionChangeMsg、RuleNode 注解和规则链 Actor。
- * 4. 学习重点：规则节点不是普通服务方法，而是由 Actor/Rule Engine 运行时按生命周期调度的策略对象。
- */

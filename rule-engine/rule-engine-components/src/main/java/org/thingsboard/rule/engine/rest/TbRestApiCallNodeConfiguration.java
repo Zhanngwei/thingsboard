@@ -137,10 +137,3 @@ public class TbRestApiCallNodeConfiguration implements NodeConfiguration<TbRestA
         }
     }
 }
-
-/*
- * 本类总结：
- * 本类描述 REST API 外部调用节点的全部可配置项，包括 URL、方法、Header、代理、TLS 凭据、请求体和并发限制。
- * 实际 HTTP 客户端创建、异步调用、失败路由和资源释放由 TbHttpClient/TbRestApiCallNode 完成。
- * 配置类本身不直接涉及外部调用、数据库、缓存或 Rule Engine Actor 调度。
- */

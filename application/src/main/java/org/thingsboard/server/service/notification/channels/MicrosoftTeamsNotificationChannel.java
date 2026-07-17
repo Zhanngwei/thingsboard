@@ -44,13 +44,12 @@ import java.util.Optional;
 
 /**
  * 中文说明：
- * 1. 类目的：`MicrosoftTeamsNotificationChannel` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
- * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Service / Facade。
+ * 1. `MicrosoftTeamsNotificationChannel` 是 ThingsBoard Application 中处理通知的处理器。
+ * 2. 它把单一处理步骤封装为可调用、可替换的组件。
+ * 3. 输入通常来自上游事件、网络消息或异步回调，输出交给下一处理步骤。
+ * 4. 直接依赖的类型边界包括 `NotificationChannel`。
+ * 5. 独立处理器可以缩小单个流程的职责范围，并便于组合处理链。
+ * 6. 阅读时重点关注入口方法、条件分支和处理完成后的转发行为。
  */
 @Component
 @RequiredArgsConstructor
@@ -155,13 +154,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
     /**
      * 中文说明：
-     * 1. 类目的：`Message` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-     * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Service / Facade。
+     * 1. `Message` 是 ThingsBoard Application 中承载消息信息的数据类型。
+     * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+     * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+     * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+     * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+     * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
      */
     @Data
     public static class Message {
@@ -189,13 +187,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
         /**
          * 中文说明：
-         * 1. 类目的：`Section` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-         * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-         * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-         * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-         * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-         * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-         * 7. 设计模式：主要体现 Service / Facade。
+         * 1. `Section` 是 ThingsBoard Application 中承载 `Section` 信息的数据类型。
+         * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+         * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+         * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+         * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+         * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
          */
         @Data
         public static class Section {
@@ -216,13 +213,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
             /**
              * 中文说明：
-             * 1. 类目的：`Fact` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-             * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-             * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-             * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-             * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-             * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-             * 7. 设计模式：主要体现 Service / Facade。
+             * 1. `Fact` 是 ThingsBoard Application 中承载 `Fact` 信息的数据类型。
+             * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+             * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+             * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+             * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+             * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
              */
             @Data
             public static class Fact {
@@ -236,13 +232,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
         /**
          * 中文说明：
-         * 1. 类目的：`ActionCard` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-         * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-         * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-         * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-         * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-         * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-         * 7. 设计模式：主要体现 Service / Facade。
+         * 1. `ActionCard` 是 ThingsBoard Application 中承载 `Action Card` 信息的数据类型。
+         * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+         * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+         * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+         * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+         * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
          */
         @Data
         @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -265,13 +260,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
             /**
              * 中文说明：
-             * 1. 类目的：`Input` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-             * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-             * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-             * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-             * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-             * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-             * 7. 设计模式：主要体现 Service / Facade。
+             * 1. `Input` 是 ThingsBoard Application 中承载 `Input` 信息的数据类型。
+             * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+             * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+             * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+             * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+             * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
              */
             @Data
             public static class Input {
@@ -293,13 +287,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
                 /**
                  * 中文说明：
-                 * 1. 类目的：`Choice` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-                 * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-                 * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-                 * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-                 * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-                 * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-                 * 7. 设计模式：主要体现 Service / Facade。
+                 * 1. `Choice` 是 ThingsBoard Application 中承载 `Choice` 信息的数据类型。
+                 * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+                 * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+                 * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+                 * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+                 * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
                  */
                 @Data
                 public static class Choice {
@@ -313,13 +306,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
             /**
              * 中文说明：
-             * 1. 类目的：`Action` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-             * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-             * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-             * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-             * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-             * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-             * 7. 设计模式：主要体现 Service / Facade。
+             * 1. `Action` 是 ThingsBoard Application 中承载 `Action` 信息的数据类型。
+             * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+             * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+             * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+             * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+             * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
              */
             @Data
             public static class Action {
@@ -337,13 +329,12 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
 
             /**
              * 中文说明：
-             * 1. 类目的：`Target` 是ThingsBoard Application 模块中的业务服务类型，用于承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
-             * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-             * 3. 协作对象：主要协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
-             * 4. 生命周期：由 Spring 容器创建为单例服务，按请求、队列消息或调度任务调用。
-             * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-             * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-             * 7. 设计模式：主要体现 Service / Facade。
+             * 1. `Target` 是 ThingsBoard Application 中承载 `Target` 信息的数据类型。
+             * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+             * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+             * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+             * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+             * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
              */
             @Data
             public static class Target {
@@ -358,11 +349,3 @@ public class MicrosoftTeamsNotificationChannel implements NotificationChannel<Mi
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`MicrosoftTeamsNotificationChannel` 在 ThingsBoard Application 模块 中承担业务服务类型职责，核心目的是承载 ThingsBoard 服务端应用的业务编排、实体访问和异步处理。
- * 2. 核心流程：校验输入后调用 DAO 或外部服务，更新状态并发布事件或队列消息。
- * 3. 关键依赖：主要依赖或协作对象包括Controller、DAO、缓存、队列、Actor、Transport、Rule Engine 和审计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

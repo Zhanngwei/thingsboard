@@ -16,8 +16,13 @@
 package org.thingsboard.rule.engine.credentials;
 
 /**
- * 中文说明：`CredentialsType` 是凭据类型枚举，用于限定描述客户端认证方式以及证书、Basic、匿名等凭据初始化资料时可选择的固定值。
- * 调用边界：本枚举本身不直接涉及数据库、缓存、Rule Engine、Actor、MQTT 或事务，只作为配置或流程判断的类型值。
+ * 中文说明：
+ * 1. `CredentialsType` 是 ThingsBoard Rule Engine Components 中定义 `Credentials Type` 固定取值的枚举类型。
+ * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+ * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+ * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+ * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+ * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
  */
 public enum CredentialsType {
     /**
@@ -51,8 +56,4 @@ public enum CredentialsType {
     CredentialsType(String label) {
         this.label = label;
     }
-    /*
-     * 本类总结：`CredentialsType` 负责描述客户端认证方式以及证书、Basic、匿名等凭据初始化资料；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

@@ -89,13 +89,12 @@ import java.util.function.Consumer;
  */
 /**
  * 中文说明：
- * 1. 职责：为每个规则节点提供消息路由、消息创建、服务访问、异步执行器、脚本引擎、状态存储和监听器注册的运行上下文。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的核心上下文边界，是具体节点与平台服务之间的主要协作入口。
- * 3. 协作对象：与 {@link TbNode}、{@link TbMsg}、规则链 Actor、DAO 服务、缓存服务、队列服务、脚本引擎、通知/RPC/遥测/告警服务协作。
- * 4. 生命周期：由 Rule Engine 运行时为节点实例提供，随节点和规则链执行环境存在；节点在 init/onMsg/destroy 等阶段调用。
- * 5. 设计原因：规则节点不能直接持有全部 Spring 服务和 Actor 细节，使用上下文可以统一权限、租户、队列、回调和服务访问边界。
- * 6. 设计模式：Facade/Context，对规则节点隐藏底层服务、缓存、数据库、队列和 Actor 调度细节。
- * 7. 技术关联：接口本身不直接执行事务、缓存、MQTT、Actor 通信或数据库操作；具体实现和返回服务可能涉及这些能力，所有方法都服务 Rule Engine。
+ * 1. `TbContext` 是 ThingsBoard Rule Engine API 中定义 `Tb Context` 能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface TbContext {
 
@@ -1026,11 +1025,3 @@ public interface TbContext {
      */
     AuditLogService getAuditLogService();
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为规则节点提供消息路由、服务访问、异步执行、脚本执行、状态存储和监听器管理的统一上下文。
- * 2. 核心流程：节点在 init 获取配置和服务，在 onMsg 中创建/路由消息并调用平台服务，在 destroy 中移除监听和释放资源。
- * 3. 关键依赖：TbNode、TbMsg、规则链 Actor、DAO 服务、缓存、队列、脚本引擎、告警/遥测/RPC/通知服务。
- * 4. 学习重点：TbContext 是规则节点与 ThingsBoard 平台能力之间的 Facade，节点通过它使用服务而不是直接耦合底层实现。
- */

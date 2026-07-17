@@ -17,12 +17,12 @@ package org.thingsboard.rule.engine.api.sms.exception;
 
 /**
  * 中文说明：
- * 1. 职责：表示短信已经进入发送阶段后发生的外部投递失败。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的短信异常层。
- * 3. 协作对象：与 SmsSender、SmsService、供应商 HTTP/SDK 客户端和规则节点失败路由协作。
- * 4. 生命周期：随一次短信发送失败创建并传播到调用方。
- * 5. 设计原因：发送失败通常需要重试、失败路由或供应商错误展示，需与配置解析失败区分。
- * 6. 技术关联：异常本身不直接涉及事务、缓存、MQTT、Actor、数据库；可能从 Rule Engine 短信节点传播到失败关系。
+ * 1. `SmsSendException` 是 ThingsBoard Rule Engine API 中表示 `Sms Send` 失败语义的异常类型。
+ * 2. 它用于把特定错误原因传递给上层处理流程。
+ * 3. 异常中保存的消息、错误码或上下文帮助调用方判断失败类型。
+ * 4. 直接依赖的类型边界包括 `SmsException`。
+ * 5. 独立异常类型让调用方能够精确捕获该类错误，而不是依赖文本判断。
+ * 6. 阅读时重点关注创建位置、携带信息和上层捕获后的处理结果。
  */
 public class SmsSendException extends SmsException {
 
@@ -47,11 +47,3 @@ public class SmsSendException extends SmsException {
         super(msg, cause);
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：表达短信供应商投递失败。
- * 2. 核心流程：SmsSender 捕获或识别发送失败后抛出 SmsSendException，SmsService 或规则节点处理失败。
- * 3. 关键依赖：SmsException、SmsSender 和外部短信供应商客户端。
- * 4. 学习重点：外部发送失败独立建模，便于 Rule Engine 做失败路由或重试策略。
- */

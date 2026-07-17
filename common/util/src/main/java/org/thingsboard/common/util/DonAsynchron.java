@@ -26,13 +26,12 @@ import java.util.function.Consumer;
 
 /**
  * 中文说明：
- * 1. 类目的：`DonAsynchron` 是ThingsBoard Common 模块中的公共工具类型，用于提供跨模块复用的纯函数、解析、转换或辅助逻辑。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括Application、DAO、Transport、Rule Engine、测试工具和第三方库。
- * 4. 生命周期：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Utility / Helper。
+ * 1. `DonAsynchron` 是 ThingsBoard Common 中围绕 `Don Asynchron` 提供具体能力的类型。
+ * 2. 它封装当前声明对应的核心操作和必要状态。
+ * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+ * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+ * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+ * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
  */
 public class DonAsynchron {
 
@@ -112,11 +111,3 @@ public class DonAsynchron {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`DonAsynchron` 在 ThingsBoard Common 模块 中承担公共工具类型职责，核心目的是提供跨模块复用的纯函数、解析、转换或辅助逻辑。
- * 2. 核心流程：接收输入参数后执行本地转换、校验或解析并返回结果。
- * 3. 关键依赖：主要依赖或协作对象包括Application、DAO、Transport、Rule Engine、测试工具和第三方库。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

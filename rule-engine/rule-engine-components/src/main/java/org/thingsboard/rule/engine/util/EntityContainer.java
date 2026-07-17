@@ -35,8 +35,3 @@ public class EntityContainer {
     private EntityType entityType;
 
 }
-
-/*
- * 本类总结：
- * 本类是 Lombok 数据容器，用于在规则节点或工具方法之间传递实体标识信息；持久化、缓存和消息处理均由调用方完成。
- */

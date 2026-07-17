@@ -26,12 +26,12 @@ import org.thingsboard.server.common.data.id.TenantId;
 
 /**
  * 中文说明：
- * 1. 职责：定义 Rule Engine、通知和账户流程使用邮件能力的统一入口。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的外部邮件服务边界。
- * 3. 协作对象：与邮件规则节点、通知中心、系统/租户邮件配置、{@link TbEmail} 和 JavaMailSender 实现协作。
- * 4. 生命周期：接口由 Spring Bean 实现提供，规则节点或系统流程在需要发送邮件时通过 {@link TbContext} 获取并调用。
- * 5. 设计原因：规则节点不应直接依赖具体邮件实现，通过接口隔离配置刷新、测试连接和真实发送。
- * 6. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor 通信、数据库；具体实现可能读取配置、执行外部 SMTP 调用并被 Rule Engine 使用。
+ * 1. `MailService` 是 ThingsBoard Rule Engine API 中定义 `Mail` 能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface MailService {
 
@@ -177,11 +177,3 @@ public interface MailService {
     boolean isConfigured(TenantId tenantId);
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为 Rule Engine、通知和账户流程提供统一邮件发送 API。
- * 2. 核心流程：调用方准备邮件内容或配置，MailService 实现读取配置并调用外部 SMTP 服务。
- * 3. 关键依赖：TbEmail、TenantId、CustomerId、JavaMailSender、邮件配置和通知流程。
- * 4. 学习重点：规则节点通过服务接口使用邮件能力，不直接管理 SMTP 客户端和配置刷新细节。
- */

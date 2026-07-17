@@ -129,9 +129,3 @@ public class TbNotificationNode extends TbAbstractExternalNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类把 Rule Engine 消息转换为 NotificationRequest，并通过通知执行器委托 NotificationCenter 处理。
- * 节点本身只负责请求构造、消息确认和回调路由；数据库、缓存和具体外部渠道发送只可能在 NotificationCenter 调用链中间接涉及。
- */

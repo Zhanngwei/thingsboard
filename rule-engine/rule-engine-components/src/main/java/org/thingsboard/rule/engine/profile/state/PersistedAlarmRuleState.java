@@ -21,14 +21,12 @@ import lombok.NoArgsConstructor;
 
 /**
  * 中文说明：
- * 1. 类目的：保存单条设备画像告警规则的可持久化运行状态，用于在规则节点重启或状态恢复时继续计算持续时间和重复次数。
- * 2. 所属模块：属于 ThingsBoard Rule Engine 的 device profile/profile state 子模块，是 `TbDeviceProfileNode` 告警计算状态的一部分。
- * 3. 协作对象：与 `AlarmRuleState`、`PersistedAlarmState`、`PersistedDeviceState` 和 Rule Node State 持久化机制协作。
- * 4. 生命周期：由设备画像节点在加载、更新和保存设备告警状态时创建或反序列化；字段值随设备告警规则评估周期更新。
- * 5. 设计原因：使用独立 DTO 隔离可持久化字段，避免把运行期规则对象、缓存对象或 DAO 对象直接写入规则节点状态。
- * 6. 技术关联：本类本身不直接涉及事务、缓存、MQTT、Actor 通信、数据库或 Rule Engine 执行；数据库持久化由外层 Rule Node State 流程间接完成。
- * 7. 显式方法：本类没有手写方法，构造器与访问器由 Lombok 生成，线程安全取决于外层状态管理是否串行化访问。
- * 8. 设计模式：可视为 Memento/DTO，用于保存告警规则运行状态快照。
+ * 1. `PersistedAlarmRuleState` 是 ThingsBoard Rule Engine Components 中承载告警信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 @Data
 @NoArgsConstructor
@@ -49,11 +47,3 @@ public class PersistedAlarmRuleState {
     private long eventCount;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：以最小 DTO 形式保存单条告警规则的时间戳、持续时间和命中次数。
- * 2. 核心流程：外层设备画像节点加载状态后反序列化本对象，规则评估过程更新字段，节点状态保存时再次序列化。
- * 3. 关键依赖：依赖 `AlarmRuleState` 的运行期评估结果，并被 `PersistedAlarmState` 聚合到设备级持久化状态中。
- * 4. 学习重点：阅读本类时应关注 Rule Engine 如何把运行期告警条件评估拆分为可恢复的轻量状态快照。
- */

@@ -26,13 +26,12 @@ import java.util.Arrays;
 
 /**
  * 中文说明：
- * 1. 类目的：`ThingsboardInstallApplication` 是ThingsBoard Application 模块中的应用服务支撑类型，用于承载服务端运行期的数据、依赖或流程控制。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Spring Bean、DAO、缓存、队列、Actor、Transport、MQTT 和 Rule Engine 调用链。
- * 4. 生命周期：由 Spring 容器、Actor System、Web 请求或队列消费流程管理。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO/Helper。
+ * 1. `ThingsboardInstallApplication` 是 ThingsBoard Application 的进程启动入口，用于启动和装配 `Thingsboard Install Application` 相关服务。
+ * 2. 它负责创建应用上下文、加载组件并把启动参数交给实际运行模块。
+ * 3. 类中通常只保留启动参数修正和框架启动调用，不承载协议或业务处理细节。
+ * 4. 它直接协作于 Spring Boot 配置、组件扫描和当前模块的服务实现。
+ * 5. 独立入口使该服务能够单独部署、配置和扩缩容。
+ * 6. 阅读时重点关注组件扫描范围、配置文件名称和传入启动框架的参数。
  */
 @Slf4j
 @SpringBootConfiguration
@@ -88,11 +87,3 @@ public class ThingsboardInstallApplication {
         return args;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`ThingsboardInstallApplication` 在 ThingsBoard Application 模块 中承担应用服务支撑类型职责，核心目的是承载服务端运行期的数据、依赖或流程控制。
- * 2. 核心流程：初始化依赖后处理请求、消息或测试断言，并把结果交还调用方。
- * 3. 关键依赖：主要依赖或协作对象包括Spring Bean、DAO、缓存、队列、Actor、Transport、MQTT 和 Rule Engine 调用链。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

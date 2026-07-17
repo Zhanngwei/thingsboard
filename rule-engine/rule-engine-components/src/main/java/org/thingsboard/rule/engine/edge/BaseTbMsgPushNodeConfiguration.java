@@ -42,9 +42,3 @@ public class BaseTbMsgPushNodeConfiguration implements NodeConfiguration<BaseTbM
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类只保存 Edge/Cloud 推送节点共用的 scope 配置。
- * 实际消息处理、事件保存、数据库回调和远端同步由具体节点类完成。
- */

@@ -25,14 +25,12 @@ import org.thingsboard.monitoring.service.transport.impl.MqttTransportHealthChec
 
 /**
  * 中文说明：
- * 1. 类目的：`TransportType` 是 ThingsBoard Monitoring 模块 中的监控配置模型类型，用于承载目标服务、协议探测、设备凭据、阈值和通知配置的数据契约。
- * 2. 所属模块：位于 monitoring 模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Monitoring 配置、REST 客户端、WebSocket 客户端、MQTT/HTTP/CoAP/LwM2M 探测器、Slack 通知和目标 ThingsBoard 服务。
- * 4. 生命周期：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 DTO / Configuration。
+ * 1. `TransportType` 是 ThingsBoard Monitoring 中定义传输层固定取值的枚举类型。
+ * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+ * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+ * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+ * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+ * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
  */
 @AllArgsConstructor
 @Getter
@@ -50,11 +48,3 @@ public enum TransportType {
     private final Class<? extends TransportHealthChecker<?>> serviceClass;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`TransportType` 在 ThingsBoard Monitoring 模块 中承担监控配置模型类型职责，核心目的是承载目标服务、协议探测、设备凭据、阈值和通知配置的数据契约。
- * 2. 核心流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
- * 3. 关键依赖：主要依赖或协作对象包括Monitoring 配置、REST 客户端、WebSocket 客户端、MQTT/HTTP/CoAP/LwM2M 探测器、Slack 通知和目标 ThingsBoard 服务。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

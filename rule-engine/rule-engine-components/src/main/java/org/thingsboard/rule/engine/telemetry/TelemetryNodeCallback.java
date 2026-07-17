@@ -26,8 +26,13 @@ import javax.annotation.Nullable;
  * Created by ashvayka on 02.04.18.
  */
 /**
- * 中文说明：`TelemetryNodeCallback` 是遥测节点回调辅助类，用于保存、删除或通知属性与时间序列遥测数据。
- * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+ * 中文说明：
+ * 1. `TelemetryNodeCallback` 是 ThingsBoard Rule Engine Components 中处理遥测数据的处理器。
+ * 2. 它把单一处理步骤封装为可调用、可替换的组件。
+ * 3. 输入通常来自上游事件、网络消息或异步回调，输出交给下一处理步骤。
+ * 4. 直接依赖的类型边界包括 `FutureCallback`。
+ * 5. 独立处理器可以缩小单个流程的职责范围，并便于组合处理链。
+ * 6. 阅读时重点关注入口方法、条件分支和处理完成后的转发行为。
  */
 @Data
 class TelemetryNodeCallback implements FutureCallback<Void> {
@@ -61,8 +66,4 @@ class TelemetryNodeCallback implements FutureCallback<Void> {
     public void onFailure(Throwable t) {
         ctx.tellFailure(msg, t);
     }
-    /*
-     * 本类总结：`TelemetryNodeCallback` 负责保存、删除或通知属性与时间序列遥测数据；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

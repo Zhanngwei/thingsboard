@@ -34,13 +34,12 @@ import javax.servlet.http.HttpServletRequest;
 
 /**
  * 中文说明：
- * 1. 类目的：`CustomOAuth2ClientMapper` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Spring Security、User DAO、缓存、邮件服务、OAuth2 客户端和审计服务。
- * 4. 生命周期：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Service / Strategy。
+ * 1. `CustomOAuth2ClientMapper` 是 ThingsBoard Application 中转换 `Custom O Auth2` 数据结构的适配组件。
+ * 2. 它把输入对象、协议内容或持久化数据转换为目标模型。
+ * 3. 转换过程负责字段映射、格式解析以及必要的默认值处理。
+ * 4. 直接依赖的类型边界包括 `AbstractOAuth2ClientMapper`、`OAuth2ClientMapper`。
+ * 5. 独立转换器可以避免不同模块重复编写并逐渐分叉的映射逻辑。
+ * 6. 阅读时重点关注字段对应关系、空值处理和不兼容输入的处理方式。
  */
 @Service(value = "customOAuth2ClientMapper")
 @Slf4j
@@ -102,11 +101,3 @@ public class CustomOAuth2ClientMapper extends AbstractOAuth2ClientMapper impleme
         }
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`CustomOAuth2ClientMapper` 在 ThingsBoard Application 模块 中承担安全认证服务类型职责，核心目的是处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
- * 2. 核心流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
- * 3. 关键依赖：主要依赖或协作对象包括Spring Security、User DAO、缓存、邮件服务、OAuth2 客户端和审计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

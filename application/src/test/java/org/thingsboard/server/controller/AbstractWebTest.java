@@ -150,13 +150,12 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 /**
  * 中文说明：
- * 1. 类目的：`AbstractWebTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
- * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 MVC Controller / Facade。
+ * 1. `AbstractWebTest` 是 ThingsBoard Application 中验证 `AbstractWeb` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 直接依赖的类型边界包括 `AbstractInMemoryStorageTest`。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @Slf4j
 public abstract class AbstractWebTest extends AbstractInMemoryStorageTest {
@@ -1514,13 +1513,12 @@ public abstract class AbstractWebTest extends AbstractInMemoryStorageTest {
 
     /**
      * 中文说明：
-     * 1. 类目的：`IdComparator` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
-     * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 MVC Controller / Facade。
+     * 1. `IdComparator` 是 ThingsBoard Application 中处理 `Id Comparator` 的处理器。
+     * 2. 它把单一处理步骤封装为可调用、可替换的组件。
+     * 3. 输入通常来自上游事件、网络消息或异步回调，输出交给下一处理步骤。
+     * 4. 直接依赖的类型边界包括 `HasId`、`Comparator`。
+     * 5. 独立处理器可以缩小单个流程的职责范围，并便于组合处理链。
+     * 6. 阅读时重点关注入口方法、条件分支和处理完成后的转发行为。
      */
     public class IdComparator<D extends HasId> implements Comparator<D> {
 
@@ -1540,13 +1538,12 @@ public abstract class AbstractWebTest extends AbstractInMemoryStorageTest {
 
     /**
      * 中文说明：
-     * 1. 类目的：`EntityIdComparator` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
-     * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 MVC Controller / Facade。
+     * 1. `EntityIdComparator` 是 ThingsBoard Application 中处理实体的处理器。
+     * 2. 它把单一处理步骤封装为可调用、可替换的组件。
+     * 3. 输入通常来自上游事件、网络消息或异步回调，输出交给下一处理步骤。
+     * 4. 直接依赖的类型边界包括 `EntityId`、`Comparator`。
+     * 5. 独立处理器可以缩小单个流程的职责范围，并便于组合处理链。
+     * 6. 阅读时重点关注入口方法、条件分支和处理完成后的转发行为。
      */
     public class EntityIdComparator<D extends EntityId> implements Comparator<D> {
 
@@ -1849,11 +1846,3 @@ public abstract class AbstractWebTest extends AbstractInMemoryStorageTest {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`AbstractWebTest` 在 ThingsBoard Application 测试模块 中承担REST/WebSocket 控制层类型职责，核心目的是承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
- * 2. 核心流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
- * 3. 关键依赖：主要依赖或协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

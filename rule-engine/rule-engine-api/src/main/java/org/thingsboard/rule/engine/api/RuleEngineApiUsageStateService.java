@@ -21,12 +21,12 @@ import org.thingsboard.server.common.data.id.TenantId;
 
 /**
  * 中文说明：
- * 1. 职责：为 Rule Engine 提供 API 使用状态查询入口。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的租户配额和 API 使用状态子系统。
- * 3. 协作对象：与 API 使用状态存储、租户限额逻辑、通知流程和 {@link TbContext} 协作。
- * 4. 生命周期：由 Spring 实现类长期存在，规则节点或系统流程需要读取状态时调用。
- * 5. 设计原因：规则引擎只需要查询契约，不应直接依赖 API 使用状态 DAO 实现。
- * 6. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor、数据库；实现通常访问数据库或缓存，间接服务 Rule Engine。
+ * 1. `RuleEngineApiUsageStateService` 是 ThingsBoard Rule Engine API 中定义用量统计能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface RuleEngineApiUsageStateService {
 
@@ -40,11 +40,3 @@ public interface RuleEngineApiUsageStateService {
     ApiUsageState findApiUsageStateById(TenantId tenantId, ApiUsageStateId id);
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：抽象 API 使用状态查询能力。
- * 2. 核心流程：调用方传入租户和状态 ID，服务实现返回对应的 API 使用状态。
- * 3. 关键依赖：ApiUsageState、ApiUsageStateId、TenantId 和状态存储实现。
- * 4. 学习重点：Rule Engine 通过专用服务接口读取租户配额状态，而不是直接访问 DAO。
- */

@@ -134,10 +134,3 @@ public class TbRestApiCallNode extends TbAbstractExternalNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类是 REST API 外部调用节点的 Rule Engine 入口，负责配置转换、消息确认和委托 HTTP 客户端处理。
- * 外部 HTTP 请求、异步回调、并发限制、代理/TLS 细节和失败元数据由 TbHttpClient 实现。
- * 本类本身不直接涉及数据库或缓存，相关能力只可能通过 Rule Engine 上下文或 HTTP 客户端调用链间接涉及。
- */

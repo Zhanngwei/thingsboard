@@ -64,7 +64,3 @@ public class TbMsgGeneratorNodeTest extends AbstractRuleNodeUpgradeTest {
         return spy(TbMsgGeneratorNode.class);
     }
 }
-/*
- * 本类总结：{@code TbMsgGeneratorNodeTest} 为 {@code TbMsgGeneratorNode} 的 调试节点 测试提供中文注释，说明测试目标、fixture 生命周期、Mock 来源和断言流程。
- * 本文件中的数据库、缓存、MQTT、Actor 或完整 Rule Engine 运行时均不由测试本身直接启动；相关行为通过 Mock、内存 fixture 或被测生产逻辑间接覆盖。
- */

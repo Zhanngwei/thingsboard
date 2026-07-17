@@ -24,13 +24,12 @@ import java.util.Set;
 
 /**
  * 中文说明：
- * 1. 类目的：`MqttTestConfigProperties` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
- * 4. 生命周期：由 JUnit 测试生命周期创建，随单个测试方法准备和清理。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Integration Test / Fixture。
+ * 1. `MqttTestConfigProperties` 是 ThingsBoard Application 中描述 MQTT 行为的配置类型。
+ * 2. 它集中保存该组件启动或运行时需要的可配置选项。
+ * 3. 字段值决定功能开关、限制条件、地址或处理策略等具体行为。
+ * 4. 它直接协作于配置加载组件和使用这些配置的运行类型。
+ * 5. 独立配置对象可以避免大量零散参数在调用链中传递。
+ * 6. 阅读时重点关注默认值、必填字段和配置项之间的约束关系。
  */
 @Data
 @Builder
@@ -90,11 +89,3 @@ public class MqttTestConfigProperties {
     String provisionSecret;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`MqttTestConfigProperties` 在 ThingsBoard Application 测试模块 中承担传输层测试或适配类型职责，核心目的是验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
- * 2. 核心流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
- * 3. 关键依赖：主要依赖或协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

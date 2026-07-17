@@ -22,12 +22,12 @@ import org.thingsboard.server.common.data.sms.config.TestSmsRequest;
 
 /**
  * 中文说明：
- * 1. 职责：定义 Rule Engine 和系统通知流程发送短信的统一服务边界。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的外部短信服务接口。
- * 3. 协作对象：与短信规则节点、通知中心、租户短信配置、{@link org.thingsboard.rule.engine.api.sms.SmsSenderFactory} 协作。
- * 4. 生命周期：由 Spring 实现类提供，规则节点或系统流程通过 {@link TbContext} 获取后调用。
- * 5. 设计原因：规则节点不应直接依赖具体短信供应商，通过接口隔离配置刷新、测试和发送实现。
- * 6. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor 通信、数据库；实现可能读取配置缓存并调用外部短信服务，直接服务 Rule Engine。
+ * 1. `SmsService` 是 ThingsBoard Rule Engine API 中定义 `Sms` 能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface SmsService {
 
@@ -66,11 +66,3 @@ public interface SmsService {
     boolean isConfigured(TenantId tenantId);
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为规则节点和系统通知提供短信发送 API。
- * 2. 核心流程：调用方准备号码和内容，SmsService 实现读取配置并调用外部短信供应商。
- * 3. 关键依赖：TenantId、CustomerId、TestSmsRequest、SmsSenderFactory 和短信供应商配置。
- * 4. 学习重点：短信节点通过服务接口隔离供应商差异，Rule Engine 不直接绑定具体短信 SDK。
- */

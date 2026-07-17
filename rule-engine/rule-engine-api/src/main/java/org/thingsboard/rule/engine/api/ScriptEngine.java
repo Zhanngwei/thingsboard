@@ -24,13 +24,12 @@ import java.util.Set;
 
 /**
  * 中文说明：
- * 1. 职责：定义 Rule Engine 规则节点执行脚本的异步接口。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的脚本执行子系统。
- * 3. 协作对象：与脚本节点、{@link TbContext#createScriptEngine}、{@link org.thingsboard.server.common.msg.TbMsg} 和脚本运行时协作。
- * 4. 生命周期：由 TbContext 根据脚本语言和脚本文本创建，随节点配置或节点生命周期存在，销毁时释放脚本运行时资源。
- * 5. 设计原因：不同脚本节点需要返回不同类型结果，统一接口能复用脚本引擎创建、异步执行和销毁逻辑。
- * 6. 设计模式：Strategy，具体脚本引擎实现封装 JavaScript/TBEL 等语言差异。
- * 7. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor、数据库；执行结果直接驱动 Rule Engine 消息转换、过滤和路由。
+ * 1. `ScriptEngine` 是 ThingsBoard Rule Engine API 中定义脚本执行能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface ScriptEngine {
 
@@ -90,11 +89,3 @@ public interface ScriptEngine {
     void destroy();
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：统一规则节点脚本的异步执行能力。
- * 2. 核心流程：节点通过 TbContext 创建 ScriptEngine，调用对应 execute 方法获得异步结果，节点销毁时释放资源。
- * 3. 关键依赖：TbMsg、JsonNode、ListenableFuture 和具体脚本语言运行时。
- * 4. 学习重点：脚本执行以异步 Future 返回结果，结果类型决定后续转换、过滤或关系路由。
- */

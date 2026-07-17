@@ -74,8 +74,3 @@ public class EntitiesRelatedDeviceIdAsyncLoader {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类把规则节点的设备关系配置转换为异步设备查询；具体读取和缓存行为在 DeviceService 内，线程安全边界在无状态 helper 与 DB callback executor 之间。
- */

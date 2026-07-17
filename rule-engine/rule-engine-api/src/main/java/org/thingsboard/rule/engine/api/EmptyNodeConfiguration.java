@@ -19,12 +19,12 @@ import lombok.Data;
 
 /**
  * 中文说明：
- * 1. 职责：表示没有业务参数的规则节点配置对象，同时保留配置版本字段用于后续兼容升级。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的节点配置抽象层，被具体规则节点作为默认配置模型复用。
- * 3. 协作对象：与 {@link NodeConfiguration}、节点注解中的配置类型以及 Rule Engine 节点初始化流程协作。
- * 4. 生命周期：由规则节点初始化或配置反序列化流程创建，随单个节点配置实例存在，不持有运行期资源。
- * 5. 设计原因：空配置节点仍需要统一实现配置接口，避免每个无配置节点重复声明一个占位配置类。
- * 6. 技术关联：本类本身不直接涉及事务、缓存、MQTT、Actor 通信、数据库；只作为 Rule Engine 配置模型参与节点生命周期。
+ * 1. `EmptyNodeConfiguration` 是 ThingsBoard Rule Engine API 中描述 `Empty Node` 行为的配置类型。
+ * 2. 它集中保存该组件启动或运行时需要的可配置选项。
+ * 3. 字段值决定功能开关、限制条件、地址或处理策略等具体行为。
+ * 4. 直接依赖的类型边界包括 `NodeConfiguration`。
+ * 5. 独立配置对象可以避免大量零散参数在调用链中传递。
+ * 6. 阅读时重点关注默认值、必填字段和配置项之间的约束关系。
  */
 @Data
 public class EmptyNodeConfiguration implements NodeConfiguration<EmptyNodeConfiguration> {
@@ -44,11 +44,3 @@ public class EmptyNodeConfiguration implements NodeConfiguration<EmptyNodeConfig
         return new EmptyNodeConfiguration();
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为无参数规则节点提供统一的默认配置对象。
- * 2. 核心流程：Rule Engine 需要默认配置时调用 defaultConfiguration 创建新实例。
- * 3. 关键依赖：NodeConfiguration 配置接口和节点配置反序列化流程。
- * 4. 学习重点：即使节点没有业务参数，也通过统一配置接口接入 Rule Engine 生命周期。
- */

@@ -17,13 +17,12 @@ package org.thingsboard.server.common.stats;
 
 /**
  * 中文说明：
- * 1. 类目的：`StatsType` 是ThingsBoard Common 模块中的统计指标契约类型，用于定义运行时统计项、计数器和持久化消息的数据结构。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括Actor、Queue、Application 统计服务、监控和日志系统。
- * 4. 生命周期：由运行期采样、周期持久化或测试流程创建和消费。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Observer / DTO。
+ * 1. `StatsType` 是 ThingsBoard Common 中定义统计数据固定取值的枚举类型。
+ * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+ * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+ * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+ * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+ * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
  */
 public enum StatsType {
     RULE_ENGINE("ruleEngine"), CORE("core"), TRANSPORT("transport"), JS_INVOKE("jsInvoke"), RATE_EXECUTOR("rateExecutor");
@@ -46,11 +45,3 @@ public enum StatsType {
         return name;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`StatsType` 在 ThingsBoard Common 模块 中承担统计指标契约类型职责，核心目的是定义运行时统计项、计数器和持久化消息的数据结构。
- * 2. 核心流程：采集运行时指标后聚合为统计消息并交给持久化或监控流程。
- * 3. 关键依赖：主要依赖或协作对象包括Actor、Queue、Application 统计服务、监控和日志系统。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

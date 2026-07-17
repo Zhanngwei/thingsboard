@@ -20,13 +20,12 @@ import org.thingsboard.server.common.msg.TbActorMsg;
 
 /**
  * 中文说明：
- * 1. 类目的：`StatsPersistTick` 是ThingsBoard Application 模块中的Actor 通信与消息处理类型，用于管理租户、设备、规则链或规则节点的异步消息路由。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括ActorSystemContext、ActorRef、队列服务、Rule Engine 节点和 DAO 服务。
- * 4. 生命周期：由 ActorService 创建，随组件初始化、消息投递和停止流程变化。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Actor / Command。
+ * 1. `StatsPersistTick` 是 ThingsBoard Application 中处理统计数据消息的 Actor 类型。
+ * 2. 它按消息顺序执行状态变更、路由或组件协调逻辑。
+ * 3. 类内状态用于保存当前 Actor 处理消息所需的上下文和运行数据。
+ * 4. 直接依赖的类型边界包括 `TbActorMsg`。
+ * 5. 使用独立 Actor 可以串行化同一业务对象的异步操作，并隔离并发状态。
+ * 6. 阅读时重点关注消息分派入口、状态更新位置和向其它 Actor 发送消息的分支。
  */
 public final class StatsPersistTick implements TbActorMsg {
     /**
@@ -39,11 +38,3 @@ public final class StatsPersistTick implements TbActorMsg {
         return MsgType.STATS_PERSIST_TICK_MSG;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`StatsPersistTick` 在 ThingsBoard Application 模块 中承担Actor 通信与消息处理类型职责，核心目的是管理租户、设备、规则链或规则节点的异步消息路由。
- * 2. 核心流程：接收 Actor 消息后定位处理器，执行业务逻辑并通过 tell 或回调继续路由。
- * 3. 关键依赖：主要依赖或协作对象包括ActorSystemContext、ActorRef、队列服务、Rule Engine 节点和 DAO 服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

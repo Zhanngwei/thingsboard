@@ -23,13 +23,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 /**
  * 中文说明：
- * 1. 类目的：`ThingsBoardThreadFactory` 是ThingsBoard Common 模块中的公共工具类型，用于提供跨模块复用的纯函数、解析、转换或辅助逻辑。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括Application、DAO、Transport、Rule Engine、测试工具和第三方库。
- * 4. 生命周期：通常作为静态工具或轻量对象按需调用，不持有长生命周期业务状态。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Utility / Helper。
+ * 1. `ThingsBoardThreadFactory` 是 ThingsBoard Common 中创建或提供 `Things Board Thread` 对象的构造组件。
+ * 2. 它根据输入配置、类型或上下文选择合适的具体实现。
+ * 3. 创建细节被集中在该类型中，调用方只依赖稳定的创建入口。
+ * 4. 直接依赖的类型边界包括 `ThreadFactory`。
+ * 5. 独立工厂可以避免调用方了解构造顺序和实现类选择规则。
+ * 6. 阅读时重点关注实现选择条件、默认分支和对象初始化参数。
  */
 public class ThingsBoardThreadFactory implements ThreadFactory {
     /**
@@ -107,11 +106,3 @@ public class ThingsBoardThreadFactory implements ThreadFactory {
         return t;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`ThingsBoardThreadFactory` 在 ThingsBoard Common 模块 中承担公共工具类型职责，核心目的是提供跨模块复用的纯函数、解析、转换或辅助逻辑。
- * 2. 核心流程：接收输入参数后执行本地转换、校验或解析并返回结果。
- * 3. 关键依赖：主要依赖或协作对象包括Application、DAO、Transport、Rule Engine、测试工具和第三方库。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

@@ -30,13 +30,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 中文说明：
- * 1. 类目的：`DefaultStatsFactory` 是ThingsBoard Common 模块中的统计指标契约类型，用于定义运行时统计项、计数器和持久化消息的数据结构。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括Actor、Queue、Application 统计服务、监控和日志系统。
- * 4. 生命周期：由运行期采样、周期持久化或测试流程创建和消费。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Observer / DTO。
+ * 1. `DefaultStatsFactory` 是 ThingsBoard Common 中创建或提供统计数据对象的构造组件。
+ * 2. 它根据输入配置、类型或上下文选择合适的具体实现。
+ * 3. 创建细节被集中在该类型中，调用方只依赖稳定的创建入口。
+ * 4. 直接依赖的类型边界包括 `StatsFactory`。
+ * 5. 独立工厂可以避免调用方了解构造顺序和实现类选择规则。
+ * 6. 阅读时重点关注实现选择条件、默认分支和对象初始化参数。
  */
 @Service
 public class DefaultStatsFactory implements StatsFactory {
@@ -185,13 +184,12 @@ public class DefaultStatsFactory implements StatsFactory {
 
     /**
      * 中文说明：
-     * 1. 类目的：`StubCounter` 是ThingsBoard Common 模块中的统计指标契约类型，用于定义运行时统计项、计数器和持久化消息的数据结构。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Actor、Queue、Application 统计服务、监控和日志系统。
-     * 4. 生命周期：由运行期采样、周期持久化或测试流程创建和消费。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Observer / DTO。
+     * 1. `StubCounter` 是 ThingsBoard Common 中围绕 `Stub Counter` 提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 直接依赖的类型边界包括 `Counter`。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     private static class StubCounter implements Counter {
         /**
@@ -225,11 +223,3 @@ public class DefaultStatsFactory implements StatsFactory {
         }
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`DefaultStatsFactory` 在 ThingsBoard Common 模块 中承担统计指标契约类型职责，核心目的是定义运行时统计项、计数器和持久化消息的数据结构。
- * 2. 核心流程：采集运行时指标后聚合为统计消息并交给持久化或监控流程。
- * 3. 关键依赖：主要依赖或协作对象包括Actor、Queue、Application 统计服务、监控和日志系统。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

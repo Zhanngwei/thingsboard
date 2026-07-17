@@ -27,12 +27,12 @@ import java.util.function.Consumer;
  */
 /**
  * 中文说明：
- * 1. 职责：定义 Rule Engine 发送设备 RPC、回复设备 RPC 和查询持久化 RPC 的服务边界。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的 RPC 子系统。
- * 3. 协作对象：与 RPC 规则节点、设备传输会话、持久化 RPC 存储和回调消费者协作。
- * 4. 生命周期：由 Spring 实现类长期存在，节点处理 RPC 消息时通过 {@link TbContext} 获取并调用。
- * 5. 设计原因：RPC 需要跨规则引擎、传输层和存储层，接口可避免节点直接耦合设备会话管理细节。
- * 6. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor、数据库；实现可能通过传输协议下发、访问 RPC 数据库并触发 Rule Engine 回调。
+ * 1. `RuleEngineRpcService` 是 ThingsBoard Rule Engine API 中定义 RPC 能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface RuleEngineRpcService {
 
@@ -65,11 +65,3 @@ public interface RuleEngineRpcService {
      */
     Rpc findRpcById(TenantId tenantId, RpcId id);
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为 Rule Engine 提供设备 RPC 发送、回复和查询入口。
- * 2. 核心流程：规则节点构建请求或回复，RuleEngineRpcService 实现负责传输下发、回调和持久化查询。
- * 3. 关键依赖：RuleEngineDeviceRpcRequest、RuleEngineDeviceRpcResponse、Rpc、设备传输会话和 RPC 存储。
- * 4. 学习重点：RPC API 是规则引擎与设备传输层之间的重要解耦边界。
- */

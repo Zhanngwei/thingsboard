@@ -27,13 +27,12 @@ import java.util.Optional;
  */
 /**
  * 中文说明：
- * 1. 职责：封装设备 RPC 调用完成后的响应或错误信息。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的设备 RPC 返回数据模型。
- * 3. 协作对象：与 {@link RuleEngineRpcService}、RPC 请求节点、设备传输层和回调消费者协作。
- * 4. 生命周期：由 RPC 服务实现或传输层在收到响应、超时或失败时创建，随一次回调消费结束。
- * 5. 设计原因：响应和错误是互斥的可选结果，用 DTO 统一传递可减少回调接口复杂度。
- * 6. 设计模式：Builder，用于清晰构造成功或失败响应。
- * 7. 技术关联：本类本身不直接涉及事务、缓存、MQTT、Actor、数据库；响应来源可能来自 MQTT/其它传输协议，直接服务 Rule Engine RPC 流程。
+ * 1. `RuleEngineDeviceRpcResponse` 是 ThingsBoard Rule Engine API 中承载响应信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 @Data
 @Builder
@@ -57,11 +56,3 @@ public final class RuleEngineDeviceRpcResponse {
     private final Optional<RpcError> error;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：承载设备 RPC 的成功响应或错误结果。
- * 2. 核心流程：传输层或 RPC 服务创建响应对象，Rule Engine 回调消费者据此选择成功或失败路由。
- * 3. 关键依赖：RuleEngineRpcService、RpcError、DeviceId 和 RPC 回调消费者。
- * 4. 学习重点：Rule Engine 的 RPC 返回值通过 Optional 区分成功响应和错误，避免隐式 null 语义。
- */

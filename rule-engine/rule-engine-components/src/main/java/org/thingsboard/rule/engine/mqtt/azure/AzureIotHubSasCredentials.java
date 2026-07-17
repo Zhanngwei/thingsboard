@@ -73,9 +73,3 @@ public class AzureIotHubSasCredentials extends CertPemCredentials {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类描述 Azure IoT Hub 的 SAS 认证凭据，并可生成 MQTT TLS 连接所需的 SslContext。
- * 它不直接使用 MQTT 客户端，不参与连接生命周期、QoS、Topic 解析、消息确认、数据库或缓存操作。
- */

@@ -25,13 +25,12 @@ import org.thingsboard.server.common.data.sync.vc.request.create.VersionCreateRe
 
 /**
  * 中文说明：
- * 1. 类目的：`EntityTypeExportCtx` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Version Control、DAO、队列、缓存和事件监听器。
- * 4. 生命周期：由 Spring 服务、事件监听或同步任务触发。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Service / Observer。
+ * 1. `EntityTypeExportCtx` 是 ThingsBoard Application 中围绕实体提供具体能力的类型。
+ * 2. 它封装当前声明对应的核心操作和必要状态。
+ * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+ * 4. 直接依赖的类型边界包括 `EntitiesExportCtx`。
+ * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+ * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
  */
 public class EntityTypeExportCtx extends EntitiesExportCtx<VersionCreateRequest> {
 
@@ -72,11 +71,3 @@ public class EntityTypeExportCtx extends EntitiesExportCtx<VersionCreateRequest>
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`EntityTypeExportCtx` 在 ThingsBoard Application 模块 中承担版本同步服务类型职责，核心目的是处理实体版本控制、同步事件和跨实例状态一致性。
- * 2. 核心流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
- * 3. 关键依赖：主要依赖或协作对象包括Version Control、DAO、队列、缓存和事件监听器。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

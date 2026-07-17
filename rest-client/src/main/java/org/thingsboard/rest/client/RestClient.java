@@ -192,18 +192,12 @@ import static org.thingsboard.server.common.data.StringUtils.isEmpty;
  */
 /**
  * 中文说明：
- * 1. 类目的：`RestClient` 是 ThingsBoard Rest Client 模块 中的REST API 客户端门面，用于把 ThingsBoard 服务端 REST 接口包装成 Java 方法，统一处理 JWT 登录、刷新、URL 参数、分页查询、文件上传下载和 DTO 映射。
- * 2. 所属模块：位于 rest-client，服务于 ThingsBoard 的客户端访问、离线工具或独立协议接入边界。
- * 3. 协作模块：主要协作对象包括 Spring RestTemplate、JWT、common data DTO、ThingsBoard 服务端 REST Controller、租户/客户/设备/规则链/资源等业务模块。
- * 4. 生命周期：由 SDK 使用方或测试代码创建，登录后在客户端会话期间复用，调用 close 时关闭内部异步执行器。
- * 5. 存在原因：使用门面类集中 REST 调用可以稳定客户端 API，调用方无需散落拼接 URL、Header、分页参数和 token 刷新逻辑。
- * 6. 事务：客户端不控制事务，所有事务边界都在被调用的 ThingsBoard 服务端 Controller/Service/DAO 中。
- * 7. 缓存：客户端只保存 token、过期时间和客户端与服务端时间差，不缓存业务实体，避免客户端读到过期数据。
- * 8. MQTT：REST 客户端不直接使用 MQTT，但设备凭据、遥测、规则链等 API 可能影响后续 MQTT transport 入站行为。
- * 9. Actor 通信：REST 请求到达服务端后可能触发 Actor 消息，例如设备、规则链或遥测相关操作；本类只负责 HTTP 边界。
- * 10. 数据库：通过 REST API 间接读写数据库，数据库连接、事务和一致性由服务端模块负责。
- * 11. Rule Engine：规则链、规则节点和遥测相关 REST 方法可能间接影响 Rule Engine 配置或触发数据流，但本类不执行规则逻辑。
- * 12. 设计模式：主要体现 Facade / Adapter。
+ * 1. `RestClient` 是 ThingsBoard REST Client 中访问 ThingsBoard REST API 的客户端封装。
+ * 2. 它把连接建立、请求发送、认证信息和响应解析集中到统一入口。
+ * 3. 公开方法以平台数据模型作为输入输出，隐藏底层通信细节。
+ * 4. 直接依赖的类型边界包括 `Closeable`。
+ * 5. 独立客户端可以保持调用 API 稳定，并避免使用方重复处理连接与序列化。
+ * 6. 阅读时重点关注连接配置、认证状态、请求构造和资源释放。
  */
 public class RestClient implements Closeable {
     /**
@@ -6498,13 +6492,4 @@ public class RestClient implements Closeable {
     public void close() {
         service.shutdown();
     }
-
-    /**
-     * 本类总结：
-     * 1. 核心职责：`RestClient` 负责把 ThingsBoard 服务端 REST 接口包装成 Java 方法，统一处理 JWT 登录、刷新、URL 参数、分页查询、文件上传下载和 DTO 映射。
-     * 2. 核心流程：调用方登录后通过方法级 API 发起 REST 请求，拦截器在请求前检查 token 过期时间并刷新或重新登录，再把响应 DTO 返回给调用方。
-     * 3. 关键依赖：Spring RestTemplate、JWT、common data DTO、ThingsBoard 服务端 REST Controller、租户/客户/设备/规则链/资源等业务模块。
-     * 4. 设计重点：通过 Facade / Adapter 把外部协议、文件格式、启动参数或 REST 细节封装在边界类中，让核心业务模块保持清晰。
-     * 5. 学习重点：关注生命周期边界、线程安全假设、远端事务归属、缓存/数据库间接性、MQTT/Actor/Rule Engine 的进入点以及为什么该类只承担当前边界职责。
-     */
 }

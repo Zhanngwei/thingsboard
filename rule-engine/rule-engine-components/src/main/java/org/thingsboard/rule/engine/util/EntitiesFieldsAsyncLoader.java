@@ -101,8 +101,3 @@ public class EntitiesFieldsAsyncLoader {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类是实体字段异步加载 helper，不保存共享状态；服务读取可能落到数据库或缓存，Future 回调和失败传播由调用方接入 Rule Engine 消息流。
- */

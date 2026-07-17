@@ -163,7 +163,3 @@ public class EntitiesRelatedDeviceIdAsyncLoaderTest {
     }
 
 }
-/*
- * 本类总结：{@code EntitiesRelatedDeviceIdAsyncLoaderTest} 为 {@code EntitiesRelatedDeviceIdAsyncLoader} 的 规则引擎工具组件 测试提供中文注释，说明测试目标、fixture 生命周期、Mock 来源和断言流程。
- * 本文件中的数据库、缓存、MQTT、Actor 或完整 Rule Engine 运行时均不由测试本身直接启动；相关行为通过 Mock、内存 fixture 或被测生产逻辑间接覆盖。
- */

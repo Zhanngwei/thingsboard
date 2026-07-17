@@ -93,9 +93,3 @@ public class TbSendRpcReplyNodeConfiguration implements NodeConfiguration<TbSend
     }
 }
 
-/*
- * 本类总结：
- * 本类描述 RPC 回复节点从消息元数据读取 serviceId、sessionId 和 requestId 的配置。
- * 实际 RPC 回复发送、EdgeEvent 持久化和异步回调由 TbSendRPCReplyNode 完成；本类不直接涉及数据库或缓存。
- */
-

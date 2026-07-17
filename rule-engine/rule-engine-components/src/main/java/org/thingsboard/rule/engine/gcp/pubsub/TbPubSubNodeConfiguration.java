@@ -62,9 +62,3 @@ public class TbPubSubNodeConfiguration implements NodeConfiguration<TbPubSubNode
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类描述 GCP Pub/Sub 外部节点的项目、Topic、属性和认证配置。
- * 实际 Publisher 创建、异步 publish、成功/失败路由由 TbPubSubNode 完成；本类不直接涉及数据库或缓存。
- */

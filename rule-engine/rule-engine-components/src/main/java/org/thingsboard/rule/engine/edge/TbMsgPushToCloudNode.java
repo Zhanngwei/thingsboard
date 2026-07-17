@@ -126,9 +126,3 @@ public class TbMsgPushToCloudNode extends AbstractTbMsgPushNode<TbMsgPushToCloud
     }
 
 }
-
-/*
- * 本类总结：
- * 本类是 push to cloud 的占位实现，实际逻辑由 Edge 侧运行环境提供。
- * 当前源码中的方法不直接执行数据库持久化、缓存访问、远端推送或异步回调。
- */

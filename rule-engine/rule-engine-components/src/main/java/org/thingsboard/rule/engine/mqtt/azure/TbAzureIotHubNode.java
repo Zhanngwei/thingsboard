@@ -91,10 +91,3 @@ public class TbAzureIotHubNode extends TbMqttNode {
         }
     }
 }
-
-/*
- * 本类总结：
- * 本类是 Azure IoT Hub 的 MQTT 特化节点，直接复用父类 MQTT 客户端连接与发布机制，并覆盖 Azure 所需的 TLS、用户名和 SAS Token 配置。
- * Rule Engine 消息确认、AT_LEAST_ONCE QoS、Topic 解析和成功/失败路由均沿用 TbMqttNode。
- * 本类本身不直接涉及数据库或缓存，相关依赖只可能通过 Rule Engine 上下文或凭据工具链间接涉及。
- */

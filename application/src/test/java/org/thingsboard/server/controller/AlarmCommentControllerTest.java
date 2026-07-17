@@ -51,13 +51,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 中文说明：
- * 1. 类目的：`AlarmCommentControllerTest` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
- * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 MVC Controller / Facade。
+ * 1. `AlarmCommentControllerTest` 是 ThingsBoard Application 中验证 `AlarmCommentController` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 直接依赖的类型边界包括 `AbstractControllerTest`。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @Slf4j
 @ContextConfiguration(classes = {AlarmCommentControllerTest.Config.class})
@@ -72,13 +71,12 @@ public class AlarmCommentControllerTest extends AbstractControllerTest {
 
     /**
      * 中文说明：
-     * 1. 类目的：`Config` 是ThingsBoard Application 测试模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
-     * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 MVC Controller / Facade。
+     * 1. `Config` 是 ThingsBoard Application 中描述配置行为的配置类型。
+     * 2. 它集中保存该组件启动或运行时需要的可配置选项。
+     * 3. 字段值决定功能开关、限制条件、地址或处理策略等具体行为。
+     * 4. 它直接协作于配置加载组件和使用这些配置的运行类型。
+     * 5. 独立配置对象可以避免大量零散参数在调用链中传递。
+     * 6. 阅读时重点关注默认值、必填字段和配置项之间的约束关系。
      */
     static class Config {
         /**
@@ -494,11 +492,3 @@ public class AlarmCommentControllerTest extends AbstractControllerTest {
         return alarmComment;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`AlarmCommentControllerTest` 在 ThingsBoard Application 测试模块 中承担REST/WebSocket 控制层类型职责，核心目的是承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
- * 2. 核心流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
- * 3. 关键依赖：主要依赖或协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

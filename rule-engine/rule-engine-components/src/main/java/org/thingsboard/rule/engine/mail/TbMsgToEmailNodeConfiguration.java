@@ -73,9 +73,3 @@ public class TbMsgToEmailNodeConfiguration implements NodeConfiguration<TbMsgToE
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类描述 to email 转换节点的模板配置，实际消息转换在 TbMsgToEmailNode 中完成。
- * 它不直接涉及外部调用、异步回调、数据库、缓存或 SMTP 连接。
- */

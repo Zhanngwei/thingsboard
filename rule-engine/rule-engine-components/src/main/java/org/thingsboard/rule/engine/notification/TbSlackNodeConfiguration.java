@@ -71,9 +71,3 @@ public class TbSlackNodeConfiguration implements NodeConfiguration<TbSlackNodeCo
     }
 
 }
-
-/*
- * 本类总结：
- * 本类描述 Slack 外部发送节点的 token 来源、消息模板和目标会话配置。
- * 实际异步发送、失败路由和系统设置读取由 TbSlackNode/SlackService 完成；本类不直接涉及数据库或缓存。
- */

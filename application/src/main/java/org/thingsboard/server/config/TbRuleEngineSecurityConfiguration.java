@@ -27,13 +27,12 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * 中文说明：
- * 1. 类目的：`TbRuleEngineSecurityConfiguration` 是ThingsBoard Application 模块中的Spring 配置类型，用于声明应用启动、Web、安全、跨域、Swagger 或调度相关 Bean。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Spring Boot 自动配置、Environment、Filter、Security、Scheduler 和 WebSocket 组件。
- * 4. 生命周期：应用启动时由 Spring 创建，运行期通常作为单例配置对象存在。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Configuration / Factory。
+ * 1. `TbRuleEngineSecurityConfiguration` 是 ThingsBoard Application 中描述安全配置行为的配置类型。
+ * 2. 它集中保存该组件启动或运行时需要的可配置选项。
+ * 3. 字段值决定功能开关、限制条件、地址或处理策略等具体行为。
+ * 4. 它直接协作于配置加载组件和使用这些配置的运行类型。
+ * 5. 独立配置对象可以避免大量零散参数在调用链中传递。
+ * 6. 阅读时重点关注默认值、必填字段和配置项之间的约束关系。
  */
 @Configuration
 @EnableWebSecurity
@@ -58,11 +57,3 @@ public class TbRuleEngineSecurityConfiguration {
         return http.build();
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`TbRuleEngineSecurityConfiguration` 在 ThingsBoard Application 模块 中承担Spring 配置类型职责，核心目的是声明应用启动、Web、安全、跨域、Swagger 或调度相关 Bean。
- * 2. 核心流程：读取配置属性并创建 Bean，供后续 Web、安全或后台任务流程使用。
- * 3. 关键依赖：主要依赖或协作对象包括Spring Boot 自动配置、Environment、Filter、Security、Scheduler 和 WebSocket 组件。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

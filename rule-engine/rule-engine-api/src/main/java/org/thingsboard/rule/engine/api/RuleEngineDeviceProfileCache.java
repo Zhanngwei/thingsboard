@@ -29,12 +29,12 @@ import java.util.function.Consumer;
  */
 /**
  * 中文说明：
- * 1. 职责：为 Rule Engine 提供设备配置缓存读取和监听能力。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的设备配置缓存边界。
- * 3. 协作对象：与设备配置服务、设备状态节点、设备配置节点、租户缓存刷新流程协作。
- * 4. 生命周期：由 Spring 缓存实现长期存在，监听器随规则节点生命周期注册和移除。
- * 5. 设计原因：规则节点频繁读取设备配置，缓存接口可避免节点直接访问数据库并支持配置变更通知。
- * 6. 技术关联：接口本身不直接涉及事务、MQTT、Actor、数据库；实现直接涉及缓存，可能在未命中时访问数据库，服务 Rule Engine。
+ * 1. `RuleEngineDeviceProfileCache` 是 ThingsBoard Rule Engine API 中定义设备配置能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface RuleEngineDeviceProfileCache {
 
@@ -77,11 +77,3 @@ public interface RuleEngineDeviceProfileCache {
     void removeListener(TenantId tenantId, EntityId listenerId);
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为规则节点提供设备配置缓存读取和变更监听。
- * 2. 核心流程：节点按设备或配置 ID 读取 DeviceProfile，初始化时注册监听，销毁时移除监听。
- * 3. 关键依赖：DeviceProfile、DeviceId、DeviceProfileId、TenantId 和缓存实现。
- * 4. 学习重点：配置缓存让规则节点避免频繁数据库访问，并能响应配置变更。
- */

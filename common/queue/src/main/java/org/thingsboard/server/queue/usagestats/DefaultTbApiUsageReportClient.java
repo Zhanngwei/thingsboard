@@ -48,13 +48,12 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 中文说明：
- * 1. 类目的：`DefaultTbApiUsageReportClient` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ * 1. `DefaultTbApiUsageReportClient` 是 ThingsBoard Common Queue 中访问用量统计的客户端封装。
+ * 2. 它把连接建立、请求发送、认证信息和响应解析集中到统一入口。
+ * 3. 公开方法以平台数据模型作为输入输出，隐藏底层通信细节。
+ * 4. 直接依赖的类型边界包括 `TbApiUsageReportClient`。
+ * 5. 独立客户端可以保持调用 API 稳定，并避免使用方重复处理连接与序列化。
+ * 6. 阅读时重点关注连接配置、认证状态、请求构造和资源释放。
  */
 @Component
 @Slf4j
@@ -234,13 +233,12 @@ public class DefaultTbApiUsageReportClient implements TbApiUsageReportClient {
 
     /**
      * 中文说明：
-     * 1. 类目的：`ReportLevel` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
-     * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+     * 1. `ReportLevel` 是 ThingsBoard Common Queue 中围绕 `Report Level` 提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     @Data
     private static class ReportLevel {
@@ -284,13 +282,12 @@ public class DefaultTbApiUsageReportClient implements TbApiUsageReportClient {
 
     /**
      * 中文说明：
-     * 1. 类目的：`ParentEntity` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
-     * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+     * 1. `ParentEntity` 是 ThingsBoard Common Queue 中表示实体持久化结构的实体类型。
+     * 2. 它保存与存储表或查询结果对应的字段。
+     * 3. 字段映射用于在数据库记录和平台领域对象之间传递数据。
+     * 4. 它直接协作于领域模型、实体映射器和存取实现。
+     * 5. 单独的持久化实体可以把存储结构与对外业务模型分开演进。
+     * 6. 阅读时重点关注字段映射、主键组成和领域对象转换方法。
      */
     @Data
     private static class ParentEntity {
@@ -311,11 +308,3 @@ public class DefaultTbApiUsageReportClient implements TbApiUsageReportClient {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`DefaultTbApiUsageReportClient` 在 ThingsBoard Common 模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
- * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

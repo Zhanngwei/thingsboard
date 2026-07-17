@@ -70,13 +70,12 @@ import java.util.stream.Collectors;
 
 /**
  * 中文说明：
- * 1. 类目的：`BaseEntityImportService` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Version Control、DAO、队列、缓存和事件监听器。
- * 4. 生命周期：由 Spring 服务、事件监听或同步任务触发。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Service / Observer。
+ * 1. `BaseEntityImportService` 是 ThingsBoard Application 中负责实体的业务服务。
+ * 2. 它集中组织该领域的核心操作，并向上层提供稳定的调用入口。
+ * 3. 类中的依赖和状态用于完成校验、编排、查询或更新等直接职责。
+ * 4. 直接依赖的类型边界包括 `EntityId`、`EntityImportService`、`E`。
+ * 5. 把这些操作集中在独立类型中，可以避免调用方重复拼装同一业务流程。
+ * 6. 阅读时重点关注公开方法的职责边界、关键校验和依赖调用顺序。
  */
 @Slf4j
 public abstract class BaseEntityImportService<I extends EntityId, E extends ExportableEntity<I>, D extends EntityExportData<E>> implements EntityImportService<I, E, D> {
@@ -445,13 +444,12 @@ public abstract class BaseEntityImportService<I extends EntityId, E extends Expo
 
     /**
      * 中文说明：
-     * 1. 类目的：`IdProvider` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Version Control、DAO、队列、缓存和事件监听器。
-     * 4. 生命周期：由 Spring 服务、事件监听或同步任务触发。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Service / Observer。
+     * 1. `IdProvider` 是 ThingsBoard Application 中创建或提供 `Id Provider` 对象的构造组件。
+     * 2. 它根据输入配置、类型或上下文选择合适的具体实现。
+     * 3. 创建细节被集中在该类型中，调用方只依赖稳定的创建入口。
+     * 4. 它直接协作于目标接口、具体实现和创建所需配置。
+     * 5. 独立工厂可以避免调用方了解构造顺序和实现类选择规则。
+     * 6. 阅读时重点关注实现选择条件、默认分支和对象初始化参数。
      */
     @SuppressWarnings("unchecked")
     @RequiredArgsConstructor
@@ -603,11 +601,3 @@ public abstract class BaseEntityImportService<I extends EntityId, E extends Expo
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`BaseEntityImportService` 在 ThingsBoard Application 模块 中承担版本同步服务类型职责，核心目的是处理实体版本控制、同步事件和跨实例状态一致性。
- * 2. 核心流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
- * 3. 关键依赖：主要依赖或协作对象包括Version Control、DAO、队列、缓存和事件监听器。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

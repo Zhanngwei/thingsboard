@@ -151,9 +151,3 @@ public class TbMsgToEmailNode implements TbNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类只负责把 Rule Engine 消息转换为邮件发送节点可识别的 SEND_EMAIL 消息。
- * 它不直接调用 SMTP、MailService、数据库或缓存；失败路由只覆盖本地模板解析和 JSON 转换异常。
- */

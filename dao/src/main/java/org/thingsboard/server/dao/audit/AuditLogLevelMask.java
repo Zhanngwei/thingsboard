@@ -19,14 +19,12 @@ import lombok.Getter;
 
 /**
  * 中文说明：
- * 1. 类目的：`AuditLogLevelMask` 是 ThingsBoard DAO 模块 中的审计与事件持久化类型，用于记录用户操作、系统事件、实体事件和事件溯源数据，支持查询、清理和异步下沉。
- * 2. 所属模块：位于 dao 模块，处在 ThingsBoard 服务端的数据访问和持久化实现层。
- * 3. 协作对象：主要协作对象包括AuditLogService、EventService、HouseKeeper、DAO、队列和外部审计 Sink。
- * 4. 生命周期：由业务服务在关键操作后创建事件或审计记录，并由数据库写入、清理任务或测试流程消费。
- * 5. 设计原因：单独建模该类型可以隔离 DAO API、业务服务、缓存和具体数据库实现，避免上层模块直接依赖 SQL、Cassandra 或测试容器细节。
- * 6. 事务与缓存：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；是否触发缓存取决于实现体中的 cache、evict 或 Redis/Caffeine 调用。
- * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
- * 8. 设计模式：主要体现 Observer / Event Sourcing / Repository。
+ * 1. `AuditLogLevelMask` 是 ThingsBoard DAO 中定义 `Audit Log Level` 固定取值的枚举类型。
+ * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+ * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+ * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+ * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+ * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
  */
 @Getter
 public enum AuditLogLevelMask {
@@ -53,11 +51,3 @@ public enum AuditLogLevelMask {
         this.read = read;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`AuditLogLevelMask` 在 ThingsBoard DAO 模块 中承担审计与事件持久化类型职责，核心目的是记录用户操作、系统事件、实体事件和事件溯源数据，支持查询、清理和异步下沉。
- * 2. 核心流程：接收业务事件上下文后写入数据库或下沉目标，并按租户、实体和时间范围支持查询。
- * 3. 关键依赖：主要依赖或协作对象包括AuditLogService、EventService、HouseKeeper、DAO、队列和外部审计 Sink。
- * 4. 学习重点：阅读本文件时应关注租户/实体作用域、事务边界、缓存失效、SQL/NoSQL 差异、数据库异常转换，以及数据变更对 Rule Engine、Transport、Actor 和审计链路的间接影响。
- */

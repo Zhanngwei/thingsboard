@@ -216,10 +216,3 @@ public class TbRabbitMqNode extends TbAbstractExternalNode {
     }
 }
 
-/*
- * 本类总结：
- * 本类直接管理 RabbitMQ Connection/Channel，并通过 externalCallExecutor 异步执行 basicPublish。
- * exchange、routingKey、消息属性和连接参数来自配置；Rule Engine 消息在发布前确认，异步回调决定成功或失败路由。
- * 本类本身不直接涉及数据库或缓存，相关行为只可能通过 Rule Engine 执行器或上下文调用链间接涉及。
- */
-

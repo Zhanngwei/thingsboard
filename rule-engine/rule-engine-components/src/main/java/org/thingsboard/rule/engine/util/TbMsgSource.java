@@ -30,8 +30,3 @@ public enum TbMsgSource {
     METADATA
 
 }
-
-/*
- * 本类总结：
- * 本枚举提供消息字段来源的两个取值；实际 Rule Engine 消息解析由使用该枚举的节点或工具方法完成。
- */

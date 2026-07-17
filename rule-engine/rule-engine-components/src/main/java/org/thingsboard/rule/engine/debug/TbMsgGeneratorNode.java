@@ -294,8 +294,3 @@ public class TbMsgGeneratorNode implements TbNode {
         return new TbPair<>(hasChanges, oldConfiguration);
     }
 }
-
-/*
- * 本类总结：
- * 本类用自消息驱动周期生成，并通过 ScriptEngine 的异步 Future 回调把生成结果送入 Rule Engine 成功链路；它不直接读写数据库、缓存、MQTT 或 Actor，线程安全重点在 initialized、nextTickId、prevMsg 与分区归属切换的边界。
- */

@@ -47,14 +47,12 @@ import java.util.stream.Collectors;
 
 /**
  * 中文说明：
- * 1. 类目的：`WsClient` 是 ThingsBoard Monitoring 模块 中的监控客户端适配类型，用于封装 REST、WebSocket 或 LwM2M 客户端连接、认证、订阅和消息收发边界。
- * 2. 所属模块：位于 monitoring 模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Monitoring 配置、REST 客户端、WebSocket 客户端、MQTT/HTTP/CoAP/LwM2M 探测器、Slack 通知和目标 ThingsBoard 服务。
- * 4. 生命周期：由 Monitoring Spring Boot 应用启动后创建，随周期性探测、失败恢复和应用关闭而运行或释放。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：本模块通常不直接访问数据库；健康检查通过服务端 API 或协议入口间接验证后端数据库、缓存和规则链状态。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 Adapter / Client。
+ * 1. `WsClient` 是 ThingsBoard Monitoring 中访问 `Ws Client` 的客户端封装。
+ * 2. 它把连接建立、请求发送、认证信息和响应解析集中到统一入口。
+ * 3. 公开方法以平台数据模型作为输入输出，隐藏底层通信细节。
+ * 4. 直接依赖的类型边界包括 `WebSocketClient`、`AutoCloseable`。
+ * 5. 独立客户端可以保持调用 API 稳定，并避免使用方重复处理连接与序列化。
+ * 6. 阅读时重点关注连接配置、认证状态、请求构造和资源释放。
  */
 @Slf4j
 public class WsClient extends WebSocketClient implements AutoCloseable {
@@ -290,13 +288,4 @@ public class WsClient extends WebSocketClient implements AutoCloseable {
     protected void onSetSSLParameters(SSLParameters sslParameters) {
         sslParameters.setEndpointIdentificationAlgorithm(null);
     }
-
-
-/*
- * 本类总结：
- * 1. 核心职责：`WsClient` 在 ThingsBoard Monitoring 模块 中承担监控客户端适配类型职责，核心目的是封装 REST、WebSocket 或 LwM2M 客户端连接、认证、订阅和消息收发边界。
- * 2. 核心流程：加载目标和传输配置，按协议执行健康检查，记录延迟与失败状态，并在阈值或状态变化时发送通知。
- * 3. 关键依赖：主要依赖或协作对象包括Monitoring 配置、REST 客户端、WebSocket 客户端、MQTT/HTTP/CoAP/LwM2M 探测器、Slack 通知和目标 ThingsBoard 服务。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */
 }

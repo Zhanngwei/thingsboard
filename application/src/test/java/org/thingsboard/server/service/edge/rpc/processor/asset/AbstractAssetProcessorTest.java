@@ -38,13 +38,12 @@ import static org.mockito.BDDMockito.willReturn;
 
 /**
  * 中文说明：
- * 1. 类目的：`AbstractAssetProcessorTest` 是ThingsBoard Application 测试模块中的Edge 同步服务类型，用于处理云端与边缘端之间的实体、事件和 RPC 数据同步。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
- * 4. 生命周期：由 Spring 服务和队列消费流程触发，随 Edge 连接和同步任务运行。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Factory / Strategy / Template Method。
+ * 1. `AbstractAssetProcessorTest` 是 ThingsBoard Application 中验证 `AbstractAssetProcessor` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 直接依赖的类型边界包括 `BaseEdgeProcessorTest`。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 public abstract class AbstractAssetProcessorTest extends BaseEdgeProcessorTest {
 
@@ -130,11 +129,3 @@ public abstract class AbstractAssetProcessorTest extends BaseEdgeProcessorTest {
         Assertions.assertThat(assetProfileUpdateMsg.getDefaultRuleChainIdLSB()).isEqualTo(expectedRuleChainIdLSB);
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`AbstractAssetProcessorTest` 在 ThingsBoard Application 测试模块 中承担Edge 同步服务类型职责，核心目的是处理云端与边缘端之间的实体、事件和 RPC 数据同步。
- * 2. 核心流程：读取实体或事件状态，构造 Edge 消息并发送到边缘同步通道。
- * 3. 关键依赖：主要依赖或协作对象包括EdgeEvent、Edge RPC、DAO、队列、protobuf 消息和版本兼容构造器。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

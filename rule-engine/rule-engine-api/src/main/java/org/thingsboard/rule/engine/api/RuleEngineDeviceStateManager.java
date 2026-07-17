@@ -21,12 +21,12 @@ import org.thingsboard.server.common.msg.queue.TbCallback;
 
 /**
  * 中文说明：
- * 1. 职责：定义 Rule Engine 侧设备连接、活跃、断开和不活跃状态变化的处理入口。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的设备状态管理边界。
- * 3. 协作对象：与设备状态节点、传输层会话事件、设备配置、队列回调 {@link TbCallback} 协作。
- * 4. 生命周期：由 Spring 实现类长期存在，随设备事件被多次调用；每次调用通过 callback 完成确认。
- * 5. 设计原因：设备状态计算需要被 Rule Engine 与传输事件共享，通过接口隔离状态机实现和调用方。
- * 6. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor、数据库；实现可能使用缓存/数据库并由传输或 Rule Engine 事件触发。
+ * 1. `RuleEngineDeviceStateManager` 是 ThingsBoard Rule Engine API 中定义设备能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface RuleEngineDeviceStateManager {
 
@@ -75,11 +75,3 @@ public interface RuleEngineDeviceStateManager {
     void onDeviceInactivity(TenantId tenantId, DeviceId deviceId, long inactivityTime, TbCallback callback);
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：抽象设备在线状态事件的 Rule Engine 处理入口。
- * 2. 核心流程：传输或规则节点上报状态事件，状态管理实现更新设备状态并通过 TbCallback 确认。
- * 3. 关键依赖：TenantId、DeviceId、TbCallback、设备状态缓存/存储实现。
- * 4. 学习重点：设备状态在传输事件和 Rule Engine 流程之间共享，需要通过接口隔离状态机细节。
- */

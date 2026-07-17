@@ -29,8 +29,13 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 /**
- * 中文说明：`DynamicPredicateValueCtxImpl` 是动态谓词值上下文实现辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
- * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+ * 中文说明：
+ * 1. `DynamicPredicateValueCtxImpl` 是 ThingsBoard Rule Engine Components 中围绕 `Dynamic Predicate Value` 提供具体能力的类型。
+ * 2. 它封装当前声明对应的核心操作和必要状态。
+ * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+ * 4. 直接依赖的类型边界包括 `DynamicPredicateValueCtx`。
+ * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+ * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
  */
 @Slf4j
 public class DynamicPredicateValueCtxImpl implements DynamicPredicateValueCtx {
@@ -119,8 +124,4 @@ public class DynamicPredicateValueCtxImpl implements DynamicPredicateValueCtx {
         }
         return null;
     }
-    /*
-     * 本类总结：`DynamicPredicateValueCtxImpl` 负责维护设备配置、告警规则、快照和设备运行状态；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }
