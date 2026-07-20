@@ -55,8 +55,3 @@ public class TbMsgDelayNodeConfiguration implements NodeConfiguration<TbMsgDelay
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类定义 deprecated delay 节点的配置默认值；实际内存挂起、ack 和自消息调度由 TbMsgDelayNode 执行。
- */

@@ -36,14 +36,12 @@ import javax.annotation.PreDestroy;
  */
 /**
  * 中文说明：
- * 1. 类目的：`CassandraBufferedRateWriteExecutor` 是 ThingsBoard DAO 模块 中的NoSQL/Cassandra 持久化类型，用于封装 Cassandra 异步查询、分页读取、语句构造和 NoSQL 时序/事件访问边界。
- * 2. 所属模块：位于 dao 模块，处在 ThingsBoard 服务端的数据访问和持久化实现层。
- * 3. 协作对象：主要协作对象包括Cassandra Session、Guava Future、NoSQL DAO API、TimeseriesService 和测试容器。
- * 4. 生命周期：由 Spring 容器创建并在 Cassandra 查询生命周期内处理异步结果、分页和异常转换。
- * 5. 设计原因：单独建模该类型可以隔离 DAO API、业务服务、缓存和具体数据库实现，避免上层模块直接依赖 SQL、Cassandra 或测试容器细节。
- * 6. 事务与缓存：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；是否触发缓存取决于实现体中的 cache、evict 或 Redis/Caffeine 调用。
- * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
- * 8. 设计模式：主要体现 Repository / Async Callback / Template。
+ * 1. `CassandraBufferedRateWriteExecutor` 是 ThingsBoard DAO 中处理 `Cassandra Buffered Rate` 的处理器。
+ * 2. 它把单一处理步骤封装为可调用、可替换的组件。
+ * 3. 输入通常来自上游事件、网络消息或异步回调，输出交给下一处理步骤。
+ * 4. 直接依赖的类型边界包括 `AbstractBufferedRateExecutor`。
+ * 5. 独立处理器可以缩小单个流程的职责范围，并便于组合处理链。
+ * 6. 阅读时重点关注入口方法、条件分支和处理完成后的转发行为。
  */
 @Component
 @Slf4j
@@ -150,11 +148,3 @@ public class CassandraBufferedRateWriteExecutor extends AbstractBufferedRateExec
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`CassandraBufferedRateWriteExecutor` 在 ThingsBoard DAO 模块 中承担NoSQL/Cassandra 持久化类型职责，核心目的是封装 Cassandra 异步查询、分页读取、语句构造和 NoSQL 时序/事件访问边界。
- * 2. 核心流程：构造 Cassandra 语句并异步执行，随后把 ResultSet 转换为 DAO API 需要的领域结果。
- * 3. 关键依赖：主要依赖或协作对象包括Cassandra Session、Guava Future、NoSQL DAO API、TimeseriesService 和测试容器。
- * 4. 学习重点：阅读本文件时应关注租户/实体作用域、事务边界、缓存失效、SQL/NoSQL 差异、数据库异常转换，以及数据变更对 Rule Engine、Transport、Actor 和审计链路的间接影响。
- */

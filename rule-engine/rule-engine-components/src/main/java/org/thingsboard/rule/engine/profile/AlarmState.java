@@ -47,8 +47,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
 
 /**
- * 中文说明：`AlarmState` 是告警状态辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
- * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+ * 中文说明：
+ * 1. `AlarmState` 是 ThingsBoard Rule Engine Components 中承载告警信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 @Data
 @Slf4j
@@ -489,8 +494,4 @@ class AlarmState {
             currentAlarm.setAckTs(alarm.getAckTs());
         }
     }
-    /*
-     * 本类总结：`AlarmState` 负责维护设备配置、告警规则、快照和设备运行状态；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

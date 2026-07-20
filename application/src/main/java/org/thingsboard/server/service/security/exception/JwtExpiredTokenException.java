@@ -19,13 +19,12 @@ import org.springframework.security.core.AuthenticationException;
 
 /**
  * 中文说明：
- * 1. 类目的：`JwtExpiredTokenException` 是ThingsBoard Application 模块中的异常与错误响应类型，用于统一表达 ThingsBoard Application 的异常状态和 HTTP 错误响应。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Controller、Spring 异常处理器、认证模块和客户端响应序列化。
- * 4. 生命周期：在请求失败、认证失败或参数校验失败时创建并返回。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Adapter。
+ * 1. `JwtExpiredTokenException` 是 ThingsBoard Application 中表示 `Jwt Expired Token` 失败语义的异常类型。
+ * 2. 它用于把特定错误原因传递给上层处理流程。
+ * 3. 异常中保存的消息、错误码或上下文帮助调用方判断失败类型。
+ * 4. 直接依赖的类型边界包括 `AuthenticationException`。
+ * 5. 独立异常类型让调用方能够精确捕获该类错误，而不是依赖文本判断。
+ * 6. 阅读时重点关注创建位置、携带信息和上层捕获后的处理结果。
  */
 public class JwtExpiredTokenException extends AuthenticationException {
     /**
@@ -70,11 +69,3 @@ public class JwtExpiredTokenException extends AuthenticationException {
         return this.token;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`JwtExpiredTokenException` 在 ThingsBoard Application 模块 中承担异常与错误响应类型职责，核心目的是统一表达 ThingsBoard Application 的异常状态和 HTTP 错误响应。
- * 2. 核心流程：捕获异常后映射错误码、状态码和响应体。
- * 3. 关键依赖：主要依赖或协作对象包括Controller、Spring 异常处理器、认证模块和客户端响应序列化。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

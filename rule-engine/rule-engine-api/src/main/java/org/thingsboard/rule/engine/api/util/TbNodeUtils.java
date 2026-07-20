@@ -36,12 +36,12 @@ import java.util.stream.Collectors;
  */
 /**
  * 中文说明：
- * 1. 职责：提供规则节点配置转换和消息模板变量替换的通用工具方法。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的节点工具层。
- * 3. 协作对象：与 {@link TbNodeConfiguration}、{@link TbNodeException}、{@link TbMsg}、TbMsgMetaData 和 JacksonUtil 协作。
- * 4. 生命周期：工具类无实例状态，方法在节点初始化或消息处理期间被静态调用。
- * 5. 设计原因：多个规则节点都需要配置反序列化和 `${metadata}`/`$[data]` 模板处理，集中到工具类避免重复实现。
- * 6. 技术关联：本类本身不直接涉及事务、缓存、MQTT、Actor、数据库；直接服务 Rule Engine 节点配置和消息处理流程。
+ * 1. `TbNodeUtils` 是 ThingsBoard Rule Engine API 中处理规则节点通用操作的工具类型。
+ * 2. 它提供无状态或轻量的复用方法，减少多个调用点的重复实现。
+ * 3. 方法通常完成格式化、校验、计算或简单对象构造。
+ * 4. 它直接协作于方法参数和返回值所代表的数据类型。
+ * 5. 集中工具方法可以统一边界行为，并降低细节变化对调用方的影响。
+ * 6. 阅读时重点关注输入约束、边界值和方法是否修改传入对象。
  */
 public class TbNodeUtils {
 
@@ -189,11 +189,3 @@ public class TbNodeUtils {
         return "${" + key + '}';
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：提供节点配置转换和规则消息模板变量替换能力。
- * 2. 核心流程：节点初始化时 convert 配置；消息处理时 processPattern 先替换元数据，再解析 JSON data 路径并替换值节点。
- * 3. 关键依赖：TbNodeConfiguration、TbMsg、TbMsgMetaData、JacksonUtil、Pattern。
- * 4. 学习重点：模板替换刻意保持轻量，只支持元数据键和 data 对象点路径，不引入完整 JSONPath。
- */

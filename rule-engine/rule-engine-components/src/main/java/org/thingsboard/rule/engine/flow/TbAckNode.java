@@ -27,12 +27,13 @@ import org.thingsboard.server.common.data.plugin.ComponentType;
 import org.thingsboard.server.common.msg.TbMsg;
 
 /**
- * 中文说明：`TbAckNode` 是确认节点规则节点，用于控制规则链输入输出、确认和检查点流转。
- * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
- * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
- * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
- * 配置对象：`EmptyNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
- * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ * 中文说明：
+ * 1. `TbAckNode` 是 ThingsBoard Rule Engine Components 中处理 `Tb Ack Node` 的规则节点。
+ * 2. 它接收规则链消息，根据节点配置执行判断、转换或外部动作。
+ * 3. 处理结果通过成功、失败或自定义关系继续传递给后续节点。
+ * 4. 直接依赖的类型边界包括 `TbNode`。
+ * 5. 独立节点类型让该能力可以在规则链中配置、复用和替换。
+ * 6. 阅读时重点关注初始化配置、消息处理入口和关系类型的选择。
  */
 @Slf4j
 @RuleNode(
@@ -72,9 +73,4 @@ public class TbAckNode implements TbNode {
         ctx.ack(msg);
         ctx.tellSuccess(msg);
     }
-
-    /*
-     * 本类总结：`TbAckNode` 负责控制规则链输入输出、确认和检查点流转；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

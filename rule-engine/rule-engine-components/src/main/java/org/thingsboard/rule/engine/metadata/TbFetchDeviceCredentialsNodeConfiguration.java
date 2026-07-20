@@ -22,9 +22,13 @@ import org.thingsboard.rule.engine.api.NodeConfiguration;
 import org.thingsboard.rule.engine.util.TbMsgSource;
 
 /**
- * 中文说明：`TbFetchDeviceCredentialsNodeConfiguration` 是获取设备凭据节点配置对象，用于承载规则节点 JSON 中的配置项和默认值。
- * 配置来源：实例字段通常由前端规则节点配置 JSON 反序列化得到，`defaultConfiguration` 提供缺省配置。
- * 调用边界：本类本身不直接涉及数据库、缓存、MQTT、Actor 或事务；具体实现和调用链可能在使用这些配置的节点中涉及。
+ * 中文说明：
+ * 1. `TbFetchDeviceCredentialsNodeConfiguration` 是 ThingsBoard Rule Engine Components 中描述设备凭据行为的配置类型。
+ * 2. 它集中保存该组件启动或运行时需要的可配置选项。
+ * 3. 字段值决定功能开关、限制条件、地址或处理策略等具体行为。
+ * 4. 直接依赖的类型边界包括 `TbAbstractFetchToNodeConfiguration`、`NodeConfiguration`。
+ * 5. 独立配置对象可以避免大量零散参数在调用链中传递。
+ * 6. 阅读时重点关注默认值、必填字段和配置项之间的约束关系。
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -42,9 +46,4 @@ public class TbFetchDeviceCredentialsNodeConfiguration extends TbAbstractFetchTo
         configuration.setFetchTo(TbMsgSource.METADATA);
         return configuration;
     }
-
-    /*
-     * 本类总结：`TbFetchDeviceCredentialsNodeConfiguration` 负责读取、补充或映射消息元数据、实体字段、属性和遥测上下文信息；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

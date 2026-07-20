@@ -82,13 +82,12 @@ import java.util.stream.Collectors;
 
 /**
  * 中文说明：
- * 1. 类目的：`SnmpTransportService` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ * 1. `SnmpTransportService` 是 ThingsBoard Common Transport 中负责 SNMP 的业务服务。
+ * 2. 它集中组织该领域的核心操作，并向上层提供稳定的调用入口。
+ * 3. 类中的依赖和状态用于完成校验、编排、查询或更新等直接职责。
+ * 4. 直接依赖的类型边界包括 `TbTransportService`、`CommandResponder`。
+ * 5. 把这些操作集中在独立类型中，可以避免调用方重复拼装同一业务流程。
+ * 6. 阅读时重点关注公开方法的职责边界、关键校验和依赖调用顺序。
  */
 @TbSnmpTransportComponent
 @Service
@@ -645,13 +644,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
 
     /**
      * 中文说明：
-     * 1. 类目的：`RequestContext` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
-     * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+     * 1. `RequestContext` 是 ThingsBoard Common Transport 中承载请求信息的数据类型。
+     * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+     * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+     * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+     * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+     * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
      */
     @Data
     private static class RequestContext {
@@ -697,13 +695,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
 
     /**
      * 中文说明：
-     * 1. 类目的：`ResponseDataMapper` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
-     * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+     * 1. `ResponseDataMapper` 是 ThingsBoard Common Transport 中定义响应能力边界的接口。
+     * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+     * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+     * 4. 它直接协作于实现类以及使用该接口的调用组件。
+     * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+     * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
      */
     private interface ResponseDataMapper {
         /**
@@ -718,13 +715,12 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
 
     /**
      * 中文说明：
-     * 1. 类目的：`ResponseProcessor` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
-     * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+     * 1. `ResponseProcessor` 是 ThingsBoard Common Transport 中定义响应能力边界的接口。
+     * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+     * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+     * 4. 它直接协作于实现类以及使用该接口的调用组件。
+     * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+     * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
      */
     private interface ResponseProcessor {
         /**
@@ -739,11 +735,3 @@ public class SnmpTransportService implements TbTransportService, CommandResponde
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`SnmpTransportService` 在 ThingsBoard Common 模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
- * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

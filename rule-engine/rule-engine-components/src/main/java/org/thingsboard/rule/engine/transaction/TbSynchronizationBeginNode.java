@@ -67,8 +67,3 @@ public class TbSynchronizationBeginNode implements TbNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类是 deprecated 同步开始节点的兼容实现；它只在规则链语义上表示同步边界，不直接管理数据库事务、缓存、MQTT 或 Actor 调度。
- */

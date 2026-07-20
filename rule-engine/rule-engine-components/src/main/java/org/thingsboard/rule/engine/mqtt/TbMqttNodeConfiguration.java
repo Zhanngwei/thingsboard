@@ -87,9 +87,3 @@ public class TbMqttNodeConfiguration implements NodeConfiguration<TbMqttNodeConf
     }
 
 }
-
-/*
- * 本类总结：
- * 本类集中描述 MQTT 节点连接和发布所需的可配置项，Topic、retained、连接超时、会话和凭据都会被 TbMqttNode 消费。
- * 配置类本身没有外部调用、异步回调、数据库或缓存逻辑。
- */

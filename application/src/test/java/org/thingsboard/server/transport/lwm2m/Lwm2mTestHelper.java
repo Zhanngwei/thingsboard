@@ -17,13 +17,12 @@ package org.thingsboard.server.transport.lwm2m;
 
 /**
  * 中文说明：
- * 1. 类目的：`Lwm2mTestHelper` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
- * 4. 生命周期：由 JUnit 测试生命周期创建，随单个测试方法准备和清理。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Integration Test / Fixture。
+ * 1. `Lwm2mTestHelper` 是 ThingsBoard Application 中处理 LwM2M 通用操作的工具类型。
+ * 2. 它提供无状态或轻量的复用方法，减少多个调用点的重复实现。
+ * 3. 方法通常完成格式化、校验、计算或简单对象构造。
+ * 4. 它直接协作于方法参数和返回值所代表的数据类型。
+ * 5. 集中工具方法可以统一边界行为，并降低细节变化对调用方的影响。
+ * 6. 阅读时重点关注输入约束、边界值和方法是否修改传入对象。
  */
 public class Lwm2mTestHelper {
 
@@ -102,13 +101,12 @@ public class Lwm2mTestHelper {
 
     /**
      * 中文说明：
-     * 1. 类目的：`LwM2MClientState` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
-     * 4. 生命周期：由 JUnit 测试生命周期创建，随单个测试方法准备和清理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Integration Test / Fixture。
+     * 1. `LwM2MClientState` 是 ThingsBoard Application 中定义 LwM2M 固定取值的枚举类型。
+     * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+     * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+     * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+     * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+     * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
      */
     public enum LwM2MClientState {
 
@@ -175,13 +173,12 @@ public class Lwm2mTestHelper {
 
     /**
      * 中文说明：
-     * 1. 类目的：`LwM2MProfileBootstrapConfigType` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
-     * 4. 生命周期：由 JUnit 测试生命周期创建，随单个测试方法准备和清理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Integration Test / Fixture。
+     * 1. `LwM2MProfileBootstrapConfigType` 是 ThingsBoard Application 中定义 LwM2M 固定取值的枚举类型。
+     * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+     * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+     * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+     * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+     * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
      */
     public enum LwM2MProfileBootstrapConfigType {
 
@@ -232,11 +229,3 @@ public class Lwm2mTestHelper {
         }
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`Lwm2mTestHelper` 在 ThingsBoard Application 测试模块 中承担传输层测试或适配类型职责，核心目的是验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
- * 2. 核心流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
- * 3. 关键依赖：主要依赖或协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

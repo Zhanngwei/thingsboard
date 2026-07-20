@@ -96,8 +96,3 @@ public abstract class TbAbstractExternalNode implements TbNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类为外部节点提供 ack 与成功/失败链路转发的公共逻辑；它不直接实现外部 I/O、数据库事务、缓存读取或 MQTT 交互，线程安全边界主要由初始化后的 forceAck 配置和调用方的消息上下文使用方式决定。
- */

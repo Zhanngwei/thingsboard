@@ -19,13 +19,12 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * 中文说明：
- * 1. 类目的：`TbWebSocketTextMsg` 是ThingsBoard Application 模块中的REST/WebSocket 控制层类型，用于承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
- * 4. 生命周期：由 Spring MVC 容器创建，按单次 Web 请求或 WebSocket 会话调用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 MVC Controller / Facade。
+ * 1. `TbWebSocketTextMsg` 是 ThingsBoard Application 中承载消息信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 直接依赖的类型边界包括 `TbWebSocketMsg`。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 @RequiredArgsConstructor
 public class TbWebSocketTextMsg implements TbWebSocketMsg<String> {
@@ -55,11 +54,3 @@ public class TbWebSocketTextMsg implements TbWebSocketMsg<String> {
         return value;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`TbWebSocketTextMsg` 在 ThingsBoard Application 模块 中承担REST/WebSocket 控制层类型职责，核心目的是承接 HTTP 或 WebSocket 入口并把请求委派给服务层。
- * 2. 核心流程：校验权限和参数后调用服务层，最终返回 DTO、响应体或异步回调。
- * 3. 关键依赖：主要依赖或协作对象包括Spring MVC、安全上下文、Service、DAO、缓存和审计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

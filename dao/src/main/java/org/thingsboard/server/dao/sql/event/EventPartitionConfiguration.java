@@ -25,14 +25,12 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 中文说明：
- * 1. 类目的：`EventPartitionConfiguration` 是 ThingsBoard DAO 模块 中的SQL/JPA 持久化实现类型，用于把 DAO API 的领域操作落到 PostgreSQL、TimescaleDB 或 JPA Repository 的具体 SQL 访问路径。
- * 2. 所属模块：位于 dao 模块，处在 ThingsBoard 服务端的数据访问和持久化实现层。
- * 3. 协作对象：主要协作对象包括Spring Data Repository、JPA Entity、Hibernate、PostgreSQL、TimescaleDB、缓存和领域服务。
- * 4. 生命周期：由 Spring 容器创建为 SQL DAO 或 Repository Bean，随事务上下文执行查询、保存、删除和分页读取。
- * 5. 设计原因：单独建模该类型可以隔离 DAO API、业务服务、缓存和具体数据库实现，避免上层模块直接依赖 SQL、Cassandra 或测试容器细节。
- * 6. 事务与缓存：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；是否触发缓存取决于实现体中的 cache、evict 或 Redis/Caffeine 调用。
- * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
- * 8. 设计模式：主要体现 Repository / DAO / Adapter。
+ * 1. `EventPartitionConfiguration` 是 ThingsBoard DAO 中描述事件行为的配置类型。
+ * 2. 它集中保存该组件启动或运行时需要的可配置选项。
+ * 3. 字段值决定功能开关、限制条件、地址或处理策略等具体行为。
+ * 4. 它直接协作于配置加载组件和使用这些配置的运行类型。
+ * 5. 独立配置对象可以避免大量零散参数在调用链中传递。
+ * 6. 阅读时重点关注默认值、必填字段和配置项之间的约束关系。
  */
 @Component
 public class EventPartitionConfiguration {
@@ -77,11 +75,3 @@ public class EventPartitionConfiguration {
         return eventType.isDebug() ? debugPartitionSizeInMs : regularPartitionSizeInMs;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`EventPartitionConfiguration` 在 ThingsBoard DAO 模块 中承担SQL/JPA 持久化实现类型职责，核心目的是把 DAO API 的领域操作落到 PostgreSQL、TimescaleDB 或 JPA Repository 的具体 SQL 访问路径。
- * 2. 核心流程：将领域查询参数转换为 Repository 或原生 SQL 调用，再把数据库记录映射回 Common 数据对象。
- * 3. 关键依赖：主要依赖或协作对象包括Spring Data Repository、JPA Entity、Hibernate、PostgreSQL、TimescaleDB、缓存和领域服务。
- * 4. 学习重点：阅读本文件时应关注租户/实体作用域、事务边界、缓存失效、SQL/NoSQL 差异、数据库异常转换，以及数据变更对 Rule Engine、Transport、Actor 和审计链路的间接影响。
- */

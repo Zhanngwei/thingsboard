@@ -41,9 +41,3 @@ public class TbSendRpcRequestNodeConfiguration implements NodeConfiguration<TbSe
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类只提供 RPC 请求节点的超时配置，实际 RPC 发送、响应回调和路由由 TbSendRPCRequestNode 完成。
- * 它不直接涉及外部调用、数据库、缓存或 Actor 调度。
- */

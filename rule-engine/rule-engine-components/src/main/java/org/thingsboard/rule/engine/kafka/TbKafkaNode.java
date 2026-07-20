@@ -281,10 +281,3 @@ public class TbKafkaNode extends TbAbstractExternalNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类直接管理 KafkaProducer，并把 Rule Engine 消息异步发送到 Kafka。
- * Topic/key、Producer 参数和 Header 行为来自节点配置；ackIfNeeded 先处理消息确认，Kafka send 回调再决定成功或失败路由。
- * 本类本身不直接涉及数据库或缓存，相关行为只可能通过 Rule Engine 上下文、执行器或 Kafka 客户端内部线程间接发生。
- */

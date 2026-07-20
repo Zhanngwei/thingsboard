@@ -21,14 +21,12 @@ import org.thingsboard.common.util.AbstractListeningExecutor;
 
 /**
  * 中文说明：
- * 1. 类目的：`CacheExecutorService` 是 ThingsBoard DAO 模块 中的DAO 缓存和失效事件类型，用于保存实体、配置、类型或会话相关数据的缓存键、缓存值和跨节点失效事件。
- * 2. 所属模块：位于 dao 模块，处在 ThingsBoard 服务端的数据访问和持久化实现层。
- * 3. 协作对象：主要协作对象包括Caffeine、Redis、Spring Cache、DAO Service、Application 服务和集群事件总线。
- * 4. 生命周期：缓存对象随 Spring 缓存 Bean 存在，失效事件随单次保存、删除或配置更新流程传播。
- * 5. 设计原因：单独建模该类型可以隔离 DAO API、业务服务、缓存和具体数据库实现，避免上层模块直接依赖 SQL、Cassandra 或测试容器细节。
- * 6. 事务与缓存：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；是否触发缓存取决于实现体中的 cache、evict 或 Redis/Caffeine 调用。
- * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
- * 8. 设计模式：主要体现 Cache-Aside / Observer / Value Object。
+ * 1. `CacheExecutorService` 是 ThingsBoard DAO 中负责缓存的业务服务。
+ * 2. 它集中组织该领域的核心操作，并向上层提供稳定的调用入口。
+ * 3. 类中的依赖和状态用于完成校验、编排、查询或更新等直接职责。
+ * 4. 直接依赖的类型边界包括 `AbstractListeningExecutor`。
+ * 5. 把这些操作集中在独立类型中，可以避免调用方重复拼装同一业务流程。
+ * 6. 阅读时重点关注公开方法的职责边界、关键校验和依赖调用顺序。
  */
 @Component
 public class CacheExecutorService extends AbstractListeningExecutor {
@@ -50,11 +48,3 @@ public class CacheExecutorService extends AbstractListeningExecutor {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`CacheExecutorService` 在 ThingsBoard DAO 模块 中承担DAO 缓存和失效事件类型职责，核心目的是保存实体、配置、类型或会话相关数据的缓存键、缓存值和跨节点失效事件。
- * 2. 核心流程：根据租户、实体或配置键读取缓存，数据库变更后发布失效事件以维持多节点一致性。
- * 3. 关键依赖：主要依赖或协作对象包括Caffeine、Redis、Spring Cache、DAO Service、Application 服务和集群事件总线。
- * 4. 学习重点：阅读本文件时应关注租户/实体作用域、事务边界、缓存失效、SQL/NoSQL 差异、数据库异常转换，以及数据变更对 Rule Engine、Transport、Actor 和审计链路的间接影响。
- */

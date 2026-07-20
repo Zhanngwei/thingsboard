@@ -66,8 +66,3 @@ public class TbSynchronizationEndNode implements TbNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类是 deprecated 同步结束节点的兼容实现；它不直接涉及数据库事务生命周期，只在 Rule Engine 消息流中继续传递消息。
- */

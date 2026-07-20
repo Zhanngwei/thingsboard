@@ -43,14 +43,12 @@ import java.util.Random;
 
 /**
  * 中文说明：
- * 1. 类目的：`AbstractContainerTest` 是 ThingsBoard MSA 测试模块 中的微服务测试和部署支撑类型，用于支撑微服务部署、黑盒测试、UI 自动化、协议连通性验证或版本控制执行器路由。
- * 2. 所属模块：位于 msa 聚合模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
- * 4. 生命周期：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 Test Fixture / Page Object / Service。
+ * 1. `AbstractContainerTest` 是 ThingsBoard Microservices 中验证 `AbstractContainer` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 它直接协作于被测类型、测试框架和必要的模拟依赖。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @Slf4j
 @Listeners(TestListener.class)
@@ -219,14 +217,12 @@ public abstract class AbstractContainerTest {
 
     /**
      * 中文说明：
-     * 1. 类目的：`CmdsType` 是 ThingsBoard MSA 测试模块 中的微服务测试和部署支撑类型，用于支撑微服务部署、黑盒测试、UI 自动化、协议连通性验证或版本控制执行器路由。
-     * 2. 所属模块：位于 msa 聚合模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
-     * 3. 协作对象：主要协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
-     * 4. 生命周期：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁。
-     * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
-     * 6. 事务与缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理。
-     * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
-     * 8. 设计模式：主要体现 Test Fixture / Page Object / Service。
+     * 1. `CmdsType` 是 ThingsBoard Microservices 中定义 `Cmds Type` 固定取值的枚举类型。
+     * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+     * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+     * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+     * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+     * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
      */
     protected enum CmdsType {
         TS_SUB_CMDS("tsSubCmds"),
@@ -291,11 +287,3 @@ public abstract class AbstractContainerTest {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`AbstractContainerTest` 在 ThingsBoard MSA 测试模块 中承担微服务测试和部署支撑类型职责，核心目的是支撑微服务部署、黑盒测试、UI 自动化、协议连通性验证或版本控制执行器路由。
- * 2. 核心流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
- * 3. 关键依赖：主要依赖或协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

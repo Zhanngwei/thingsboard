@@ -20,13 +20,12 @@ import org.thingsboard.server.common.data.id.EntityId;
 
 /**
  * 中文说明：
- * 1. 类目的：`SingleEntityFilter` 是ThingsBoard Common 模块中的公共数据模型类型，用于承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括REST Controller、DAO、Rule Engine、Transport、Edge 同步、缓存和 JSON 序列化框架。
- * 4. 生命周期：通常由 REST 请求、DAO 查询、消息反序列化、配置加载或测试夹具创建，并随单次业务流程传递。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Value Object / Builder。
+ * 1. `SingleEntityFilter` 是 ThingsBoard Common Data 中处理实体的处理器。
+ * 2. 它把单一处理步骤封装为可调用、可替换的组件。
+ * 3. 输入通常来自上游事件、网络消息或异步回调，输出交给下一处理步骤。
+ * 4. 直接依赖的类型边界包括 `EntityFilter`。
+ * 5. 独立处理器可以缩小单个流程的职责范围，并便于组合处理链。
+ * 6. 阅读时重点关注入口方法、条件分支和处理完成后的转发行为。
  */
 @Data
 public class SingleEntityFilter implements EntityFilter {
@@ -46,11 +45,3 @@ public class SingleEntityFilter implements EntityFilter {
     private EntityId singleEntity;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`SingleEntityFilter` 在 ThingsBoard Common 模块 中承担公共数据模型类型职责，核心目的是承载 ThingsBoard 实体、配置、查询、告警、通知、安全或设备画像等跨层数据契约。
- * 2. 核心流程：接收外部或持久化数据后在各层之间传递，必要时参与校验、序列化或转换。
- * 3. 关键依赖：主要依赖或协作对象包括REST Controller、DAO、Rule Engine、Transport、Edge 同步、缓存和 JSON 序列化框架。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

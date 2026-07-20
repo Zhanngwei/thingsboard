@@ -86,9 +86,3 @@ public class TbSqsNodeConfiguration implements NodeConfiguration<TbSqsNodeConfig
         FIFO
     }
 }
-
-/*
- * 本类总结：
- * 本类描述 AWS SQS 外部节点的队列和发送参数，实际云 SDK 客户端生命周期与 sendMessage 调用在 TbSqsNode 中完成。
- * 配置类本身不直接涉及外部调用、数据库、缓存或异步回调。
- */

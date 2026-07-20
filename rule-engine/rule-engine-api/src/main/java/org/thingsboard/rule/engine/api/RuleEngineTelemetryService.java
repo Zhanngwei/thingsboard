@@ -32,12 +32,12 @@ import java.util.List;
  */
 /**
  * 中文说明：
- * 1. 职责：为 Rule Engine 提供遥测、属性、latest 数据保存、删除和通知的统一 API。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的遥测与属性存储边界。
- * 3. 协作对象：与遥测节点、属性节点、TimeseriesService、AttributesService、设备通知流程和回调执行器协作。
- * 4. 生命周期：由 Spring 实现类长期存在，规则节点处理遥测/属性消息时通过 {@link TbContext} 获取并调用。
- * 5. 设计原因：遥测写入需要同时处理历史数据、latest 数据、属性范围、TTL 和设备通知，接口统一这些持久化语义。
- * 6. 技术关联：接口本身不直接涉及 MQTT 或 Actor；实现通常涉及数据库、缓存、异步回调和 Rule Engine 消息确认。
+ * 1. `RuleEngineTelemetryService` 是 ThingsBoard Rule Engine API 中定义遥测数据能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface RuleEngineTelemetryService {
 
@@ -274,11 +274,3 @@ public interface RuleEngineTelemetryService {
      */
     void deleteTimeseriesAndNotify(TenantId tenantId, EntityId entityId, List<String> keys, List<DeleteTsKvQuery> deleteTsKvQueries, FutureCallback<Void> callback);
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为规则节点提供遥测和属性的保存、删除、latest 更新和通知能力。
- * 2. 核心流程：规则节点解析 TbMsg 后调用保存或删除方法，服务实现写入数据库/缓存并通过 FutureCallback 驱动消息确认或失败。
- * 3. 关键依赖：TsKvEntry、AttributeKvEntry、DeleteTsKvQuery、FutureCallback、TenantId、EntityId。
- * 4. 学习重点：遥测服务接口把历史数据、latest 数据、属性范围和通知语义统一到 Rule Engine 可调用的异步 API。
- */

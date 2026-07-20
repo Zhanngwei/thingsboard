@@ -81,8 +81,3 @@ public class EntitiesRelatedEntityIdAsyncLoader {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类负责把关系查询配置转换为异步关系查找，并在 DB callback executor 上解析第一条结果；Rule Engine 消息流、失败处理和后续实体使用均由调用方负责。
- */

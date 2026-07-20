@@ -46,12 +46,12 @@ import java.util.Collection;
  */
 /**
  * 中文说明：
- * 1. 职责：为 Rule Engine 提供告警创建、更新、确认、清除、分配、删除和查询的统一 API。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的告警子系统边界。
- * 3. 协作对象：与告警规则节点、告警 DAO/服务实现、实体关系查询、租户隔离和页面查询模型协作。
- * 4. 生命周期：由 Spring 实现类长期存在，规则节点处理告警消息或查询告警状态时通过 {@link TbContext} 获取并调用。
- * 5. 设计原因：告警操作涉及唯一活跃告警约束、状态迁移和查询分页，规则节点通过接口复用统一服务而不是直接访问 DAO。
- * 6. 技术关联：接口本身不直接涉及 MQTT 或 Actor；实现通常涉及数据库、缓存、事务和 Rule Engine 告警流程。
+ * 1. `RuleEngineAlarmService` 是 ThingsBoard Rule Engine API 中定义告警能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface RuleEngineAlarmService {
 
@@ -254,11 +254,3 @@ public interface RuleEngineAlarmService {
      */
     PageData<EntitySubtype> findAlarmTypesByTenantId(TenantId tenantId, PageLink pageLink);
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为规则节点提供完整告警写入、状态迁移和查询能力。
- * 2. 核心流程：告警节点调用创建/更新/确认/清除等方法，查询节点调用分页和聚合查询方法，服务实现负责数据库和缓存一致性。
- * 3. 关键依赖：Alarm、AlarmInfo、AlarmApiCallResult、TenantId、EntityId、分页查询模型和告警服务实现。
- * 4. 学习重点：告警服务是 Rule Engine 与告警持久化/状态机之间的边界，活跃告警唯一性需要实现层保证原子性。
- */

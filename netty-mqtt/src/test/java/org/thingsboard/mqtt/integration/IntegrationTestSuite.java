@@ -20,27 +20,16 @@ import org.junit.runner.RunWith;
 
 /**
  * 中文说明：
- * 1. 类目的：`IntegrationTestSuite` 是 ThingsBoard Netty MQTT 测试模块 中的Netty MQTT 集成测试类型，用于通过内置 MQTT server 验证客户端连接、心跳、发布订阅和异常关闭行为。
- * 2. 所属模块：位于 netty-mqtt 模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Netty Channel、MQTT codec、ThingsBoard Transport、回调接口、集成测试 broker 和异步调度器。
- * 4. 生命周期：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 Integration Test / Test Server。
+ * 1. `IntegrationTestSuite` 是 ThingsBoard Netty MQTT Client 中验证 `IntegrationTestSuite` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 它直接协作于被测类型、测试框架和必要的模拟依赖。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @RunWith(ClasspathSuite.class)
 @ClasspathSuite.ClassnameFilters({
         "org.thingsboard.mqtt.integration.*Test",
 })
 public class IntegrationTestSuite {
-
-
-/*
- * 本类总结：
- * 1. 核心职责：`IntegrationTestSuite` 在 ThingsBoard Netty MQTT 测试模块 中承担Netty MQTT 集成测试类型职责，核心目的是通过内置 MQTT server 验证客户端连接、心跳、发布订阅和异常关闭行为。
- * 2. 核心流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
- * 3. 关键依赖：主要依赖或协作对象包括Netty Channel、MQTT codec、ThingsBoard Transport、回调接口、集成测试 broker 和异步调度器。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */
 }

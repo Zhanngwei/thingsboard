@@ -29,12 +29,12 @@ import java.util.function.Consumer;
  */
 /**
  * 中文说明：
- * 1. 职责：为 Rule Engine 提供资产配置缓存读取和监听能力。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的资产配置缓存边界。
- * 3. 协作对象：与资产服务、资产配置服务、元数据节点、缓存刷新流程协作。
- * 4. 生命周期：由 Spring 缓存实现长期存在，监听器随规则节点生命周期注册和移除。
- * 5. 设计原因：规则节点可能频繁读取资产配置，缓存接口可以隔离数据库访问并提供配置变更通知。
- * 6. 技术关联：接口本身不直接涉及事务、MQTT、Actor、数据库；实现直接涉及缓存，可能在未命中时访问数据库，服务 Rule Engine。
+ * 1. `RuleEngineAssetProfileCache` 是 ThingsBoard Rule Engine API 中定义资产配置能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface RuleEngineAssetProfileCache {
 
@@ -77,11 +77,3 @@ public interface RuleEngineAssetProfileCache {
     void removeListener(TenantId tenantId, EntityId listenerId);
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为规则节点提供资产配置缓存读取和变更监听。
- * 2. 核心流程：节点按资产或配置 ID 读取 AssetProfile，初始化时注册监听，销毁时移除监听。
- * 3. 关键依赖：AssetProfile、AssetId、AssetProfileId、TenantId 和缓存实现。
- * 4. 学习重点：资产配置缓存与设备配置缓存模式一致，用于降低规则节点对数据库的直接依赖。
- */

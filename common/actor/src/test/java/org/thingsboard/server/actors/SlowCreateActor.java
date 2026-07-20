@@ -22,13 +22,12 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 中文说明：
- * 1. 类目的：`SlowCreateActor` 是ThingsBoard Common 测试模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 生命周期：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ * 1. `SlowCreateActor` 是 ThingsBoard Actor 中处理 `Slow Create Actor` 消息的 Actor 类型。
+ * 2. 它按消息顺序执行状态变更、路由或组件协调逻辑。
+ * 3. 类内状态用于保存当前 Actor 处理消息所需的上下文和运行数据。
+ * 4. 直接依赖的类型边界包括 `TestRootActor`。
+ * 5. 使用独立 Actor 可以串行化同一业务对象的异步操作，并隔离并发状态。
+ * 6. 阅读时重点关注消息分派入口、状态更新位置和向其它 Actor 发送消息的分支。
  */
 @Slf4j
 public class SlowCreateActor extends TestRootActor {
@@ -58,13 +57,12 @@ public class SlowCreateActor extends TestRootActor {
 
     /**
      * 中文说明：
-     * 1. 类目的：`SlowCreateActorCreator` 是ThingsBoard Common 测试模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
-     * 4. 生命周期：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+     * 1. `SlowCreateActorCreator` 是 ThingsBoard Actor 中创建或提供 `Slow Create Actor` 对象的构造组件。
+     * 2. 它根据输入配置、类型或上下文选择合适的具体实现。
+     * 3. 创建细节被集中在该类型中，调用方只依赖稳定的创建入口。
+     * 4. 直接依赖的类型边界包括 `TbActorCreator`。
+     * 5. 独立工厂可以避免调用方了解构造顺序和实现类选择规则。
+     * 6. 阅读时重点关注实现选择条件、默认分支和对象初始化参数。
      */
     public static class SlowCreateActorCreator implements TbActorCreator {
 
@@ -113,11 +111,3 @@ public class SlowCreateActor extends TestRootActor {
         }
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`SlowCreateActor` 在 ThingsBoard Common 测试模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
- * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

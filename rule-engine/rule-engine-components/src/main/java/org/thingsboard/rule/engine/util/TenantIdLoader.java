@@ -158,8 +158,3 @@ public class TenantIdLoader {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类提供同步租户归属解析，覆盖多种实体类型；它本身不直接参与 Rule Engine 消息流或事务控制，具体数据库/缓存访问发生在 TbContext 暴露的服务与缓存中。
- */

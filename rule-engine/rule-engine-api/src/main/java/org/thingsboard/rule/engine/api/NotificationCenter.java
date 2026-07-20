@@ -30,12 +30,12 @@ import java.util.Set;
 
 /**
  * 中文说明：
- * 1. 职责：定义 Rule Engine 和系统通知流程处理通知请求、Web 通知状态和可用投递方式的入口。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的通知中心边界。
- * 3. 协作对象：与通知规则节点、通知模板、通知目标、用户过滤器、通知请求统计和 Web 通知存储协作。
- * 4. 生命周期：由 Spring 实现类长期存在，规则节点或系统流程在创建、更新和查询通知时调用。
- * 5. 设计原因：通知可能投递到 Web、邮件、Slack、Firebase 等多个渠道，集中接口避免规则节点直接编排各渠道。
- * 6. 技术关联：接口本身不直接涉及事务、缓存、MQTT、Actor、数据库；实现通常访问通知数据库、模板和外部渠道，直接服务 Rule Engine。
+ * 1. `NotificationCenter` 是 ThingsBoard Rule Engine API 中定义通知能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 它直接协作于实现类以及使用该接口的调用组件。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface NotificationCenter {
 
@@ -107,11 +107,3 @@ public interface NotificationCenter {
     Set<NotificationDeliveryMethod> getAvailableDeliveryMethods(TenantId tenantId);
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：集中管理通知请求处理、Web 通知状态和投递方式发现。
- * 2. 核心流程：规则节点或系统流程提交 NotificationRequest，通知中心持久化、投递并通过回调返回统计。
- * 3. 关键依赖：NotificationRequest、NotificationTemplate、UsersFilter、FutureCallback 和通知存储/渠道实现。
- * 4. 学习重点：通知中心把多渠道通知编排从规则节点中抽离出来，节点只表达发送意图。
- */

@@ -236,10 +236,3 @@ public class TbMsgPushToEdgeNode extends AbstractTbMsgPushNode<TbMsgPushToEdgeNo
         }, ctx.getDbCallbackExecutor());
     }
 }
-
-/*
- * 本类总结：
- * 本类把 Cloud 侧消息转换为 EdgeEvent，并保存到一个或多个 Edge 的事件队列。
- * 它不直接向 Edge 发起网络推送；EdgeEventService.saveAsync 和 onEdgeEventUpdate 触发后续同步，数据库/缓存可能在服务调用链中涉及。
- * 成功和失败路由由 dbCallbackExecutor 上的异步回调决定。
- */

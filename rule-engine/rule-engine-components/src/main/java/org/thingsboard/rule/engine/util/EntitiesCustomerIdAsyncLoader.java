@@ -65,8 +65,3 @@ public class EntitiesCustomerIdAsyncLoader {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类为规则节点提供客户归属解析的异步 helper；具体数据库/缓存读取由服务层决定，本类只做 Future 转换且不持有跨消息状态。
- */

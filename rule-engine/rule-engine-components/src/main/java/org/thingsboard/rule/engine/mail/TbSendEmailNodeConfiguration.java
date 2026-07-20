@@ -100,9 +100,3 @@ public class TbSendEmailNodeConfiguration implements NodeConfiguration {
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类描述发送邮件节点的 SMTP、TLS、代理和系统配置开关。
- * 实际 MailService/SMTP 调用、异步回调和失败路由由 TbSendEmailNode 完成；本类不直接涉及数据库或缓存。
- */

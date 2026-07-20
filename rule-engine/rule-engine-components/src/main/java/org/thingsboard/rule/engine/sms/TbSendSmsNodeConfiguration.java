@@ -56,9 +56,3 @@ public class TbSendSmsNodeConfiguration implements NodeConfiguration {
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类描述 SMS 发送节点的模板和 provider 选择配置。
- * 实际发送、异步执行和失败路由由 TbSendSmsNode 完成；本类不直接涉及数据库、缓存或外部调用。
- */

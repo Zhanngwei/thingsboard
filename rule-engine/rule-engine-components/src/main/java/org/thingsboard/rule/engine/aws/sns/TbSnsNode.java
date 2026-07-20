@@ -192,10 +192,3 @@ public class TbSnsNode extends TbAbstractExternalNode {
         }
     }
 }
-
-/*
- * 本类总结：
- * 本类直接管理 AmazonSNS 客户端，并把 Rule Engine 消息通过 externalCallExecutor 发布到 AWS SNS。
- * Topic ARN、凭据和 region 来自配置；消息确认在发布前处理，异步回调决定成功或失败路由。
- * 本类本身不直接涉及数据库或缓存，相关行为只可能通过 Rule Engine 上下文、执行器或 AWS SDK 调用链间接涉及。
- */

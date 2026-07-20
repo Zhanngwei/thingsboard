@@ -84,8 +84,3 @@ public enum ContactBasedEntityDetails {
     }
 
 }
-
-/*
- * 本类总结：
- * 本枚举提供联系信息字段名常量，属于纯内存映射；具体实体数据读取和消息流使用发生在调用方。
- */

@@ -20,22 +20,13 @@ import org.thingsboard.server.queue.discovery.event.PartitionChangeEvent;
 
 /**
  * 中文说明：
- * 1. 类目的：`TbRuleEngineConsumerService` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
- * 4. 生命周期：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
+ * 1. `TbRuleEngineConsumerService` 是 ThingsBoard Application 中定义 `Tb Rule Engine` 能力边界的接口。
+ * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+ * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+ * 4. 直接依赖的类型边界包括 `ApplicationListener`。
+ * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+ * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
  */
 public interface TbRuleEngineConsumerService extends ApplicationListener<PartitionChangeEvent> {
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`TbRuleEngineConsumerService` 在 ThingsBoard Application 模块 中承担队列服务类型职责，核心目的是封装 ThingsBoard 队列生产、消费、确认和分区处理。
- * 2. 核心流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
- * 3. 关键依赖：主要依赖或协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

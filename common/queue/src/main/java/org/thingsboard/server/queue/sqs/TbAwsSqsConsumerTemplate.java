@@ -51,13 +51,12 @@ import java.util.stream.Stream;
 
 /**
  * 中文说明：
- * 1. 类目的：`TbAwsSqsConsumerTemplate` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ * 1. `TbAwsSqsConsumerTemplate` 是 ThingsBoard Common Queue 中围绕 `Tb Aws Sqs` 提供具体能力的类型。
+ * 2. 它封装当前声明对应的核心操作和必要状态。
+ * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+ * 4. 直接依赖的类型边界包括 `TbQueueMsg`。
+ * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+ * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
  */
 @Slf4j
 public class TbAwsSqsConsumerTemplate<T extends TbQueueMsg> extends AbstractParallelTbQueueConsumerTemplate<Message, T> {
@@ -238,13 +237,12 @@ public class TbAwsSqsConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
 
     /**
      * 中文说明：
-     * 1. 类目的：`AwsSqsMsgWrapper` 是ThingsBoard Common 模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
-     * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
-     * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
-     * 4. 生命周期：由调用模块、Spring Bean、协议处理器、队列流程或序列化框架管理。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+     * 1. `AwsSqsMsgWrapper` 是 ThingsBoard Common Queue 中承载消息信息的数据类型。
+     * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+     * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+     * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+     * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+     * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
      */
     @Data
     private static class AwsSqsMsgWrapper {
@@ -278,11 +276,3 @@ public class TbAwsSqsConsumerTemplate<T extends TbQueueMsg> extends AbstractPara
         return sqsClient.getQueueUrl(topic.replaceAll("\\.", "_") + ".fifo").getQueueUrl();
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`TbAwsSqsConsumerTemplate` 在 ThingsBoard Common 模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
- * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

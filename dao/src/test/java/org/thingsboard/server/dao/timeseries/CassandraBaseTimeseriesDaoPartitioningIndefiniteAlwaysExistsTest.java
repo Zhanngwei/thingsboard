@@ -36,14 +36,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 中文说明：
- * 1. 类目的：`CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExistsTest` 是 ThingsBoard DAO 测试模块 中的时序数据持久化类型，用于处理遥测键值、最新值、历史分区、聚合查询和 Timescale/PostgreSQL 时序读写。
- * 2. 所属模块：位于 dao 模块，处在 ThingsBoard 服务端的数据访问和持久化实现层。
- * 3. 协作对象：主要协作对象包括TimeseriesService、SQL/Timescale DAO、Cassandra DAO、Queue、Rule Engine 和 Transport 上报链路。
- * 4. 生命周期：由遥测写入、历史查询、聚合查询或测试流程按请求调用，并受数据库连接池和事务管理约束。
- * 5. 设计原因：单独建模该类型可以隔离 DAO API、业务服务、缓存和具体数据库实现，避免上层模块直接依赖 SQL、Cassandra 或测试容器细节。
- * 6. 事务与缓存：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；是否触发缓存取决于实现体中的 cache、evict 或 Redis/Caffeine 调用。
- * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
- * 8. 设计模式：主要体现 Repository / Strategy / Template。
+ * 1. `CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExistsTest` 是 ThingsBoard DAO 中验证 `CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExists` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 它直接协作于被测类型、测试框架和必要的模拟依赖。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = CassandraBaseTimeseriesDao.class)
@@ -107,11 +105,3 @@ public class CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExistsTest {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`CassandraBaseTimeseriesDaoPartitioningIndefiniteAlwaysExistsTest` 在 ThingsBoard DAO 测试模块 中承担时序数据持久化类型职责，核心目的是处理遥测键值、最新值、历史分区、聚合查询和 Timescale/PostgreSQL 时序读写。
- * 2. 核心流程：根据实体、键、时间窗口和聚合参数选择存储路径，执行批量写入或查询后返回时序数据。
- * 3. 关键依赖：主要依赖或协作对象包括TimeseriesService、SQL/Timescale DAO、Cassandra DAO、Queue、Rule Engine 和 Transport 上报链路。
- * 4. 学习重点：阅读本文件时应关注租户/实体作用域、事务边界、缓存失效、SQL/NoSQL 差异、数据库异常转换，以及数据变更对 Rule Engine、Transport、Actor 和审计链路的间接影响。
- */

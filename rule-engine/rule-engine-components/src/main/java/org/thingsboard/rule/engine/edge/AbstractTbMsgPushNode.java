@@ -278,9 +278,3 @@ public abstract class AbstractTbMsgPushNode<T extends BaseTbMsgPushNodeConfigura
                 ALARM, CONNECT_EVENT, DISCONNECT_EVENT, ACTIVITY_EVENT, INACTIVITY_EVENT, TO_SERVER_RPC_REQUEST);
     }
 }
-
-/*
- * 本类总结：
- * 本类提供 Edge/Cloud 推送节点的通用消息过滤、事件构造和类型映射逻辑。
- * 它本身不直接进行数据库持久化、缓存访问或远端推送；这些边界由具体子类或服务调用链实现。
- */

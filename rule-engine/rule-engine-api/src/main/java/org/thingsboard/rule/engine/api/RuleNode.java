@@ -28,13 +28,12 @@ import java.lang.annotation.Target;
 
 /**
  * 中文说明：
- * 1. 职责：标记一个 {@link TbNode} 实现类是可被 Rule Engine 发现、注册和展示的规则节点类型。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的节点元数据声明层。
- * 3. 协作对象：与节点扫描器、规则链 UI、{@link NodeConfiguration}、规则节点运行时和组件注册流程协作。
- * 4. 生命周期：注解元数据在应用启动或组件扫描时读取，随后用于节点定义、UI 配置和运行时实例化。
- * 5. 设计原因：节点元数据必须随节点实现类发布，使用运行时注解可避免外部注册表与代码实现不一致。
- * 6. 设计模式：元数据驱动的 Factory/Strategy 注册，Rule Engine 根据注解决定如何创建和路由节点。
- * 7. 技术关联：注解本身不直接涉及事务、缓存、MQTT、Actor 通信、数据库；直接驱动 Rule Engine 节点发现和配置流程。
+ * 1. `RuleNode` 是 ThingsBoard Rule Engine API 中声明规则节点元数据的注解类型。
+ * 2. 它为被标注的类型或成员提供框架可读取的描述信息。
+ * 3. 注解属性定义调用方可以声明的配置内容和默认值。
+ * 4. 它直接协作于读取该注解的扫描器、注册器或运行框架。
+ * 5. 独立注解可以用声明式方式表达规则，避免调用方编写重复注册代码。
+ * 6. 阅读时重点关注注解目标、保留策略和每个属性的默认语义。
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
@@ -181,11 +180,3 @@ public @interface RuleNode {
     int version() default 0;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：用运行时注解声明规则节点的注册、UI 和配置元数据。
- * 2. 核心流程：应用启动扫描 TbNode 实现类，读取 RuleNode 注解，构建节点定义并驱动实例化和 UI 展示。
- * 3. 关键依赖：TbNode、NodeConfiguration、ComponentType、ComponentScope、RuleChainType 和连接关系类型。
- * 4. 学习重点：ThingsBoard Rule Engine 通过注解把节点实现、配置模型和前端展示元数据绑定在一起。
- */

@@ -162,10 +162,3 @@ public class TbSendRPCReplyNode implements TbNode {
         }, ctx.getDbCallbackExecutor());
     }
 }
-
-/*
- * 本类总结：
- * 本类负责发送设备 RPC 回复：普通路径调用 RpcService，Edge 路径把回复保存到 EdgeEvent 队列。
- * 普通路径本身不直接访问数据库或缓存；Edge 路径通过 EdgeEventService.saveAsync 直接进入异步持久化边界。
- * RpcService、Actor、MQTT/传输和 Edge 同步的具体实现/调用链可能间接涉及其它系统组件。
- */

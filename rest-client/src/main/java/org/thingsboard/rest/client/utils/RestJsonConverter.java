@@ -36,18 +36,12 @@ import java.util.stream.Collectors;
 
 /**
  * 中文说明：
- * 1. 类目的：`RestJsonConverter` 是 ThingsBoard Rest Client 模块 中的REST JSON 到 KV 模型转换器，用于把 REST API 返回的属性和时序 JSON 转换为 ThingsBoard 内部 AttributeKvEntry、TsKvEntry 和 KvEntry 类型。
- * 2. 所属模块：位于 rest-client，服务于 ThingsBoard 的客户端访问、离线工具或独立协议接入边界。
- * 3. 协作模块：主要协作对象包括 Jackson JsonNode、ThingsBoard KV 数据模型、RestClient 属性/时序查询方法。
- * 4. 生命周期：作为无状态工具类被静态调用，方法执行期间临时创建转换结果，调用结束即可释放局部对象。
- * 5. 存在原因：独立转换器让 RestClient 保持 HTTP 门面职责，不把 JSON 类型判断和 KV 构造细节混入大量 REST 方法。
- * 6. 事务：不涉及事务，只在内存中转换 REST 响应数据。
- * 7. 缓存：不涉及缓存，每次调用都重新转换输入 JSON。
- * 8. MQTT：REST 客户端不直接使用 MQTT，但设备凭据、遥测、规则链等 API 可能影响后续 MQTT transport 入站行为。
- * 9. Actor 通信：REST 请求到达服务端后可能触发 Actor 消息，例如设备、规则链或遥测相关操作；本类只负责 HTTP 边界。
- * 10. 数据库：不访问数据库，数据来源是服务端 REST 响应。
- * 11. Rule Engine：不执行 Rule Engine，只为可能来自遥测/属性查询的数据构造客户端模型。
- * 12. 设计模式：主要体现 Adapter / Converter。
+ * 1. `RestJsonConverter` 是 ThingsBoard REST Client 中转换 `Rest Json` 数据结构的适配组件。
+ * 2. 它把输入对象、协议内容或持久化数据转换为目标模型。
+ * 3. 转换过程负责字段映射、格式解析以及必要的默认值处理。
+ * 4. 它直接协作于源模型、目标模型和相关编解码类型。
+ * 5. 独立转换器可以避免不同模块重复编写并逐渐分叉的映射逻辑。
+ * 6. 阅读时重点关注字段对应关系、空值处理和不兼容输入的处理方式。
  */
 public class RestJsonConverter {
     /**
@@ -145,12 +139,4 @@ public class RestJsonConverter {
             }
         }
     }
-    /**
-     * 本类总结：
-     * 1. 核心职责：`RestJsonConverter` 负责把 REST API 返回的属性和时序 JSON 转换为 ThingsBoard 内部 AttributeKvEntry、TsKvEntry 和 KvEntry 类型。
-     * 2. 核心流程：读取 JSON 中的 key、value、ts 或 lastUpdateTs 字段，按布尔、数字、文本、JSON 容器类型构造对应 KV entry。
-     * 3. 关键依赖：Jackson JsonNode、ThingsBoard KV 数据模型、RestClient 属性/时序查询方法。
-     * 4. 设计重点：通过 Adapter / Converter 把外部协议、文件格式、启动参数或 REST 细节封装在边界类中，让核心业务模块保持清晰。
-     * 5. 学习重点：关注生命周期边界、线程安全假设、远端事务归属、缓存/数据库间接性、MQTT/Actor/Rule Engine 的进入点以及为什么该类只承担当前边界职责。
-     */
 }

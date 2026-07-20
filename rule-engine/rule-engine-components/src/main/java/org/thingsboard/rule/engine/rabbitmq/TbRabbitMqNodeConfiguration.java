@@ -100,9 +100,3 @@ public class TbRabbitMqNodeConfiguration implements NodeConfiguration<TbRabbitMq
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类提供 RabbitMQ 外部节点的连接和发布目标配置，实际连接与 basicPublish 由 TbRabbitMqNode 执行。
- * 配置类本身没有外部调用、异步回调、数据库或缓存逻辑。
- */

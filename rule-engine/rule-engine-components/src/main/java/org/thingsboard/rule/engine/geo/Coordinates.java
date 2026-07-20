@@ -18,8 +18,13 @@ package org.thingsboard.rule.engine.geo;
 import lombok.Data;
 
 /**
- * 中文说明：`Coordinates` 是坐标辅助类，用于执行 GPS 地理围栏、距离和多边形判断及状态跟踪。
- * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+ * 中文说明：
+ * 1. `Coordinates` 是 ThingsBoard Rule Engine Components 中围绕 `Coordinates` 提供具体能力的类型。
+ * 2. 它封装当前声明对应的核心操作和必要状态。
+ * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+ * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+ * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+ * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
  */
 @Data
 public class Coordinates {
@@ -31,8 +36,4 @@ public class Coordinates {
      * `longitude` 字段，保存当前对象的对应属性。
      */
     private final double longitude;
-    /*
-     * 本类总结：`Coordinates` 负责执行 GPS 地理围栏、距离和多边形判断及状态跟踪；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

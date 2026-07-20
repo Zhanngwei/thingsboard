@@ -59,13 +59,12 @@ import java.util.stream.Collectors;
 
 /**
  * 中文说明：
- * 1. 类目的：`TbRuleEngineQueueConsumerManager` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
- * 4. 生命周期：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
+ * 1. `TbRuleEngineQueueConsumerManager` 是 ThingsBoard Application 中负责队列的协调管理组件。
+ * 2. 它集中组织该领域的核心操作，并向上层提供稳定的调用入口。
+ * 3. 类中的依赖和状态用于完成校验、编排、查询或更新等直接职责。
+ * 4. 它直接协作于领域模型、存取接口和相关业务组件。
+ * 5. 把这些操作集中在独立类型中，可以避免调用方重复拼装同一业务流程。
+ * 6. 阅读时重点关注公开方法的职责边界、关键校验和依赖调用顺序。
  */
 @Slf4j
 public class TbRuleEngineQueueConsumerManager {
@@ -585,13 +584,12 @@ public class TbRuleEngineQueueConsumerManager {
 
     /**
      * 中文说明：
-     * 1. 类目的：`ConsumerWrapper` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
-     * 4. 生命周期：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
+     * 1. `ConsumerWrapper` 是 ThingsBoard Application 中定义 `Consumer Wrapper` 能力边界的接口。
+     * 2. 它声明实现方必须提供的核心操作和输入输出约定。
+     * 3. 接口方法共同定义该能力的输入、输出和行为边界。
+     * 4. 它直接协作于实现类以及使用该接口的调用组件。
+     * 5. 接口使调用方依赖稳定契约，并允许不同实现按场景替换。
+     * 6. 阅读时重点关注方法契约、参数语义和实现类需要保证的行为。
      */
     interface ConsumerWrapper {
 
@@ -614,13 +612,12 @@ public class TbRuleEngineQueueConsumerManager {
 
     /**
      * 中文说明：
-     * 1. 类目的：`ConsumerPerPartitionWrapper` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
-     * 4. 生命周期：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
+     * 1. `ConsumerPerPartitionWrapper` 是 ThingsBoard Application 中围绕分区提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 直接依赖的类型边界包括 `ConsumerWrapper`。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     class ConsumerPerPartitionWrapper implements ConsumerWrapper {
         private final Map<TopicPartitionInfo, TbQueueConsumerTask> consumers = new HashMap<>();
@@ -669,13 +666,12 @@ public class TbRuleEngineQueueConsumerManager {
 
     /**
      * 中文说明：
-     * 1. 类目的：`SingleConsumerWrapper` 是ThingsBoard Application 模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
-     * 4. 生命周期：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
+     * 1. `SingleConsumerWrapper` 是 ThingsBoard Application 中围绕 `Single Consumer Wrapper` 提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 直接依赖的类型边界包括 `ConsumerWrapper`。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     class SingleConsumerWrapper implements ConsumerWrapper {
         /**
@@ -725,11 +721,3 @@ public class TbRuleEngineQueueConsumerManager {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`TbRuleEngineQueueConsumerManager` 在 ThingsBoard Application 模块 中承担队列服务类型职责，核心目的是封装 ThingsBoard 队列生产、消费、确认和分区处理。
- * 2. 核心流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
- * 3. 关键依赖：主要依赖或协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

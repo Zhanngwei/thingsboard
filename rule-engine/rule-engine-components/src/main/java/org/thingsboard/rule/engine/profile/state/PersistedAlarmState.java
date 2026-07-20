@@ -22,14 +22,12 @@ import java.util.Map;
 
 /**
  * 中文说明：
- * 1. 类目的：保存某一种设备画像告警的可持久化状态，包含创建规则状态和清除规则状态。
- * 2. 所属模块：属于 ThingsBoard Rule Engine 的 device profile/profile state 子模块，服务于 `TbDeviceProfileNode` 的告警生命周期计算。
- * 3. 协作对象：与 `AlarmState`、`PersistedAlarmRuleState`、`PersistedDeviceState`、`AlarmSeverity` 和规则节点状态存储协作。
- * 4. 生命周期：由设备画像节点在设备状态初始化、告警规则评估、状态保存和状态恢复过程中创建、更新或反序列化。
- * 5. 设计原因：把同一告警类型下不同严重级别的创建规则与清除规则分开持久化，避免运行期 `AlarmState` 与存储格式强耦合。
- * 6. 技术关联：本类是纯状态载体，不直接涉及事务、缓存、MQTT、Actor 通信或数据库访问；数据库读写由外层 Rule Node State 机制间接完成。
- * 7. 显式方法：本类没有手写方法，访问器由 Lombok 生成；对象本身不保证线程安全，由外层设备状态流程控制并发。
- * 8. 设计模式：可视为 Memento/DTO，用于保存告警状态恢复所需的最小快照。
+ * 1. `PersistedAlarmState` 是 ThingsBoard Rule Engine Components 中承载告警信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 @Data
 public class PersistedAlarmState {
@@ -44,11 +42,3 @@ public class PersistedAlarmState {
     private PersistedAlarmRuleState clearRuleState;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：聚合同一告警类型的创建规则状态和清除规则状态，作为设备级持久化状态的一部分。
- * 2. 核心流程：设备画像节点恢复设备状态时读取本对象，告警创建/清除评估更新内部规则状态，保存节点状态时写回。
- * 3. 关键依赖：依赖 `AlarmSeverity` 作为创建规则索引，依赖 `PersistedAlarmRuleState` 表达单条规则的可恢复快照。
- * 4. 学习重点：关注告警创建与清除状态为何分离，以及 Rule Engine 如何避免把运行期告警对象直接持久化。
- */

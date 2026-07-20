@@ -76,14 +76,12 @@ import java.util.regex.Pattern;
 
 /**
  * 中文说明：
- * 1. 类目的：`BaseImageService` 是 ThingsBoard DAO 模块 中的资源与 OTA 持久化服务类型，用于管理二进制资源、图片、OTA 包元数据和关联实体的数据库访问。
- * 2. 所属模块：位于 dao 模块，处在 ThingsBoard 服务端的数据访问和持久化实现层。
- * 3. 协作对象：主要协作对象包括ResourceService、ImageService、OtaPackageService、缓存、存储服务和设备配置流程。
- * 4. 生命周期：由资源上传、下载、删除、OTA 发布或设备配置读取流程调用，并随事务完成更新状态。
- * 5. 设计原因：单独建模该类型可以隔离 DAO API、业务服务、缓存和具体数据库实现，避免上层模块直接依赖 SQL、Cassandra 或测试容器细节。
- * 6. 事务与缓存：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；是否触发缓存取决于实现体中的 cache、evict 或 Redis/Caffeine 调用。
- * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
- * 8. 设计模式：主要体现 Service / Repository / Adapter。
+ * 1. `BaseImageService` 是 ThingsBoard DAO 中负责图片资源的业务服务。
+ * 2. 它集中组织该领域的核心操作，并向上层提供稳定的调用入口。
+ * 3. 类中的依赖和状态用于完成校验、编排、查询或更新等直接职责。
+ * 4. 直接依赖的类型边界包括 `BaseResourceService`、`ImageService`。
+ * 5. 把这些操作集中在独立类型中，可以避免调用方重复拼装同一业务流程。
+ * 6. 阅读时重点关注公开方法的职责边界、关键校验和依赖调用顺序。
  */
 @Service
 @Slf4j
@@ -914,14 +912,12 @@ public class BaseImageService extends BaseResourceService implements ImageServic
 
     /**
      * 中文说明：
-     * 1. 类目的：`UpdateResult` 是 ThingsBoard DAO 模块 中的资源与 OTA 持久化服务类型，用于管理二进制资源、图片、OTA 包元数据和关联实体的数据库访问。
-     * 2. 所属模块：位于 dao 模块，处在 ThingsBoard 服务端的数据访问和持久化实现层。
-     * 3. 协作对象：主要协作对象包括ResourceService、ImageService、OtaPackageService、缓存、存储服务和设备配置流程。
-     * 4. 生命周期：由资源上传、下载、删除、OTA 发布或设备配置读取流程调用，并随事务完成更新状态。
-     * 5. 设计原因：单独建模该类型可以隔离 DAO API、业务服务、缓存和具体数据库实现，避免上层模块直接依赖 SQL、Cassandra 或测试容器细节。
-     * 6. 事务与缓存：直接或间接涉及数据库访问，事务边界通常由 Spring 服务层或测试事务管理器控制；是否触发缓存取决于实现体中的 cache、evict 或 Redis/Caffeine 调用。
-     * 7. MQTT/Actor/Rule Engine：DAO 层通常不直接处理 MQTT 或 Actor 消息，但设备、遥测、规则链等数据变更会被 Transport、Actor 或 Rule Engine 间接消费。
-     * 8. 设计模式：主要体现 Service / Repository / Adapter。
+     * 1. `UpdateResult` 是 ThingsBoard DAO 中承载 `Update Result` 信息的数据类型。
+     * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+     * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+     * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+     * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+     * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
      */
     @Data(staticConstructor = "of")
     private static class UpdateResult {
@@ -932,11 +928,3 @@ public class BaseImageService extends BaseResourceService implements ImageServic
         private final String value;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`BaseImageService` 在 ThingsBoard DAO 模块 中承担资源与 OTA 持久化服务类型职责，核心目的是管理二进制资源、图片、OTA 包元数据和关联实体的数据库访问。
- * 2. 核心流程：校验租户和资源归属后保存元数据或读取内容引用，必要时同步缓存和设备配置。
- * 3. 关键依赖：主要依赖或协作对象包括ResourceService、ImageService、OtaPackageService、缓存、存储服务和设备配置流程。
- * 4. 学习重点：阅读本文件时应关注租户/实体作用域、事务边界、缓存失效、SQL/NoSQL 差异、数据库异常转换，以及数据变更对 Rule Engine、Transport、Actor 和审计链路的间接影响。
- */

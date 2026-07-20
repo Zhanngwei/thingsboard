@@ -61,12 +61,13 @@ import static org.thingsboard.server.common.data.msg.TbNodeConnectionType.FAILUR
 import static org.thingsboard.server.common.data.msg.TbNodeConnectionType.SUCCESS;
 
 /**
- * 中文说明：`TbAbstractRelationActionNode` 是抽象关系Action节点规则节点，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
- * 输入关系：作为规则链节点接收上游节点传入的 `TbMsg`，根据消息体、元数据、发起实体或上下文服务读取所需数据。
- * 输出关系：处理成功时通过 `Success`、`True`、`False` 或其它命名关系把原消息或转换后的消息交给后续节点，实际关系由节点逻辑和配置决定。
- * 失败关系：配置校验、脚本执行、服务调用、数据解析或异步回调异常时通过 `Failure` 关系交给规则链失败分支。
- * 配置对象：`TbAbstractRelationActionNodeConfiguration`，配置内容来自规则节点 JSON，并在 `init` 或父类初始化阶段转换为运行时对象。
- * 调用方和生命周期：Rule Engine 节点运行时创建本节点并调用 `init`，每条消息进入 `onMsg` 或等价处理方法，`destroy` 负责释放脚本引擎、缓存、监听器等资源。
+ * 中文说明：
+ * 1. `TbAbstractRelationActionNode` 是 ThingsBoard Rule Engine Components 中处理实体关系的规则节点。
+ * 2. 它接收规则链消息，根据节点配置执行判断、转换或外部动作。
+ * 3. 处理结果通过成功、失败或自定义关系继续传递给后续节点。
+ * 4. 直接依赖的类型边界包括 `TbAbstractRelationActionNodeConfiguration`、`TbNode`。
+ * 5. 独立节点类型让该能力可以在规则链中配置、复用和替换。
+ * 6. 阅读时重点关注初始化配置、消息处理入口和关系类型的选择。
  */
 @Slf4j
 public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationActionNodeConfiguration> implements TbNode {
@@ -233,8 +234,13 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     }
 
     /**
-     * 中文说明：`EntityKey` 是实体键辅助类，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
-     * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+     * 中文说明：
+     * 1. `EntityKey` 是 ThingsBoard Rule Engine Components 中围绕实体提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     @Data
     @AllArgsConstructor
@@ -254,8 +260,13 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     }
 
     /**
-     * 中文说明：`SearchDirectionIds` 是SearchDirectionIds辅助类，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
-     * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+     * 中文说明：
+     * 1. `SearchDirectionIds` 是 ThingsBoard Rule Engine Components 中围绕 `Search Direction Ids` 提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     @Data
     protected static class SearchDirectionIds {
@@ -274,8 +285,13 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     }
 
     /**
-     * 中文说明：`EntityCacheLoader` 是实体CacheLoader辅助类，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
-     * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+     * 中文说明：
+     * 1. `EntityCacheLoader` 是 ThingsBoard Rule Engine Components 中管理实体缓存内容或失效事件的类型。
+     * 2. 它保存缓存键、缓存值或触发清理所需的最小业务信息。
+     * 3. 相关方法负责读取、更新或移除当前领域的缓存条目。
+     * 4. 直接依赖的类型边界包括 `CacheLoader`。
+     * 5. 独立缓存边界可以统一键规则和失效行为，避免各调用点自行维护。
+     * 6. 阅读时重点关注缓存键组成、命中后的返回值和失效触发条件。
      */
     private static class EntityCacheLoader extends CacheLoader<EntityKey, EntityContainer> {
 
@@ -412,8 +428,13 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
     }
 
     /**
-     * 中文说明：`RelationContainer` 是关系Container辅助类，用于执行告警、客户归属、关系、设备状态、日志或外部存储等动作。
-     * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+     * 中文说明：
+     * 1. `RelationContainer` 是 ThingsBoard Rule Engine Components 中围绕实体关系提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     @Data
     @NoArgsConstructor
@@ -430,10 +451,4 @@ public abstract class TbAbstractRelationActionNode<C extends TbAbstractRelationA
         private boolean result;
 
     }
-
-
-    /*
-     * 本类总结：`TbAbstractRelationActionNode` 负责执行告警、客户归属、关系、设备状态、日志或外部存储等动作；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

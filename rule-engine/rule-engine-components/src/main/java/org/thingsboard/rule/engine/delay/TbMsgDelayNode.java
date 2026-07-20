@@ -152,8 +152,3 @@ public class TbMsgDelayNode implements TbNode {
         pendingMsgs.clear();
     }
 }
-
-/*
- * 本类总结：
- * 本类通过 Rule Engine 自消息实现内存级延迟，涉及 ack 和成功链路投递；它不直接涉及数据库事务、缓存或 MQTT，节点停止后 pendingMsgs 中的消息不会被本类恢复。
- */

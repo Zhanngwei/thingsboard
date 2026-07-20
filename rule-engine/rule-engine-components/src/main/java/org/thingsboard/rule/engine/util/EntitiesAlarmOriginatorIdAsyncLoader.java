@@ -58,8 +58,3 @@ public class EntitiesAlarmOriginatorIdAsyncLoader {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类为规则节点提供告警 originator 的异步解析能力；它通过服务层发起读取，具体数据库/缓存行为由服务实现决定，回调由 TbContext 的 DB callback executor 承载。
- */

@@ -139,10 +139,3 @@ public class TbSendSmsNode extends TbAbstractExternalNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类是短信外部发送节点，负责模板解析、SMS 发送器生命周期和异步发送回调。
- * 消息确认在发送前由 ackIfNeeded 处理，smsExecutor 回调决定成功或失败路由。
- * 本类本身不直接涉及数据库或缓存；系统 SMS 服务、provider 工厂或具体 SmsSender 的实现/调用链可能间接涉及。
- */

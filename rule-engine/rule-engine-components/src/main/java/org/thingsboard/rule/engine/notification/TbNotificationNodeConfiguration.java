@@ -52,9 +52,3 @@ public class TbNotificationNodeConfiguration implements NodeConfiguration<TbNoti
     }
 
 }
-
-/*
- * 本类总结：
- * 本类描述通知发送节点的目标和模板配置，实际通知请求处理由 TbNotificationNode 与 NotificationCenter 完成。
- * 配置类本身不直接涉及外部调用、数据库、缓存或异步回调。
- */

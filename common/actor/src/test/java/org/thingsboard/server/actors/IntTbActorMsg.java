@@ -21,13 +21,12 @@ import org.thingsboard.server.common.msg.TbActorMsg;
 
 /**
  * 中文说明：
- * 1. 类目的：`IntTbActorMsg` 是ThingsBoard Common 测试模块中的公共基础设施类型，用于定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 所属模块：位于 common 聚合模块，支撑服务端启动、Web API、Actor、队列、传输层、公共数据契约或业务服务流程。
- * 3. 协作对象：主要协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 生命周期：由调用模块、序列化框架、协议处理器、队列消费者或测试框架按需创建和使用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Contract / Adapter。
+ * 1. `IntTbActorMsg` 是 ThingsBoard Actor 中承载消息信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 直接依赖的类型边界包括 `TbActorMsg`。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 public class IntTbActorMsg implements TbActorMsg {
 
@@ -57,11 +56,3 @@ public class IntTbActorMsg implements TbActorMsg {
         return MsgType.QUEUE_TO_RULE_ENGINE_MSG;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`IntTbActorMsg` 在 ThingsBoard Common 测试模块 中承担公共基础设施类型职责，核心目的是定义跨服务端模块复用的数据结构、接口契约或协议适配逻辑。
- * 2. 核心流程：接收调用方输入后完成数据承载、协议转换、接口委派或测试断言。
- * 3. 关键依赖：主要依赖或协作对象包括DAO、Application、Rule Engine、Transport、Queue、Actor、Cache 和 Edge 同步模块。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

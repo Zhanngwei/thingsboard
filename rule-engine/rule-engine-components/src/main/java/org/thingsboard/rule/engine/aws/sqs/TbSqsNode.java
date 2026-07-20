@@ -227,10 +227,3 @@ public class TbSqsNode extends TbAbstractExternalNode {
         }
     }
 }
-
-/*
- * 本类总结：
- * 本类直接管理 AmazonSQS 客户端，并通过 externalCallExecutor 将 Rule Engine 消息发送到 SQS 队列。
- * 队列 URL、队列类型、延迟、消息属性、凭据和 region 来自配置；成功/失败路由由异步回调决定。
- * 本类本身不直接涉及数据库或缓存，相关行为只可能通过 Rule Engine 上下文、执行器或 AWS SDK 调用链间接涉及。
- */

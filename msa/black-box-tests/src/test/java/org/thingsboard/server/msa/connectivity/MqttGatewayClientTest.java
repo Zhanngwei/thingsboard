@@ -71,14 +71,12 @@ import static org.thingsboard.server.msa.prototypes.DevicePrototypes.defaultGate
 
 /**
  * 中文说明：
- * 1. 类目的：`MqttGatewayClientTest` 是 ThingsBoard MSA 测试模块 中的协议连通性测试类型，用于验证微服务环境下 MQTT、HTTP、CoAP、网关和设备上报链路。
- * 2. 所属模块：位于 msa 聚合模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
- * 4. 生命周期：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 Integration Test / Client Adapter。
+ * 1. `MqttGatewayClientTest` 是 ThingsBoard Microservices 中验证 `MqttGatewayClient` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 直接依赖的类型边界包括 `AbstractContainerTest`。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @DisableUIListeners
 @Slf4j
@@ -530,14 +528,12 @@ public class MqttGatewayClientTest extends AbstractContainerTest {
 
     /**
      * 中文说明：
-     * 1. 类目的：`MqttMessageListener` 是 ThingsBoard MSA 测试模块 中的协议连通性测试类型，用于验证微服务环境下 MQTT、HTTP、CoAP、网关和设备上报链路。
-     * 2. 所属模块：位于 msa 聚合模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
-     * 3. 协作对象：主要协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
-     * 4. 生命周期：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁。
-     * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
-     * 6. 事务与缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理。
-     * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
-     * 8. 设计模式：主要体现 Integration Test / Client Adapter。
+     * 1. `MqttMessageListener` 是 ThingsBoard Microservices 中处理消息的处理器。
+     * 2. 它把单一处理步骤封装为可调用、可替换的组件。
+     * 3. 输入通常来自上游事件、网络消息或异步回调，输出交给下一处理步骤。
+     * 4. 直接依赖的类型边界包括 `MqttHandler`。
+     * 5. 独立处理器可以缩小单个流程的职责范围，并便于组合处理链。
+     * 6. 阅读时重点关注入口方法、条件分支和处理完成后的转发行为。
      */
     @Data
     private class MqttMessageListener implements MqttHandler {
@@ -573,14 +569,12 @@ public class MqttGatewayClientTest extends AbstractContainerTest {
 
     /**
      * 中文说明：
-     * 1. 类目的：`MqttEvent` 是 ThingsBoard MSA 测试模块 中的协议连通性测试类型，用于验证微服务环境下 MQTT、HTTP、CoAP、网关和设备上报链路。
-     * 2. 所属模块：位于 msa 聚合模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
-     * 3. 协作对象：主要协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
-     * 4. 生命周期：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁。
-     * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
-     * 6. 事务与缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理。
-     * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
-     * 8. 设计模式：主要体现 Integration Test / Client Adapter。
+     * 1. `MqttEvent` 是 ThingsBoard Microservices 中承载事件信息的数据类型。
+     * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+     * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+     * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+     * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+     * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
      */
     @Data
     private class MqttEvent {
@@ -593,11 +587,3 @@ public class MqttGatewayClientTest extends AbstractContainerTest {
 
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`MqttGatewayClientTest` 在 ThingsBoard MSA 测试模块 中承担协议连通性测试类型职责，核心目的是验证微服务环境下 MQTT、HTTP、CoAP、网关和设备上报链路。
- * 2. 核心流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
- * 3. 关键依赖：主要依赖或协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

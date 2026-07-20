@@ -85,8 +85,3 @@ public class EntitiesByNameAndTypeLoader {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类提供按名称解析实体 ID 的同步工具方法；它自身无共享可变状态，Rule Engine 消息流和线程调度由调用该工具的节点负责。
- */

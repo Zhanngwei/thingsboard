@@ -181,10 +181,3 @@ public class TbSendRPCRequestNode implements TbNode {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类根据 TbMsg 构造服务端到设备的 RPC 请求，并通过 RpcService 异步等待响应回调。
- * 节点提交 RPC 后立即 ack 原消息，之后由 RPC 回调把响应重新入队到 Success 或 Failure。
- * 本类本身不直接涉及数据库或缓存；RPC 服务、Actor、传输层、MQTT 或持久化的具体实现/调用链可能间接涉及。
- */

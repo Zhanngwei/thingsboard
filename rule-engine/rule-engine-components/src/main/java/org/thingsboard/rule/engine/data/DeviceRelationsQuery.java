@@ -46,8 +46,3 @@ public class DeviceRelationsQuery {
      */
     private boolean fetchLastLevelOnly;
 }
-
-/*
- * 本类总结：
- * 本类封装按关系查找设备时需要的查询参数，不保存运行态状态；数据库、缓存和消息流处理均发生在使用该配置的 loader 或规则节点中。
- */

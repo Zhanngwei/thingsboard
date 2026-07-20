@@ -36,8 +36,3 @@ public class GpsGeofencingEvents {
      */
     public static final String OUTSIDE = "Outside";
 }
-
-/*
- * 本类总结：
- * 本类集中保存地理围栏事件字符串，属于无状态常量类；具体事件判断、缓存读取和规则链消息分发由调用方实现。
- */

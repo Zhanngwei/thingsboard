@@ -38,9 +38,3 @@ public class TbMsgPushToCloudNodeConfiguration extends BaseTbMsgPushNodeConfigur
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类描述 push to cloud 节点的配置默认值，实际 Edge 侧事件保存和同步逻辑不在本配置类中。
- * 它不直接涉及外部调用、数据库、缓存或异步回调。
- */

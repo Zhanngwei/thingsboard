@@ -27,18 +27,12 @@ import java.io.File;
 
 /**
  * 中文说明：
- * 1. 类目的：`MigratorTool` 是 ThingsBoard Tools 模块 中的遥测迁移命令入口，用于解析命令行参数，组装 dump 解析器和迁移器，并启动离线迁移流程。
- * 2. 所属模块：位于 tools，服务于 ThingsBoard 的客户端访问、离线工具或独立协议接入边界。
- * 3. 协作模块：主要协作对象包括 Apache Commons CLI/IO、Cassandra CQLSSTableWriter、Paho MQTT、SSL KeyStore、ThingsBoard common data。
- * 4. 生命周期：由命令行 main 或迁移流程按需创建，处理完输入文件、SSTable writer 或 MQTT 会话后结束。
- * 5. 存在原因：命令入口只负责参数和流程装配，实际解析/写入交给专门组件，便于维护和测试。
- * 6. 事务：不参与在线事务；迁移工具生成离线 SSTable 文件，由 Cassandra 导入流程承担最终写入。
- * 7. 缓存：使用内存 Map/Set 缓存 dump 中的字典、实体类型和分区键，生命周期限定在单次迁移命令内。
- * 8. MQTT：只有 MqttSslClient 直接创建 MQTT SSL 连接并发布测试遥测，迁移工具不涉及 MQTT。
- * 9. Actor 通信：工具不直接发送 Actor 消息，导入后的数据被服务端读取时才可能进入后续运行时流程。
- * 10. 数据库：迁移工具面向 PostgreSQL dump 和 Cassandra SSTable 文件，属于离线数据库迁移辅助逻辑。
- * 11. Rule Engine：不执行 Rule Engine，迁移数据导入后才可能被服务端规则或查询流程消费。
- * 12. 设计模式：主要体现 Command。
+ * 1. `MigratorTool` 是 ThingsBoard Tools 中围绕 `Migrator Tool` 提供具体能力的类型。
+ * 2. 它封装当前声明对应的核心操作和必要状态。
+ * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+ * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+ * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+ * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
  */
 public class MigratorTool {
 
@@ -125,13 +119,4 @@ public class MigratorTool {
         }
         return null;
     }
-
-    /**
-     * 本类总结：
-     * 1. 核心职责：`MigratorTool` 负责解析命令行参数，组装 dump 解析器和迁移器，并启动离线迁移流程。
-     * 2. 核心流程：读取命令行参数或 dump 文件，解析字典和实体类型，构造 Cassandra SSTable 行，或建立 MQTT SSL 连接发送测试遥测。
-     * 3. 关键依赖：Apache Commons CLI/IO、Cassandra CQLSSTableWriter、Paho MQTT、SSL KeyStore、ThingsBoard common data。
-     * 4. 设计重点：通过 Command 把外部协议、文件格式、启动参数或 REST 细节封装在边界类中，让核心业务模块保持清晰。
-     * 5. 学习重点：关注生命周期边界、线程安全假设、远端事务归属、缓存/数据库间接性、MQTT/Actor/Rule Engine 的进入点以及为什么该类只承担当前边界职责。
-     */
 }

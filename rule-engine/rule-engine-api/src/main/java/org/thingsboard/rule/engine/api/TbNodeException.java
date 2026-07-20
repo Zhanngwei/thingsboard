@@ -23,12 +23,12 @@ import org.thingsboard.server.common.msg.TbActorError;
  */
 /**
  * 中文说明：
- * 1. 职责：表示规则节点初始化、消息处理或配置升级过程中抛出的节点级异常。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的错误边界，被规则节点和 Actor 执行链路共同识别。
- * 3. 协作对象：与 {@link TbNode}、{@link TbContext} 以及 {@link TbActorError} 协作，用于区分可恢复和不可恢复错误。
- * 4. 生命周期：随一次异常路径创建，交给 Rule Engine 运行时决定失败路由、重试或停止节点。
- * 5. 设计原因：需要携带 unrecoverable 标志，普通 Exception 无法表达节点错误是否应中止后续恢复流程。
- * 6. 技术关联：本类本身不直接涉及事务、缓存、MQTT、数据库；通过 TbActorError 间接参与 Actor 错误通信，并直接服务 Rule Engine。
+ * 1. `TbNodeException` 是 ThingsBoard Rule Engine API 中表示规则节点失败语义的异常类型。
+ * 2. 它用于把特定错误原因传递给上层处理流程。
+ * 3. 异常中保存的消息、错误码或上下文帮助调用方判断失败类型。
+ * 4. 直接依赖的类型边界包括 `Exception`、`TbActorError`。
+ * 5. 独立异常类型让调用方能够精确捕获该类错误，而不是依赖文本判断。
+ * 6. 阅读时重点关注创建位置、携带信息和上层捕获后的处理结果。
  */
 public class TbNodeException extends Exception implements TbActorError {
 
@@ -83,11 +83,3 @@ public class TbNodeException extends Exception implements TbActorError {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：为规则节点错误提供统一异常类型和可恢复性标志。
- * 2. 核心流程：节点或工具类抛出 TbNodeException，Rule Engine/Actor 错误链路读取 unrecoverable 决定处理策略。
- * 3. 关键依赖：TbNode、TbContext、TbActorError 和规则节点失败路由。
- * 4. 学习重点：Rule Engine 的异常不只表达失败原因，还表达错误恢复策略。
- */

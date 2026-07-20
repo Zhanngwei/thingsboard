@@ -17,12 +17,12 @@ package org.thingsboard.rule.engine.api.sms.exception;
 
 /**
  * 中文说明：
- * 1. 职责：表示短信供应商配置解析失败。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的短信异常层。
- * 3. 协作对象：与短信配置、SmsSenderFactory 和 SmsService 配置刷新流程协作。
- * 4. 生命周期：随一次配置解析失败创建并传播到调用方。
- * 5. 设计原因：配置错误与发送错误处理方式不同，单独异常类型便于向管理员反馈配置问题。
- * 6. 技术关联：异常本身不直接涉及事务、缓存、MQTT、Actor、数据库；可能阻断 Rule Engine 短信发送前置配置流程。
+ * 1. `SmsParseException` 是 ThingsBoard Rule Engine API 中表示 `Sms Parse` 失败语义的异常类型。
+ * 2. 它用于把特定错误原因传递给上层处理流程。
+ * 3. 异常中保存的消息、错误码或上下文帮助调用方判断失败类型。
+ * 4. 直接依赖的类型边界包括 `SmsException`。
+ * 5. 独立异常类型让调用方能够精确捕获该类错误，而不是依赖文本判断。
+ * 6. 阅读时重点关注创建位置、携带信息和上层捕获后的处理结果。
  */
 public class SmsParseException extends SmsException {
 
@@ -48,11 +48,3 @@ public class SmsParseException extends SmsException {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：表达短信供应商配置解析失败。
- * 2. 核心流程：配置解析发现问题后抛出 SmsParseException，配置测试或发送流程向调用方反馈。
- * 3. 关键依赖：SmsException、SmsSenderFactory 和短信配置模型。
- * 4. 学习重点：解析错误独立建模，便于区分配置问题和外部发送失败。
- */

@@ -20,12 +20,12 @@ import lombok.Data;
 
 /**
  * 中文说明：
- * 1. 职责：承载规则节点对外展示和配置所需的节点定义信息。
- * 2. 所属模块：属于 ThingsBoard Rule Engine API 的节点元数据 DTO。
- * 3. 协作对象：与 {@link RuleNode} 注解、管理端规则链 UI、节点配置默认值和组件扫描流程协作。
- * 4. 生命周期：应用启动或节点元数据刷新时由扫描流程构建，随后用于前端展示和规则节点配置。
- * 5. 设计原因：注解是代码侧元数据，NodeDefinition 是运行期可序列化的数据载体，便于传给 UI 或 API。
- * 6. 技术关联：本类本身不直接涉及事务、缓存、MQTT、Actor、数据库；直接服务 Rule Engine 节点发现和 UI 配置流程。
+ * 1. `NodeDefinition` 是 ThingsBoard Rule Engine API 中围绕 `Node Definition` 提供具体能力的类型。
+ * 2. 它封装当前声明对应的核心操作和必要状态。
+ * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+ * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+ * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+ * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
  */
 @Data
 public class NodeDefinition {
@@ -84,11 +84,3 @@ public class NodeDefinition {
     String docUrl;
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：把 RuleNode 注解中的节点元数据转换成运行期可传输的数据结构。
- * 2. 核心流程：组件扫描读取注解和默认配置，构建 NodeDefinition，前端规则链编辑器读取并展示。
- * 3. 关键依赖：RuleNode、NodeConfiguration、JsonNode 和规则链 UI。
- * 4. 学习重点：Rule Engine 节点元数据既用于运行时注册，也用于前端配置体验。
- */

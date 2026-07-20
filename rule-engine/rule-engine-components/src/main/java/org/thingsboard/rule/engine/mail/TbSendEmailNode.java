@@ -199,10 +199,3 @@ public class TbSendEmailNode extends TbAbstractExternalNode {
         return javaMailProperties;
     }
 }
-
-/*
- * 本类总结：
- * 本类是邮件发送外部节点，负责校验 SEND_EMAIL 消息并通过系统 MailService 或自定义 JavaMailSender 发送邮件。
- * 发送在 mailExecutor 中异步执行，ackIfNeeded 先处理消息确认，回调决定成功或失败路由。
- * 本类本身不直接访问数据库或缓存；系统邮件服务和全局 SMTP 设置的具体实现/调用链可能间接涉及。
- */

@@ -16,8 +16,13 @@
 package org.thingsboard.rule.engine.profile;
 
 /**
- * 中文说明：`NumericParseException` 是数值解析异常辅助类，用于维护设备配置、告警规则、快照和设备运行状态。
- * 调用边界：本类本身不一定直接触发数据库、缓存、Rule Engine、Actor、MQTT 或事务；是否涉及取决于具体方法和调用链。
+ * 中文说明：
+ * 1. `NumericParseException` 是 ThingsBoard Rule Engine Components 中表示 `Numeric Parse` 失败语义的异常类型。
+ * 2. 它用于把特定错误原因传递给上层处理流程。
+ * 3. 异常中保存的消息、错误码或上下文帮助调用方判断失败类型。
+ * 4. 直接依赖的类型边界包括 `RuntimeException`。
+ * 5. 独立异常类型让调用方能够精确捕获该类错误，而不是依赖文本判断。
+ * 6. 阅读时重点关注创建位置、携带信息和上层捕获后的处理结果。
  */
 public class NumericParseException extends RuntimeException {
     /**
@@ -29,8 +34,4 @@ public class NumericParseException extends RuntimeException {
     public NumericParseException(String message) {
         super(message);
     }
-    /*
-     * 本类总结：`NumericParseException` 负责维护设备配置、告警规则、快照和设备运行状态；作为节点时遵循 Rule Engine 的输入、输出、失败和生命周期约定，作为配置或 helper 时仅承载对应数据和辅助逻辑。
-     * 数据库、缓存、MQTT、Actor 与事务边界以具体方法说明为准；本类或方法本身未直接涉及时，相关行为可能仅存在于具体实现或调用链中。
-     */
 }

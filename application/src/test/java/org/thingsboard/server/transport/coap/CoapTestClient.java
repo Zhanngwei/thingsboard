@@ -30,13 +30,12 @@ import java.io.IOException;
 
 /**
  * 中文说明：
- * 1. 类目的：`CoapTestClient` 是ThingsBoard Application 测试模块中的传输层测试或适配类型，用于验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
- * 4. 生命周期：由 JUnit 测试生命周期创建，随单个测试方法准备和清理。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Integration Test / Fixture。
+ * 1. `CoapTestClient` 是 ThingsBoard Application 中访问 CoAP 的客户端封装。
+ * 2. 它把连接建立、请求发送、认证信息和响应解析集中到统一入口。
+ * 3. 公开方法以平台数据模型作为输入输出，隐藏底层通信细节。
+ * 4. 它直接协作于网络客户端、认证模型和请求响应对象。
+ * 5. 独立客户端可以保持调用 API 稳定，并避免使用方重复处理连接与序列化。
+ * 6. 阅读时重点关注连接配置、认证状态、请求构造和资源释放。
  */
 public class CoapTestClient {
 
@@ -290,11 +289,3 @@ public class CoapTestClient {
         return COAP_BASE_URL + token + "/" + featureType.name().toLowerCase() + "/" + requestId;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`CoapTestClient` 在 ThingsBoard Application 测试模块 中承担传输层测试或适配类型职责，核心目的是验证 MQTT、CoAP、LwM2M 或传输协议与服务端应用的集成行为。
- * 2. 核心流程：构造协议客户端并发送消息，等待服务端处理后断言响应或持久化结果。
- * 3. 关键依赖：主要依赖或协作对象包括Transport API、会话、遥测服务、Actor、队列和测试容器。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

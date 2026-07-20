@@ -78,13 +78,12 @@ import java.util.stream.Stream;
 
 /**
  * 中文说明：
- * 1. 类目的：`AbstractBulkImportService` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Version Control、DAO、队列、缓存和事件监听器。
- * 4. 生命周期：由 Spring 服务、事件监听或同步任务触发。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Service / Observer。
+ * 1. `AbstractBulkImportService` 是 ThingsBoard Application 中负责 `Bulk Import` 的业务服务。
+ * 2. 它集中组织该领域的核心操作，并向上层提供稳定的调用入口。
+ * 3. 类中的依赖和状态用于完成校验、编排、查询或更新等直接职责。
+ * 4. 直接依赖的类型边界包括 `HasId`。
+ * 5. 把这些操作集中在独立类型中，可以避免调用方重复拼装同一业务流程。
+ * 6. 阅读时重点关注公开方法的职责边界、关键校验和依赖调用顺序。
  */
 public abstract class AbstractBulkImportService<E extends HasId<? extends EntityId> & HasTenantId> {
     /**
@@ -412,13 +411,12 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
 
     /**
      * 中文说明：
-     * 1. 类目的：`EntityData` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Version Control、DAO、队列、缓存和事件监听器。
-     * 4. 生命周期：由 Spring 服务、事件监听或同步任务触发。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Service / Observer。
+     * 1. `EntityData` 是 ThingsBoard Application 中承载实体信息的数据类型。
+     * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+     * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+     * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+     * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+     * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
      */
     @Data
     protected static class EntityData {
@@ -432,13 +430,12 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
 
     /**
      * 中文说明：
-     * 1. 类目的：`ParsedValue` 是ThingsBoard Application 模块中的版本同步服务类型，用于处理实体版本控制、同步事件和跨实例状态一致性。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Version Control、DAO、队列、缓存和事件监听器。
-     * 4. 生命周期：由 Spring 服务、事件监听或同步任务触发。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Service / Observer。
+     * 1. `ParsedValue` 是 ThingsBoard Application 中围绕 `Parsed Value` 提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 它直接协作于构造参数、字段类型和公开方法涉及的对象。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     @Data
     protected static class ParsedValue {
@@ -480,11 +477,3 @@ public abstract class AbstractBulkImportService<E extends HasId<? extends Entity
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`AbstractBulkImportService` 在 ThingsBoard Application 模块 中承担版本同步服务类型职责，核心目的是处理实体版本控制、同步事件和跨实例状态一致性。
- * 2. 核心流程：接收同步请求后加载实体状态，转换为事件并写入目标存储或队列。
- * 3. 关键依赖：主要依赖或协作对象包括Version Control、DAO、队列、缓存和事件监听器。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

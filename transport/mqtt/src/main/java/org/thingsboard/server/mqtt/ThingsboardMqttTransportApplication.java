@@ -26,18 +26,12 @@ import java.util.Arrays;
 
 /**
  * 中文说明：
- * 1. 类目的：`ThingsboardMqttTransportApplication` 是 ThingsBoard MQTT Transport 启动模块 中的MQTT 独立协议服务启动入口，用于启动独立的 ThingsBoard MQTT transport Spring Boot 进程，并加载协议包、common、queue 和 cache 相关组件。
- * 2. 所属模块：位于 transport/mqtt，服务于 ThingsBoard 的客户端访问、离线工具或独立协议接入边界。
- * 3. 协作模块：主要协作对象包括 MQTT transport 实现、ThingsBoard common transport、queue、cache、Spring Boot 自动配置和部署脚本。
- * 4. 生命周期：由操作系统服务、Docker 容器或命令行启动，SpringApplication 创建上下文后持续运行直到进程关闭。
- * 5. 存在原因：每种协议以独立启动类和独立配置名运行，可以单独扩缩容、隔离端口/线程/资源配置，并降低主服务进程负载。
- * 6. 事务：启动类不参与事务，设备会话、遥测入站和数据库事务由被扫描到的 transport/common/DAO 服务控制。
- * 7. 缓存：启动类只启用 cache 包扫描，不直接读写缓存，缓存生命周期由 Spring Bean 管理。
- * 8. MQTT：仅 MQTT transport 启动入口直接承载 MQTT 服务；其它协议启动入口分别承载 HTTP、CoAP、LwM2M 或 SNMP 入站流程。
- * 9. Actor 通信：入站消息通常经 queue/common transport 转换后进入服务端 Actor 系统，启动类只负责装配入口进程。
- * 10. 数据库：启动类不访问数据库，协议消息后续持久化由服务端 DAO 和事务层完成。
- * 11. Rule Engine：入站遥测/属性/RPC 消息后续可能进入 Rule Engine，启动类只决定对应 transport 进程是否启动。
- * 12. 设计模式：主要体现 Bootstrap / Adapter。
+ * 1. `ThingsboardMqttTransportApplication` 是 ThingsBoard MQTT Transport 的进程启动入口，用于启动和装配 MQTT 相关服务。
+ * 2. 它负责创建应用上下文、加载组件并把启动参数交给实际运行模块。
+ * 3. 类中通常只保留启动参数修正和框架启动调用，不承载协议或业务处理细节。
+ * 4. 它直接协作于 Spring Boot 配置、组件扫描和当前模块的服务实现。
+ * 5. 独立入口使该服务能够单独部署、配置和扩缩容。
+ * 6. 阅读时重点关注组件扫描范围、配置文件名称和传入启动框架的参数。
  */
 @SpringBootConfiguration
 @EnableAsync
@@ -77,12 +71,4 @@ public class ThingsboardMqttTransportApplication {
         }
         return args;
     }
-    /**
-     * 本类总结：
-     * 1. 核心职责：`ThingsboardMqttTransportApplication` 负责启动独立的 ThingsBoard MQTT transport Spring Boot 进程，并加载协议包、common、queue 和 cache 相关组件。
-     * 2. 核心流程：main 方法接收命令行参数，补齐默认 spring.config.name 后启动 Spring Boot，上下文再加载协议 handler、队列生产者、缓存和调度任务。
-     * 3. 关键依赖：MQTT transport 实现、ThingsBoard common transport、queue、cache、Spring Boot 自动配置和部署脚本。
-     * 4. 设计重点：通过 Bootstrap / Adapter 把外部协议、文件格式、启动参数或 REST 细节封装在边界类中，让核心业务模块保持清晰。
-     * 5. 学习重点：关注生命周期边界、线程安全假设、远端事务归属、缓存/数据库间接性、MQTT/Actor/Rule Engine 的进入点以及为什么该类只承担当前边界职责。
-     */
 }

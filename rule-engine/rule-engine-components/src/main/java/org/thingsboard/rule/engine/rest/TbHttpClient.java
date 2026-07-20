@@ -515,10 +515,3 @@ public class TbHttpClient {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类封装 REST 外部调用的 HTTP 客户端生命周期、请求构造、异步回调、失败元数据和并发限制。
- * 它直接调用外部 HTTP 服务，但不直接访问数据库或缓存；数据库/缓存只可能在 Rule Engine 上下文、凭据实现或调用链内部间接涉及。
- * 成功和失败路由由调用方传入的回调完成，线程安全依赖 AsyncRestTemplate、Netty/Apache 客户端和并发队列实现。
- */

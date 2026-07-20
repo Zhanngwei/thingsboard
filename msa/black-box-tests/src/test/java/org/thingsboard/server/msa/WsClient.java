@@ -29,14 +29,12 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 中文说明：
- * 1. 类目的：`WsClient` 是 ThingsBoard MSA 测试模块 中的微服务测试和部署支撑类型，用于支撑微服务部署、黑盒测试、UI 自动化、协议连通性验证或版本控制执行器路由。
- * 2. 所属模块：位于 msa 聚合模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
- * 4. 生命周期：由 MSA 测试套件、Docker 编排流程、Selenium 驱动或 Spring Boot VC executor 启动和销毁。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 Test Fixture / Page Object / Service。
+ * 1. `WsClient` 是 ThingsBoard Microservices 中访问 `Ws Client` 的客户端封装。
+ * 2. 它把连接建立、请求发送、认证信息和响应解析集中到统一入口。
+ * 3. 公开方法以平台数据模型作为输入输出，隐藏底层通信细节。
+ * 4. 直接依赖的类型边界包括 `WebSocketClient`。
+ * 5. 独立客户端可以保持调用 API 稳定，并避免使用方重复处理连接与序列化。
+ * 6. 阅读时重点关注连接配置、认证状态、请求构造和资源释放。
  */
 @Slf4j
 public class WsClient extends WebSocketClient {
@@ -179,11 +177,3 @@ public class WsClient extends WebSocketClient {
         sslParameters.setEndpointIdentificationAlgorithm(null);
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`WsClient` 在 ThingsBoard MSA 测试模块 中承担微服务测试和部署支撑类型职责，核心目的是支撑微服务部署、黑盒测试、UI 自动化、协议连通性验证或版本控制执行器路由。
- * 2. 核心流程：准备微服务环境和测试数据，执行 REST、协议或 UI 操作，等待异步结果并断言服务端状态。
- * 3. 关键依赖：主要依赖或协作对象包括Docker Compose、Testcontainers、Selenium、TestNG/JUnit、REST 客户端、MQTT/CoAP/HTTP 客户端、Web UI 和版本控制队列。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

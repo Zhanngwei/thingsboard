@@ -92,13 +92,12 @@ import static org.mockito.Mockito.when;
 
 /**
  * 中文说明：
- * 1. 类目的：`TbRuleEngineQueueConsumerManagerTest` 是ThingsBoard Application 测试模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
- * 4. 生命周期：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
+ * 1. `TbRuleEngineQueueConsumerManagerTest` 是 ThingsBoard Application 中验证 `TbRuleEngineQueueConsumerManager` 相关行为的测试类型。
+ * 2. 它通过测试夹具构造输入，并执行被测类型的关键入口。
+ * 3. 测试方法用准备数据、执行步骤和预期结果描述需要保持的行为。
+ * 4. 它直接协作于被测类型、测试框架和必要的模拟依赖。
+ * 5. 独立测试类型用于固定当前行为，防止后续修改造成回归。
+ * 6. 阅读时重点关注测试方法名称中的场景、准备数据和最终断言。
  */
 @Slf4j
 @RunWith(MockitoJUnitRunner.class)
@@ -855,13 +854,12 @@ public class TbRuleEngineQueueConsumerManagerTest {
 
     /**
      * 中文说明：
-     * 1. 类目的：`TestConsumer` 是ThingsBoard Application 测试模块中的队列服务类型，用于封装 ThingsBoard 队列生产、消费、确认和分区处理。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
-     * 4. 生命周期：由 Spring 创建并随应用启动订阅队列，运行期持续处理消息。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Producer-Consumer / Strategy。
+     * 1. `TestConsumer` 是 ThingsBoard Application 中围绕 `Consumer` 提供具体能力的类型。
+     * 2. 它封装当前声明对应的核心操作和必要状态。
+     * 3. 类中的字段和方法共同完成该职责范围内的数据处理。
+     * 4. 直接依赖的类型边界包括 `AbstractTbQueueConsumerTemplate`。
+     * 5. 独立类型可以明确职责边界，避免相关逻辑分散到多个调用方。
+     * 6. 阅读时重点关注父类契约、公开入口和状态发生变化的位置。
      */
     class TestConsumer extends AbstractTbQueueConsumerTemplate<TbMsg, TbProtoQueueMsg<ToRuleEngineMsg>> {
 
@@ -1012,11 +1010,3 @@ public class TbRuleEngineQueueConsumerManagerTest {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`TbRuleEngineQueueConsumerManagerTest` 在 ThingsBoard Application 测试模块 中承担队列服务类型职责，核心目的是封装 ThingsBoard 队列生产、消费、确认和分区处理。
- * 2. 核心流程：接收队列记录后反序列化消息，路由到 Actor 或业务服务并提交确认。
- * 3. 关键依赖：主要依赖或协作对象包括TbQueue、Actor、Rule Engine、Transport、Tenant Profile 和统计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

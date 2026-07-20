@@ -83,8 +83,3 @@ public class TbMsgGeneratorNodeConfiguration implements NodeConfiguration<TbMsgG
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类集中描述 generator 节点的可配置项；运行时异步脚本回调、消息调度和线程安全边界由 TbMsgGeneratorNode 处理。
- */

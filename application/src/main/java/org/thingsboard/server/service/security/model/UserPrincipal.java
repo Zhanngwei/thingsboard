@@ -19,13 +19,12 @@ import java.io.Serializable;
 
 /**
  * 中文说明：
- * 1. 类目的：`UserPrincipal` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Spring Security、User DAO、缓存、邮件服务、OAuth2 客户端和审计服务。
- * 4. 生命周期：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 Service / Strategy。
+ * 1. `UserPrincipal` 是 ThingsBoard Application 中承载用户信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 直接依赖的类型边界包括 `Serializable`。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 public class UserPrincipal implements Serializable {
 
@@ -67,13 +66,12 @@ public class UserPrincipal implements Serializable {
 
     /**
      * 中文说明：
-     * 1. 类目的：`Type` 是ThingsBoard Application 模块中的安全认证服务类型，用于处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
-     * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
-     * 3. 协作对象：主要协作对象包括Spring Security、User DAO、缓存、邮件服务、OAuth2 客户端和审计服务。
-     * 4. 生命周期：由 Spring 创建为服务 Bean，随登录、刷新令牌和权限校验请求调用。
-     * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
-     * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
-     * 7. 设计模式：主要体现 Service / Strategy。
+     * 1. `Type` 是 ThingsBoard Application 中定义类型固定取值的枚举类型。
+     * 2. 它列出当前流程允许使用的有限状态、模式或类别。
+     * 3. 枚举值可携带与该选项关联的标识、名称或处理参数。
+     * 4. 它直接协作于使用该枚举进行分支判断或序列化的类型。
+     * 5. 使用枚举可以限制非法取值，并让分支语义在源码中保持明确。
+     * 6. 阅读时重点关注各枚举值含义、附加字段和反向查找方法。
      */
     public enum Type {
         USER_NAME,
@@ -81,11 +79,3 @@ public class UserPrincipal implements Serializable {
     }
 
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`UserPrincipal` 在 ThingsBoard Application 模块 中承担安全认证服务类型职责，核心目的是处理认证、授权、JWT、OAuth2、2FA 或会话安全流程。
- * 2. 核心流程：读取安全上下文和凭据，校验权限后返回认证结果或安全响应。
- * 3. 关键依赖：主要依赖或协作对象包括Spring Security、User DAO、缓存、邮件服务、OAuth2 客户端和审计服务。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

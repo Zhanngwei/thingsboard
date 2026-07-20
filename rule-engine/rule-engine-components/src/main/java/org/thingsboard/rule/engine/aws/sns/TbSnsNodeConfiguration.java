@@ -54,9 +54,3 @@ public class TbSnsNodeConfiguration implements NodeConfiguration<TbSnsNodeConfig
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类仅描述 AWS SNS 发布节点所需配置，实际客户端生命周期和 publish 调用在 TbSnsNode 中完成。
- * 它不直接涉及外部调用、数据库、缓存或异步回调。
- */

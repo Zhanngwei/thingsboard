@@ -105,9 +105,3 @@ public class TbKafkaNodeConfiguration implements NodeConfiguration<TbKafkaNodeCo
         return configuration;
     }
 }
-
-/*
- * 本类总结：
- * 本类定义 Kafka 外部节点的 Producer 配置和消息映射选项，供 TbKafkaNode 在初始化和发送时读取。
- * 它不直接进行外部调用、异步回调、数据库、缓存或 Rule Engine Actor 操作。
- */

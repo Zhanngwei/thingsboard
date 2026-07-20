@@ -43,9 +43,3 @@ public class TbAzureIotHubNodeConfiguration extends TbMqttNodeConfiguration {
     }
 
 }
-
-/*
- * 本类总结：
- * 本类只提供 Azure IoT Hub MQTT 节点的默认配置，实际 MQTT 客户端生命周期和发布逻辑在 TbAzureIotHubNode/TbMqttNode 中执行。
- * 本类本身不直接涉及外部调用、数据库、缓存或异步回调。
- */

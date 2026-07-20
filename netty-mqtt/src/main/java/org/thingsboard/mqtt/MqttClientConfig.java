@@ -28,14 +28,12 @@ import java.util.Random;
 
 /**
  * 中文说明：
- * 1. 类目的：`MqttClientConfig` 是 ThingsBoard Netty MQTT 模块 中的Netty MQTT 客户端协议类型，用于封装基于 Netty 的 MQTT 客户端连接、订阅、发布、QoS、重传、心跳和集成测试服务端逻辑。
- * 2. 所属模块：位于 netty-mqtt 模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Netty Channel、MQTT codec、ThingsBoard Transport、回调接口、集成测试 broker 和异步调度器。
- * 4. 生命周期：由客户端构造、Netty 通道建立、MQTT 会话保持、断线关闭和测试 broker 生命周期驱动。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：本模块不直接涉及数据库事务或缓存；它通过 MQTT 协议与 Transport 交互，后续数据才可能进入 Actor、Rule Engine 和 DAO。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 State Machine / Command / Callback。
+ * 1. `MqttClientConfig` 是 ThingsBoard Netty MQTT Client 中描述 MQTT 行为的配置类型。
+ * 2. 它集中保存该组件启动或运行时需要的可配置选项。
+ * 3. 字段值决定功能开关、限制条件、地址或处理策略等具体行为。
+ * 4. 它直接协作于配置加载组件和使用这些配置的运行类型。
+ * 5. 独立配置对象可以避免大量零散参数在调用链中传递。
+ * 6. 阅读时重点关注默认值、必填字段和配置项之间的约束关系。
  */
 @SuppressWarnings({"WeakerAccess", "unused"})
 public final class MqttClientConfig {
@@ -356,11 +354,3 @@ public final class MqttClientConfig {
         this.maxBytesInMessage = maxBytesInMessage;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`MqttClientConfig` 在 ThingsBoard Netty MQTT 模块 中承担Netty MQTT 客户端协议类型职责，核心目的是封装基于 Netty 的 MQTT 客户端连接、订阅、发布、QoS、重传、心跳和集成测试服务端逻辑。
- * 2. 核心流程：建立 TCP/MQTT 连接后处理 CONNECT、SUBSCRIBE、PUBLISH、PING 和 DISCONNECT 状态，并通过回调通知调用方。
- * 3. 关键依赖：主要依赖或协作对象包括Netty Channel、MQTT codec、ThingsBoard Transport、回调接口、集成测试 broker 和异步调度器。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

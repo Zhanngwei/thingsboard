@@ -39,14 +39,12 @@ import java.util.Arrays;
 
 /**
  * 中文说明：
- * 1. 类目的：`ThingsboardVersionControlExecutorApplication` 是 ThingsBoard MSA 模块 中的版本控制执行器服务类型，用于为独立 VC executor 微服务提供启动入口、租户路由和队列路由信息。
- * 2. 所属模块：位于 msa 聚合模块，服务于 ThingsBoard 的运维监控、微服务测试或 MQTT 客户端协议边界。
- * 3. 协作对象：主要协作对象包括Version Control API、Queue、Spring Boot、gRPC/REST 和 ThingsBoard 集群路由配置。
- * 4. 生命周期：由 Spring Boot 启动为独立进程，随服务注册、队列路由读取和进程关闭而存在。
- * 5. 设计原因：单独建模该类型可以隔离协议细节、测试编排、页面操作和运行时探测逻辑，避免业务模块直接耦合外部工具或网络状态机。
- * 6. 事务与缓存：测试通过服务 API 或容器初始化间接影响数据库；VC executor 自身主要负责队列路由而非事务管理。
- * 7. MQTT/Actor/Rule Engine：是否直接涉及 MQTT 取决于模块；监控和 MSA 可能通过协议入口间接触发 Actor 与 Rule Engine，netty-mqtt 则直接管理 MQTT 会话。
- * 8. 设计模式：主要体现 Service / Routing Strategy。
+ * 1. `ThingsboardVersionControlExecutorApplication` 是 ThingsBoard Microservices 的进程启动入口，用于启动和装配版本控制相关服务。
+ * 2. 它负责创建应用上下文、加载组件并把启动参数交给实际运行模块。
+ * 3. 类中通常只保留启动参数修正和框架启动调用，不承载协议或业务处理细节。
+ * 4. 它直接协作于 Spring Boot 配置、组件扫描和当前模块的服务实现。
+ * 5. 独立入口使该服务能够单独部署、配置和扩缩容。
+ * 6. 阅读时重点关注组件扫描范围、配置文件名称和传入启动框架的参数。
  */
 @SpringBootApplication
 @EnableAsync
@@ -86,11 +84,3 @@ public class ThingsboardVersionControlExecutorApplication {
         return args;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`ThingsboardVersionControlExecutorApplication` 在 ThingsBoard MSA 模块 中承担版本控制执行器服务类型职责，核心目的是为独立 VC executor 微服务提供启动入口、租户路由和队列路由信息。
- * 2. 核心流程：启动 VC executor 后读取租户和队列路由配置，为版本控制请求选择正确的执行队列。
- * 3. 关键依赖：主要依赖或协作对象包括Version Control API、Queue、Spring Boot、gRPC/REST 和 ThingsBoard 集群路由配置。
- * 4. 学习重点：阅读本文件时应关注连接生命周期、异步回调、协议状态、测试环境、线程安全边界，以及它与 MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */

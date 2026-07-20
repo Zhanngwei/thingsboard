@@ -36,18 +36,12 @@ import java.security.KeyStore;
 
 /**
  * 中文说明：
- * 1. 类目的：`MqttSslClient` 是 ThingsBoard Tools 模块 中的MQTT SSL 手工验证客户端，用于加载 JKS 证书并通过 Eclipse Paho 建立 MQTT over TLS 连接，向 ThingsBoard 设备遥测主题发布测试数据。
- * 2. 所属模块：位于 tools，服务于 ThingsBoard 的客户端访问、离线工具或独立协议接入边界。
- * 3. 协作模块：主要协作对象包括 Paho MqttAsyncClient、SSLContext、KeyStore、ResourceUtils、ThingsBoard MQTT transport。
- * 4. 生命周期：由 main 方法启动，建立连接、发布一次遥测、断开连接后退出进程。
- * 5. 存在原因：独立手测工具便于快速验证证书、TLS 握手和 MQTT transport 配置，不需要启动完整测试框架。
- * 6. 事务：不参与在线事务；迁移工具生成离线 SSTable 文件，由 Cassandra 导入流程承担最终写入。
- * 7. 缓存：使用内存 Map/Set 缓存 dump 中的字典、实体类型和分区键，生命周期限定在单次迁移命令内。
- * 8. MQTT：直接涉及 MQTT，负责 CONNECT、TLS socket、PUBLISH 和 DISCONNECT 的客户端侧验证。
- * 9. Actor 通信：消息进入 ThingsBoard MQTT transport 后才可能转换为 Actor 消息，本工具只负责协议入口。
- * 10. 数据库：迁移工具面向 PostgreSQL dump 和 Cassandra SSTable 文件，属于离线数据库迁移辅助逻辑。
- * 11. Rule Engine：发布的遥测进入服务端后可能触发 Rule Engine，本工具不执行规则链。
- * 12. 设计模式：主要体现 Command / Client Adapter。
+ * 1. `MqttSslClient` 是 ThingsBoard Tools 中访问 MQTT 的客户端封装。
+ * 2. 它把连接建立、请求发送、认证信息和响应解析集中到统一入口。
+ * 3. 公开方法以平台数据模型作为输入输出，隐藏底层通信细节。
+ * 4. 它直接协作于网络客户端、认证模型和请求响应对象。
+ * 5. 独立客户端可以保持调用 API 稳定，并避免使用方重复处理连接与序列化。
+ * 6. 阅读时重点关注连接配置、认证状态、请求构造和资源释放。
  */
 @Slf4j
 public class MqttSslClient {
@@ -108,12 +102,4 @@ public class MqttSslClient {
             log.error("Unexpected exception occurred in MqttSslClient", e);
         }
     }
-    /**
-     * 本类总结：
-     * 1. 核心职责：`MqttSslClient` 负责加载 JKS 证书并通过 Eclipse Paho 建立 MQTT over TLS 连接，向 ThingsBoard 设备遥测主题发布测试数据。
-     * 2. 核心流程：加载 trust/key store，初始化 SSLContext，配置 MQTT socket factory，连接 broker，发布遥测并断开。
-     * 3. 关键依赖：Paho MqttAsyncClient、SSLContext、KeyStore、ResourceUtils、ThingsBoard MQTT transport。
-     * 4. 设计重点：通过 Command / Client Adapter 把外部协议、文件格式、启动参数或 REST 细节封装在边界类中，让核心业务模块保持清晰。
-     * 5. 学习重点：关注生命周期边界、线程安全假设、远端事务归属、缓存/数据库间接性、MQTT/Actor/Rule Engine 的进入点以及为什么该类只承担当前边界职责。
-     */
 }

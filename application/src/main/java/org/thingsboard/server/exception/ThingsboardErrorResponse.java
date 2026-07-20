@@ -24,13 +24,12 @@ import java.util.Date;
 
 /**
  * 中文说明：
- * 1. 类目的：`ThingsboardErrorResponse` 是ThingsBoard Application 模块中的异常与错误响应类型，用于统一表达 ThingsBoard Application 的异常状态和 HTTP 错误响应。
- * 2. 所属模块：位于 application 模块，支撑服务端启动、Web API、Actor、队列、传输层或业务服务流程。
- * 3. 协作对象：主要协作对象包括Controller、Spring 异常处理器、认证模块和客户端响应序列化。
- * 4. 生命周期：在请求失败、认证失败或参数校验失败时创建并返回。
- * 5. 设计原因：单独建模该类型可以隔离职责边界，避免 Controller、Service、DAO、Actor 或测试夹具之间直接耦合。
- * 6. 技术关联：是否涉及事务、缓存、MQTT、Actor、数据库和 Rule Engine 取决于调用链；本注释用于标明该类型在链路中的直接或间接位置。
- * 7. 设计模式：主要体现 DTO / Adapter。
+ * 1. `ThingsboardErrorResponse` 是 ThingsBoard Application 中承载响应信息的数据类型。
+ * 2. 它把一次调用、消息传递或序列化所需的数据组织为明确结构。
+ * 3. 字段分别表示该业务对象的标识、状态、内容或处理参数。
+ * 4. 它直接协作于创建该对象的生产方和读取字段的消费方。
+ * 5. 独立数据类型可以固定跨层契约，避免使用无结构的参数集合。
+ * 6. 阅读时重点关注字段语义、构造方式以及对象在调用链中的使用位置。
  */
 @ApiModel
 public class ThingsboardErrorResponse {
@@ -137,11 +136,3 @@ public class ThingsboardErrorResponse {
         return timestamp;
     }
 }
-
-/*
- * 本类总结：
- * 1. 核心职责：`ThingsboardErrorResponse` 在 ThingsBoard Application 模块 中承担异常与错误响应类型职责，核心目的是统一表达 ThingsBoard Application 的异常状态和 HTTP 错误响应。
- * 2. 核心流程：捕获异常后映射错误码、状态码和响应体。
- * 3. 关键依赖：主要依赖或协作对象包括Controller、Spring 异常处理器、认证模块和客户端响应序列化。
- * 4. 学习重点：阅读本文件时应关注其生命周期、线程安全边界以及事务、缓存、MQTT、Actor、数据库和 Rule Engine 的直接或间接关系。
- */
