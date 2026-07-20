@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1320" viewBox="0 0 1800 1320" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Alarm clear architecture</title>
+  <desc id="desc">High contrast architecture comparing REST, explicit Clear Alarm Rule Node, Device Profile automatic clear and Edge uplink, including PostgreSQL row locking and path-specific outputs.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#111827"/>
+    </marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.subtitle{font:400 18px Arial,'Microsoft YaHei',sans-serif;fill:#374151}
+      .band{stroke:#111827;stroke-width:2}.box{stroke:#111827;stroke-width:2}.h{font:700 20px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.t{font:400 16px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.small{font:400 14px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.code{font:600 14px Consolas,monospace;fill:#111827}
+      .line{stroke:#111827;stroke-width:2.5;fill:none;marker-end:url(#arrow)}.dash{stroke:#111827;stroke-width:2.5;stroke-dasharray:9 7;fill:none;marker-end:url(#arrow)}
+      .yes{font:700 14px Arial,'Microsoft YaHei',sans-serif;fill:#166534}.no{font:700 14px Arial,'Microsoft YaHei',sans-serif;fill:#991B1B}
+    </style>
+  </defs>
+
+  <rect width="1800" height="1320" fill="#FFFFFF"/>
+  <text x="70" y="55" class="title">ThingsBoard 3.6 Alarm 清除架构</text>
+  <text x="70" y="88" class="subtitle">四条入口共享 PostgreSQL 状态转换，但 Root Action、局部 Relation、订阅、审计与 Edge 副作用不同</text>
+
+  <rect x="50" y="120" width="1700" height="250" fill="#EFF6FF" class="band" rx="6"/>
+  <text x="75" y="155" class="h">入口与调用语义</text>
+
+  <rect x="80" y="190" width="380" height="130" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="105" y="225" class="h">REST</text>
+  <text x="105" y="255" class="code">POST /api/alarm/{id}/clear</text>
+  <text x="105" y="282" class="small">权限、SYSTEM comment、EntityAction、audit</text>
+  <text x="105" y="305" class="small">重复清除最终返回 400</text>
+
+  <rect x="500" y="190" width="380" height="130" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="525" y="225" class="h">显式 Clear Alarm Node</text>
+  <text x="525" y="255" class="code">TbClearAlarmNode.processAlarm(...)</text>
+  <text x="525" y="282" class="small">AlarmId 或 originator + type 查询</text>
+  <text x="525" y="305" class="small">JS/TBEL details + producer callback</text>
+
+  <rect x="920" y="190" width="380" height="130" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="945" y="225" class="h">Device Profile</text>
+  <text x="945" y="255" class="code">AlarmState.createOrClearAlarms(...)</text>
+  <text x="945" y="282" class="small">telemetry / attributes / activity / periodic</text>
+  <text x="945" y="305" class="small">create rule 优先，clear condition 次之</text>
+
+  <rect x="1340" y="190" width="380" height="130" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="1365" y="225" class="h">Edge gRPC Uplink</text>
+  <text x="1365" y="255" class="code">ALARM_CLEAR_RPC_MESSAGE</text>
+  <text x="1365" y="282" class="small">BaseAlarmProcessor 直接调用 DAO Service</text>
+  <text x="1365" y="305" class="small">缺失/重复均按 success no-op</text>
+
+  <rect x="50" y="410" width="1700" height="230" fill="#ECFDF5" class="band" rx="6"/>
+  <text x="75" y="445" class="h">共享服务与路径分叉</text>
+
+  <rect x="90" y="490" width="330" height="105" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="115" y="525" class="h">DefaultTbAlarmService</text>
+  <text x="115" y="555" class="small">仅 REST：用户 comment + action/audit</text>
+  <text x="115" y="578" class="small">重复 clear 转 BAD_REQUEST</text>
+
+  <rect x="500" y="490" width="410" height="105" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="525" y="525" class="h">DefaultAlarmSubscriptionService</text>
+  <text x="525" y="555" class="small">REST / Rule Node / Profile 经过</text>
+  <text x="525" y="578" class="small">first clear 才异步 WS + AlarmTrigger</text>
+
+  <rect x="1000" y="490" width="320" height="105" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="1025" y="525" class="h">BaseAlarmService</text>
+  <text x="1025" y="555" class="small">传播目标 + ActionEntityEvent</text>
+  <text x="1025" y="578" class="small">重复 clear 也产生 Edge action</text>
+
+  <rect x="1410" y="490" width="280" height="105" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="1435" y="525" class="h">JpaAlarmDao</text>
+  <text x="1435" y="555" class="small">JSON 参数/结果适配</text>
+  <text x="1435" y="578" class="small">cleared => modified</text>
+
+  <path d="M270 320 L270 490" class="line"/>
+  <path d="M690 320 L690 490" class="line"/>
+  <path d="M1110 320 L1110 455 L705 455 L705 490" class="line"/>
+  <path d="M1530 320 L1530 455 L1160 455 L1160 490" class="line"/>
+  <path d="M420 542 L500 542" class="line"/>
+  <path d="M910 542 L1000 542" class="line"/>
+  <path d="M1320 542 L1410 542" class="line"/>
+
+  <rect x="50" y="680" width="1700" height="245" fill="#FFFBEB" class="band" rx="6"/>
+  <text x="75" y="715" class="h">PostgreSQL 原子状态转换</text>
+
+  <rect x="90" y="755" width="620" height="125" fill="#FFFFFF" class="box" rx="6"/>
+  <text x="115" y="790" class="h">clear_alarm(t_id, a_id, a_ts, a_details)</text>
+  <text x="115" y="822" class="code">SELECT alarm WHERE tenant_id + id FOR UPDATE</text>
+  <text x="115" y="850" class="small">首次：cleared=true, clear_ts；可选替换 additional_info</text>
+  <text x="115" y="873" class="small">重复：success=true, cleared=false，不改 clear_ts/details</text>
+
+  <rect x="790" y="755" width="300" height="125" fill="#FEF3C7" class="box" rx="6"/>
+  <text x="815" y="790" class="h">alarm</text>
+  <text x="815" y="822" class="small">主状态与 ACK/CLEAR 字段</text>
+  <text x="815" y="850" class="small">主键 id；tenant 条件防越界</text>
+
+  <rect x="1170" y="755" width="270" height="125" fill="#FEF3C7" class="box" rx="6"/>
+  <text x="1195" y="790" class="h">entity_alarm</text>
+  <text x="1195" y="822" class="small">CLEAR 不删除、不重建</text>
+  <text x="1195" y="850" class="small">继续支持历史可见性查询</text>
+
+  <rect x="1510" y="755" width="190" height="125" fill="#FEF3C7" class="box" rx="6"/>
+  <text x="1535" y="790" class="h">alarm_comment</text>
+  <text x="1535" y="822" class="small">仅 REST 自动写</text>
+  <text x="1535" y="850" class="small">独立事务</text>
+
+  <path d="M1550 595 L1550 650 L400 650 L400 755" class="line"/>
+  <path d="M710 817 L790 817" class="line"/>
+  <path d="M1090 817 L1170 817" class="dash"/>
+  <path d="M255 595 L255 660 L1605 660 L1605 755" class="dash"/>
+
+  <rect x="50" y="965" width="1700" height="300" fill="#F8FAFC" class="band" rx="6"/>
+  <text x="75" y="1000" class="h">路径特有输出矩阵</text>
+
+  <rect x="90" y="1040" width="310" height="170" fill="#DBEAFE" class="box" rx="6"/>
+  <text x="115" y="1075" class="h">REST</text>
+  <text x="115" y="1107" class="yes">YES  WS + AlarmTrigger</text>
+  <text x="115" y="1134" class="yes">YES  root ALARM_CLEAR</text>
+  <text x="115" y="1161" class="yes">YES  comment + audit</text>
+  <text x="115" y="1188" class="yes">YES  Edge</text>
+
+  <rect x="520" y="1040" width="310" height="170" fill="#DCFCE7" class="box" rx="6"/>
+  <text x="545" y="1075" class="h">Clear Alarm Node</text>
+  <text x="545" y="1107" class="yes">YES  WS + AlarmTrigger</text>
+  <text x="545" y="1134" class="yes">YES  root ALARM_CLEAR</text>
+  <text x="545" y="1161" class="yes">YES  local Cleared relation</text>
+  <text x="545" y="1188" class="no">NO   user comment/audit</text>
+
+  <rect x="950" y="1040" width="310" height="170" fill="#CCFBF1" class="box" rx="6"/>
+  <text x="975" y="1075" class="h">Device Profile</text>
+  <text x="975" y="1107" class="yes">YES  WS + AlarmTrigger</text>
+  <text x="975" y="1134" class="no">NO   root ALARM_CLEAR</text>
+  <text x="975" y="1161" class="yes">YES  Alarm Cleared relation</text>
+  <text x="975" y="1188" class="yes">YES  Edge</text>
+
+  <rect x="1380" y="1040" width="310" height="170" fill="#FCE7F3" class="box" rx="6"/>
+  <text x="1405" y="1075" class="h">Edge Uplink</text>
+  <text x="1405" y="1107" class="no">NO   local WS / AlarmTrigger</text>
+  <text x="1405" y="1134" class="no">NO   local Rule Engine message</text>
+  <text x="1405" y="1161" class="no">NO   comment/audit</text>
+  <text x="1405" y="1188" class="yes">YES  other related Edges</text>
+
+  <path d="M1100 595 L1100 940 L245 940 L245 1040" class="dash"/>
+  <path d="M1100 940 L675 940 L675 1040" class="dash"/>
+  <path d="M1100 940 L1105 1040" class="dash"/>
+  <path d="M1100 940 L1535 940 L1535 1040" class="dash"/>
+
+  <text x="70" y="1298" class="subtitle">实线表示同步调用；虚线表示异步、事件或不属于同一事务的副作用。HTML 中点击缩略图可打开原始 SVG。</text>
+</svg>

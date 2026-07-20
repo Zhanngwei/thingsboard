@@ -103,7 +103,7 @@ flowchart TD
           <tr><td>提交后</td><td><code>@TransactionalEventListener</code></td><td>Device/Credentials/Count/Relation/Alarm Type cache evict；Edge event</td></tr>
         </tbody>
       </table>
-      <p>含完整包名、参数、输入输出、源码链接和设计原因的逐步调用链见<a href="README.md#三完整调用链">Markdown 第三节</a>。</p>
+      <p>含完整包名、参数、输入输出、源码链接和设计原因的逐步调用链见<a href="README.md">Markdown 第三节</a>。</p>
 
       <h2 id="section-4">四、消息流</h2>
       <pre class="mermaid">
@@ -299,25 +299,6 @@ flowchart LR
     </article>
   </main>
   <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
-  <script>
-    mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'neutral',flowchart:{htmlLabels:true,curve:'basis'},sequence:{useMaxWidth:true,wrap:true}});
-    window.addEventListener('DOMContentLoaded', function () {
-      function scrollToHash() {
-        var target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
-        if (target) { target.scrollIntoView(); }
-      }
-      function waitForImages() {
-        return Promise.all(Array.from(document.images).map(function (img) {
-          if (img.complete) { return Promise.resolve(); }
-          return new Promise(function (resolve) {
-            img.addEventListener('load', resolve, {once:true});
-            img.addEventListener('error', resolve, {once:true});
-          });
-        }));
-      }
-      mermaid.run({querySelector:'.mermaid'}).then(waitForImages).then(scrollToHash);
-      window.addEventListener('hashchange', function () { window.requestAnimationFrame(scrollToHash); });
-    });
-  </script>
+  <script src="../../assets/guide.js"></script>
 </body>
 </html>

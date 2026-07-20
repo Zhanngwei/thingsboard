@@ -1,0 +1,279 @@
+@startuml
+title ThingsBoard 3.6 Alarm 清除、幂等、消息分叉与 Edge 传播
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #111827
+skinparam ArrowColor #111827
+skinparam ParticipantBorderColor #111827
+skinparam ParticipantBackgroundColor #F8FAFC
+skinparam ActorBorderColor #111827
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #111827
+skinparam DatabaseBackgroundColor #FEF3C7
+skinparam QueueBorderColor #111827
+skinparam QueueBackgroundColor #DBEAFE
+skinparam NoteBorderColor #92400E
+skinparam NoteBackgroundColor #FFFBEB
+skinparam SequenceGroupBorderColor #374151
+skinparam SequenceGroupBackgroundColor #F9FAFB
+skinparam BoxBorderColor #4B5563
+skinparam BoxBackgroundColor #FFFFFF
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 150
+
+actor "REST Client" as Client
+box "Application / REST" #EFF6FF
+participant "AlarmController" as Controller
+participant "DefaultTbAlarmService" as App
+participant "DefaultTbAlarmCommentService" as Comment
+participant "EntityActionService" as Action
+end box
+
+box "Alarm application service" #ECFDF5
+participant "DefaultAlarmSubscriptionService" as Subscription
+participant "SubscriptionManager\nWebSocket" as WS
+participant "AlarmTriggerProcessor" as Notification
+end box
+
+box "DAO" #F8FAFC
+participant "BaseAlarmService" as Service
+participant "JpaAlarmDao\nAlarmRepository" as Dao
+participant "EdgeEventSourcingListener" as EdgeEvent
+end box
+
+database "PostgreSQL\nalarm / entity_alarm\nalarm_comment / audit_log" as PG
+queue "Rule Engine Queue" as RuleQueue
+participant "RuleNodeActor" as Actor
+participant "TbClearAlarmNode" as ClearNode
+participant "TbDeviceProfileNode\nDeviceState / AlarmState" as Profile
+
+== REST first clear ==
+Client -> Controller: POST /api/alarm/{id}/clear
+activate Controller
+Controller -> Controller: checkAlarmId(id, WRITE)
+Controller -> App: clear(alarm, currentUser)
+activate App
+App -> Subscription: clearAlarm(tenant,id,now,null)
+activate Subscription
+Subscription -> Service: clearAlarm(...)
+activate Service
+Service -> Dao: clearAlarm(...)
+activate Dao
+Dao -> PG: SELECT clear_alarm(tenant,id,ts,NULL)
+activate PG
+PG -> PG: SELECT alarm FOR UPDATE
+alt row exists and cleared=false
+  PG -> PG: UPDATE cleared=true, clear_ts=ts
+  PG --> Dao: success=true, cleared=true, alarm_info
+else row exists and already cleared
+  PG --> Dao: success=true, cleared=false, current alarm_info
+else row missing or tenant mismatch
+  PG --> Dao: success=false
+end
+deactivate PG
+Dao -> Dao: toAlarmApiResult\nmodified = created || cleared || modified
+Dao --> Service: AlarmApiCallResult
+deactivate Dao
+
+alt result contains Alarm
+  Service -> PG: read existing entity_alarm targets\nwhen propagation flags are enabled
+  Service -> EdgeEvent: publish ActionEntityEvent(ALARM_CLEAR)
+  activate EdgeEvent
+  EdgeEvent -> RuleQueue: Core/Edge notification, callback null
+  EdgeEvent --> Service: listener catches its own failures
+  deactivate EdgeEvent
+end
+Service --> Subscription: result + propagated entities
+deactivate Service
+
+alt first clear: successful && modified
+  Subscription -> Subscription: schedule AlarmUpdateCallback\non wsCallBackExecutor
+  Subscription --> App: return without waiting
+  deactivate Subscription
+
+  ... asynchronous callback may run before or after REST side effects ...
+  Subscription -> WS: onAlarmUpdate per propagated entity\nlocal or Core Queue
+  Subscription -> Notification: process AlarmTrigger(CLEARED)
+
+  App -> Comment: save SYSTEM comment subtype CLEAR
+  activate Comment
+  Comment -> PG: INSERT alarm_comment partition
+  Comment -> Action: log ADDED_COMMENT
+  Action -> RuleQueue: COMMENT_CREATED
+  Action -> Notification: AlarmCommentTrigger
+  Action -> PG: async audit_log ADDED_COMMENT
+  Comment --> App: saved comment
+  deactivate Comment
+
+  App -> Action: logEntityAction(ALARM_CLEAR)
+  activate Action
+  Action -> RuleQueue: push TbMsgType.ALARM_CLEAR\noriginator is Alarm originator
+  Action -> PG: async audit_log ALARM_CLEAR
+  note right of Action
+  processNotificationRules has no ALARM_CLEAR case,
+  so it does not emit EntityActionTrigger.
+  end note
+  Action --> App: returns without waiting for consume/audit
+  deactivate Action
+  App --> Controller: cleared AlarmInfo
+  Controller --> Client: HTTP 200
+else duplicate clear
+  Subscription --> App: modified=false; skip WS/AlarmTrigger
+  deactivate Subscription
+  App --> Controller: ThingsboardException already cleared
+  Controller --> Client: HTTP 400
+  note over Client,EdgeEvent
+  The Edge ActionEntityEvent was published in BaseAlarmService
+  before DefaultTbAlarmService rejected the duplicate.
+  end note
+else missing row after controller check
+  Subscription --> App: success=false
+  deactivate Subscription
+  App --> Controller: ITEM_NOT_FOUND
+  Controller --> Client: error response
+end
+deactivate App
+deactivate Controller
+
+note over PG,RuleQueue
+The alarm row, comments, audit, WebSocket, notification,
+Rule Engine messages and Edge events do not share one transaction.
+end note
+
+== Explicit Clear Alarm Rule Node ==
+RuleQueue -> Actor: input TbMsg
+activate Actor
+Actor -> ClearNode: onMsg(ctx,msg)
+activate ClearNode
+alt msg originator type is ALARM
+  ClearNode -> Subscription: findAlarmById(AlarmId)
+else other originator
+  ClearNode -> Subscription: findLatestActiveByOriginatorAndType(...)
+end
+Subscription -> Service: DAO query
+Service -> PG: SELECT Alarm
+PG --> Service: Alarm or null
+Service --> Subscription: Alarm or null
+Subscription --> ClearNode: Alarm or null
+
+alt missing or already cleared at pre-query
+  ClearNode -> Actor: tellNext(False)
+else active Alarm
+  ClearNode -> ClearNode: async JS/TBEL details\nmetadata includes prevAlarmDetails
+  ClearNode -> Subscription: clearAlarm(...,details)
+  Subscription -> Service: same clear path
+  Service -> PG: clear_alarm(...)
+  PG --> Service: result
+  Service --> Subscription: result + Edge event
+  Subscription --> ClearNode: result; WS/AlarmTrigger scheduled if first
+  alt result.isCleared
+    ClearNode -> RuleQueue: enqueue root ALARM_CLEAR action message
+    alt producer success
+      RuleQueue --> ClearNode: onSuccess
+      ClearNode -> Actor: tellNext(ALARM, Cleared)\nisClearedAlarm=true
+    else producer failure
+      RuleQueue --> ClearNode: onFailure
+      ClearNode -> Actor: tellFailure(transformed ALARM)
+    end
+  else race produced no-op
+    ClearNode -> Actor: tellSuccess(original message)
+  end
+end
+deactivate ClearNode
+deactivate Actor
+
+note over ClearNode,PG
+The database is already committed before root action enqueue.
+A producer failure cannot restore the active Alarm.
+end note
+
+== Device Profile automatic clear ==
+RuleQueue -> Actor: telemetry / attributes / activity\nor periodic self message
+activate Actor
+Actor -> Profile: onMsg(ctx,msg)
+activate Profile
+Profile -> Profile: update/read latest snapshot\nevaluate create rules by severity
+alt no create rule TRUE and currentAlarm + clear rule exist
+  Profile -> Profile: evaluate clear condition
+  alt clear condition TRUE
+    Profile -> Profile: reset create and clear rule state
+    Profile -> Subscription: clearAlarm(...,createDetails(clearState))
+    Subscription -> Service: same persistence path
+    Service -> PG: clear_alarm(...)
+    PG --> Service: result
+    Service --> Subscription: result + Edge event
+    Subscription --> Profile: result; async WS/AlarmTrigger on first clear
+    opt result.isCleared
+      Profile -> RuleQueue: enqueueForTellNext(ALARM, "Alarm Cleared")
+    end
+    Profile -> Profile: currentAlarm = null
+  end
+end
+Profile -> PG: optional save rule_node_state
+Profile -> Actor: tellSuccess(original telemetry/attribute)
+deactivate Profile
+deactivate Actor
+
+== External root clear updates Device Profile state ==
+RuleQueue -> Actor: TbMsgType.ALARM_CLEAR
+activate Actor
+Actor -> Profile: onMsg(ctx,msg)
+activate Profile
+Profile -> Profile: DeviceState.processAlarmClearNotification\nmatch AlarmId, currentAlarm=null\nclear create-rule state
+Profile -> PG: optional save rule_node_state
+Profile -> Actor: tellSuccess(root action)
+deactivate Profile
+deactivate Actor
+
+== Edge uplink clear ==
+actor "Source Edge" as SourceEdge
+participant "EdgeGrpcSession" as EdgeGrpc
+participant "AlarmEdgeProcessor" as EdgeProcessor
+participant "BaseAlarmProcessor" as BaseProcessor
+queue "Other related Edge events" as OtherEdges
+
+SourceEdge -> EdgeGrpc: UplinkMsg ALARM_CLEAR_RPC_MESSAGE
+activate EdgeGrpc
+EdgeGrpc -> EdgeProcessor: processAlarmMsgFromEdge(tenant,edge,msg)
+activate EdgeProcessor
+EdgeProcessor -> EdgeProcessor: source EdgeId ThreadLocal = edge
+EdgeProcessor -> BaseProcessor: processAlarmMsg(...)
+activate BaseProcessor
+BaseProcessor -> Service: findAlarmById; clearAlarm directly
+Service -> PG: clear_alarm(...)
+PG --> Service: first or duplicate result
+Service -> EdgeEvent: ActionEntityEvent(ALARM_CLEAR)\nsource EdgeId from ThreadLocal
+EdgeEvent -> RuleQueue: Edge notification
+RuleQueue -> OtherEdges: save events for related Edges\nexcluding source Edge
+Service --> BaseProcessor: result
+BaseProcessor --> EdgeProcessor: immediate Future success
+deactivate BaseProcessor
+EdgeProcessor -> EdgeProcessor: remove ThreadLocal
+EdgeProcessor --> EdgeGrpc: success
+deactivate EdgeProcessor
+EdgeGrpc --> SourceEdge: uplink response success
+deactivate EdgeGrpc
+
+note over SourceEdge,Profile
+This Edge branch bypasses DefaultAlarmSubscriptionService and
+EntityActionService: no local WS, AlarmTrigger or root ALARM_CLEAR.
+end note
+
+== Concurrent duplicate clear and ACK comparison ==
+participant "Clear A" as A
+participant "Clear B" as B
+participant "ACK C" as C
+A -> PG: SELECT alarm FOR UPDATE
+PG --> A: lock granted
+B -> PG: SELECT same alarm FOR UPDATE
+note over B,PG: waits for A
+A -> PG: UPDATE cleared=true, clear_ts=A
+A --> PG: commit
+PG --> B: refreshed row already cleared
+B -> PG: no UPDATE; return cleared=false
+C -> PG: SELECT same row FOR UPDATE
+PG --> C: cleared=true acknowledged=false
+C -> PG: UPDATE acknowledged=true, ack_ts=C
+C --> PG: final status CLEARED_ACK
+
+@enduml

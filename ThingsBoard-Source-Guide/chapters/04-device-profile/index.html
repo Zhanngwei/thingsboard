@@ -156,7 +156,7 @@ flowchart TD
   C --&gt; E[after-commit cache and Edge]
   E --&gt; Q[Transport delete lifecycle entity action audit]
       </pre>
-      <p>完整方法签名、源码位置、输入输出和设计原因见<a href="README.md#三完整调用链">Markdown 第三节</a>。</p>
+      <p>完整方法签名、源码位置、输入输出和设计原因见<a href="README.md">Markdown 第三节</a>。</p>
 
       <h2 id="section-4">四、消息流</h2>
       <pre class="mermaid">
@@ -333,34 +333,15 @@ erDiagram
       <h3>删除 Profile 会删除 Device 吗？</h3><p>不会；Device FK 会阻止删除，且 default Profile 由服务直接拒绝。</p>
       <h3>Profile 为什么使用 JSONB？</h3><p>协议、Provision 和 Alarm Rule 是多态且演进快；常用约束字段仍拆列，深层结构由 Jackson 和 validator 管理。</p>
       <h3>Kafka 是否让 Profile 与数据库一致？</h3><p>不会。无 outbox、跨 topic 无全序、consumer 异步，Kafka 只实现 Queue SPI 的一种部署。</p>
-      <p>更多问题与标准答案见<a href="README.md#十三常见面试题">Markdown 第十三节</a>。</p>
+      <p>更多问题与标准答案见<a href="README.md">Markdown 第十三节</a>。</p>
 
       <nav class="chapter-nav" aria-label="章节导航">
         <a href="../03-device-delete/index.html">← 03 Device 删除流程</a>
-        <a href="../../index.html#chapter-05">05 Rule Chain 执行流程（待分析）→</a>
+        <a href="../05-rule-chain-execution/index.html">05 Rule Chain 执行流程→</a>
       </nav>
     </article>
   </main>
   <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
-  <script>
-    mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'neutral',flowchart:{htmlLabels:true,curve:'basis'},sequence:{useMaxWidth:true,wrap:true}});
-    window.addEventListener('DOMContentLoaded', function () {
-      function scrollToHash() {
-        var target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
-        if (target) { target.scrollIntoView(); }
-      }
-      function waitForImages() {
-        return Promise.all(Array.from(document.images).map(function (img) {
-          if (img.complete) { return Promise.resolve(); }
-          return new Promise(function (resolve) {
-            img.addEventListener('load', resolve, {once:true});
-            img.addEventListener('error', resolve, {once:true});
-          });
-        }));
-      }
-      mermaid.run({querySelector:'.mermaid'}).then(waitForImages).then(scrollToHash);
-      window.addEventListener('hashchange', function () { window.requestAnimationFrame(scrollToHash); });
-    });
-  </script>
+  <script src="../../assets/guide.js"></script>
 </body>
 </html>

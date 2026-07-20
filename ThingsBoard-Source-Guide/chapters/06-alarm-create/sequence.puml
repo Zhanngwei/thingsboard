@@ -1,0 +1,220 @@
+@startuml
+title ThingsBoard 3.6 Alarm 创建、去重、传播与异步通知
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #111827
+skinparam ArrowColor #111827
+skinparam ParticipantBorderColor #111827
+skinparam ParticipantBackgroundColor #F8FAFC
+skinparam ActorBorderColor #111827
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #111827
+skinparam DatabaseBackgroundColor #FEF3C7
+skinparam QueueBorderColor #111827
+skinparam QueueBackgroundColor #DBEAFE
+skinparam NoteBorderColor #92400E
+skinparam NoteBackgroundColor #FFFBEB
+skinparam SequenceGroupBorderColor #374151
+skinparam SequenceGroupBackgroundColor #F9FAFB
+skinparam BoxBorderColor #4B5563
+skinparam BoxBackgroundColor #FFFFFF
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 150
+
+actor "REST Client" as Client
+box "Application / REST" #EFF6FF
+participant "AlarmController" as Controller
+participant "DefaultTbAlarmService" as App
+participant "EntityActionService" as Action
+end box
+
+box "Alarm Application Service" #ECFDF5
+participant "DefaultAlarmSubscriptionService" as Subscription
+participant "NotificationRuleProcessor" as Notification
+participant "SubscriptionManagerService" as WS
+end box
+
+box "DAO" #F8FAFC
+participant "BaseAlarmService" as Service
+participant "JpaAlarmDao" as Dao
+participant "AlarmRepository" as Repository
+participant "EntityAlarmRepository" as EntityAlarmRepo
+end box
+
+database "PostgreSQL\nalarm / alarm_types / entity_alarm" as PG
+queue "Rule Engine Queue" as Queue
+participant "RuleNodeActor" as Actor
+participant "TbCreateAlarmNode" as Node
+participant "TbDeviceProfileNode\nAlarmState" as Profile
+
+== REST create-or-update ==
+Client -> Controller: POST /api/alarm\nAlarm JSON
+activate Controller
+Controller -> Controller: set current tenant\ncheck Alarm and originator permissions
+Controller -> App: save(alarm, currentUser)
+activate App
+App -> App: actionType = id == null ? ADDED : UPDATED
+App -> Subscription: createAlarm(request)
+activate Subscription
+Subscription -> Subscription: read API usage state
+Subscription -> Service: createAlarm(request, creationEnabled)
+activate Service
+Service -> Service: validate fields and timestamps\nrecompute customer from originator
+Service -> Dao: createOrUpdateActiveAlarm(request, enabled)
+activate Dao
+Dao -> Dao: choose edgeAlarmId or random UUID\nserialize details and propagation types
+Dao -> Repository: createOrUpdateActiveAlarm(flat parameters)
+activate Repository
+Repository -> PG: SELECT create_or_update_active_alarm(...)
+activate PG
+PG -> PG: SELECT active by originator_id + type\nAND cleared=false ORDER BY start_ts DESC FOR UPDATE
+
+alt active row does not exist and creation enabled
+  PG -> PG: INSERT alarm\nacknowledged=false, cleared=false
+  PG -> PG: INSERT alarm_types\nON CONFLICT DO NOTHING
+  PG -> PG: SELECT alarm_info
+  PG --> Repository: JSON created=true, modified=true
+else active row exists and fields changed
+  PG -> PG: UPDATE same alarm id\nseverity/time/details/propagation
+  PG -> PG: SELECT alarm_info
+  PG --> Repository: JSON modified=true + old
+else active row exists and fields are identical
+  PG --> Repository: JSON modified=false
+else no active row and creation disabled
+  PG --> Repository: JSON success=false
+end
+deactivate PG
+Repository --> Dao: JSON text
+deactivate Repository
+Dao -> Dao: parse AlarmApiCallResult
+Dao --> Service: result
+deactivate Dao
+
+alt result contains Alarm
+  Service -> Service: publish SaveEntityEvent\nevict alarm-type cache
+  Service -> Service: calculate propagation entities
+  loop originator + parents + owner + tenant
+    Service -> EntityAlarmRepo: save(EntityAlarm)
+    EntityAlarmRepo -> PG: INSERT or UPDATE entity_alarm
+    alt one propagation row fails
+      EntityAlarmRepo --> Service: exception
+      Service -> Service: log warning and continue
+    end
+  end
+end
+Service --> Subscription: result + propagated entities
+deactivate Service
+
+alt successful and modified
+  Subscription -> WS: submit async onAlarmUpdate per entity
+  Subscription -> Notification: submit async AlarmTrigger
+  opt severity changed
+    Subscription -> PG: save SYSTEM alarm_comment
+  end
+end
+Subscription --> App: synchronous result
+deactivate Subscription
+
+alt result modified
+  App -> Action: logEntityAction(ADDED or UPDATED)
+  activate Action
+  Action -> Notification: EntitiesLimitTrigger for ADDED\nand EntityActionTrigger for ADDED or UPDATED
+  Action -> Queue: push ENTITY_CREATED or ENTITY_UPDATED
+  Action -> PG: async save audit_log
+  Action --> App: returns without waiting for consumers/audit
+  deactivate Action
+end
+App --> Controller: Alarm
+deactivate App
+Controller --> Client: HTTP response
+deactivate Controller
+
+note over PG
+Alarm function and later entity_alarm saves do not share
+one explicit service transaction in this creation path.
+WebSocket, notification, Queue and audit are also outside it.
+end note
+
+== Explicit Create Alarm Rule Node ==
+Queue -> Actor: input TbMsg
+activate Actor
+Actor -> Node: onMsg(ctx, msg)
+activate Node
+Node -> Subscription: findLatestActiveByOriginatorAndType(...)
+Subscription -> Service: findLatestActiveByOriginatorAndType(...)
+Service -> PG: SELECT latest active
+PG --> Service: Alarm or null
+Service --> Subscription: Alarm or null
+Subscription --> Node: Alarm or null
+Node -> Node: build details asynchronously\nbuild new Alarm or mutate existing
+Node -> Subscription: createAlarm(request) or updateAlarm(request)
+Subscription -> Service: same persistence path
+Service --> Subscription: AlarmApiCallResult
+Subscription --> Node: result
+Node -> Queue: enqueue alarmActionMsg\nENTITY_CREATED or ENTITY_UPDATED
+alt producer success
+  Queue --> Node: onSuccess
+  Node -> Actor: tellNext(ALARM, Created or Updated)
+else producer failure
+  Queue --> Node: onFailure
+  Node -> Actor: tellFailure(ALARM)
+end
+Node --> Actor: callback path completes
+deactivate Node
+deactivate Actor
+
+note over Node,PG
+The Alarm is already persisted before alarmActionMsg enqueue.
+Queue failure cannot roll it back.
+end note
+
+== Device Profile Alarm Rule ==
+Queue -> Actor: telemetry or attributes TbMsg
+activate Actor
+Actor -> Profile: onMsg(ctx, msg)
+activate Profile
+Profile -> Profile: load DeviceState and latest snapshot\nmerge update, evaluate severity rules
+alt new matching alarm
+  Profile -> Subscription: createAlarm(request)
+else existing alarm and allowed severity
+  Profile -> Subscription: updateAlarm(request)
+else no create rule and clear rule matches
+  Profile -> Subscription: clearAlarm(...)
+end
+Subscription -> Service: same persistence path
+alt snapshot, evaluation and Alarm service succeed
+  Service --> Subscription: AlarmApiCallResult
+  Subscription --> Profile: result
+  Profile -> Queue: enqueueForTellNext(ALARM relation msg)
+  Profile -> Actor: tellSuccess(original telemetry/attribute msg)
+else synchronous exception
+  Service --> Subscription: exception
+  Subscription --> Profile: exception propagates
+  Profile -> Actor: onMsg throws; no tellSuccess
+end
+deactivate Profile
+deactivate Actor
+
+note over Profile,Queue
+On the successful path, original message success is independent
+from the extra Alarm message producer callback.
+The profile path does not call REST audit/EntityAction orchestration.
+end note
+
+== Concurrent first-create window ==
+participant "Request A" as A
+participant "Request B" as B
+A -> PG: SELECT active FOR UPDATE
+PG --> A: no row, therefore no tuple lock
+B -> PG: SELECT active FOR UPDATE
+PG --> B: no row, therefore no tuple lock
+A -> PG: INSERT alarm id A
+PG --> A: success
+B -> PG: INSERT alarm id B
+PG --> B: success possible
+note over A,B
+The partial active index is not UNIQUE.
+Two active alarms may be inserted for the same originator and type.
+end note
+
+@enduml

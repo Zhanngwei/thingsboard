@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Rule Chain execution architecture</title>
+  <desc id="desc">Control plane metadata persistence and runtime Queue, Actor, Rule Node, callback and retry boundaries.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#253746"/>
+    </marker>
+    <marker id="arrow-accent" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#176b87"/>
+    </marker>
+    <style>
+      .title{font:700 34px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#17202a}
+      .subtitle{font:400 17px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#415563}
+      .lane{font:700 20px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#17202a}
+      .box-title{font:700 17px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#111827}
+      .box-text{font:400 14px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#263842}
+      .small{font:400 13px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#415563}
+      .code{font:600 13px Consolas,'Microsoft YaHei',monospace;fill:#18313f}
+      .line{fill:none;stroke:#253746;stroke-width:2;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#176b87;stroke-width:2;stroke-dasharray:8 6;marker-end:url(#arrow-accent)}
+      .boundary{fill:#f8fafc;stroke:#9eacb8;stroke-width:1.5}
+      .source{fill:#eef6f8;stroke:#176b87;stroke-width:2}
+      .queue{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}
+      .actor{fill:#ffffff;stroke:#334155;stroke-width:2}
+      .node{fill:#eef8f8;stroke:#1f6d70;stroke-width:2}
+      .store{fill:#f3f1f8;stroke:#655b83;stroke-width:2}
+      .warn{fill:#fff5cc;stroke:#8a5a00;stroke-width:1.5}
+      .success{fill:#eef7f1;stroke:#287a4b;stroke-width:2}
+      .failure{fill:#fff2ed;stroke:#a34f37;stroke-width:2}
+    </style>
+  </defs>
+
+  <rect width="1800" height="1120" fill="#ffffff"/>
+  <text x="60" y="58" class="title">ThingsBoard 3.6 Rule Chain execution architecture</text>
+  <text x="60" y="88" class="subtitle">The callback follows local execution only until a Queue boundary; metadata commit and Actor reload are separate phases.</text>
+
+  <rect x="40" y="120" width="1720" height="675" rx="6" class="boundary"/>
+  <text x="65" y="155" class="lane">Runtime data plane</text>
+
+  <rect x="70" y="190" width="250" height="155" rx="5" class="source"/>
+  <text x="195" y="225" text-anchor="middle" class="box-title">Message sources</text>
+  <text x="195" y="258" text-anchor="middle" class="box-text">MQTT / CoAP / LwM2M / HTTP</text>
+  <text x="195" y="284" text-anchor="middle" class="box-text">Entity action / RPC / Scheduler</text>
+  <text x="195" y="316" text-anchor="middle" class="code">TbMsg</text>
+
+  <rect x="70" y="405" width="250" height="150" rx="5" class="source"/>
+  <text x="195" y="440" text-anchor="middle" class="box-title">Profile-aware producer</text>
+  <text x="195" y="472" text-anchor="middle" class="code">DefaultTbClusterService</text>
+  <text x="195" y="499" text-anchor="middle" class="box-text">select queueName + ruleChainId</text>
+  <text x="195" y="526" text-anchor="middle" class="box-text">resolve tenant/entity partition</text>
+
+  <path d="M195 345 L195 405" class="line"/>
+
+  <rect x="390" y="225" width="265" height="130" rx="5" class="queue"/>
+  <text x="522" y="260" text-anchor="middle" class="box-title">Rule Engine Queue</text>
+  <text x="522" y="290" text-anchor="middle" class="code">ToRuleEngineMsg protobuf</text>
+  <text x="522" y="318" text-anchor="middle" class="box-text">topic + partition + offset</text>
+  <path d="M320 480 C355 480 345 290 390 290" class="line"/>
+
+  <rect x="390" y="405" width="265" height="200" rx="5" class="actor"/>
+  <text x="522" y="440" text-anchor="middle" class="box-title">Consumer pack</text>
+  <text x="522" y="472" text-anchor="middle" class="code">consumerLoop / processMsgs</text>
+  <text x="522" y="500" text-anchor="middle" class="box-text">Submit Strategy</text>
+  <text x="522" y="526" text-anchor="middle" class="box-text">TbMsgPackCallback per record</text>
+  <text x="522" y="552" text-anchor="middle" class="box-text">await timeout</text>
+  <text x="522" y="578" text-anchor="middle" class="box-text">commit or reprocess</text>
+  <path d="M522 355 L522 405" class="line"/>
+
+  <rect x="735" y="170" width="310" height="470" rx="5" class="actor"/>
+  <text x="890" y="205" text-anchor="middle" class="box-title">Actor hierarchy</text>
+  <rect x="780" y="235" width="220" height="62" rx="4" class="actor"/>
+  <text x="890" y="273" text-anchor="middle" class="code">AppActor</text>
+  <rect x="780" y="325" width="220" height="72" rx="4" class="actor"/>
+  <text x="890" y="357" text-anchor="middle" class="code">TenantActor</text>
+  <text x="890" y="380" text-anchor="middle" class="small">root / explicit chain route</text>
+  <rect x="780" y="425" width="220" height="72" rx="4" class="actor"/>
+  <text x="890" y="457" text-anchor="middle" class="code">RuleChainActor</text>
+  <text x="890" y="480" text-anchor="middle" class="small">firstNode + relation map</text>
+  <rect x="780" y="525" width="220" height="72" rx="4" class="actor"/>
+  <text x="890" y="557" text-anchor="middle" class="code">RuleNodeActor</text>
+  <text x="890" y="580" text-anchor="middle" class="small">TbNode lifecycle + mailbox</text>
+  <path d="M890 297 L890 325" class="line"/>
+  <path d="M890 397 L890 425" class="line"/>
+  <path d="M890 497 L890 525" class="line"/>
+  <path d="M655 505 L735 505" class="line"/>
+
+  <rect x="1125" y="170" width="300" height="190" rx="5" class="node"/>
+  <text x="1275" y="205" text-anchor="middle" class="box-title">TbNode / DefaultTbContext</text>
+  <text x="1275" y="238" text-anchor="middle" class="code">tbNode.onMsg(ctx, msg)</text>
+  <text x="1275" y="270" text-anchor="middle" class="box-text">tellSuccess / tellNext</text>
+  <text x="1275" y="296" text-anchor="middle" class="box-text">tellFailure / ack</text>
+  <text x="1275" y="322" text-anchor="middle" class="box-text">input / output / enqueue</text>
+  <path d="M1045 560 C1090 560 1080 270 1125 270" class="line"/>
+
+  <rect x="1125" y="420" width="300" height="160" rx="5" class="store"/>
+  <text x="1275" y="455" text-anchor="middle" class="box-title">Node side effects</text>
+  <text x="1275" y="488" text-anchor="middle" class="box-text">PostgreSQL / TimescaleDB</text>
+  <text x="1275" y="514" text-anchor="middle" class="box-text">Cassandra / Redis</text>
+  <text x="1275" y="540" text-anchor="middle" class="box-text">HTTP / MQTT / Kafka / Mail</text>
+  <path d="M1275 360 L1275 420" class="line"/>
+
+  <rect x="1490" y="170" width="230" height="90" rx="5" class="success"/>
+  <text x="1605" y="207" text-anchor="middle" class="box-title">Callback success</text>
+  <text x="1605" y="234" text-anchor="middle" class="small">terminal / ack / enqueue OK</text>
+  <rect x="1490" y="290" width="230" height="90" rx="5" class="failure"/>
+  <text x="1605" y="327" text-anchor="middle" class="box-title">Callback failure</text>
+  <text x="1605" y="354" text-anchor="middle" class="small">unhandled Failure / init error</text>
+  <rect x="1490" y="420" width="230" height="160" rx="5" class="queue"/>
+  <text x="1605" y="455" text-anchor="middle" class="box-title">Queue boundary</text>
+  <text x="1605" y="486" text-anchor="middle" class="box-text">remote target</text>
+  <text x="1605" y="512" text-anchor="middle" class="box-text">multi-target fan-out</text>
+  <text x="1605" y="538" text-anchor="middle" class="box-text">singleton handoff</text>
+  <text x="1605" y="563" text-anchor="middle" class="small">new UUID + new callback</text>
+  <path d="M1425 230 L1490 215" class="line"/>
+  <path d="M1425 270 L1490 335" class="line"/>
+  <path d="M1425 320 C1460 350 1460 500 1490 500" class="line"/>
+  <path d="M1490 500 C1450 650 700 710 522 605" class="dash"/>
+
+  <rect x="70" y="655" width="1585" height="105" rx="5" class="warn"/>
+  <text x="95" y="688" class="box-title">Completion boundary</text>
+  <text x="95" y="717" class="box-text">Local single-target execution keeps the original callback. Remote or multi-target routing completes the parent on producer handoff and creates independent child records.</text>
+  <text x="95" y="744" class="box-text">Processing Strategy can commit failures/timeouts or retry selected records, but it cannot roll back database transactions or external calls already completed by Rule Nodes.</text>
+
+  <rect x="40" y="825" width="1720" height="250" rx="6" class="boundary"/>
+  <text x="65" y="862" class="lane">Control plane and hot reload</text>
+
+  <rect x="75" y="900" width="240" height="105" rx="5" class="source"/>
+  <text x="195" y="938" text-anchor="middle" class="box-title">Rule Chain REST / UI</text>
+  <text x="195" y="969" text-anchor="middle" class="code">saveRuleChainMetaData</text>
+
+  <rect x="385" y="900" width="280" height="105" rx="5" class="actor"/>
+  <text x="525" y="938" text-anchor="middle" class="box-title">DAO transaction</text>
+  <text x="525" y="967" text-anchor="middle" class="box-text">validate, replace Nodes/Relations</text>
+  <text x="525" y="990" text-anchor="middle" class="box-text">update first_rule_node_id</text>
+
+  <rect x="735" y="900" width="240" height="105" rx="5" class="store"/>
+  <text x="855" y="938" text-anchor="middle" class="box-title">PostgreSQL COMMIT</text>
+  <text x="855" y="968" text-anchor="middle" class="box-text">rule_chain / rule_node</text>
+  <text x="855" y="991" text-anchor="middle" class="box-text">relation</text>
+
+  <rect x="1045" y="900" width="270" height="105" rx="5" class="queue"/>
+  <text x="1180" y="938" text-anchor="middle" class="box-title">Lifecycle notification</text>
+  <text x="1180" y="968" text-anchor="middle" class="box-text">one topic/record per RE service</text>
+  <text x="1180" y="991" text-anchor="middle" class="small">not in the DB transaction</text>
+
+  <rect x="1385" y="900" width="300" height="105" rx="5" class="actor"/>
+  <text x="1535" y="934" text-anchor="middle" class="box-title">High-priority Actor reload</text>
+  <text x="1535" y="964" text-anchor="middle" class="box-text">create / update / delete NodeActor</text>
+  <text x="1535" y="990" text-anchor="middle" class="box-text">rebuild firstNode + relation map</text>
+
+  <path d="M315 952 L385 952" class="line"/>
+  <path d="M665 952 L735 952" class="line"/>
+  <path d="M975 952 L1045 952" class="line"/>
+  <path d="M1315 952 L1385 952" class="line"/>
+
+  <text x="60" y="1100" class="small">Behavior baseline: ThingsBoard 3.6.4 (0cb411fc90). Diagram uses a white background and dark text for browser-readable contrast.</text>
+</svg>

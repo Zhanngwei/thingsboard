@@ -10,9 +10,9 @@
 - <a id="chapter-02"></a>**02 Device 创建流程**（已完成）：[Markdown](chapters/02-device-create/README.md) · [HTML](chapters/02-device-create/index.html) · [PlantUML](chapters/02-device-create/sequence.puml) · [时序图 SVG](chapters/02-device-create/sequence.svg) · [架构图 SVG](assets/architecture/02-device-create.svg)
 - <a id="chapter-03"></a>**03 Device 删除流程**（已完成）：[Markdown](chapters/03-device-delete/README.md) · [HTML](chapters/03-device-delete/index.html) · [PlantUML](chapters/03-device-delete/sequence.puml) · [时序图 SVG](chapters/03-device-delete/sequence.svg) · [架构图 SVG](assets/architecture/03-device-delete.svg)
 - <a id="chapter-04"></a>**04 Device Profile 流程**（已完成）：[Markdown](chapters/04-device-profile/README.md) · [HTML](chapters/04-device-profile/index.html) · [PlantUML](chapters/04-device-profile/sequence.puml) · [时序图 SVG](chapters/04-device-profile/sequence.svg) · [架构图 SVG](assets/architecture/04-device-profile.svg)
-- <a id="chapter-05"></a>**05 Rule Chain 执行流程**（待分析）：Rule Chain/Node Actor 创建、关系路由、成功/失败分支和消息确认。
-- <a id="chapter-06"></a>**06 Alarm 创建流程**（待分析）：Alarm Rule、去重、状态机、DAO、事件与通知。
-- <a id="chapter-07"></a>**07 Alarm 清除流程**（待分析）：clear/ack 状态变化、传播、Rule Engine 回调与数据库更新。
+- <a id="chapter-05"></a>**05 Rule Chain 执行流程**（已完成）：[Markdown](chapters/05-rule-chain-execution/README.md) · [HTML](chapters/05-rule-chain-execution/index.html) · [PlantUML](chapters/05-rule-chain-execution/sequence.puml) · [时序图 SVG](chapters/05-rule-chain-execution/sequence.svg) · [架构图 SVG](assets/architecture/05-rule-chain-execution.svg)
+- <a id="chapter-06"></a>**06 Alarm 创建流程**（已完成）：[Markdown](chapters/06-alarm-create/README.md) · [HTML](chapters/06-alarm-create/index.html) · [PlantUML](chapters/06-alarm-create/sequence.puml) · [时序图 SVG](chapters/06-alarm-create/sequence.svg) · [架构图 SVG](assets/architecture/06-alarm-create.svg)
+- <a id="chapter-07"></a>**07 Alarm 清除流程**（已完成）：[Markdown](chapters/07-alarm-clear/README.md) · [HTML](chapters/07-alarm-clear/index.html) · [PlantUML](chapters/07-alarm-clear/sequence.puml) · [时序图 SVG](chapters/07-alarm-clear/sequence.svg) · [架构图 SVG](assets/architecture/07-alarm-clear.svg)
 - <a id="chapter-08"></a>**08 Attributes 保存流程**（待分析）：client/shared/server scope、最新值、通知和设备下行。
 - <a id="chapter-09"></a>**09 Telemetry 保存流程**（待分析）：所有入口统一后的 `TsKvEntry`、latest/history 双写与订阅通知。
 - <a id="chapter-10"></a>**10 RPC 流程**（待分析）：server-side/client-side RPC、会话路由、超时、持久化与状态回报。

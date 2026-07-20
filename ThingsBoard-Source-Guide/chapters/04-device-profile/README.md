@@ -2,7 +2,7 @@
 
 > 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章同时覆盖 Device Profile 的创建、更新、重命名、默认切换、删除，以及它对 Device、Transport、Rule Engine、Alarm、Provision、OTA、Edge 和缓存的传播。四条写路径具有不同的事务与通知语义，不能合并理解。
 
-[上一篇：03 Device 删除流程](../03-device-delete/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/04-device-profile.svg) | [下一篇：05 Rule Chain 执行流程（待分析）](../../SUMMARY.md#chapter-05)
+[上一篇：03 Device 删除流程](../03-device-delete/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/04-device-profile.svg) | [下一篇：05 Rule Chain 执行流程](../05-rule-chain-execution/README.md)
 
 ---
 
@@ -141,19 +141,19 @@ MQTT、CoAP、LwM2M 和 SNMP 不是 Profile 数据库写入口。它们是 Profi
 
 | 步骤 | 类与方法（完整参数） | 源码位置 | 输入 -> 输出 | 职责与设计原因 |
 |---|---|---|---|---|
-| 1 | `org.thingsboard.server.controller.DeviceProfileController.saveDeviceProfile(DeviceProfile deviceProfile)` | [DeviceProfileController.java:249](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L249) | HTTP JSON -> `DeviceProfile` | 强制覆盖 tenantId，执行实体级检查，把用户上下文交给应用服务 |
-| 2 | `org.thingsboard.server.service.entitiy.device.profile.DefaultTbDeviceProfileService.save(DeviceProfile deviceProfile, User user)` | [DefaultTbDeviceProfileService.java:66](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L66) | Profile + User -> saved Profile | 计算 ADDED/UPDATED，比较 OTA 字段，组织 VC、Cluster、OTA、Rule Engine 和 Audit；没有外层事务 |
-| 3 | `org.thingsboard.server.dao.device.DeviceProfileServiceImpl.saveDeviceProfile(DeviceProfile deviceProfile)` | [DeviceProfileServiceImpl.java:268](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L268) | Profile -> saved Profile | DAO Service 公共入口，启用完整校验 |
-| 4 | `org.thingsboard.server.dao.service.validator.DeviceProfileDataValidator.validateDataImpl(TenantId tenantId, DeviceProfile deviceProfile)` | [DeviceProfileDataValidator.java:159](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/DeviceProfileDataValidator.java#L159) | Profile -> valid or exception | 校验 tenant、default、queue、transport、schema、alarm、Rule Chain、Dashboard、OTA |
-| 5 | `org.thingsboard.server.dao.resource.BaseImageService.replaceBase64WithImageUrl(HasImage entity, String type)` | [BaseImageService.java:423](../../../dao/src/main/java/org/thingsboard/server/dao/resource/BaseImageService.java#L423) | Base64 image -> URL | `@Transactional(noRollbackFor=Exception.class)`；image resource 可先于 Profile 独立提交 |
-| 6 | `org.thingsboard.server.dao.sql.device.JpaDeviceProfileDao.saveAndFlush(TenantId tenantId, DeviceProfile deviceProfile)` | [JpaDeviceProfileDao.java:105](../../../dao/src/main/java/org/thingsboard/server/dao/sql/device/JpaDeviceProfileDao.java#L105) | domain -> persisted domain | 独立 `@Transactional`，JPA save 后 flush 约束；返回时事务提交 |
-| 7 | `DeviceProfileServiceImpl.handleEvictEvent(DeviceProfileEvictEvent event)` | [DeviceProfileServiceImpl.java:147](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L147) | cache keys -> evict | REST 保存此时已无活动事务，因此 `publishEvictEvent` 直接同步清 DAO cache |
-| 8 | `ApplicationEventPublisher.publishEvent(SaveEntityEvent<?> event)` | [DeviceProfileServiceImpl.java:300](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L300) | tenant + id + created -> listeners | 无外层事务时 `fallbackExecution=true` 的 Edge listener 立即执行；event 不携带 Profile body |
-| 9 | `AbstractTbEntityService.autoCommit(User user, EntityId entityId)` | [AbstractTbEntityService.java:191](../../../application/src/main/java/org/thingsboard/server/service/entitiy/AbstractTbEntityService.java#L191) | user + profileId -> Future UUID | 可选 Version Control auto-commit；返回 Future 不被等待 |
-| 10 | `DefaultTbClusterService.onDeviceProfileChange(DeviceProfile, TbQueueCallback)` | [DefaultTbClusterService.java:428](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L428) | serialized Profile -> Transport notifications | 把完整 Profile 广播到每个 Transport serviceId，callback 为 null |
-| 11 | `DefaultTbClusterService.broadcastEntityStateChangeEvent(TenantId, EntityId, ComponentLifecycleEvent)` | [DefaultTbClusterService.java:415](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L415) | CREATED/UPDATED -> lifecycle notifications | 通知所有 Core/Rule Engine 节点清运行时缓存 |
-| 12 | `DefaultOtaPackageStateService.update(DeviceProfile, boolean, boolean)` | [DefaultOtaPackageStateService.java:226](../../../application/src/main/java/org/thingsboard/server/service/ota/DefaultOtaPackageStateService.java#L226) | Profile OTA diff -> per-device async work | 分页 100 台，更新未显式覆盖 OTA 的 Device 状态遥测/属性 |
-| 13 | `DefaultTbNotificationEntityService.logEntityAction(...)` -> `EntityActionService.logEntityAction(...)` | [DefaultTbNotificationEntityService.java:146](../../../application/src/main/java/org/thingsboard/server/service/entitiy/DefaultTbNotificationEntityService.java#L146) | action -> Rule Engine + Audit | 发送 `ENTITY_CREATED/ENTITY_UPDATED`，处理 Notification Rule，并异步记录 audit_log |
+| 1 | `org.thingsboard.server.controller.DeviceProfileController.saveDeviceProfile(DeviceProfile deviceProfile)` | [DeviceProfileController.java:249](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L248) | HTTP JSON -> `DeviceProfile` | 强制覆盖 tenantId，执行实体级检查，把用户上下文交给应用服务 |
+| 2 | `org.thingsboard.server.service.entitiy.device.profile.DefaultTbDeviceProfileService.save(DeviceProfile deviceProfile, User user)` | [DefaultTbDeviceProfileService.java:66](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L65) | Profile + User -> saved Profile | 计算 ADDED/UPDATED，比较 OTA 字段，组织 VC、Cluster、OTA、Rule Engine 和 Audit；没有外层事务 |
+| 3 | `org.thingsboard.server.dao.device.DeviceProfileServiceImpl.saveDeviceProfile(DeviceProfile deviceProfile)` | [DeviceProfileServiceImpl.java:268](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L266) | Profile -> saved Profile | DAO Service 公共入口，启用完整校验 |
+| 4 | `org.thingsboard.server.dao.service.validator.DeviceProfileDataValidator.validateDataImpl(TenantId tenantId, DeviceProfile deviceProfile)` | [DeviceProfileDataValidator.java:159](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/DeviceProfileDataValidator.java#L157) | Profile -> valid or exception | 校验 tenant、default、queue、transport、schema、alarm、Rule Chain、Dashboard、OTA |
+| 5 | `org.thingsboard.server.dao.resource.BaseImageService.replaceBase64WithImageUrl(HasImage entity, String type)` | [BaseImageService.java:423](../../../dao/src/main/java/org/thingsboard/server/dao/resource/BaseImageService.java#L421) | Base64 image -> URL | `@Transactional(noRollbackFor=Exception.class)`；image resource 可先于 Profile 独立提交 |
+| 6 | `org.thingsboard.server.dao.sql.device.JpaDeviceProfileDao.saveAndFlush(TenantId tenantId, DeviceProfile deviceProfile)` | [JpaDeviceProfileDao.java:105](../../../dao/src/main/java/org/thingsboard/server/dao/sql/device/JpaDeviceProfileDao.java#L103) | domain -> persisted domain | 独立 `@Transactional`，JPA save 后 flush 约束；返回时事务提交 |
+| 7 | `DeviceProfileServiceImpl.handleEvictEvent(DeviceProfileEvictEvent event)` | [DeviceProfileServiceImpl.java:147](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L145) | cache keys -> evict | REST 保存此时已无活动事务，因此 `publishEvictEvent` 直接同步清 DAO cache |
+| 8 | `ApplicationEventPublisher.publishEvent(SaveEntityEvent<?> event)` | [DeviceProfileServiceImpl.java:300](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L298) | tenant + id + created -> listeners | 无外层事务时 `fallbackExecution=true` 的 Edge listener 立即执行；event 不携带 Profile body |
+| 9 | `AbstractTbEntityService.autoCommit(User user, EntityId entityId)` | [AbstractTbEntityService.java:191](../../../application/src/main/java/org/thingsboard/server/service/entitiy/AbstractTbEntityService.java#L190) | user + profileId -> Future UUID | 可选 Version Control auto-commit；返回 Future 不被等待 |
+| 10 | `DefaultTbClusterService.onDeviceProfileChange(DeviceProfile, TbQueueCallback)` | [DefaultTbClusterService.java:428](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L427) | serialized Profile -> Transport notifications | 把完整 Profile 广播到每个 Transport serviceId，callback 为 null |
+| 11 | `DefaultTbClusterService.broadcastEntityStateChangeEvent(TenantId, EntityId, ComponentLifecycleEvent)` | [DefaultTbClusterService.java:415](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L414) | CREATED/UPDATED -> lifecycle notifications | 通知所有 Core/Rule Engine 节点清运行时缓存 |
+| 12 | `DefaultOtaPackageStateService.update(DeviceProfile, boolean, boolean)` | [DefaultOtaPackageStateService.java:226](../../../application/src/main/java/org/thingsboard/server/service/ota/DefaultOtaPackageStateService.java#L225) | Profile OTA diff -> per-device async work | 分页 100 台，更新未显式覆盖 OTA 的 Device 状态遥测/属性 |
+| 13 | `DefaultTbNotificationEntityService.logEntityAction(...)` -> `EntityActionService.logEntityAction(...)` | [DefaultTbNotificationEntityService.java:146](../../../application/src/main/java/org/thingsboard/server/service/entitiy/DefaultTbNotificationEntityService.java#L145) | action -> Rule Engine + Audit | 发送 `ENTITY_CREATED/ENTITY_UPDATED`，处理 Notification Rule，并异步记录 audit_log |
 
 `autoCommit(...)`、Cluster producer、OTA producer 和 Audit 不组成一次确认协议。HTTP 返回前只完成这些方法的同步调用，不等待所有 Future、broker consumer、Session callback 或 Rule Node 执行完成。
 
@@ -191,14 +191,14 @@ flowchart TD
 
 | 步骤 | 类与方法 | 源码位置 | 关键事实 |
 |---|---|---|---|
-| 1 | `DeviceProfileController.setDefaultDeviceProfile(String)` | [DeviceProfileController.java:291](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L291) | Controller 在调用前分别读取 target 和 previous default |
-| 2 | `DefaultTbDeviceProfileService.setDefaultDeviceProfile(DeviceProfile, DeviceProfile, User)` | [DefaultTbDeviceProfileService.java:134](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L134) | 无 `@Transactional`；只在 changed=true 时记录两次 UPDATED action |
-| 3 | `DeviceProfileServiceImpl.setDefaultDeviceProfile(TenantId, DeviceProfileId)` | [DeviceProfileServiceImpl.java:507](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L507) | 旧默认 false 与目标 true 分别调用事务 DAO save |
-| 4 | `JpaAbstractDao.save(TenantId, D)` | [JpaAbstractDao.java:80](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L80) | 每次代理调用单独事务提交 |
+| 1 | `DeviceProfileController.setDefaultDeviceProfile(String)` | [DeviceProfileController.java:291](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L290) | Controller 在调用前分别读取 target 和 previous default |
+| 2 | `DefaultTbDeviceProfileService.setDefaultDeviceProfile(DeviceProfile, DeviceProfile, User)` | [DefaultTbDeviceProfileService.java:134](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L133) | 无 `@Transactional`；只在 changed=true 时记录两次 UPDATED action |
+| 3 | `DeviceProfileServiceImpl.setDefaultDeviceProfile(TenantId, DeviceProfileId)` | [DeviceProfileServiceImpl.java:507](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L505) | 旧默认 false 与目标 true 分别调用事务 DAO save |
+| 4 | `JpaAbstractDao.save(TenantId, D)` | [JpaAbstractDao.java:80](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L78) | 每次代理调用单独事务提交 |
 
 建表脚本没有 `UNIQUE (tenant_id) WHERE is_default = true` 一类约束。应用校验只能降低普通请求的冲突，不能防止两个并发默认切换产生多默认，也不能防止第一次 save 成功、第二次 save 失败后出现“无默认”。
 
-此外，[DeviceProfileServiceImpl.java:523](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L523) 为旧默认 Profile 构造 evict event 时传入的是**目标 Profile** 的 `provisionDeviceKey`。如果两个 key 不同，旧 Profile 的 provision-key cache key 不会被该事件淘汰，按 provision key 读取时可能短期得到 `isDefault=true` 的旧缓存对象。这不改变数据库结果，但属于 3.6.4 源码级缓存风险。
+此外，[DeviceProfileServiceImpl.java:523](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L521) 为旧默认 Profile 构造 evict event 时传入的是**目标 Profile** 的 `provisionDeviceKey`。如果两个 key 不同，旧 Profile 的 provision-key cache key 不会被该事件淘汰，按 provision key 读取时可能短期得到 `isDefault=true` 的旧缓存对象。这不改变数据库结果，但属于 3.6.4 源码级缓存风险。
 
 默认切换不会调用 `onDeviceProfileChange(...)`，也不会广播 Profile lifecycle。Transport Session 和 Rule Engine Profile cache 不会因 `is_default` 改变而热更新；标准 Device 创建通过 DAO 的 default-profile cache 读取新默认值。
 
@@ -206,14 +206,14 @@ flowchart TD
 
 | 步骤 | 类与方法 | 源码位置 | 输入 -> 输出 | 职责 |
 |---|---|---|---|---|
-| 1 | `DeviceProfileController.deleteDeviceProfile(String)` | [DeviceProfileController.java:270](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L270) | path UUID -> void | `Operation.DELETE` 检查并保留删除前 Profile 快照 |
-| 2 | `DefaultTbDeviceProfileService.delete(DeviceProfile, User)` | [DefaultTbDeviceProfileService.java:107](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L107) | Profile snapshot -> void | 调 DAO 删除，成功后发 Transport delete、lifecycle、Rule Engine action 和 Audit |
-| 3 | `DeviceProfileServiceImpl.deleteDeviceProfile(TenantId, DeviceProfileId)` | [DeviceProfileServiceImpl.java:339](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L339) | tenant + id -> void | `@Transactional`；禁止删除默认 Profile |
-| 4 | `AbstractEntityService.deleteEntityRelations(TenantId, EntityId)` | [AbstractEntityService.java:126](../../../dao/src/main/java/org/thingsboard/server/dao/entity/AbstractEntityService.java#L126) | Profile -> void | 清双向 relation 和 Profile 的 entity-alarm 引用 |
-| 5 | `JpaAbstractDao.removeById(TenantId, UUID)` | [JpaAbstractDao.java:187](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L187) | UUID -> boolean | 删除 Profile；Device FK 可阻止；关联 OTA 由 FK cascade |
-| 6 | `DeviceProfileEvictEvent` / `DeleteEntityEvent` | [DeviceProfileServiceImpl.java:361](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L361) | old keys + id -> after-commit listeners | DB commit 后清 DAO cache，并产生 Edge DELETED event |
-| 7 | `DefaultTbClusterService.onDeviceProfileDelete(DeviceProfile, TbQueueCallback)` | [DefaultTbClusterService.java:477](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L477) | id -> every Transport service | Transport 只 evict Profile cache；正常路径下没有引用 Device |
-| 8 | lifecycle + entity action | [DefaultTbDeviceProfileService.java:114](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L114) | DELETED -> runtime consumers | 清 Rule Engine cache、发 `ENTITY_DELETED`、记 Audit |
+| 1 | `DeviceProfileController.deleteDeviceProfile(String)` | [DeviceProfileController.java:270](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L269) | path UUID -> void | `Operation.DELETE` 检查并保留删除前 Profile 快照 |
+| 2 | `DefaultTbDeviceProfileService.delete(DeviceProfile, User)` | [DefaultTbDeviceProfileService.java:107](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L106) | Profile snapshot -> void | 调 DAO 删除，成功后发 Transport delete、lifecycle、Rule Engine action 和 Audit |
+| 3 | `DeviceProfileServiceImpl.deleteDeviceProfile(TenantId, DeviceProfileId)` | [DeviceProfileServiceImpl.java:339](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L337) | tenant + id -> void | `@Transactional`；禁止删除默认 Profile |
+| 4 | `AbstractEntityService.deleteEntityRelations(TenantId, EntityId)` | [AbstractEntityService.java:126](../../../dao/src/main/java/org/thingsboard/server/dao/entity/AbstractEntityService.java#L124) | Profile -> void | 清双向 relation 和 Profile 的 entity-alarm 引用 |
+| 5 | `JpaAbstractDao.removeById(TenantId, UUID)` | [JpaAbstractDao.java:187](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L185) | UUID -> boolean | 删除 Profile；Device FK 可阻止；关联 OTA 由 FK cascade |
+| 6 | `DeviceProfileEvictEvent` / `DeleteEntityEvent` | [DeviceProfileServiceImpl.java:361](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L359) | old keys + id -> after-commit listeners | DB commit 后清 DAO cache，并产生 Edge DELETED event |
+| 7 | `DefaultTbClusterService.onDeviceProfileDelete(DeviceProfile, TbQueueCallback)` | [DefaultTbClusterService.java:477](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L476) | id -> every Transport service | Transport 只 evict Profile cache；正常路径下没有引用 Device |
+| 8 | lifecycle + entity action | [DefaultTbDeviceProfileService.java:114](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L113) | DELETED -> runtime consumers | 清 Rule Engine cache、发 `ENTITY_DELETED`、记 Audit |
 
 删除保护分两层：应用层明确禁止删除 default；数据库 `device.device_profile_id` 外键阻止删除仍被 Device 引用的 Profile。捕获到 `fk_device_profile` 后转换为 `The device profile referenced by the devices cannot be deleted!`。
 
@@ -634,23 +634,23 @@ Profile 需要名称、Provision key 唯一约束，需要 Rule Chain/Dashboard/
 
 ## 十二、源码阅读路线
 
-1. [DeviceProfile.java:54](../../../common/data/src/main/java/org/thingsboard/server/common/data/DeviceProfile.java#L54)：先看顶层列对应字段，区分普通列与 `profileData`。
-2. [DeviceProfileData.java:38](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/DeviceProfileData.java#L38)：看 transport/provision/alarm 的聚合边界。
+1. [DeviceProfile.java:54](../../../common/data/src/main/java/org/thingsboard/server/common/data/DeviceProfile.java#L53)：先看顶层列对应字段，区分普通列与 `profileData`。
+2. [DeviceProfileData.java:38](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/DeviceProfileData.java#L37)：看 transport/provision/alarm 的聚合边界。
 3. [schema-entities.sql:277](../../../dao/src/main/resources/sql/schema-entities.sql#L277)：用真实 DDL 确认 UNIQUE、FK、cascade 和 default 唯一约束缺口。
-4. [DeviceProfileController.java:249](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L249)：确认三条写 REST 入口和权限。
-5. [DefaultTbDeviceProfileService.java:66](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L66)：按源代码顺序标记保存后的所有副作用，并注意没有 `@Transactional`。
-6. [DeviceProfileServiceImpl.java:279](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L279)：重点阅读 image、saveAndFlush、cache event、SaveEntityEvent 和 rename loop。
-7. [DeviceProfileDataValidator.java:159](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/DeviceProfileDataValidator.java#L159)：把每个配置字段与下游模块对上。
-8. [DeviceProfileServiceImpl.java:507](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L507)：单独审查默认切换的两个 DAO transaction 和 cache key。
-9. [DeviceProfileServiceImpl.java:339](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L339)：确认删除事务、default 保护和 Device FK。
-10. [DefaultTbClusterService.java:584](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L584)：看 Profile 如何编码后广播到每个 Transport 节点。
-11. [DefaultTransportService.java:1369](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1369)：看 Transport cache 与 active Session 热更新。
-12. [DeviceSessionCtx.java:293](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/DeviceSessionCtx.java#L293)：用 MQTT 具体实现理解 topic/payload/Protobuf 如何立即变化。
-13. [AbstractConsumerService.java:267](../../../application/src/main/java/org/thingsboard/server/service/queue/processing/AbstractConsumerService.java#L267)：看 lifecycle consumer 的 Rule Engine cache eviction。
-14. [DefaultTbDeviceProfileCache.java:133](../../../application/src/main/java/org/thingsboard/server/service/profile/DefaultTbDeviceProfileCache.java#L133)：看 evict、reload 和 listener 回调条件。
-15. [TbDeviceProfileNode.java:266](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/profile/TbDeviceProfileNode.java#L266)：把 cache listener 接到 Alarm Rule DeviceState。
-16. [DefaultTbClusterService.java:322](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L322)：最后看 Device Profile 如何决定 Rule Engine queue/rule chain。
-17. [DefaultOtaPackageStateService.java:226](../../../application/src/main/java/org/thingsboard/server/service/ota/DefaultOtaPackageStateService.java#L226)：理解 Profile OTA 更新为何会扇出到大量 Device telemetry/attribute。
+4. [DeviceProfileController.java:249](../../../application/src/main/java/org/thingsboard/server/controller/DeviceProfileController.java#L248)：确认三条写 REST 入口和权限。
+5. [DefaultTbDeviceProfileService.java:66](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/profile/DefaultTbDeviceProfileService.java#L65)：按源代码顺序标记保存后的所有副作用，并注意没有 `@Transactional`。
+6. [DeviceProfileServiceImpl.java:279](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L277)：重点阅读 image、saveAndFlush、cache event、SaveEntityEvent 和 rename loop。
+7. [DeviceProfileDataValidator.java:159](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/DeviceProfileDataValidator.java#L157)：把每个配置字段与下游模块对上。
+8. [DeviceProfileServiceImpl.java:507](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L505)：单独审查默认切换的两个 DAO transaction 和 cache key。
+9. [DeviceProfileServiceImpl.java:339](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L337)：确认删除事务、default 保护和 Device FK。
+10. [DefaultTbClusterService.java:584](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L583)：看 Profile 如何编码后广播到每个 Transport 节点。
+11. [DefaultTransportService.java:1369](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1368)：看 Transport cache 与 active Session 热更新。
+12. [DeviceSessionCtx.java:293](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/DeviceSessionCtx.java#L292)：用 MQTT 具体实现理解 topic/payload/Protobuf 如何立即变化。
+13. [AbstractConsumerService.java:267](../../../application/src/main/java/org/thingsboard/server/service/queue/processing/AbstractConsumerService.java#L266)：看 lifecycle consumer 的 Rule Engine cache eviction。
+14. [DefaultTbDeviceProfileCache.java:133](../../../application/src/main/java/org/thingsboard/server/service/profile/DefaultTbDeviceProfileCache.java#L132)：看 evict、reload 和 listener 回调条件。
+15. [TbDeviceProfileNode.java:266](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/profile/TbDeviceProfileNode.java#L267)：把 cache listener 接到 Alarm Rule DeviceState。
+16. [DefaultTbClusterService.java:322](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L321)：最后看 Device Profile 如何决定 Rule Engine queue/rule chain。
+17. [DefaultOtaPackageStateService.java:226](../../../application/src/main/java/org/thingsboard/server/service/ota/DefaultOtaPackageStateService.java#L225)：理解 Profile OTA 更新为何会扇出到大量 Device telemetry/attribute。
 
 下一章建议阅读 Rule Chain 执行流程。Device Profile 已经解释了消息“进入哪个 Queue 和 Rule Chain”，下一步应沿 `TbRuleEngineQueueConsumerManager -> AppActor -> TenantActor -> RuleChainActor -> RuleNodeActor` 解释消息如何完成、失败和确认。
 
@@ -720,4 +720,4 @@ Profile 需要名称、Provision key 唯一约束，需要 Rule Chain/Dashboard/
 
 ---
 
-[上一篇：03 Device 删除流程](../03-device-delete/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [下一篇：05 Rule Chain 执行流程（待分析）](../../SUMMARY.md#chapter-05)
+[上一篇：03 Device 删除流程](../03-device-delete/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [下一篇：05 Rule Chain 执行流程](../05-rule-chain-execution/README.md)

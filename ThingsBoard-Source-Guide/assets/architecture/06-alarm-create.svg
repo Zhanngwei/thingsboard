@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Alarm creation architecture</title>
+  <desc id="desc">High contrast architecture showing REST, explicit rule node, device profile alarm rules, application services, PostgreSQL tables, propagation and asynchronous outputs.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#111827"/>
+    </marker>
+    <style>
+      .title{font:700 34px Arial,sans-serif;fill:#111827}.subtitle{font:400 18px Arial,sans-serif;fill:#374151}
+      .band{stroke:#111827;stroke-width:2}.box{stroke:#111827;stroke-width:2;rx:6;ry:6}.h{font:700 20px Arial,sans-serif;fill:#111827}.t{font:400 16px Arial,sans-serif;fill:#111827}.small{font:400 14px Arial,sans-serif;fill:#111827}.code{font:600 14px Consolas,monospace;fill:#111827}
+      .line{stroke:#111827;stroke-width:2.5;fill:none;marker-end:url(#arrow)}.dash{stroke:#111827;stroke-width:2.5;stroke-dasharray:9 7;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1800" height="1180" fill="#FFFFFF"/>
+  <text x="70" y="55" class="title">ThingsBoard 3.6 Alarm 创建架构</text>
+  <text x="70" y="88" class="subtitle">三条入口共享 Alarm 持久化主线，但权限、Actor callback、审计和消息完成语义不同</text>
+
+  <rect x="50" y="120" width="1700" height="210" fill="#EFF6FF" class="band" rx="6"/>
+  <text x="75" y="154" class="h">入口层</text>
+  <rect x="90" y="180" width="430" height="105" fill="#FFFFFF" class="box"/>
+  <text x="115" y="215" class="h">REST</text><text x="115" y="246" class="code">AlarmController.saveAlarm(Alarm)</text><text x="115" y="272" class="small">权限、tenant、originator/assignee 检查</text>
+  <rect x="685" y="180" width="430" height="105" fill="#FFFFFF" class="box"/>
+  <text x="710" y="215" class="h">显式 Rule Node</text><text x="710" y="246" class="code">TbCreateAlarmNode.processAlarm(...)</text><text x="710" y="272" class="small">pattern/message Alarm + JS/TBEL details</text>
+  <rect x="1280" y="180" width="430" height="105" fill="#FFFFFF" class="box"/>
+  <text x="1305" y="215" class="h">Device Profile</text><text x="1305" y="246" class="code">DeviceState - AlarmState</text><text x="1305" y="272" class="small">snapshot + schedule + repeat/duration</text>
+
+  <rect x="50" y="370" width="1700" height="230" fill="#ECFDF5" class="band" rx="6"/>
+  <text x="75" y="405" class="h">应用与 DAO 编排</text>
+  <rect x="90" y="445" width="360" height="105" fill="#FFFFFF" class="box"/>
+  <text x="115" y="480" class="h">DefaultTbAlarmService</text><text x="115" y="512" class="small">REST 复合保存、EntityAction、audit</text>
+  <rect x="540" y="445" width="420" height="105" fill="#FFFFFF" class="box"/>
+  <text x="565" y="480" class="h">DefaultAlarmSubscriptionService</text><text x="565" y="512" class="small">API usage + WS + AlarmTrigger + comment</text>
+  <rect x="1050" y="445" width="300" height="105" fill="#FFFFFF" class="box"/>
+  <text x="1075" y="480" class="h">BaseAlarmService</text><text x="1075" y="512" class="small">校验 customer + propagation</text>
+  <rect x="1440" y="445" width="270" height="105" fill="#FFFFFF" class="box"/>
+  <text x="1465" y="480" class="h">JpaAlarmDao</text><text x="1465" y="512" class="small">native function + JSON result</text>
+
+  <path d="M305 285 L305 445" class="line"/><path d="M305 550 L540 550" class="line"/>
+  <path d="M900 285 L900 445" class="line"/><path d="M1495 285 L1495 350 L750 350 L750 445" class="line"/>
+  <path d="M960 497 L1050 497" class="line"/><path d="M1350 497 L1440 497" class="line"/>
+
+  <rect x="50" y="640" width="1700" height="270" fill="#FFFBEB" class="band" rx="6"/>
+  <text x="75" y="675" class="h">PostgreSQL 持久化</text>
+  <rect x="90" y="720" width="570" height="135" fill="#FFFFFF" class="box"/>
+  <text x="115" y="755" class="h">create_or_update_active_alarm(...)</text>
+  <text x="115" y="787" class="code">originator_id + type + cleared=false</text>
+  <text x="115" y="817" class="small">已有行 FOR UPDATE；首次空键无锁；active 索引非 UNIQUE</text>
+  <rect x="745" y="720" width="300" height="135" fill="#FEF3C7" class="box"/>
+  <text x="770" y="755" class="h">alarm</text><text x="770" y="787" class="small">告警主体与当前状态</text><text x="770" y="817" class="small">PK: id</text>
+  <rect x="1125" y="720" width="300" height="135" fill="#FEF3C7" class="box"/>
+  <text x="1150" y="755" class="h">alarm_types</text><text x="1150" y="787" class="small">租户告警类型目录</text><text x="1150" y="817" class="small">UK: tenant_id + type</text>
+  <rect x="1500" y="720" width="210" height="135" fill="#FEF3C7" class="box"/>
+  <text x="1525" y="755" class="h">entity_alarm</text><text x="1525" y="787" class="small">可见性反向索引</text><text x="1525" y="817" class="small">PK: entity + alarm</text>
+  <path d="M1575 550 L1575 640 L375 640 L375 720" class="line"/>
+  <path d="M660 787 L745 787" class="line"/><path d="M660 815 L700 815 L700 675 L1275 675 L1275 720" class="line"/>
+  <path d="M1200 550 L1200 620 L1460 620 L1460 690 L1605 690 L1605 720" class="dash"/>
+
+  <rect x="50" y="950" width="1700" height="175" fill="#F8FAFC" class="band" rx="6"/>
+  <text x="75" y="985" class="h">提交后的独立输出</text>
+  <rect x="90" y="1020" width="240" height="70" fill="#DBEAFE" class="box"/><text x="115" y="1062" class="h">WebSocket</text>
+  <rect x="380" y="1020" width="240" height="70" fill="#DCFCE7" class="box"/><text x="405" y="1062" class="h">AlarmTrigger</text>
+  <rect x="670" y="1020" width="300" height="70" fill="#CCFBF1" class="box"/><text x="695" y="1049" class="h">EntitiesLimitTrigger</text><text x="695" y="1075" class="small">EntityActionTrigger</text>
+  <rect x="1020" y="1020" width="260" height="70" fill="#EDE9FE" class="box"/><text x="1045" y="1062" class="h">Rule Engine Queue</text>
+  <rect x="1330" y="1020" width="170" height="70" fill="#FCE7F3" class="box"/><text x="1355" y="1062" class="h">audit_log</text>
+  <rect x="1550" y="1020" width="160" height="70" fill="#FFEDD5" class="box"/><text x="1575" y="1062" class="h">comment</text>
+  <path d="M750 550 L750 610 L1730 610 L1730 920 L210 920 L210 1020" class="dash"/><path d="M1730 920 L500 920 L500 1020" class="dash"/>
+  <path d="M270 550 L270 610 L35 610 L35 930 L820 930 L820 1020" class="dash"/><path d="M35 930 L1150 930 L1150 1020" class="dash"/><path d="M35 930 L1415 930 L1415 1020" class="dash"/>
+  <path d="M1730 920 L1630 920 L1630 1020" class="dash"/>
+  <text x="70" y="1158" class="subtitle">虚线表示异步或非同一事务边界；点击 HTML 中的缩略图可在新窗口打开原始 SVG。</text>
+</svg>

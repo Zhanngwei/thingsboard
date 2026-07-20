@@ -2,7 +2,7 @@
 
 > 源码基线：ThingsBoard `3.6.4`，工作区提交 `0cb411fc90`。本文档只记录能够从当前工作区源码、配置和建表脚本中核实的行为。
 
-[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md)
+[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md)
 
 ## 阅读定位
 
@@ -36,7 +36,9 @@
 | 02 | Device 创建流程 | 已完成 | [Markdown](chapters/02-device-create/README.md) / [HTML](chapters/02-device-create/index.html) / [PlantUML](chapters/02-device-create/sequence.puml) / [时序图 SVG](chapters/02-device-create/sequence.svg) / [架构图 SVG](assets/architecture/02-device-create.svg) |
 | 03 | Device 删除流程 | 已完成 | [Markdown](chapters/03-device-delete/README.md) / [HTML](chapters/03-device-delete/index.html) / [PlantUML](chapters/03-device-delete/sequence.puml) / [时序图 SVG](chapters/03-device-delete/sequence.svg) / [架构图 SVG](assets/architecture/03-device-delete.svg) |
 | 04 | Device Profile 流程 | 已完成 | [Markdown](chapters/04-device-profile/README.md) / [HTML](chapters/04-device-profile/index.html) / [PlantUML](chapters/04-device-profile/sequence.puml) / [时序图 SVG](chapters/04-device-profile/sequence.svg) / [架构图 SVG](assets/architecture/04-device-profile.svg) |
-| 05 | Rule Chain 执行流程 | 待分析 | [目录锚点](SUMMARY.md#chapter-05) |
+| 05 | Rule Chain 执行流程 | 已完成 | [Markdown](chapters/05-rule-chain-execution/README.md) / [HTML](chapters/05-rule-chain-execution/index.html) / [PlantUML](chapters/05-rule-chain-execution/sequence.puml) / [时序图 SVG](chapters/05-rule-chain-execution/sequence.svg) / [架构图 SVG](assets/architecture/05-rule-chain-execution.svg) |
+| 06 | Alarm 创建流程 | 已完成 | [Markdown](chapters/06-alarm-create/README.md) / [HTML](chapters/06-alarm-create/index.html) / [PlantUML](chapters/06-alarm-create/sequence.puml) / [时序图 SVG](chapters/06-alarm-create/sequence.svg) / [架构图 SVG](assets/architecture/06-alarm-create.svg) |
+| 07 | Alarm 清除流程 | 已完成 | [Markdown](chapters/07-alarm-clear/README.md) / [HTML](chapters/07-alarm-clear/index.html) / [PlantUML](chapters/07-alarm-clear/sequence.puml) / [时序图 SVG](chapters/07-alarm-clear/sequence.svg) / [架构图 SVG](assets/architecture/07-alarm-clear.svg) |
 
 完整规划见 [SUMMARY.md](SUMMARY.md)。待分析章节只链接到目录锚点，避免产生指向不存在文件的失效链接。
 
@@ -64,12 +66,31 @@ Device 删除不会自动清理 `attribute_kv`、`ts_kv`、`ts_kv_latest`、Cass
 
 默认 Profile 切换把旧 Profile 的 `is_default` 改为 `false`、再把目标 Profile 改为 `true`，两次 DAO save 属于独立事务，建表脚本也没有“每租户唯一默认”的约束。Transport 收到完整 Profile 后会热更新匹配的在线 Session；Rule Engine 侧通过 Profile cache listener 和 Rule Node self message 刷新 Alarm Rule 状态，系统中不存在独立的 Device Profile Actor。
 
+## 第 05 章关键结论
+
+Rule Chain 本地单目标路由沿用原始 Queue record 的 `TbMsgCallback`；单目标跨分区和多目标 fan-out 会生成新 UUID 的 Queue 消息，父 callback 只等待 producer handoff，不等待子 Rule Chain 执行完成。Singleton Node 跨服务重路由甚至以 `callback=null` 发送后立即 ack 源消息。
+
+默认 Main Queue 使用 `BURST + SKIP_ALL_FAILURES`：一个 poll pack 并发进入 Actor，失败或超时最终 commit。超时 cleanup 后旧 callback 仍然 valid，业务 Node 可能在 offset commit 后继续完成；Retry Strategy 也无法回滚已经提交的数据库或外部副作用。Rule Chain metadata 的 Nodes、relations 和 first node 在一个 PostgreSQL transaction 中更新，但 lifecycle notification 与 Actor reload 在提交后异步发生。
+
+## 第 06 章关键结论
+
+`createAlarm(...)` 实际由 PostgreSQL `create_or_update_active_alarm(...)` 按 `originator_id + type + cleared=false` 创建或更新 active Alarm。已有行通过 `FOR UPDATE` 串行更新，但 active partial index 不是 UNIQUE；首次并发创建时不存在可锁 tuple，因此 3.6 数据库不能强保证只有一条 active Alarm。
+
+Alarm 主体 `alarm`、可见性索引 `entity_alarm`、WebSocket、Alarm notification、Rule Engine action、audit 和 severity comment 没有共同事务。`entity_alarm` 保存失败只记录 warning，传播配置收缩也不会删除旧记录。REST、显式 Create Alarm Node 和 Device Profile Alarm Rule 共用持久化主线，但权限、审计、Actor callback 和下游消息语义不同。
+
+## 第 07 章关键结论
+
+`clear_alarm(...)` 按 `(tenant_id,id) FOR UPDATE` 串行化状态转换：首次调用写 `cleared/clear_ts`，重复调用成功但不修改时间或 details。`JpaAlarmDao` 只把首次清除映射为 `modified=true`，所以 WebSocket 和 `AlarmTrigger` 不会因重复清除再次触发；但 `BaseAlarmService` 仍会为重复调用发布 Edge `ActionEntityEvent`，REST 随后才返回 already-cleared 错误。
+
+REST、显式 Clear Alarm Node、Device Profile 自动清除和 Edge 上行的输出并不等价。只有 REST 生成用户 SYSTEM comment 与 audit；显式节点同时产生 root `ALARM_CLEAR` 和局部 `Cleared`；Device Profile 只产生 `Alarm Cleared` relation；Edge 上行绕过 Subscription，因此没有本地 WS、AlarmTrigger 或 Rule Engine clear 消息。
+
 ## 图表约定
 
 - Markdown 中的 `mermaid` 代码块可由支持 Mermaid 的编辑器直接渲染。
 - HTML 使用 Mermaid 10 和 markdown-it 的 CDN 版本；直接打开 HTML 即可浏览，首次渲染需要能够访问 CDN。
+- 所有章节统一引用 `assets/guide.js`：Mermaid 使用白底深色文字的高对比主题，页面只显示可点击缩略图；点击后以独立 SVG 新窗口打开，不继承正文的 `max-width` 限制。
 - PlantUML 时序图保留独立 `.puml` 源文件，便于 JetBrains PlantUML 插件、PlantUML CLI 或 CI 渲染。
-- SVG 架构图是独立静态文件，不依赖 JavaScript。
+- PlantUML 和架构 SVG 在 HTML 中也显示为缩略图，链接必须使用新窗口打开原始 `.svg` 文件，保留浏览器原生缩放和矢量清晰度。
 
 ## 版本边界
 

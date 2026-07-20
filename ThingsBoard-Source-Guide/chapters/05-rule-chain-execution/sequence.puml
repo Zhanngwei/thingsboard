@@ -1,0 +1,136 @@
+@startuml
+title ThingsBoard 3.6 Rule Chain execution, fan-out, retry and hot reload
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontColor #17202A
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.4
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantFontColor #111827
+skinparam LifeLineBorderColor #64748B
+skinparam LifeLineBackgroundColor #F8FAFC
+skinparam SequenceGroupBackgroundColor #F8FAFC
+skinparam SequenceGroupBorderColor #64748B
+skinparam SequenceGroupFontColor #111827
+skinparam NoteBackgroundColor #FFF5CC
+skinparam NoteBorderColor #8A5A00
+skinparam NoteFontColor #111827
+skinparam DatabaseBackgroundColor #EEF6F8
+skinparam DatabaseBorderColor #176B87
+skinparam QueueBackgroundColor #FFF7E8
+skinparam QueueBorderColor #9A5B13
+
+actor Source
+participant "DefaultTbClusterService" as Producer
+queue "Rule Engine Queue" as Queue
+participant "TbRuleEngineQueue\nConsumerManager" as Consumer
+participant "Pack Context / Callback" as Pack
+participant AppActor as App
+participant TenantActor as Tenant
+participant RuleChainActor as Chain
+participant RuleNodeActor as Node
+participant "TbNode / TbContext" as TbNode
+database "Business DB / External" as SideEffect
+participant "Processing Strategy" as Strategy
+actor "Rule Chain REST" as REST
+participant "DefaultTbRuleChainService" as RuleService
+participant "BaseRuleChainService" as Dao
+database PostgreSQL as Pg
+queue "RE notification topics" as Notify
+
+group Runtime: producer and local single-target path
+  Source -> Producer: pushMsgToRuleEngine(tenantId, entityId, tbMsg, callback)
+  Producer -> Producer: apply Profile ruleChainId / queueName
+  Producer -> Queue: send(ToRuleEngineMsg, partition)
+  Queue --> Producer: producer callback
+  Queue -> Consumer: poll() returns record pack
+  Consumer -> Pack: create TbMsgPackProcessingContext\nand one TbMsgPackCallback per record
+  Consumer -> App: QueueToRuleEngineMsg
+  App -> Tenant: tenant Actor route
+  alt no explicit ruleChainId
+    Tenant -> Chain: rootChainActor.tell(msg)
+  else explicit ruleChainId
+    Tenant -> Chain: ctx.tell(ruleChainActorId, msg)
+  end
+  Chain -> Node: first/resume node, same TbMsgCallback
+  Node -> Pack: onProcessingStart(ruleNodeInfo)
+  Node -> TbNode: tbNode.onMsg(ctx, msg)
+  alt asynchronous business node
+    TbNode -> SideEffect: async DAO / HTTP / telemetry call
+    SideEffect --> TbNode: FutureCallback
+  end
+  TbNode -> Chain: tellSuccess/tellNext/tellFailure
+  alt one matching target and local partition
+    Chain -> Node: next RuleNodeActor, same callback
+  else no matching non-Failure relation
+    Chain -> Pack: callback.onSuccess()
+  else no matching Failure relation
+    Chain -> Pack: callback.onFailure(error)
+  end
+end
+
+group Multi-target fan-out creates independent Queue records
+  Node -> Chain: tellNext(msg, relationTypes)
+  Chain -> Chain: match N outbound relations
+  loop each relation target
+    Chain -> Queue: copy target + new UUID, producer send
+    Queue --> Chain: one producer callback
+  end
+  alt every child producer succeeds
+    Chain -> Pack: parent callback.onSuccess()
+  else any child producer fails
+    Chain -> Pack: parent callback.onFailure()
+  end
+  note over Queue,Pack
+    Parent completion waits for child enqueue only.
+    Each child is later consumed with a new pack callback.
+    Already enqueued siblings are not rolled back.
+  end note
+end
+
+group Pack decision, timeout and retry
+  Consumer -> Pack: await(packProcessingTimeout)
+  alt all pending callbacks completed
+    Pack --> Consumer: success / failed maps
+  else timeout
+    Pack --> Consumer: pending map remains
+  end
+  Consumer -> Strategy: analyze(success, failed, pending)
+  alt commit decision
+    Strategy --> Consumer: commit=true
+    Consumer -> Pack: cleanup()
+    Consumer -> Queue: commit offset
+  else retry decision
+    Strategy --> Consumer: reprocessMap
+    Consumer -> Pack: cleanup() invalidates old attempt\nwhen skipTimeoutMsgsPossible=true
+    Consumer -> Consumer: submitStrategy.update(reprocessMap)
+  end
+  note over SideEffect,Strategy
+    Retry cannot undo completed database or external effects.
+    RETRY_ALL may repeat records already reported successful.
+    Main Queue default SKIP_ALL_FAILURES commits failures/timeouts.
+  end note
+end
+
+group Control plane: metadata transaction then Actor hot reload
+  REST -> RuleService: saveRuleChainMetaData(...)
+  RuleService -> Dao: saveRuleChainMetaData(...)
+  Dao -> Pg: BEGIN; replace nodes / relations / first node
+  Pg --> Dao: COMMIT
+  Dao --> RuleService: RuleChainUpdateResult
+  RuleService -> Notify: broadcast lifecycle UPDATED per RE service
+  Notify -> App: ComponentLifecycleMsg high priority
+  App -> Tenant: high-priority lifecycle
+  Tenant -> Chain: high-priority UPDATED
+  Chain -> Pg: reload chain, nodes and relations
+  Pg --> Chain: current graph
+  Chain -> Node: create / update / delete child actors
+  note over Pg,Notify
+    PostgreSQL commit and notification send are not one transaction.
+    HTTP success does not prove every service has reloaded the graph.
+  end note
+end
+
+@enduml

@@ -98,7 +98,7 @@
           <tr><td>14</td><td><code>org.thingsboard.server.dao.timeseries.BaseTimeseriesService.save(TenantId, EntityId, List, long)</code></td><td>entry → partition/history/latest Futures</td><td>聚合后端写入结果，但不提供统一回滚</td></tr>
         </tbody>
       </table>
-      <p>完整逐步源码位置、参数和设计原因见 <a href="README.md#三完整调用链">Markdown 版调用链</a>。</p>
+      <p>完整逐步源码位置、参数和设计原因见 <a href="README.md">Markdown 版调用链</a>。</p>
 
       <h2 id="section-4">四、消息流</h2>
       <pre class="mermaid">
@@ -291,25 +291,6 @@ flowchart LR
     </article>
   </main>
   <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
-  <script>
-    mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'neutral',flowchart:{htmlLabels:true,curve:'basis'},sequence:{useMaxWidth:true,wrap:true}});
-    window.addEventListener('DOMContentLoaded', function () {
-      function scrollToHash() {
-        var target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
-        if (target) { target.scrollIntoView(); }
-      }
-      function waitForImages() {
-        return Promise.all(Array.from(document.images).map(function (img) {
-          if (img.complete) { return Promise.resolve(); }
-          return new Promise(function (resolve) {
-            img.addEventListener('load', resolve, {once:true});
-            img.addEventListener('error', resolve, {once:true});
-          });
-        }));
-      }
-      mermaid.run({querySelector:'.mermaid'}).then(waitForImages).then(scrollToHash);
-      window.addEventListener('hashchange', function () { window.requestAnimationFrame(scrollToHash); });
-    });
-  </script>
+  <script src="../../assets/guide.js"></script>
 </body>
 </html>

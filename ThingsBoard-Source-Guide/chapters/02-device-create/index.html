@@ -105,7 +105,7 @@ flowchart TD
           <tr><td>State</td><td><code>DefaultDeviceStateService.onQueueMsg(DeviceStateServiceMsgProto, TbCallback)</code></td><td>注册 Core partition state，保存 active=false</td></tr>
         </tbody>
       </table>
-      <p>逐步输入、输出、源码行号和设计原因见<a href="README.md#三完整调用链">完整 Markdown 调用链</a>。</p>
+      <p>逐步输入、输出、源码行号和设计原因见<a href="README.md">完整 Markdown 调用链</a>。</p>
 
       <h2 id="section-4">四、消息流</h2>
       <pre class="mermaid">
@@ -318,25 +318,6 @@ erDiagram
     </article>
   </main>
   <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
-  <script>
-    mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'neutral',flowchart:{htmlLabels:true,curve:'basis'},sequence:{useMaxWidth:true,wrap:true}});
-    window.addEventListener('DOMContentLoaded', function () {
-      function scrollToHash() {
-        var target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
-        if (target) { target.scrollIntoView(); }
-      }
-      function waitForImages() {
-        return Promise.all(Array.from(document.images).map(function (img) {
-          if (img.complete) { return Promise.resolve(); }
-          return new Promise(function (resolve) {
-            img.addEventListener('load', resolve, {once:true});
-            img.addEventListener('error', resolve, {once:true});
-          });
-        }));
-      }
-      mermaid.run({querySelector:'.mermaid'}).then(waitForImages).then(scrollToHash);
-      window.addEventListener('hashchange', function () { window.requestAnimationFrame(scrollToHash); });
-    });
-  </script>
+  <script src="../../assets/guide.js"></script>
 </body>
 </html>

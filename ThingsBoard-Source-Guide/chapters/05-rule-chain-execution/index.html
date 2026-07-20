@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>05 Rule Chain 执行流程 · ThingsBoard 3.6 源码解析</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="全局导航"><a href="README.md">Markdown</a><a href="../../SUMMARY.md">全书目录</a><a href="sequence.puml">PlantUML</a><a href="sequence.svg">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="本章目录">
+      <strong>05 Rule Chain 执行流程</strong>
+      <a href="#section-1">一、流程目标</a>
+      <a href="#section-2">二、入口</a>
+      <a href="#section-3">三、完整调用链</a>
+      <a href="#section-4">四、消息流</a>
+      <a href="#section-5">五、时序图</a>
+      <a href="#section-6">六、数据变化</a>
+      <a href="#section-7">七、源码分析</a>
+      <a href="#section-8">八、Actor 分析</a>
+      <a href="#section-9">九、Kafka 分析</a>
+      <a href="#section-10">十、数据库分析</a>
+      <a href="#section-11">十一、异常处理</a>
+      <a href="#section-12">十二、源码阅读路线</a>
+      <a href="#section-13">十三、常见面试题</a>
+    </aside>
+
+    <article class="content">
+      <p class="status">CHAPTER 05 · SOURCE VERIFIED</p>
+      <h1>Rule Chain 执行流程</h1>
+      <div class="meta"><span>ThingsBoard 3.6.4</span><span>0cb411fc90</span><span>Queue Pack Callback</span><span>Chain/Node Actor</span><span>PostgreSQL Graph</span></div>
+      <p>本章从 <code>ToRuleEngineMsg</code> 被 consumer poll 开始，跟踪 App/Tenant/RuleChain/RuleNode Actor、关系路由、嵌套链、跨分区和 fan-out，直到 Processing Strategy commit 或 reprocess；同时解释 Rule Chain 图的保存与热更新。</p>
+      <div class="notice"><strong>核心结论：</strong>本地单目标路由共用原 callback；跨分区或多目标路由会创建新的 Queue 消息，父消息只等待 producer handoff。默认 Main Queue 使用 <code>SKIP_ALL_FAILURES</code>，失败或超时不自动触发 broker retry。Queue offset、Rule Node 数据库事务和外部副作用没有共同事务。</div>
+
+      <h2 id="section-1">一、流程目标</h2>
+      <p>Rule Chain 是可热更新的有向处理图。RuleChainActor 管理 first node 和 relations，RuleNodeActor 管理一个 <code>TbNode</code> 运行实例，Rule Engine Queue 管理服务隔离、分区、pack timeout 和提交策略。</p>
+      <table>
+        <thead><tr><th>平面</th><th>入口</th><th>权威状态</th><th>成功含义</th></tr></thead>
+        <tbody>
+          <tr><td>控制面</td><td>Rule Chain REST</td><td><code>rule_chain</code>、<code>rule_node</code>、<code>relation</code></td><td>PostgreSQL 图事务提交，不代表所有 Actor 已 reload</td></tr>
+          <tr><td>数据面</td><td>Rule Engine Queue</td><td>Queue record、Actor 内存图、业务后端</td><td>由 callback 和 Processing Strategy 决定，不是全链路事务</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart LR
+  subgraph C[Control plane]
+    UI[Rule Chain UI] --&gt; CTRL[RuleChainController]
+    CTRL --&gt; TX[Metadata transaction]
+    TX --&gt; DB[(rule_chain rule_node relation)]
+    TX --&gt; NF[Lifecycle notification]
+  end
+  subgraph D[Runtime data plane]
+    SRC[Transport Entity Action RPC] --&gt; Q[(Rule Engine Queue)]
+    Q --&gt; CM[Consumer Manager]
+    CM --&gt; AA[AppActor]
+    AA --&gt; TA[TenantActor]
+    TA --&gt; RC[RuleChainActor]
+    RC --&gt; RN[RuleNodeActor]
+    RN --&gt; NODE[TbNode]
+  end
+  NF -. reload .-&gt; RC
+      </pre>
+      <table>
+        <thead><tr><th>路由形态</th><th>父 callback 完成点</th><th>主要风险</th></tr></thead>
+        <tbody>
+          <tr><td>单目标、本地</td><td>下游 terminal/ack/failure</td><td>长节点占用当前 pack 时间</td></tr>
+          <tr><td>单目标、远程</td><td>新消息 producer callback</td><td>父 offset 可早于子执行提交</td></tr>
+          <tr><td>多目标</td><td>所有子 producer success；任一 producer failure 则父 failure</td><td>已入队兄弟分支不回滚</td></tr>
+          <tr><td>Singleton 跨服务</td><td>调用 producer 后立即 ack source</td><td>不等待 producer callback 或远端执行</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-2">二、入口</h2>
+      <table>
+        <thead><tr><th>入口</th><th>调用时机</th><th>进入方式</th></tr></thead>
+        <tbody>
+          <tr><td>MQTT / CoAP / LwM2M / HTTP</td><td>Telemetry、Attributes、RPC 等设备消息</td><td>Transport 转 <code>TbMsg</code> 后投递 Rule Engine Queue</td></tr>
+          <tr><td>REST Entity 操作</td><td>Device/Asset/Alarm/Attribute 等变化</td><td>应用服务构造 entity-action message 并投递 Queue</td></tr>
+          <tr><td>Scheduler / 内部服务</td><td>状态和定时任务</td><td>对应服务构造消息；不直接调用 RuleNode</td></tr>
+          <tr><td>Queue Consumer</td><td>poll 到 <code>ToRuleEngineMsg</code> pack</td><td>反序列化后 <code>ActorSystemContext.tell</code></td></tr>
+          <tr><td>Actor 内部</td><td>relation、nested input/output、跨分区</td><td>Actor message 或重新入 Queue</td></tr>
+        </tbody>
+      </table>
+      <h3>配置 API</h3>
+      <table>
+        <thead><tr><th>API</th><th>方法</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td><code>POST /api/ruleChain</code></td><td><code>RuleChainController.saveRuleChain(RuleChain)</code></td><td>保存顶层 Chain</td></tr>
+          <tr><td><code>POST /api/ruleChain/{id}/root</code></td><td><code>setRootRuleChain(String)</code></td><td>切换 Root Chain</td></tr>
+          <tr><td><code>POST /api/ruleChain/metadata</code></td><td><code>saveRuleChainMetaData(RuleChainMetaData, boolean)</code></td><td>原子保存 Nodes、first node 和 connections</td></tr>
+          <tr><td><code>DELETE /api/ruleChain/{id}</code></td><td><code>deleteRuleChain(String)</code></td><td>删除非 Root、无 Profile 引用 Chain</td></tr>
+        </tbody>
+      </table>
+      <p>REST 只修改控制面，不能通过 Controller 线程执行一条业务消息。完整入口和权限见 <a href="README.md">Markdown 版</a>。</p>
+
+      <h2 id="section-3">三、完整调用链</h2>
+      <table>
+        <thead><tr><th>步骤</th><th>类与方法</th><th>输入 -> 输出</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L292"><code>org.thingsboard.server.service.queue.DefaultTbClusterService.pushMsgToRuleEngine(TenantId, EntityId, TbMsg, TbQueueCallback)</code></a></td><td>TbMsg -> Profile 路由</td><td>覆盖默认 RuleChainId/queueName 并解析 partition</td></tr>
+          <tr><td>2</td><td><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L360"><code>consumerLoop(TbQueueConsumer)</code></a></td><td>broker -> record pack</td><td>poll 并调用 processMsgs</td></tr>
+          <tr><td>3</td><td><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L393"><code>processMsgs(List, TbQueueConsumer, Queue)</code></a></td><td>pack -> callbacks</td><td>Submit Strategy、await、Processing Strategy、commit/retry</td></tr>
+          <tr><td>4</td><td><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L486"><code>forwardToRuleEngineActor(String, TenantId, ToRuleEngineMsg, TbMsgCallback)</code></a></td><td>protobuf -> Actor msg</td><td>恢复 TbMsg 并注入本 pack callback</td></tr>
+          <tr><td>5</td><td><a href="../../../application/src/main/java/org/thingsboard/server/actors/app/AppActor.java#L191"><code>org.thingsboard.server.actors.app.AppActor.onQueueToRuleEngineMsg(...)</code></a></td><td>tenant msg -> TenantActor</td><td>Actor 树根路由</td></tr>
+          <tr><td>6</td><td><a href="../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L240"><code>org.thingsboard.server.actors.tenant.TenantActor.onQueueToRuleEngineMsg(...)</code></a></td><td>RuleChainId -> Actor</td><td>Root/显式 Chain、RE 开关和缺失链终态</td></tr>
+          <tr><td>7</td><td><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleChainActorMessageProcessor.java#L282"><code>RuleChainActorMessageProcessor.onQueueToRuleEngineMsg(...)</code></a></td><td>entry -> first/resume node</td><td>检查 graph active 和旧 resume node</td></tr>
+          <tr><td>8</td><td><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleNodeActorMessageProcessor.java#L197"><code>RuleNodeActorMessageProcessor.onRuleChainToRuleNodeMsg(...)</code></a></td><td>envelope -> TbNode</td><td>profiler、状态、节点执行上限、singleton ownership</td></tr>
+          <tr><td>9</td><td><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L209"><code>DefaultTbContext.tellNext(...)</code></a></td><td>Node result -> Chain msg</td><td>debug/profiler 后将 relation types 送回 ChainActor</td></tr>
+          <tr><td>10</td><td><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleChainActorMessageProcessor.java#L413"><code>RuleChainActorMessageProcessor.onTellNext(...)</code></a></td><td>relation types -> 0/1/N targets</td><td>终点、直接 Actor 路由或 Queue fan-out</td></tr>
+          <tr><td>11</td><td><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L108"><code>TbMsgPackProcessingContext.await(...)</code></a></td><td>callbacks -> maps</td><td>等待全部 completion 或 timeout</td></tr>
+          <tr><td>12</td><td><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/processing/TbRuleEngineProcessingStrategyFactory.java#L150"><code>TbRuleEngineProcessingStrategy.analyze(...)</code></a></td><td>success/failed/pending -> decision</td><td>commit 或 reprocess 选定 records</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+sequenceDiagram
+  participant Q as Queue Consumer
+  participant P as Pack Context
+  participant A as Actor Tree
+  participant N as TbNode
+  participant S as Processing Strategy
+  Q-&gt;&gt;P: create callbacks
+  Q-&gt;&gt;A: QueueToRuleEngineMsg
+  A-&gt;&gt;N: tbNode.onMsg(ctx,msg)
+  N--&gt;&gt;A: tellNext or async callback
+  A--&gt;&gt;P: success or failure
+  Q-&gt;&gt;P: await(timeout)
+  Q-&gt;&gt;S: analyze maps
+  alt commit
+    S--&gt;&gt;Q: commit=true
+    Q-&gt;&gt;Q: consumer.commit()
+  else retry
+    S--&gt;&gt;Q: reprocessMap
+    Q-&gt;&gt;Q: submitStrategy.update()
+  end
+      </pre>
+      <h3>Relation 终态</h3>
+      <ul>
+        <li>无匹配 <code>Failure</code> relation：callback failure。</li>
+        <li>无匹配 Success/custom relation：callback success。</li>
+        <li>单目标且本地：继续共用原 callback。</li>
+        <li>跨分区或多目标：复制新 UUID 并重新入 Queue。</li>
+      </ul>
+      <h3>嵌套 Rule Chain</h3>
+      <p>标准 metadata 保存把 nested connection 转成合成 <code>TbRuleChainInputNode</code>。它把 caller chain/node 压入 <code>TbMsgProcessingCtx</code> stack；目标 <code>TbRuleChainOutputNode</code> 以节点名称作为 label，pop stack 后从 caller input node 按 label 继续。</p>
+      <pre class="mermaid">
+sequenceDiagram
+  participant C as Caller Node
+  participant I as TbRuleChainInputNode
+  participant T as Target Chain
+  participant O as TbRuleChainOutputNode
+  participant R as Caller Chain
+  C-&gt;&gt;I: relation message
+  I-&gt;&gt;I: push caller chain/node to stack
+  I-&gt;&gt;T: RuleChainInputMsg
+  T-&gt;&gt;O: execute target graph
+  O-&gt;&gt;O: pop stack, output label = node name
+  O-&gt;&gt;R: RuleChainOutputMsg
+  R-&gt;&gt;R: route from caller input node by label
+      </pre>
+      <p>运行时兼容 target 直接为 <code>RULE_CHAIN</code> 的 relation，但该路径不压 caller stack，因此不会建立 output 返回点。标准 UI 保存使用合成 Input Node 模型。</p>
+
+      <h2 id="section-4">四、消息流</h2>
+      <p><a href="../../assets/architecture/05-rule-chain-execution.svg"><img src="../../assets/architecture/05-rule-chain-execution.svg" alt="Rule Chain execution static SVG architecture"></a></p>
+      <pre class="mermaid">
+flowchart TD
+  N[Rule Node tellNext] --&gt; M[Match outbound relations]
+  M --&gt; C{target count}
+  C --&gt;|0 Failure| F[callback failure]
+  C --&gt;|0 other| S[callback success]
+  C --&gt;|1 local| L[Next Actor, same callback]
+  C --&gt;|1 remote| Q1[New UUID to Queue]
+  C --&gt;|many| QN[One new Queue message per target]
+  QN --&gt; A[Aggregate producer callbacks]
+  A --&gt;|all success| S
+  A --&gt;|any failure| F
+      </pre>
+      <pre class="mermaid">
+flowchart LR
+  ORIGINAL[Original record callback] --&gt; LOCAL[Local one-target chain]
+  ORIGINAL --&gt; HANDOFF[Remote or fan-out producer callback]
+  HANDOFF --&gt; COMMIT[Parent may commit]
+  HANDOFF --&gt; CHILD[(Child Queue records)]
+  CHILD --&gt; NEW[New consumer callbacks]
+  NEW --&gt; SIDE[Independent Node side effects]
+      </pre>
+
+      <h2 id="section-5">五、时序图</h2>
+      <p><a href="sequence.puml">PlantUML 源文件</a>覆盖本地单分支、Queue fan-out、timeout/retry/commit 和 metadata 热更新；<a href="sequence.svg">SVG 结果</a>可在新窗口原尺寸缩放。</p>
+      <p><a href="sequence.svg"><img src="sequence.svg" alt="Rule Chain execution PlantUML sequence diagram"></a></p>
+
+      <h2 id="section-6">六、数据变化</h2>
+      <table>
+        <thead><tr><th>状态</th><th>普通执行</th><th>配置保存</th></tr></thead>
+        <tbody>
+          <tr><td>Rule Chain 图表</td><td>只读 Actor 内存图</td><td>修改 <code>rule_chain/rule_node/relation</code></td></tr>
+          <tr><td>业务数据库</td><td>由具体 Node 决定</td><td>不由 metadata API 修改</td></tr>
+          <tr><td>Queue</td><td>原 record commit/retry；可能生成子 record</td><td>发送 lifecycle notification</td></tr>
+          <tr><td>Actor</td><td>callback、stack、node counter、Node 状态</td><td>新增/更新/停止 NodeActor 并重建 routes</td></tr>
+          <tr><td>Session</td><td>通常不直接修改</td><td>不扫描 Transport Session</td></tr>
+          <tr><td>Cache</td><td>Rule Node 可使用自身 cache</td><td>运行图由 Actor 内存持有；Relation from/to 查询有 Caffeine/Redis 事务缓存并在关系事务完成后 evict</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart LR
+  R[Queue record] --&gt; A[Actor execution]
+  A --&gt; P[(PostgreSQL Tx)]
+  A --&gt; T[(Timeseries write)]
+  A --&gt; E[External API]
+  A --&gt; Q[New Queue record]
+  R --&gt; C[Offset commit]
+  P -. no common transaction .- C
+  T -. no common transaction .- C
+  E -. no rollback .- C
+  Q -. independent callback .- C
+      </pre>
+
+      <h2 id="section-7">七、源码分析</h2>
+      <table>
+        <thead><tr><th>层</th><th>核心类型</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td>Queue</td><td><code>org.thingsboard.server.service.queue.ruleengine.TbRuleEngineQueueConsumerManager</code></td><td>poll、pack、timeout、commit/reprocess</td></tr>
+          <tr><td>Callback</td><td><code>TbMsgPackProcessingContext</code>、<code>TbMsgPackCallback</code></td><td>pending/success/failed 和消息有效性</td></tr>
+          <tr><td>Actor</td><td><code>AppActor</code>、<code>TenantActor</code>、<code>RuleChainActor</code>、<code>RuleNodeActor</code></td><td>租户、链、节点路由与生命周期</td></tr>
+          <tr><td>Node API</td><td><code>TbNode</code>、<code>TbContext</code>、<code>DefaultTbContext</code></td><td>执行插件与 completion 契约</td></tr>
+          <tr><td>Persistence</td><td><code>BaseRuleChainService</code>、<code>DefaultTbRuleChainService</code></td><td>图事务、通知、VC、审计</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+classDiagram
+  ContextAwareActor &lt;|-- ComponentActor
+  ComponentActor &lt;|-- RuleEngineComponentActor
+  RuleEngineComponentActor &lt;|-- RuleChainActor
+  RuleEngineComponentActor &lt;|-- RuleNodeActor
+  ComponentMsgProcessor &lt;|-- RuleChainActorMessageProcessor
+  ComponentMsgProcessor &lt;|-- RuleNodeActorMessageProcessor
+  TbContext &lt;|.. DefaultTbContext
+  TbNode &lt;|.. TbMsgTimeseriesNode
+  RuleNodeActorMessageProcessor --&gt; TbNode : reflection
+      </pre>
+      <h3><code>TbMsg</code> 执行字段</h3>
+      <p><code>id</code> 是当前 record callback key；<code>ruleChainId/ruleNodeId</code> 控制目标和 resume；<code>ctx</code> 保存节点计数和 nested stack；<code>callback</code> 是 <code>transient</code>，Queue consumer 反序列化时注入新的 callback。详见 <a href="../../../common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java#L734">toByteArray</a> 和 <a href="../../../common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java#L777">fromBytes</a>。</p>
+      <p><code>MultipleTbQueueTbMsgCallbackWrapper</code> 聚合的是 producer 入队结果，不是子 Rule Chain 完成结果。完整类清单、接口和 callback wrapper 分析见 <a href="README.md">Markdown 版</a>。</p>
+
+      <h2 id="section-8">八、Actor 分析</h2>
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --&gt; TenantInit
+  TenantInit --&gt; ChainsLoaded: partition managed and RE enabled
+  ChainsLoaded --&gt; ChainActive: create RuleChainActor
+  ChainActive --&gt; NodesActive: create RuleNodeActors
+  NodesActive --&gt; NodesActive: lifecycle UPDATED reload
+  NodesActive --&gt; Suspended: API limit or partition move
+  Suspended --&gt; NodesActive: enabled or partition returns
+  NodesActive --&gt; [*]: DELETED or tenant stop
+      </pre>
+      <table>
+        <thead><tr><th>Actor 可以保证</th><th>Actor 不能保证</th></tr></thead>
+        <tbody>
+          <tr><td>同一 mailbox 的同步 <code>process(msg)</code> 不并发</td><td>不同 RuleNodeActor 之间不串行</td></tr>
+          <tr><td>同优先级队列按入队顺序处理</td><td>高优先级 lifecycle 可越过普通消息，不是全局 FIFO</td></tr>
+          <tr><td>协调 Node init/update/destroy</td><td>不等待 Node 内 Future、DAO 或 HTTP callback</td></tr>
+          <tr><td>分区变化时重建运行实例</td><td>不提供跨 Actor/Queue/DB exactly-once</td></tr>
+        </tbody>
+      </table>
+      <p>Node 删除会先走 processor <code>onStop</code>，Actor 销毁时又调用 <code>stop</code>；当前实现不清空 <code>tbNode</code>，自定义 <code>TbNode.destroy()</code> 应可重复执行。</p>
+      <h3>Singleton Node</h3>
+      <p>普通 Node 在当前 Rule Chain 服务执行；singleton Node 按 RuleNodeId 分区。非 owner 创建新 UUID 消息、以空 callback 重新入 Queue，再立即 <code>ack(source)</code>。它提供单实例位置约束，不提供事务性交接。</p>
+      <p>Actor 适合把可变图和 Node 生命周期绑定到 mailbox，但它串行化的是调用入口，不是异步业务完成。详细创建/停止/分区流程见 <a href="README.md">Markdown 版</a>。</p>
+
+      <h2 id="section-9">九、Kafka 分析</h2>
+      <table>
+        <thead><tr><th>项目</th><th>Main Queue 默认</th><th>源码语义</th></tr></thead>
+        <tbody>
+          <tr><td>Name / Topic</td><td><code>Main</code> / <code>tb_rule_engine.main</code></td><td>topic 还可能被部署前缀改写</td></tr>
+          <tr><td>Logical partitions</td><td>10</td><td>Kafka 下通常形成 <code>tb_rule_engine.main.0</code> 到 <code>.9</code> 的独立物理 topics</td></tr>
+          <tr><td>Client ID</td><td><code>re-Main-consumer-{serviceId}-{counter}</code></td><td>每个 consumer 唯一</td></tr>
+          <tr><td>Group</td><td><code>re-Main-consumer</code></td><td>isolated tenant 包含 tenantId</td></tr>
+          <tr><td>Pack timeout</td><td>2000 ms</td><td>不是单 Node timeout</td></tr>
+          <tr><td>Submit</td><td><code>BURST</code></td><td>poll pack 全部提交 Actor</td></tr>
+          <tr><td>Processing</td><td><code>SKIP_ALL_FAILURES</code></td><td>失败/超时直接 commit</td></tr>
+        </tbody>
+      </table>
+      <p>这些不是单个 Kafka topic 内的 10 个原生 partitions。3.6.4 每个物理 topic 的原生 partition 默认是 1，consumer 使用 <code>subscribe(topicNames)</code>。平台安装默认 Queue provider 是 in-memory；只有启用 Kafka 时 group 和 <code>commitSync()</code> 才成立。</p>
+      <h3>Submit Strategy</h3>
+      <p><code>BURST</code> 全部提交；<code>BATCH</code> 分批；<code>SEQUENTIAL</code> 一条 success 后下一条；<code>SEQUENTIAL_BY_ORIGINATOR</code> 和 <code>SEQUENTIAL_BY_TENANT</code> 只在各自 key 内串行。BATCH/SEQUENTIAL 的 failure 会阻断后续提交直到 timeout，而 pending map 从一开始就包含尚未提交的尾部消息；顺序范围仅限当前 consumer poll pack。</p>
+      <h3>Processing Strategy</h3>
+      <table>
+        <thead><tr><th>策略</th><th>重处理集合</th><th>关键风险</th></tr></thead>
+        <tbody>
+          <tr><td><code>SKIP_ALL_FAILURES</code></td><td>无</td><td>commit 后 late callback 仍 valid</td></tr>
+          <tr><td><code>SKIP_ALL_FAILURES_AND_TIMED_OUT</code></td><td>无</td><td>只阻止后续检查点，不能撤销已发副作用</td></tr>
+          <tr><td><code>RETRY_FAILED/TIMED_OUT</code></td><td>选定 failed/pending</td><td>旧 attempt 部分副作用可能已完成</td></tr>
+          <tr><td><code>RETRY_ALL</code></td><td>failed/pending/success</td><td>明确重复成功副作用</td></tr>
+        </tbody>
+      </table>
+      <p>Retry Strategy 先复制 reprocess map，可能 sleep，manager 随后才 cleanup；窗口内完成的旧 callback 不会从已复制 map 中移除。<code>maxRetries=3</code> 表示原始 attempt 后最多再处理 3 次。</p>
+      <pre class="mermaid">
+flowchart TD
+  P[poll pack] --&gt; I[Submit Strategy init]
+  I --&gt; A[submitAttempt]
+  A --&gt; W[await timeout]
+  W --&gt; R[success failed pending maps]
+  R --&gt; S[Processing Strategy analyze]
+  S --&gt;|commit| C[cleanup then offset commit]
+  S --&gt;|retry| U[cleanup then update reprocessMap]
+  U --&gt; A
+      </pre>
+
+      <h2 id="section-10">十、数据库分析</h2>
+      <pre class="mermaid">
+erDiagram
+  RULE_CHAIN {
+    uuid id PK
+    uuid tenant_id
+    varchar name
+    uuid first_rule_node_id
+    boolean root
+    varchar configuration
+  }
+  RULE_NODE {
+    uuid id PK
+    uuid rule_chain_id
+    varchar type
+    varchar configuration
+    boolean singleton_mode
+    varchar queue_name
+  }
+  RELATION {
+    uuid from_id PK
+    varchar from_type PK
+    varchar relation_type_group PK
+    varchar relation_type PK
+    uuid to_id PK
+    varchar to_type PK
+  }
+  RULE_CHAIN ||--o{ RULE_NODE : logical_owner
+  RULE_NODE ||--o{ RELATION : routes
+      </pre>
+      <ul>
+        <li>Rule Chain/Node configuration 在 DDL 中是 <code>varchar</code>，由 JPA <code>JsonStringType</code> 映射 <code>JsonNode</code>，不是 JSONB。</li>
+        <li><code>rule_node.rule_chain_id</code>、<code>first_rule_node_id</code> 和多态 <code>relation</code> 没有实体 FK，完整性主要由 Java validator 和显式 cleanup 保证。</li>
+        <li>Metadata 的 Node/Relation/first-node 修改处于 <code>BaseRuleChainService.saveRuleChainMetaData(...)</code> 单个 PostgreSQL transaction。</li>
+        <li>VC、lifecycle notification、related-chain update 和 audit 在 transaction 返回后执行。</li>
+        <li>Relation from/to 查询有事务缓存；关系保存/删除事件在 transaction 完成后 evict 精确 cache keys，provider 可为 Caffeine 或 Redis。</li>
+        <li><code>validateRuleNode(...)</code> 捕获插件反射/配置解析异常后返回错误字符串，但 metadata 保存调用点未检查返回值；不能保证所有无效 Node 配置都阻止提交。</li>
+        <li>运行时业务 Node 使用各自 DAO transaction；不存在包住整条 Rule Chain 的 Spring transaction。</li>
+      </ul>
+      <p>DDL 证据：<a href="../../../dao/src/main/resources/sql/schema-entities.sql#L165">rule_chain</a>、<a href="../../../dao/src/main/resources/sql/schema-entities.sql#L180">rule_node</a>、<a href="../../../dao/src/main/resources/sql/schema-entities.sql#L419">relation</a>。</p>
+
+      <h2 id="section-11">十一、异常处理</h2>
+      <table>
+        <thead><tr><th>失败点</th><th>源码终态</th><th>风险</th></tr></thead>
+        <tbody>
+          <tr><td>无 Root Chain</td><td>callback failure</td><td>默认 Main Queue skip + commit</td></tr>
+          <tr><td>误投到非 Rule Engine TenantActor</td><td>只记录日志，无 callback</td><td>pack 等到 timeout</td></tr>
+          <tr><td>显式 Chain Actor 不存在</td><td>callback success，dead-letter TODO</td><td>静默不执行</td></tr>
+          <tr><td>nested target 不存在</td><td>ErrorActor callback failure</td><td>前序副作用不回滚</td></tr>
+          <tr><td>nested 消息期间 RE API Usage 被禁用</td><td>不转发也不 callback</td><td>原 pack 等到 timeout</td></tr>
+          <tr><td>直接 RULE_CHAIN relation 的目标链 inactive</td><td>只记录日志，无 callback</td><td>原 pack 等到 timeout</td></tr>
+          <tr><td>Node 同步异常</td><td>走 Failure relation</td><td>只有无 Failure 后继才成为 pack failure</td></tr>
+          <tr><td>无匹配非 Failure relation</td><td>callback success</td><td>错误关系可能表现为正常结束</td></tr>
+          <tr><td>多分支部分 producer 失败</td><td>父 failure</td><td>成功入队兄弟继续</td></tr>
+          <tr><td>Singleton handoff 失败</td><td>源已 ack，producer callback null</td><td>远端可能未执行</td></tr>
+          <tr><td>pack timeout + 默认策略</td><td>commit，旧消息仍 valid</td><td>DB/外部操作可在 commit 后完成</td></tr>
+          <tr><td>Rate-limit exception</td><td>pack success</td><td>不会 Queue retry，依赖配额监控</td></tr>
+          <tr><td>无效 Node 配置被 validator 转成未检查字符串</td><td>metadata 可能提交</td><td>Actor reload/init 后才暴露失败</td></tr>
+          <tr><td>metadata commit 后通知失败</td><td>DB 新图、部分 Actor 旧图</td><td>集群短时或持续版本分裂</td></tr>
+        </tbody>
+      </table>
+      <p>关键生产措施：为外部副作用设计业务幂等键；关键链使用专用 Queue；同时监控 pack timeout、Node failure、notification lag 和下游延迟；不要把 <code>RETRY_ALL</code> 当成无成本可靠性开关。</p>
+
+      <h2 id="section-12">十二、源码阅读路线</h2>
+      <ol>
+        <li><a href="../../../common/message/src/main/java/org/thingsboard/server/common/msg/TbMsg.java#L688"><code>TbMsg</code></a>：先看 callback、route 和 processing ctx。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L292"><code>DefaultTbClusterService.pushMsgToRuleEngine(...)</code></a>：看 Profile 路由。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L393"><code>processMsgs(...)</code></a>：画 pack 生命周期。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L122"><code>TbMsgPackProcessingContext</code></a>：理解一次 completion。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L240"><code>TenantActor</code></a>：比较 Root、显式、禁用和缺失分支。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleChainActorMessageProcessor.java#L142"><code>RuleChainActorMessageProcessor.start/onUpdate</code></a>：看内存图。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleNodeActorMessageProcessor.java#L197"><code>RuleNodeActorMessageProcessor</code></a>：看 Node 和 singleton。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L173"><code>DefaultTbContext</code></a>：区分 next/failure/ack/input/output。</li>
+        <li><a href="../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleChainActorMessageProcessor.java#L413"><code>onTellNext(...)</code></a>：精读 0/1/N routes。</li>
+        <li><a href="../../../dao/src/main/java/org/thingsboard/server/dao/rule/BaseRuleChainService.java#L208"><code>saveRuleChainMetaData(...)</code></a>：看图如何落库。</li>
+      </ol>
+      <p>完整 15 步路线见 <a href="README.md">Markdown 版</a>。下一章进入 Alarm 创建流程，把本章 callback/Failure relation 连接到 Alarm 去重和状态机。</p>
+
+      <h2 id="section-13">十三、常见面试题</h2>
+      <h3><code>tellSuccess</code> 是否表示整链成功？</h3><p>不是。它选择 Success relation；无匹配后继才完成 callback。</p>
+      <h3>Rule Node 异常后 Kafka 一定重试吗？</h3><p>不一定。异常先走 Failure relation；无后继才 callback failure，而默认 Main Queue 会 skip failure 并 commit。</p>
+      <h3>多分支是否等待全部分支业务完成？</h3><p>不等待。父 callback 只聚合多个子消息的 producer 入队结果，子记录以后独立消费。</p>
+      <h3>Actor 是否保证设备消息全局顺序？</h3><p>不保证。单 mailbox 只串行同步入口；不同 NodeActor、异步 Future、partition 和重新入 Queue 都可并发。</p>
+      <h3>Metadata 保存是一个事务吗？</h3><p>Nodes、relations 和 first node 是一个 PostgreSQL transaction；通知、VC、related chains 和 audit 在其后。</p>
+      <h3>Rule Node configuration 是 JSONB 吗？</h3><p>不是。3.6.4 DDL 是 varchar，JPA 映射为 JsonNode。</p>
+      <h3>嵌套链如何返回？</h3><p>Input Node 压 caller stack，Output Node 用名称作为 label，pop 后回 caller input node 继续路由。</p>
+      <h3>默认 timeout 会取消 Node 吗？</h3><p>不会。<code>SKIP_ALL_FAILURES</code> cleanup 后 callback 仍 valid；已发出的 DAO/HTTP 操作也无法撤销。</p>
+      <h3>Singleton Node 是否 exactly-once？</h3><p>不是。它约束执行 owner，但源消息在重新入 Queue 后立即 ack，且不等待 producer callback。</p>
+      <h3>如何提升关键链可靠性？</h3><p>专用 Queue、明确 retry 范围、业务幂等、唯一约束/upsert、外部 request id、补偿路径和 notification 收敛监控需要同时设计。</p>
+      <p>其余面试题及标准答案见 <a href="README.md">Markdown 版</a>。</p>
+
+      <nav class="chapter-nav" aria-label="章节导航">
+        <a href="../04-device-profile/index.html">← 04 Device Profile 流程</a>
+        <a href="../06-alarm-create/index.html">06 Alarm 创建流程 →</a>
+      </nav>
+    </article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>
