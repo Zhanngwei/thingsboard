@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>02 Device 创建流程 · ThingsBoard 3.6 源码解析</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="全局导航"><a href="README.md">Markdown</a><a href="../../SUMMARY.md">全书目录</a><a href="sequence.puml">PlantUML</a><a href="sequence.svg">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="本章目录">
+      <strong>02 Device 创建流程</strong>
+      <a href="#section-1">一、流程目标</a>
+      <a href="#section-2">二、入口</a>
+      <a href="#section-3">三、完整调用链</a>
+      <a href="#section-4">四、消息流</a>
+      <a href="#section-5">五、时序图</a>
+      <a href="#section-6">六、数据变化</a>
+      <a href="#section-7">七、源码分析</a>
+      <a href="#section-8">八、Actor 分析</a>
+      <a href="#section-9">九、Kafka 分析</a>
+      <a href="#section-10">十、数据库分析</a>
+      <a href="#section-11">十一、异常处理</a>
+      <a href="#section-12">十二、源码阅读路线</a>
+      <a href="#section-13">十三、常见面试题</a>
+    </aside>
+
+    <article class="content">
+      <p class="status">CHAPTER 02 · SOURCE VERIFIED</p>
+      <h1>Device 创建流程</h1>
+      <div class="meta"><span>ThingsBoard 3.6.4</span><span>0cb411fc90</span><span>REST → PostgreSQL → Queue</span><span>Lazy Device Actor</span></div>
+      <p>本章完整追踪 <code>POST /api/device</code> 与 <code>POST /api/device-with-credentials</code>，并把 Provision、Gateway、LwM2M、Rule Engine、Edge 和导入入口作为独立分支标明。</p>
+      <div class="notice"><strong>核心结论：</strong><code>device</code> 与 <code>device_credentials</code> 在 DAO Service 的同一 PostgreSQL 事务提交。Cluster、Rule Engine、Device State 和 Audit 都发生在提交之后；Device <code>CREATED</code> 生命周期不会主动创建 Device Actor。</div>
+
+      <h2 id="section-1">一、流程目标</h2>
+      <p>创建流程把用户提交的 Device DTO 变成具备租户/Profile 归属、可认证凭据、集群可见性和初始在线状态的设备。实体写入先闭合本地事务，再异步传播派生状态。</p>
+      <table>
+        <thead><tr><th>成功点</th><th>保证</th><th>不保证</th></tr></thead>
+        <tbody>
+          <tr><td><code>saveAndFlush()</code></td><td>SQL 已发送，约束可检查</td><td>外层事务已提交</td></tr>
+          <tr><td>DAO 事务方法返回</td><td>Device 与 Credentials 已提交</td><td>Queue/Audit 已完成</td></tr>
+          <tr><td>HTTP 200</td><td>同步编排正常返回</td><td>Consumer、Rule Chain、State 已完成</td></tr>
+          <tr><td>异步消费完成</td><td>对应派生动作完成</td><td>与 Device INSERT 具有共同事务</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-2">二、入口</h2>
+      <table>
+        <thead><tr><th>入口</th><th>方法</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>POST /api/device</code></td><td><code>org.thingsboard.server.controller.DeviceController.saveDevice(Device, String)</code></td><td>标准创建；默认 ACCESS_TOKEN，可指定 token</td></tr>
+          <tr><td><code>POST /api/device-with-credentials</code></td><td><code>DeviceController.saveDeviceWithCredentials(SaveDeviceWithCredentialsRequest)</code></td><td>ACCESS_TOKEN、X509、MQTT_BASIC、LwM2M</td></tr>
+          <tr><td><code>POST /api/lwm2m/device-credentials</code></td><td><code>org.thingsboard.server.controller.Lwm2mController.saveDeviceWithCredentials(Map)</code></td><td>已废弃兼容接口；解包后委托 DeviceController</td></tr>
+          <tr><td>CSV bulk import</td><td><code>DeviceController.processDevicesBulkImport(BulkImportRequest)</code></td><td>每行进入 TbDeviceService 显式凭据路径</td></tr>
+          <tr><td>Provision</td><td><code>org.thingsboard.server.service.device.DeviceProvisionServiceImpl.processCreateDevice(...)</code></td><td>MQTT/CoAP/HTTP 设备自动注册分支</td></tr>
+          <tr><td>Gateway</td><td><code>org.thingsboard.server.service.transport.DefaultTransportApiService.handle(GetOrCreateDeviceFromGatewayRequestMsg)</code></td><td>创建子设备并额外保存 Created 关系</td></tr>
+          <tr><td>Rule Engine / Edge / Import</td><td><code>TbAbstractRelationActionNode</code> / <code>BaseDeviceProcessor</code> / <code>DeviceImportService</code></td><td>复用 DAO Service，但通知语义不同</td></tr>
+        </tbody>
+      </table>
+      <p><code>@PreAuthorize</code> 允许 CUSTOMER_USER 进入方法不代表可创建。细粒度 <code>Operation.CREATE</code> 检查使用 <code>CustomerUserPermissions</code>，其 Device checker 不包含 CREATE，最终返回拒绝。</p>
+
+      <pre class="mermaid">
+flowchart TD
+  U[HTTP user] --&gt; P{PreAuthorize}
+  P --&gt;|TENANT_ADMIN or CUSTOMER_USER| C[DeviceController]
+  P --&gt;|other| X1[403]
+  C --&gt; T[tenantId = current user tenant]
+  T --&gt; A[checkEntity null, Device, CREATE]
+  A --&gt; R{Authority permission strategy}
+  R --&gt;|Tenant Admin same tenant| S[DefaultTbDeviceService]
+  R --&gt;|Customer User| X2[CREATE denied]
+      </pre>
+
+      <h2 id="section-3">三、完整调用链</h2>
+      <h3>3.1 REST 到事务边界</h3>
+      <table>
+        <thead><tr><th>步骤</th><th>类与方法</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>org.thingsboard.server.controller.DeviceController.saveDevice(Device, String)</code></td><td>覆盖 tenantId，创建时执行 CREATE 权限</td></tr>
+          <tr><td>2</td><td><code>org.thingsboard.server.service.entitiy.device.DefaultTbDeviceService.save(Device, Device, String, User)</code></td><td>应用用例编排，不是核心 DB 事务</td></tr>
+          <tr><td>3</td><td><code>org.thingsboard.server.dao.device.DeviceServiceImpl.saveDeviceWithAccessToken(Device, String)</code></td><td><code>@Transactional</code> 包住 Device 与 Credentials</td></tr>
+          <tr><td>4</td><td><code>DeviceServiceImpl.saveDeviceWithoutCredentials(Device, boolean)</code></td><td>validate、Profile、normalize、flush、events</td></tr>
+          <tr><td>5</td><td><code>org.thingsboard.server.dao.service.validator.DeviceDataValidator.validateDataImpl(TenantId, Device)</code></td><td>tenant/customer/transport/OTA 一致性</td></tr>
+          <tr><td>6</td><td><code>org.thingsboard.server.dao.device.DeviceProfileServiceImpl.findOrCreateDeviceProfile(TenantId, String)</code></td><td>兼容 legacy type；唯一冲突后尝试重查，但不保证外层事务可恢复</td></tr>
+          <tr><td>7</td><td><code>org.thingsboard.server.dao.sql.device.JpaDeviceDao.saveAndFlush(TenantId, Device)</code></td><td>生成 time-based UUID 并 INSERT device</td></tr>
+          <tr><td>8</td><td><code>org.thingsboard.server.dao.device.DeviceCredentialsServiceImpl.saveOrUpdate(TenantId, DeviceCredentials)</code></td><td>凭据格式化、校验、INSERT、cache event</td></tr>
+          <tr><td>9</td><td><code>org.thingsboard.server.dao.sql.device.JpaDeviceCredentialsDao.saveAndFlush(...)</code></td><td>提前暴露 credentials/device 唯一冲突</td></tr>
+        </tbody>
+      </table>
+
+      <h3>3.2 提交后分叉</h3>
+      <table>
+        <thead><tr><th>分支</th><th>方法</th><th>输出</th></tr></thead>
+        <tbody>
+          <tr><td>事务事件</td><td><code>AbstractCachedEntityService.publishEvictEvent(E)</code></td><td>AFTER_COMMIT 清 Device/Credentials/Count cache</td></tr>
+          <tr><td>Edge</td><td><code>EdgeEventSourcingListener.handleEvent(SaveEntityEvent&lt;?&gt;)</code></td><td>ADDED Edge notification</td></tr>
+          <tr><td>Cluster</td><td><code>DefaultTbClusterService.onDeviceUpdated(Device, Device)</code></td><td>Transport update、CREATED lifecycle、Core state、OTA</td></tr>
+          <tr><td>Rule Engine</td><td><code>EntityActionService.pushEntityActionToRuleEngine(...)</code></td><td><code>TbMsgType.ENTITY_CREATED</code></td></tr>
+          <tr><td>Audit</td><td><code>AuditLogServiceImpl.logAction(...)</code></td><td>AuditLogLevelFilter 允许时由 executor 异步写 audit_log</td></tr>
+          <tr><td>State</td><td><code>DefaultDeviceStateService.onQueueMsg(DeviceStateServiceMsgProto, TbCallback)</code></td><td>注册 Core partition state，保存 active=false</td></tr>
+        </tbody>
+      </table>
+      <p>逐步输入、输出、源码行号和设计原因见<a href="README.md#三完整调用链">完整 Markdown 调用链</a>。</p>
+
+      <h2 id="section-4">四、消息流</h2>
+      <pre class="mermaid">
+flowchart LR
+  UI[Tenant Admin] --&gt; DC[DeviceController]
+  DC --&gt; ACL[AccessControlService]
+  ACL --&gt; APP[DefaultTbDeviceService]
+  APP --&gt; DS[DeviceServiceImpl transaction]
+  DS --&gt; V[DeviceDataValidator]
+  DS --&gt; DP[DeviceProfileService]
+  DS --&gt; JD[JpaDeviceDao]
+  JD --&gt; D[(device)]
+  DS --&gt; CS[CredentialsService]
+  CS --&gt; C[(device_credentials)]
+  D --&gt; COMMIT{COMMIT}
+  C --&gt; COMMIT
+  COMMIT --&gt; CACHE[After-commit cache/Edge events]
+  COMMIT --&gt; N[NotificationEntityService]
+  N --&gt; TQ[Transport notifications]
+  N --&gt; LQ[Lifecycle notifications]
+  N --&gt; CQ[Core state queue]
+  N --&gt; RQ[Rule Engine ENTITY_CREATED]
+  N --&gt; A[(audit_log async)]
+      </pre>
+
+      <pre class="mermaid">
+flowchart TD
+  DB[(Committed Device)] --&gt; L[Lifecycle CREATED]
+  DB --&gt; S[DeviceState added=true]
+  DB --&gt; E[ENTITY_CREATED]
+  L --&gt; AC[AbstractConsumerService cache evict]
+  AC --&gt; AA[AppActor - TenantActor]
+  AA --&gt; NO[No eager DeviceActor]
+  S --&gt; DSS[DefaultDeviceStateService]
+  DSS --&gt; ST[(attribute_kv active=false default)]
+  E --&gt; RA[RuleChainActor - RuleNodeActor]
+      </pre>
+      <p><img src="../../assets/architecture/02-device-create.svg" alt="Device create static SVG architecture"></p>
+
+      <h2 id="section-5">五、时序图</h2>
+      <p><a href="sequence.puml">打开 PlantUML 源文件</a>，或查看<a href="sequence.svg">经 PlantUML CLI 验证生成的时序图 SVG</a>。图中包含权限拒绝、Profile 分支、flush/rollback/commit、AFTER_COMMIT、五条异步通知和 Device Actor 惰性生命周期。</p>
+      <p><a href="sequence.svg"><img src="sequence.svg" alt="Device create PlantUML sequence diagram"></a></p>
+
+      <h2 id="section-6">六、数据变化</h2>
+      <table>
+        <thead><tr><th>对象</th><th>变化</th><th>边界</th></tr></thead>
+        <tbody>
+          <tr><td><code>device</code></td><td>新 UUID、tenant/customer/profile、name/type/device_data 等</td><td>核心事务</td></tr>
+          <tr><td><code>device_credentials</code></td><td>一条 ACCESS_TOKEN/X509/MQTT_BASIC/LwM2M 凭据</td><td>与 Device 同一事务</td></tr>
+          <tr><td><code>device_profile</code></td><td>只有 legacy type 不存在时自动创建</td><td>加入外层事务</td></tr>
+          <tr><td>Device/Credentials/Count cache</td><td>事务提交后 evict</td><td>Spring transaction event</td></tr>
+          <tr><td>Device Profile cache</td><td>lifecycle consumer 按 deviceId evict</td><td>Queue 异步</td></tr>
+          <tr><td>Device State</td><td>内存注册；默认写 SERVER_SCOPE <code>active=false</code></td><td>Core Queue 异步</td></tr>
+          <tr><td>Rule Engine</td><td>Device JSON + user/customer metadata 的 ENTITY_CREATED</td><td>Rule Queue 异步</td></tr>
+          <tr><td><code>audit_log</code></td><td>AuditLogLevelFilter 允许时记录 ADDED/SUCCESS；失败链记录 FAILURE</td><td>executor 异步</td></tr>
+          <tr><td>Session / Device Actor</td><td>不创建 Session；不预建 Device Actor</td><td>无变化</td></tr>
+        </tbody>
+      </table>
+
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --&gt; RequestDTO
+  RequestDTO --&gt; Validated
+  Validated --&gt; ProfileBound
+  ProfileBound --&gt; DeviceFlushed
+  DeviceFlushed --&gt; CredentialsFlushed
+  CredentialsFlushed --&gt; Committed
+  Committed --&gt; ClusterVisible
+  Committed --&gt; Audited
+  ClusterVisible --&gt; StateRegistered
+  ClusterVisible --&gt; RuleEngineVisible
+  ClusterVisible --&gt; ActorStillLazy
+  ActorStillLazy --&gt; DeviceActorActive: first device-aware message
+      </pre>
+
+      <h2 id="section-7">七、源码分析</h2>
+      <h3>7.1 分层与继承</h3>
+      <pre class="mermaid">
+classDiagram
+  BaseController &lt;|-- DeviceController
+  AbstractTbEntityService &lt;|-- DefaultTbDeviceService
+  TbDeviceService &lt;|.. DefaultTbDeviceService
+  AbstractCachedEntityService &lt;|-- DeviceServiceImpl
+  DeviceService &lt;|.. DeviceServiceImpl
+  JpaAbstractDao &lt;|-- JpaDeviceDao
+  DeviceDao &lt;|.. JpaDeviceDao
+  JpaRepository &lt;|-- DeviceRepository
+  DeviceController --&gt; TbDeviceService
+  DefaultTbDeviceService --&gt; DeviceService
+  DeviceServiceImpl --&gt; DeviceCredentialsService
+  DeviceServiceImpl --&gt; DeviceProfileService
+      </pre>
+      <p><code>DefaultTbDeviceService</code> 知道 User、ActionType、VC、通知和审计；<code>DeviceServiceImpl</code> 知道事务、Validator、Profile、Credentials、Cache 和数据库。Provision、Gateway、Edge、Rule Node 可以复用后者并保持自己的确认语义。</p>
+
+      <h3>7.2 关键实现族</h3>
+      <table>
+        <thead><tr><th>职责</th><th>接口</th><th>实现</th></tr></thead>
+        <tbody>
+          <tr><td>应用用例</td><td><code>org.thingsboard.server.service.entitiy.device.TbDeviceService</code></td><td><code>DefaultTbDeviceService</code></td></tr>
+          <tr><td>领域持久化</td><td><code>org.thingsboard.server.dao.device.DeviceService</code></td><td><code>DeviceServiceImpl</code></td></tr>
+          <tr><td>Device DAO</td><td><code>org.thingsboard.server.dao.device.DeviceDao</code></td><td><code>JpaDeviceDao</code></td></tr>
+          <tr><td>Credentials</td><td><code>DeviceCredentialsService</code> / <code>DeviceCredentialsDao</code></td><td><code>DeviceCredentialsServiceImpl</code> / <code>JpaDeviceCredentialsDao</code></td></tr>
+          <tr><td>ORM</td><td><code>JpaRepository</code></td><td><code>DeviceRepository</code> / <code>DeviceCredentialsRepository</code></td></tr>
+          <tr><td>缓存</td><td><code>TbTransactionalCache</code></td><td>Device/credentials 的 Caffeine 或 Redis 实现</td></tr>
+          <tr><td>集群</td><td><code>org.thingsboard.server.cluster.TbClusterService</code></td><td><code>DefaultTbClusterService</code></td></tr>
+          <tr><td>审计</td><td><code>AuditLogService</code></td><td><code>AuditLogServiceImpl</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-8">八、Actor 分析</h2>
+      <p>数据库主事务不经过 Actor。CREATED lifecycle 经 notification consumer 到 <code>AppActor.onComponentLifecycleMsg(...)</code> 和 <code>TenantActor.onComponentLifecycleMsg(...)</code>；TenantActor 对 CREATED 只查询已有 actor ref，不调用 <code>getOrCreateDeviceActor(...)</code>。</p>
+      <pre class="mermaid">
+flowchart TD
+  C[DEVICE CREATED lifecycle] --&gt; A[AppActor]
+  A --&gt; T[TenantActor]
+  T --&gt; R{existing Device actor?}
+  R --&gt;|yes| D[deliver lifecycle]
+  R --&gt;|no| N[debug and stop]
+  N --&gt; L[Device Actor remains lazy]
+  M[later session/RPC/device-aware msg] --&gt; G[getOrCreateDeviceActor]
+  G --&gt; DA[DeviceActor starts]
+      </pre>
+      <p><code>ENTITY_CREATED</code> 虽以 Device 为 originator，却进入 RuleChainActor/RuleNodeActor，不进入 Device Actor。</p>
+
+      <h2 id="section-9">九、Kafka 分析</h2>
+      <p>Kafka 不是必需项，<code>queue.type</code> 默认是 <code>in-memory</code>。配置 Kafka 时，创建后的逻辑消息映射如下：</p>
+      <table>
+        <thead><tr><th>消息</th><th>Topic</th><th>典型 Consumer Group</th></tr></thead>
+        <tbody>
+          <tr><td>Device State</td><td><code>tb_core</code>，默认 10 partitions</td><td><code>monolith-core-consumer</code> / <code>tb-core-node</code></td></tr>
+          <tr><td>ENTITY_CREATED</td><td>Profile queue；默认 Main 常为 <code>tb_rule_engine.main</code></td><td><code>re-&lt;queueName&gt;-consumer</code></td></tr>
+          <tr><td>Lifecycle</td><td><code>tb_rule_engine.notifications.&lt;serviceId&gt;</code></td><td>每 Rule Engine service 实例独立 group</td></tr>
+          <tr><td>Transport update</td><td><code>tb_transport.notifications.&lt;serviceId&gt;</code></td><td><code>transport-node-&lt;serviceId&gt;</code></td></tr>
+        </tbody>
+      </table>
+      <p>这些 send 均传 <code>null</code> callback，HTTP 不等待 broker ACK 或 consumer commit。PostgreSQL 与 Kafka 之间没有 transactional outbox；崩溃可造成 Device 已提交但通知缺失，消费重试也可能导致业务副作用重复。</p>
+
+      <h2 id="section-10">十、数据库分析</h2>
+      <pre class="mermaid">
+erDiagram
+  DEVICE_PROFILE ||--o{ DEVICE : physical_FK
+  DEVICE ||--|| DEVICE_CREDENTIALS : unique_logical_link
+  DEVICE ||--o{ AUDIT_LOG : logical_entity_id
+  DEVICE ||--o{ ATTRIBUTE_KV : logical_entity_id
+  DEVICE {
+    uuid id PK
+    bigint created_time
+    uuid tenant_id
+    uuid customer_id
+    uuid device_profile_id FK
+    varchar name UK_scope_tenant
+    varchar type
+    jsonb device_data
+    uuid external_id UK_scope_tenant
+  }
+  DEVICE_CREDENTIALS {
+    uuid id PK
+    uuid device_id UK
+    varchar credentials_id UK
+    varchar credentials_type
+    varchar credentials_value
+  }
+      </pre>
+      <p>实体与凭据始终写 PostgreSQL。<code>device_credentials.device_id</code> 在 3.6.4 建表脚本中只有 UNIQUE、没有 FK，不能把逻辑一对一画成物理外键。<code>device.device_profile_id</code>、firmware 和 software 才有真实 FK。<code>audit_log</code> 只在 <code>AuditLogLevelFilter</code> 允许该实体/动作时异步写入。</p>
+      <p>默认 <code>state.persistToTelemetry=false</code> 时，稍后的 Core consumer 写 <code>attribute_kv(active=false)</code>；为 true 时才通过所选 timeseries backend 写 SQL/TimescaleDB/Cassandra。Redis 只在选择 Redis cache 时保存缓存副本，不是权威实体库。</p>
+
+      <h2 id="section-11">十一、异常处理</h2>
+      <table>
+        <thead><tr><th>失败位置</th><th>结果</th><th>事务状态</th></tr></thead>
+        <tbody>
+          <tr><td>权限/Validator</td><td>拒绝或 validation error</td><td>无提交</td></tr>
+          <tr><td>Device name/externalId 冲突</td><td>转换为可读 DataValidationException</td><td>回滚</td></tr>
+          <tr><td>Credentials ID/device ID 冲突</td><td><code>Specified credentials are already registered!</code></td><td>Device 与 Credentials 一起回滚</td></tr>
+          <tr><td>Commit 失败</td><td>AFTER_COMMIT listener 不执行，catch 防御性 evict</td><td>回滚</td></tr>
+          <tr><td>提交后 autoCommit/Cluster 同步异常</td><td>HTTP 可能报错</td><td>Device 已存在</td></tr>
+          <tr><td>Queue/Audit/State 异步失败</td><td>HTTP 不感知，派生状态缺失或重试</td><td>Device 保留</td></tr>
+        </tbody>
+      </table>
+      <div class="notice"><strong>生产幂等：</strong>网络超时或 5xx 后先按 tenant 内稳定 name/external ID 查询，再决定重试；自动生成的 token 需要通过 credentials API 读取，不能由客户端重算。</div>
+
+      <h2 id="section-12">十二、源码阅读路线</h2>
+      <ol>
+        <li><code>DeviceController.saveDevice(...)</code>：看 tenantId 覆盖和 create 分支。</li>
+        <li><code>BaseController.checkEntity(...)</code>、<code>CustomerUserPermissions</code>：看两层授权。</li>
+        <li><code>DefaultTbDeviceService.save(...)</code>：先标出事务之后的动作。</li>
+        <li><code>DeviceServiceImpl.saveDeviceWithAccessToken(...)</code>、<code>doSaveDevice(...)</code>、<code>saveDeviceWithoutCredentials(...)</code>：建立事务主线。</li>
+        <li><code>DeviceDataValidator</code>、<code>DeviceProfileServiceImpl</code>、<code>syncDeviceData(...)</code>：看输入规范化。</li>
+        <li><code>JpaAbstractDao</code>、两个 Entity、两个 Repository、<code>schema-entities.sql</code>：对齐 DTO/JPA/SQL。</li>
+        <li><code>AbstractCachedEntityService</code> 与 transaction listeners：确认 commit 后 evict。</li>
+        <li><code>DefaultTbClusterService.onDeviceUpdated(...)</code>：拆开四条通知。</li>
+        <li><code>EntityActionService</code> 与 <code>AuditLogServiceImpl</code>：看 Rule Engine 和异步审计。</li>
+        <li><code>AbstractConsumerService</code>、<code>AppActor</code>、<code>TenantActor</code>、<code>DefaultDeviceStateService</code>：验证 Actor 与 state 的后续行为。</li>
+      </ol>
+
+      <h2 id="section-13">十三、常见面试题</h2>
+      <h3>Device 与 Credentials 是否同一事务？</h3><p>是。两个创建入口最终都进入 <code>DeviceServiceImpl</code> 的 <code>@Transactional</code> 方法；凭据冲突会回滚 Device。</p>
+      <h3><code>saveAndFlush()</code> 是否等于 commit？</h3><p>不等于。flush 发送 SQL 并检查约束；外层事务仍可回滚。</p>
+      <h3>为什么 Customer User 通过注解仍不能创建？</h3><p>方法级注解只是入口过滤；Resource/Operation 的 PermissionChecker 不允许 Customer User 执行 Device CREATE。</p>
+      <h3>创建会预建 Device Actor 吗？</h3><p>不会。CREATED lifecycle 只投递给已有 actor；后续 device-aware message 才调用 <code>getOrCreateDeviceActor(...)</code>。</p>
+      <h3>HTTP 失败是否一定没创建？</h3><p>不一定。DAO commit 后的同步编排异常仍可被外层 catch 返回；此时 Device 已存在。</p>
+      <h3>Kafka 是必需的吗？</h3><p>不是。Queue SPI 默认 in-memory；Kafka 是可选物理实现。</p>
+      <h3>创建会写 TimescaleDB/Cassandra 吗？</h3><p>实体事务不会。只有启用 state telemetry 后，异步 <code>active=false</code> 才可能进入所选时序后端。</p>
+      <h3>为什么同时发 lifecycle 和 ENTITY_CREATED？</h3><p>前者服务运行时 cache/Actor 传播，后者是进入用户 Rule Chain 的业务消息，消费者与失败语义不同。</p>
+      <h3>为什么凭据查询缓存 null？</h3><p>阻止无效 token 的高频尝试持续打数据库；因此新凭据提交后必须 evict 对应 key。</p>
+
+      <nav class="chapter-nav" aria-label="章节导航">
+        <a href="../01-mqtt-message-ingress/index.html">← 01 MQTT 消息进入系统</a>
+        <a href="../03-device-delete/index.html">03 Device 删除流程 →</a>
+      </nav>
+    </article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script>
+    mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'neutral',flowchart:{htmlLabels:true,curve:'basis'},sequence:{useMaxWidth:true,wrap:true}});
+    window.addEventListener('DOMContentLoaded', function () {
+      function scrollToHash() {
+        var target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
+        if (target) { target.scrollIntoView(); }
+      }
+      function waitForImages() {
+        return Promise.all(Array.from(document.images).map(function (img) {
+          if (img.complete) { return Promise.resolve(); }
+          return new Promise(function (resolve) {
+            img.addEventListener('load', resolve, {once:true});
+            img.addEventListener('error', resolve, {once:true});
+          });
+        }));
+      }
+      mermaid.run({querySelector:'.mermaid'}).then(waitForImages).then(scrollToHash);
+      window.addEventListener('hashchange', function () { window.requestAnimationFrame(scrollToHash); });
+    });
+  </script>
+</body>
+</html>

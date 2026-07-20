@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="930" viewBox="0 0 1440 930" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6.4 MQTT telemetry ingress architecture</title>
+  <desc id="desc">Architecture diagram separating MQTT session events through the Core Queue and Device Actor from telemetry messages through the Rule Engine Queue and persistence services.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f6f7f9}.band{fill:#fff;stroke:#cfd8df;stroke-width:1.5}.title{font:700 28px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#17202a}.sub{font:400 14px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#5e6b78}.label{font:600 15px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#1d2b36}.small{font:400 12px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#52616e}.node{fill:#fff;stroke:#8395a3;stroke-width:1.5}.network{fill:#e8f5f7;stroke:#176b87}.queue{fill:#f9f0e4;stroke:#9a5b13}.actor{fill:#eef2f8;stroke:#566f92}.db{fill:#edf6ef;stroke:#287a4b}.arrow{fill:none;stroke:#415563;stroke-width:2;marker-end:url(#m)}.session{fill:none;stroke:#176b87;stroke-width:2.3;marker-end:url(#mb)}.telemetry{fill:none;stroke:#9a5b13;stroke-width:2.6;marker-end:url(#mo)}.dash{stroke-dasharray:7 6}.callout{fill:#fff8e9;stroke:#d6a24a;stroke-width:1.5}.calloutText{font:600 13px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#6a4612}
+    </style>
+    <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#415563"/></marker>
+    <marker id="mb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#176b87"/></marker>
+    <marker id="mo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#9a5b13"/></marker>
+  </defs>
+  <rect class="bg" width="1440" height="930"/>
+  <text class="title" x="48" y="52">ThingsBoard 3.6.4 · MQTT 消息进入系统</text>
+  <text class="sub" x="48" y="79">蓝色：连接/会话路径　橙色：Telemetry PUBLISH 路径　源码基线：0cb411fc90</text>
+
+  <rect class="band" x="38" y="105" width="1364" height="154" rx="6"/>
+  <text class="label" x="58" y="132">01 · 网络与协议</text>
+  <rect class="node network" x="65" y="158" width="170" height="68" rx="5"/>
+  <text class="label" x="150" y="184" text-anchor="middle">MQTT Device</text><text class="small" x="150" y="205" text-anchor="middle">CONNECT / PUBLISH</text>
+  <rect class="node network" x="292" y="158" width="210" height="68" rx="5"/>
+  <text class="label" x="397" y="184" text-anchor="middle">Netty Pipeline</text><text class="small" x="397" y="205" text-anchor="middle">IP · TLS · Decoder</text>
+  <rect class="node network" x="560" y="148" width="265" height="88" rx="5"/>
+  <text class="label" x="692" y="179" text-anchor="middle">MqttTransportHandler</text><text class="small" x="692" y="200" text-anchor="middle">session state · topic dispatch</text><text class="small" x="692" y="218" text-anchor="middle">protocol ACK</text>
+  <rect class="node network" x="882" y="158" width="210" height="68" rx="5"/>
+  <text class="label" x="987" y="184" text-anchor="middle">MqttTransportAdaptor</text><text class="small" x="987" y="205" text-anchor="middle">JSON / Protobuf</text>
+  <rect class="node network" x="1148" y="148" width="220" height="88" rx="5"/>
+  <text class="label" x="1258" y="179" text-anchor="middle">DefaultTransportService</text><text class="small" x="1258" y="200" text-anchor="middle">limits · metadata · routing</text><text class="small" x="1258" y="218" text-anchor="middle">Core / Rule Queue producer</text>
+  <path class="arrow" d="M235 192H292"/><path class="arrow" d="M502 192H560"/><path class="telemetry" d="M825 192H882"/><path class="telemetry" d="M1092 192H1148"/>
+
+  <rect class="band" x="38" y="281" width="653" height="262" rx="6"/>
+  <text class="label" x="58" y="310">02A · CONNECT / Session（Core 路径）</text>
+  <rect class="node" x="70" y="340" width="230" height="70" rx="5"/>
+  <text class="label" x="185" y="367" text-anchor="middle">Transport API Template</text><text class="small" x="185" y="389" text-anchor="middle">credential request/reply</text>
+  <rect class="node" x="364" y="340" width="260" height="70" rx="5"/>
+  <text class="label" x="494" y="367" text-anchor="middle">DefaultTransportApiService</text><text class="small" x="494" y="389" text-anchor="middle">validate + build DeviceInfo</text>
+  <rect class="node db" x="70" y="449" width="230" height="60" rx="5"/>
+  <text class="label" x="185" y="475" text-anchor="middle">PostgreSQL entity tables</text><text class="small" x="185" y="495" text-anchor="middle">credentials · device · profile</text>
+  <rect class="node queue" x="364" y="449" width="118" height="60" rx="5"/>
+  <text class="label" x="423" y="475" text-anchor="middle">Core Queue</text><text class="small" x="423" y="495" text-anchor="middle">Session Open</text>
+  <rect class="node actor" x="506" y="449" width="118" height="60" rx="5"/>
+  <text class="label" x="565" y="475" text-anchor="middle">Device Actor</text><text class="small" x="565" y="495" text-anchor="middle">session state</text>
+  <path class="session" d="M300 375H364"/><path class="session" d="M494 410V430H185V449"/><path class="session" d="M300 479H364"/><path class="session" d="M482 479H506"/>
+
+  <rect class="band" x="713" y="281" width="689" height="262" rx="6"/>
+  <text class="label" x="733" y="310">02B · Telemetry PUBLISH（Rule Engine 路径）</text>
+  <rect class="node queue" x="745" y="340" width="180" height="70" rx="5"/>
+  <text class="label" x="835" y="367" text-anchor="middle">Rule Engine Queue</text><text class="small" x="835" y="389" text-anchor="middle">ToRuleEngineMsg</text>
+  <rect class="node" x="970" y="340" width="260" height="70" rx="5"/>
+  <text class="label" x="1100" y="367" text-anchor="middle">QueueConsumerManager</text><text class="small" x="1100" y="389" text-anchor="middle">poll · strategy · commit/retry</text>
+  <rect class="node actor" x="745" y="449" width="140" height="60" rx="5"/>
+  <text class="label" x="815" y="475" text-anchor="middle">AppActor</text><text class="small" x="815" y="495" text-anchor="middle">tenant route</text>
+  <rect class="node actor" x="905" y="449" width="140" height="60" rx="5"/>
+  <text class="label" x="975" y="475" text-anchor="middle">TenantActor</text><text class="small" x="975" y="495" text-anchor="middle">rule chain route</text>
+  <rect class="node actor" x="1065" y="449" width="140" height="60" rx="5"/>
+  <text class="label" x="1135" y="475" text-anchor="middle">RuleChainActor</text><text class="small" x="1135" y="495" text-anchor="middle">topology</text>
+  <rect class="node actor" x="1225" y="449" width="140" height="60" rx="5"/>
+  <text class="label" x="1295" y="475" text-anchor="middle">RuleNodeActor</text><text class="small" x="1295" y="495" text-anchor="middle">TbNode.onMsg</text>
+  <path class="telemetry" d="M925 375H970"/><path class="telemetry" d="M1100 410V430H815V449"/><path class="telemetry" d="M885 479H905"/><path class="telemetry" d="M1045 479H1065"/><path class="telemetry" d="M1205 479H1225"/>
+
+  <path class="session dash" d="M1210 236V270H423V449"/><text class="small" x="570" y="269">SessionEvent -> Core Queue</text>
+  <path class="telemetry dash" d="M1300 236V320H835V340"/><text class="small" x="1076" y="319">POST_TELEMETRY_REQUEST -> Rule Engine Queue</text>
+
+  <rect class="band" x="38" y="565" width="1364" height="245" rx="6"/>
+  <text class="label" x="58" y="594">03 · Save Timeseries 与可选时序后端</text>
+  <rect class="node actor" x="70" y="628" width="210" height="70" rx="5"/>
+  <text class="label" x="175" y="655" text-anchor="middle">TbMsgTimeseriesNode</text><text class="small" x="175" y="677" text-anchor="middle">timestamp · TTL · latest flag</text>
+  <rect class="node" x="330" y="628" width="250" height="70" rx="5"/>
+  <text class="label" x="455" y="655" text-anchor="middle">TelemetrySubscriptionService</text><text class="small" x="455" y="677" text-anchor="middle">validate · notify</text>
+  <rect class="node" x="630" y="628" width="210" height="70" rx="5"/>
+  <text class="label" x="735" y="655" text-anchor="middle">BaseTimeseriesService</text><text class="small" x="735" y="677" text-anchor="middle">partition + history + latest</text>
+  <rect class="node db" x="890" y="615" width="140" height="96" rx="5"/>
+  <text class="label" x="960" y="642" text-anchor="middle">PostgreSQL</text><text class="small" x="960" y="664" text-anchor="middle">RANGE ts_kv</text><text class="small" x="960" y="682" text-anchor="middle">ts_kv_latest</text>
+  <rect class="node db" x="1050" y="615" width="140" height="96" rx="5"/>
+  <text class="label" x="1120" y="642" text-anchor="middle">TimescaleDB</text><text class="small" x="1120" y="664" text-anchor="middle">hypertable chunks</text><text class="small" x="1120" y="682" text-anchor="middle">SQL latest</text>
+  <rect class="node db" x="1210" y="615" width="160" height="96" rx="5"/>
+  <text class="label" x="1290" y="642" text-anchor="middle">Cassandra</text><text class="small" x="1290" y="664" text-anchor="middle">ts_kv_cf</text><text class="small" x="1290" y="682" text-anchor="middle">ts_kv_latest_cf</text>
+  <path class="telemetry" d="M280 663H330"/><path class="telemetry" d="M580 663H630"/><path class="telemetry" d="M840 663H890"/><path class="telemetry" d="M840 663V733H1120V711"/><path class="telemetry" d="M840 663V756H1290V711"/>
+  <text class="small" x="890" y="750">DATABASE_TS_TYPE selects one history backend</text>
+
+  <rect class="callout" x="65" y="835" width="1300" height="58" rx="5"/>
+  <text class="calloutText" x="85" y="860">确认边界：</text><text class="small" x="175" y="860">MQTT PUBACK 在 Rule Engine Queue producer 成功后发送，早于 consumer、Actor、Rule Node 和数据库。</text>
+  <text class="calloutText" x="85" y="881">一致性边界：</text><text class="small" x="175" y="881">history 与 latest 由多个异步 Future 汇总，不存在覆盖 Queue 和多 DAO 的统一事务回滚。</text>
+</svg>

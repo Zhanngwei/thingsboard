@@ -1,0 +1,281 @@
+@startuml
+title ThingsBoard 3.6.4 - Device Profile save, default switch, delete and runtime propagation
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam sequence {
+  ArrowColor #315A6B
+  ActorBorderColor #315A6B
+  LifeLineBorderColor #8A99A3
+  ParticipantBorderColor #537487
+  ParticipantBackgroundColor #F5F8FA
+  DatabaseBorderColor #8B5A2B
+  DatabaseBackgroundColor #FFF8EE
+  GroupBorderColor #8796A0
+  GroupBackgroundColor #FAFBFC
+  DividerBackgroundColor #EAF2F5
+}
+
+actor "Tenant Admin" as Admin
+participant "DeviceProfileController" as Controller
+participant "DefaultTbDeviceProfileService\n(no outer transaction)" as AppService
+participant "DeviceProfileServiceImpl" as DaoService
+participant "DeviceProfileDataValidator" as Validator
+participant "BaseImageService\nindependent transaction" as ImageService
+participant "JpaDeviceProfileDao\ntransaction per call" as JpaDao
+database "PostgreSQL" as PG
+participant "DeviceServiceImpl\ntransaction per Device" as DeviceService
+participant "DAO cache / Spring events" as DaoEvents
+participant "Version Control service" as VC
+participant "DefaultTbClusterService" as Cluster
+queue "Transport notifications" as TransportNf
+queue "Lifecycle notifications" as LifecycleNf
+participant "DefaultOtaPackageStateService" as OtaService
+queue "OTA state queue" as OtaQueue
+participant "EntityActionService" as EntityAction
+queue "Rule Engine data queue" as RuleData
+participant "AuditLogServiceImpl\nexecutor" as Audit
+
+== Standard REST create or update ==
+Admin -> Controller: POST /api/deviceProfile\nDeviceProfile JSON
+Controller -> Controller: setTenantId(current tenant)\ncheckEntity(id, profile, DEVICE_PROFILE)
+Controller -> AppService: save(deviceProfile, currentUser)
+AppService -> DaoService: find old Profile when update\ncompare firmwareId/softwareId
+AppService -> DaoService: saveDeviceProfile(deviceProfile)
+DaoService -> Validator: validate(profile, DeviceProfile::getTenantId)
+
+alt validation fails
+  Validator --> DaoService: DataValidationException
+  DaoService --> AppService: exception
+  AppService -> EntityAction: log failure action with empty Profile id
+  EntityAction -> Audit: async failure audit
+  AppService --> Controller: exception
+  Controller --> Admin: HTTP validation error
+else valid
+  Validator --> DaoService: old Profile or null
+
+  DaoService -> ImageService: replaceBase64WithImageUrl(profile, "device profile")
+  ImageService -> PG: optional INSERT/UPDATE image resource
+  ImageService -> PG: COMMIT independently\nnoRollbackFor Exception
+  ImageService --> DaoService: Profile image URL
+
+  DaoService -> JpaDao: saveAndFlush(tenantId, profile)
+  JpaDao -> PG: INSERT/UPDATE device_profile\nflush UNIQUE and FK constraints
+  alt Profile SQL fails
+    PG --> JpaDao: constraint or SQL exception
+    JpaDao -> PG: ROLLBACK Profile transaction
+    JpaDao --> DaoService: exception
+    DaoService -> DaoEvents: direct cache eviction fallback
+    DaoService --> AppService: translated uniqueness error
+    note over ImageService,PG
+      An image resource may already be committed
+      while the Profile row was not saved.
+    end note
+    AppService -> EntityAction: log failure action
+    EntityAction -> Audit: async failure audit
+    AppService --> Controller: exception
+    Controller --> Admin: HTTP error
+  else Profile SQL succeeds
+    PG --> JpaDao: flushed
+    JpaDao -> PG: COMMIT Profile transaction
+    JpaDao --> DaoService: saved Profile
+    DaoService -> DaoEvents: direct evict id/name/default/provision keys
+    DaoService -> DaoEvents: SaveEntityEvent\nfallback listener may create Edge event now
+
+    opt Profile name changed
+      loop pages of 100 associated Devices
+        DaoService -> PG: SELECT Devices by tenant and profileId
+        PG --> DaoService: Device page
+        loop each Device
+          DaoService -> DaoService: device.type = new Profile name
+          DaoService -> DeviceService: saveDevice(device)
+          DeviceService -> PG: UPDATE device type
+          DeviceService -> PG: COMMIT this Device transaction
+          DeviceService -> DaoEvents: Device cache and SaveEntityEvent
+          DeviceService --> DaoService: saved Device
+        end
+      end
+      note over DaoService,PG
+        A mid-loop failure cannot roll back the committed Profile
+        or previously committed Device compatibility updates.
+      end note
+    end
+
+    DaoService --> AppService: saved Profile
+    AppService -> VC: autoCommit(user, profileId)
+    VC --> AppService: Future returned, not awaited
+
+    AppService -> Cluster: onDeviceProfileChange(savedProfile, null)
+    loop every TB_TRANSPORT serviceId
+      Cluster -> TransportNf: EntityUpdateMsg(full encoded Profile)
+    end
+
+    AppService -> Cluster: broadcastEntityStateChangeEvent\nCREATED or UPDATED
+    par every Core serviceId
+      Cluster -> LifecycleNf: ToCoreNotificationMsg(componentLifecycle)
+    else remaining Rule Engine serviceIds
+      Cluster -> LifecycleNf: ToRuleEngineNotificationMsg(componentLifecycle)
+    end
+
+    AppService -> OtaService: update(profile, firmwareChanged, softwareChanged)
+    opt firmware or software changed
+      loop pages of 100 Devices without explicit override
+        OtaService -> PG: SELECT Devices by Profile and empty OTA
+        OtaService -> OtaQueue: ToOtaPackageStateServiceMsg per Device
+        OtaService -> PG: async OTA state telemetry / attribute work
+      end
+    end
+
+    AppService -> EntityAction: logEntityAction(ADDED or UPDATED)
+    EntityAction -> EntityAction: process notification rules
+    EntityAction -> RuleData: TbMsg ENTITY_CREATED / ENTITY_UPDATED\nProfile JSON body
+    EntityAction -> Audit: async success audit
+    AppService --> Controller: saved Profile
+    Controller --> Admin: HTTP 200 and Profile JSON
+  end
+end
+
+== Switch tenant default Profile ==
+Admin -> Controller: POST /api/deviceProfile/{id}/default
+Controller -> DaoService: find target and previous default
+Controller -> AppService: setDefaultDeviceProfile(target, previous, user)
+AppService -> DaoService: setDefaultDeviceProfile(tenantId, targetId)
+DaoService -> JpaDao: find target by id
+JpaDao -> PG: SELECT target
+PG --> JpaDao: target
+
+alt target already default
+  DaoService --> AppService: changed=false
+  AppService --> Controller: target unchanged
+  Controller --> Admin: HTTP 200, no action/audit
+else target is not default
+  DaoService -> DaoService: findDefaultDeviceProfile(tenantId)
+  alt previous default exists
+    DaoService -> JpaDao: save(previous isDefault=false)
+    JpaDao -> PG: UPDATE previous default false
+    JpaDao -> PG: COMMIT transaction 1
+  end
+  DaoService -> JpaDao: save(target isDefault=true)
+  JpaDao -> PG: UPDATE target default true
+  alt target save fails
+    JpaDao -> PG: ROLLBACK transaction 2
+    note over DaoService,PG
+      The previous transaction is not rolled back.
+      The tenant may have no default Profile.
+    end note
+    JpaDao --> AppService: exception
+    AppService -> Audit: async failure audit
+    AppService --> Controller: exception
+    Controller --> Admin: HTTP error
+  else target save succeeds
+    JpaDao -> PG: COMMIT transaction 2
+    DaoService -> DaoEvents: direct cache evictions
+    DaoService --> AppService: changed=true
+    AppService -> DaoService: reload previous and target
+    AppService -> EntityAction: UPDATED previous Profile
+    EntityAction -> RuleData: ENTITY_UPDATED previous
+    EntityAction -> Audit: previous UPDATED audit
+    AppService -> EntityAction: UPDATED target Profile
+    EntityAction -> RuleData: ENTITY_UPDATED target
+    EntityAction -> Audit: target UPDATED audit
+    note over AppService,LifecycleNf
+      No onDeviceProfileChange and no lifecycle broadcast.
+      Transport and Rule Engine runtime caches are not refreshed for isDefault.
+    end note
+    AppService --> Controller: target Profile
+    Controller --> Admin: HTTP 200
+  end
+end
+
+== Delete non-default Profile ==
+Admin -> Controller: DELETE /api/deviceProfile/{id}
+Controller -> Controller: checkDeviceProfileId(id, DELETE)
+Controller -> AppService: delete(profileSnapshot, user)
+AppService -> DaoService: deleteDeviceProfile(tenantId, profileId)
+DaoService -> PG: BEGIN delete transaction\nSELECT Profile
+
+alt Profile is default
+  DaoService -> PG: ROLLBACK
+  DaoService --> AppService: DataValidationException
+  AppService -> Audit: async failure audit
+  AppService --> Controller: exception
+  Controller --> Admin: HTTP error
+else non-default
+  DaoService -> PG: DELETE Profile inbound/outbound relations\nDELETE entity_alarm references
+  DaoService -> PG: DELETE device_profile
+  alt Device FK references Profile
+    PG --> DaoService: fk_device_profile violation
+    DaoService -> PG: ROLLBACK relations and Profile delete
+    DaoService --> AppService: referenced Profile validation error
+    AppService -> Audit: async failure audit
+    AppService --> Controller: exception
+    Controller --> Admin: HTTP error
+  else no Device reference
+    PG -> PG: CASCADE ota_package rows\nwhose device_profile_id matches
+    DaoService -> DaoEvents: publish cache event and DeleteEntityEvent
+    DaoService -> PG: COMMIT delete transaction
+    PG --> DaoService: committed
+    DaoEvents -> DaoEvents: AFTER_COMMIT DAO cache eviction\nand optional Edge event
+    DaoService --> AppService: return
+
+    AppService -> Cluster: onDeviceProfileDelete(profile, null)
+    loop every TB_TRANSPORT serviceId
+      Cluster -> TransportNf: EntityDeleteMsg(DEVICE_PROFILE, id)
+    end
+    AppService -> Cluster: lifecycle DELETED
+    Cluster -> LifecycleNf: Profile DELETED notifications
+    AppService -> EntityAction: logEntityAction(DELETED)
+    EntityAction -> RuleData: ENTITY_DELETED old Profile JSON
+    EntityAction -> Audit: async DELETED audit
+    AppService --> Controller: void
+    Controller --> Admin: HTTP 200
+  end
+end
+
+== Independent runtime consumers ==
+participant "DefaultTransportService" as TransportService
+participant "Transport Profile cache" as TransportCache
+participant "MQTT / CoAP / LwM2M / SNMP sessions" as Sessions
+participant "AbstractConsumerService" as LifecycleConsumer
+participant "DefaultTbDeviceProfileCache" as ReCache
+participant "TbDeviceProfileNode" as ProfileNode
+participant "AppActor / TenantActor" as Actors
+
+TransportNf -> TransportService: poll EntityUpdateMsg
+TransportService -> TransportCache: put(full Profile)
+TransportService -> Sessions: update matching SessionInfo and protocol adaptor
+note right of Sessions
+  MQTT refreshes topic filters, payload type,
+  Protobuf descriptors and adaptor without reconnect.
+end note
+
+TransportNf -> TransportService: poll EntityDeleteMsg
+TransportService -> TransportCache: evict(ProfileId)
+
+LifecycleNf -> LifecycleConsumer: poll ComponentLifecycleMsg
+LifecycleConsumer -> ReCache: evict(tenantId, ProfileId)
+ReCache -> DaoService: reload Profile from DAO
+alt Profile still exists (create/update)
+  DaoService --> ReCache: fresh Profile
+  ReCache -> ProfileNode: registered Profile listener
+  ProfileNode -> ProfileNode: self DEVICE_PROFILE_UPDATE_SELF_MSG\nupdate matching Device alarm states
+else Profile deleted
+  DaoService --> ReCache: null
+  note over ReCache,ProfileNode
+    No Profile listener callback is made for null.
+    Normal delete has no referencing Devices because of the FK.
+  end note
+end
+LifecycleConsumer -> Actors: high-priority lifecycle message
+Actors -> Actors: no Device Profile Actor target\nlog invalid component lifecycle target
+
+RuleData -> Actors: QueueToRuleEngineMsg entity action
+Actors -> Actors: execute configured Rule Chain
+
+note over PG,Sessions
+  There is no database outbox or shared transaction across Profile rows,
+  Transport/lifecycle/data queues, Session updates, OTA state and Audit.
+end note
+
+@enduml

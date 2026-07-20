@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>03 Device 删除流程 · ThingsBoard 3.6 源码解析</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="全局导航"><a href="README.md">Markdown</a><a href="../../SUMMARY.md">全书目录</a><a href="sequence.puml">PlantUML</a><a href="sequence.svg">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="本章目录">
+      <strong>03 Device 删除流程</strong>
+      <a href="#section-1">一、流程目标</a>
+      <a href="#section-2">二、入口</a>
+      <a href="#section-3">三、完整调用链</a>
+      <a href="#section-4">四、消息流</a>
+      <a href="#section-5">五、时序图</a>
+      <a href="#section-6">六、数据变化</a>
+      <a href="#section-7">七、源码分析</a>
+      <a href="#section-8">八、Actor 分析</a>
+      <a href="#section-9">九、Kafka 分析</a>
+      <a href="#section-10">十、数据库分析</a>
+      <a href="#section-11">十一、异常处理</a>
+      <a href="#section-12">十二、源码阅读路线</a>
+      <a href="#section-13">十三、常见面试题</a>
+    </aside>
+
+    <article class="content">
+      <p class="status">CHAPTER 03 · SOURCE VERIFIED</p>
+      <h1>Device 删除流程</h1>
+      <div class="meta"><span>ThingsBoard 3.6.4</span><span>0cb411fc90</span><span>REST → PostgreSQL</span><span>Pre-commit Queue</span><span>Telemetry retained</span></div>
+      <p>本章追踪 <code>DELETE /api/device/{deviceId}</code> 从权限检查、Alarm/Device 聚合删除，到 Transport、Device State、Actor、Rule Engine 和审计的完整链路，并把直接 DAO 删除与 Edge 解除绑定作为不同入口处理。</p>
+      <div class="notice"><strong>核心结论：</strong>标准 REST 删除的 Alarm、Credentials、Relations、entity-alarm 与 Device 处在同一外层事务中；Gateway、Transport、Core、lifecycle 和 <code>ENTITY_DELETED</code> 在该事务提交前发送。<code>attribute_kv</code>、<code>ts_kv</code>、<code>ts_kv_latest</code>、Cassandra telemetry 和设备 RPC 不会自动清理。</div>
+
+      <h2 id="section-1">一、流程目标</h2>
+      <p>删除流程既要撤销 Device 的持久身份，也要让分布式运行时停止接受该 Device 的连接和消息。这两部分使用不同的一致性机制：前者依赖 PostgreSQL 本地事务，后者依赖 Queue、Actor 和协议回调。</p>
+      <table>
+        <thead><tr><th>时点</th><th>已经保证</th><th>仍未保证</th></tr></thead>
+        <tbody>
+          <tr><td>DAO DELETE 返回</td><td>SQL 语句已执行</td><td>外层事务提交</td></tr>
+          <tr><td>Queue send 返回</td><td>消息交给 Queue 实现</td><td>Consumer 完成、DB 最终提交</td></tr>
+          <tr><td>事务 COMMIT</td><td>Alarm/Device 聚合删除已持久化</td><td>Session/Actor/Rule Chain 已处理</td></tr>
+          <tr><td>HTTP 200</td><td>同步编排与 commit 成功</td><td>遥测、属性、RPC 已擦除</td></tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>会删除</th><th>不会删除</th></tr></thead>
+        <tbody>
+          <tr><td><code>device</code>、<code>device_credentials</code>、双向 relation、originator Alarm、相关 entity-alarm</td><td><code>attribute_kv</code>、<code>ts_kv</code>、<code>ts_kv_latest</code>、Cassandra history/latest、<code>rpc</code>、通用 event/debug event</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-2">二、入口</h2>
+      <table>
+        <thead><tr><th>入口</th><th>方法</th><th>真实语义</th></tr></thead>
+        <tbody>
+          <tr><td><code>DELETE /api/device/{deviceId}</code></td><td><code>org.thingsboard.server.controller.DeviceController.deleteDevice(String)</code></td><td>Tenant Admin 标准删除，进入完整应用事务</td></tr>
+          <tr><td>Import/VC removeById</td><td><code>org.thingsboard.server.service.sync.ie.exporting.DefaultExportableEntitiesService.removeById(TenantId, I)</code></td><td>直接调用 <code>DeviceServiceImpl.deleteEntity</code>，不包含完整 Alarm/Cluster 编排</td></tr>
+          <tr><td>Tenant 删除</td><td><code>org.thingsboard.server.dao.tenant.TenantServiceImpl.deleteTenant(TenantId)</code></td><td>分页 DAO 删除 Device；租户整体故意不是单事务</td></tr>
+          <tr><td>Edge 上行 DELETE</td><td><code>DeviceEdgeProcessor.processDeviceMsgFromEdge(...)</code></td><td>只 <code>unassignDeviceFromEdge</code>，不删除云端 Device</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart TD
+  U[Tenant Admin] --&gt; P{TENANT_ADMIN?}
+  P --&gt;|no| X1[403]
+  P --&gt;|yes| C[checkDeviceId DeviceId DELETE]
+  C --&gt; E{exists and same tenant?}
+  E --&gt;|no| X2[404 or permission error]
+  E --&gt;|yes| S[DefaultTbDeviceService.delete]
+  S --&gt; T[Outer Spring transaction]
+      </pre>
+
+      <h2 id="section-3">三、完整调用链</h2>
+      <h3>3.1 REST 到数据库</h3>
+      <table>
+        <thead><tr><th>步骤</th><th>类与完整方法</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>org.thingsboard.server.controller.DeviceController.deleteDevice(String strDeviceId)</code></td><td>解析 UUID、实体检查、委托应用服务</td></tr>
+          <tr><td>2</td><td><code>org.thingsboard.server.controller.BaseController.checkDeviceId(DeviceId, Operation)</code></td><td>查询 Device 并执行 DELETE 权限</td></tr>
+          <tr><td>3</td><td><code>org.thingsboard.server.service.entitiy.device.DefaultTbDeviceService.delete(Device, User)</code></td><td><code>@Transactional</code> 包住整个标准删除用例</td></tr>
+          <tr><td>4</td><td><code>org.thingsboard.server.service.entitiy.AbstractTbEntityService.removeAlarmsByOriginatorId(TenantId, EntityId)</code></td><td>一次查询全部 AlarmId，逐条执行 Alarm 聚合删除</td></tr>
+          <tr><td>5</td><td><code>org.thingsboard.server.dao.device.DeviceServiceImpl.deleteDevice(TenantId, DeviceId)</code></td><td>Entity View 保护、entity-alarm、credentials、relations、device</td></tr>
+          <tr><td>6</td><td><code>org.thingsboard.server.dao.device.DeviceCredentialsServiceImpl.deleteDeviceCredentialsByDeviceId(TenantId, DeviceId)</code></td><td>DELETE RETURNING credentials，发布 cache event</td></tr>
+          <tr><td>7</td><td><code>org.thingsboard.server.dao.relation.BaseRelationService.deleteEntityRelations(TenantId, EntityId)</code></td><td>删除 inbound/outbound relation，发布旧关系事件</td></tr>
+          <tr><td>8</td><td><code>org.thingsboard.server.dao.sql.device.JpaDeviceDao.removeById(TenantId, UUID)</code></td><td>删除 Device 元数据行</td></tr>
+        </tbody>
+      </table>
+
+      <h3>3.2 提交前通知与提交后事件</h3>
+      <table>
+        <thead><tr><th>阶段</th><th>方法</th><th>输出</th></tr></thead>
+        <tbody>
+          <tr><td>提交前</td><td><code>DefaultGatewayNotificationsService.onDeviceDeleted(Device)</code></td><td>可选持久化 RPC <code>gateway_device_deleted</code></td></tr>
+          <tr><td>提交前</td><td><code>DefaultTbClusterService.onDeviceDeleted(TenantId, Device, TbQueueCallback)</code></td><td>Transport delete、Core State delete、lifecycle DELETED</td></tr>
+          <tr><td>提交前</td><td><code>EntityActionService.pushEntityActionToRuleEngine(...)</code></td><td>旧 Device JSON 的 <code>ENTITY_DELETED</code></td></tr>
+          <tr><td>异步独立</td><td><code>AuditLogServiceImpl.logEntityAction(...)</code></td><td>mask 允许时 executor 写 <code>audit_log</code></td></tr>
+          <tr><td>提交后</td><td><code>@TransactionalEventListener</code></td><td>Device/Credentials/Count/Relation/Alarm Type cache evict；Edge event</td></tr>
+        </tbody>
+      </table>
+      <p>含完整包名、参数、输入输出、源码链接和设计原因的逐步调用链见<a href="README.md#三完整调用链">Markdown 第三节</a>。</p>
+
+      <h2 id="section-4">四、消息流</h2>
+      <pre class="mermaid">
+flowchart LR
+  A[Tenant Admin] --&gt; C[DeviceController]
+  C --&gt; APP[DefaultTbDeviceService transaction]
+  APP --&gt; AL[AlarmService]
+  AL --&gt; PG[(PostgreSQL)]
+  APP --&gt; DS[DeviceServiceImpl]
+  DS --&gt; PG
+  DS --&gt; N[NotificationEntityService before commit]
+  N --&gt; TQ[Transport notifications]
+  N --&gt; CQ[Core state queue]
+  N --&gt; LQ[Lifecycle notifications]
+  N --&gt; RQ[Rule Engine ENTITY_DELETED]
+  N --&gt; AU[Audit executor]
+  N --&gt; CM{COMMIT}
+  CM --&gt;|success| AC[After-commit cache and Edge events]
+  CM --&gt;|failure| GH[Messages are not recalled]
+      </pre>
+
+      <pre class="mermaid">
+flowchart TD
+  TQ[EntityDeleteMsg] --&gt; TS[DefaultTransportService]
+  TS --&gt; MQ[MQTT closes Netty channel]
+  TS --&gt; CO[CoAP cancels observations]
+  TS --&gt; LW[LwM2M removes session state]
+  CQ[State deleted=true] --&gt; ST[deviceStates.remove]
+  LQ[Lifecycle DELETED] --&gt; TA[TenantActor]
+  TA --&gt; DA[getOrCreate DeviceActor]
+  DA --&gt; STOP[DeviceDeleteMsg then stop]
+  RQ[ENTITY_DELETED] --&gt; RE[Rule Chain execution]
+      </pre>
+      <p><a href="../../assets/architecture/03-device-delete.svg"><img src="../../assets/architecture/03-device-delete.svg" alt="Device delete static SVG architecture"></a></p>
+
+      <h2 id="section-5">五、时序图</h2>
+      <p><a href="sequence.puml">PlantUML 源文件</a>覆盖拒绝、回滚、提交前消息与异步 Consumer；<a href="sequence.svg">SVG 渲染结果</a>可独立放大查看。</p>
+      <p><a href="sequence.svg"><img src="sequence.svg" alt="Device delete PlantUML sequence diagram"></a></p>
+
+      <h2 id="section-6">六、数据变化</h2>
+      <table>
+        <thead><tr><th>对象</th><th>变化</th><th>边界</th></tr></thead>
+        <tbody>
+          <tr><td>Alarm 聚合</td><td>originator Alarm、relations、comments、entity-alarm、可选 alarm_types 删除</td><td>外层事务</td></tr>
+          <tr><td>Device 聚合</td><td>credentials、双向 relation、entity-alarm、device 删除</td><td>外层事务</td></tr>
+          <tr><td>缓存</td><td>Device/Credentials/Count/Relation/Alarm Type 提交后 evict</td><td>AFTER_COMMIT</td></tr>
+          <tr><td>Session</td><td>MQTT close；CoAP/LwM2M/Gateway 清状态</td><td>Transport Queue 异步</td></tr>
+          <tr><td>Actor</td><td>Device Actor 可能先创建，再立即 stop</td><td>Lifecycle Queue 异步</td></tr>
+          <tr><td>Rule Engine</td><td>旧 Device 快照的 ENTITY_DELETED</td><td>提交前发送，异步消费</td></tr>
+          <tr><td>Telemetry/Attribute/RPC</td><td>不变，可能成为 orphan</td><td>本链无调用</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --&gt; Persisted
+  Persisted --&gt; Authorized
+  Authorized --&gt; Blocked: Entity View exists
+  Blocked --&gt; Persisted: rollback
+  Authorized --&gt; RowsDeletedInTx: no reference
+  RowsDeletedInTx --&gt; MessagesEmitted
+  MessagesEmitted --&gt; CommittedDeleted: commit
+  MessagesEmitted --&gt; PersistedRuntimeMismatch: rollback
+  CommittedDeleted --&gt; CacheEvicted: after commit
+  CommittedDeleted --&gt; TelemetryOrphaned: no telemetry delete
+      </pre>
+
+      <h2 id="section-7">七、源码分析</h2>
+      <pre class="mermaid">
+classDiagram
+  BaseController &lt;|-- DeviceController
+  AbstractTbEntityService &lt;|-- DefaultTbDeviceService
+  TbDeviceService &lt;|.. DefaultTbDeviceService
+  AbstractCachedEntityService &lt;|-- DeviceServiceImpl
+  DeviceService &lt;|.. DeviceServiceImpl
+  DeviceActor --|&gt; ContextAwareActor
+  DeviceController --&gt; DefaultTbDeviceService
+  DefaultTbDeviceService --&gt; AlarmService
+  DefaultTbDeviceService --&gt; DeviceServiceImpl
+  DeviceServiceImpl --&gt; DeviceCredentialsServiceImpl
+  DeviceServiceImpl --&gt; BaseRelationService
+  DefaultTbDeviceService --&gt; DefaultTbNotificationEntityService
+  DefaultTbNotificationEntityService --&gt; DefaultTbClusterService
+  DefaultTbNotificationEntityService --&gt; EntityActionService
+      </pre>
+      <p>应用层知道 User、ActionType、Alarm、Gateway 与 Cluster；DAO 层知道 Entity View、Credentials、Relations、Device DAO 和事务缓存事件。直接调用 DAO Service 只复用后一组语义，因此入口差异是架构事实，不是文档分类技巧。</p>
+      <table>
+        <thead><tr><th>职责</th><th>接口</th><th>实现</th></tr></thead>
+        <tbody>
+          <tr><td>应用用例</td><td><code>TbDeviceService</code></td><td><code>DefaultTbDeviceService</code></td></tr>
+          <tr><td>Device 持久化</td><td><code>DeviceService</code></td><td><code>DeviceServiceImpl</code></td></tr>
+          <tr><td>Alarm</td><td><code>AlarmService</code></td><td><code>BaseAlarmService</code></td></tr>
+          <tr><td>Relation</td><td><code>RelationService</code></td><td><code>BaseRelationService</code> / <code>JpaRelationDao</code></td></tr>
+          <tr><td>Cluster</td><td><code>TbClusterService</code></td><td><code>DefaultTbClusterService</code></td></tr>
+          <tr><td>State</td><td><code>DeviceStateService</code></td><td><code>DefaultDeviceStateService</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-8">八、Actor 分析</h2>
+      <p>数据库删除不经过 Actor。Lifecycle consumer 到达 <code>TenantActor.onComponentLifecycleMsg(...)</code> 后，删除分支调用 <code>getOrCreateDeviceActor(...)</code>，高优先级投递 <code>DeviceDeleteMsg</code>，随后把 ID 放入 <code>deletedDevices</code>。<code>DeviceActor</code> 对该消息唯一动作是 <code>ctx.stop(ctx.getSelf())</code>。</p>
+      <pre class="mermaid">
+sequenceDiagram
+  participant Q as Lifecycle Queue
+  participant C as Notification Consumer
+  participant T as TenantActor
+  participant D as DeviceActor
+  Q-&gt;&gt;C: Device DELETED
+  C-&gt;&gt;C: evict Device to Profile cache
+  C-&gt;&gt;T: lifecycle high priority
+  T-&gt;&gt;D: getOrCreate + DeviceDeleteMsg
+  T-&gt;&gt;T: deletedDevices.add
+  D-&gt;&gt;D: ctx.stop(self)
+      </pre>
+      <p>若 Actor 原先不存在，删除可能短暂创建它再停止。Consumer 在 commit 前运行时可能读到旧 Device；commit 后运行时初始化查询返回 null，但高优先级删除消息仍能触发停止。</p>
+
+      <h2 id="section-9">九、Kafka 分析</h2>
+      <p>Kafka 不是必需路径。默认 <code>queue.type=in-memory</code>；设置 <code>TB_QUEUE_TYPE=kafka</code> 后，同一 Queue SPI 才使用 Kafka producer/consumer。</p>
+      <table>
+        <thead><tr><th>逻辑 Queue</th><th>路由</th><th>Consumer</th></tr></thead>
+        <tbody>
+          <tr><td>Transport notification</td><td>每个 TB_TRANSPORT serviceId 的 notification topic</td><td>Transport consumer</td></tr>
+          <tr><td>Core state</td><td>tenantId + deviceId 的 Core partition</td><td><code>DefaultTbCoreConsumerService</code></td></tr>
+          <tr><td>Lifecycle notification</td><td>每个 TB_RULE_ENGINE serviceId</td><td><code>DefaultTbRuleEngineConsumerService</code></td></tr>
+          <tr><td>Rule Engine data</td><td>queueName + tenantId + entityId</td><td><code>TbRuleEngineQueueConsumerManager</code></td></tr>
+        </tbody>
+      </table>
+      <div class="notice"><strong>顺序边界：</strong>四类消息位于不同 topic/producer，没有跨 topic 全序；callback 基本为 <code>null</code>，也没有 transactional outbox。Rule Node 不能假设 Session 已关闭或 Actor 已停止。</div>
+
+      <h2 id="section-10">十、数据库分析</h2>
+      <h3>PostgreSQL</h3>
+      <p><code>device_credentials.device_id</code> 只有 UNIQUE，没有 Device FK；<code>relation</code>、<code>attribute_kv</code>、<code>alarm.originator_id</code>、<code>entity_alarm.entity_id</code> 都是多态引用。只有 <code>alarm_comment.alarm_id</code> 和 <code>entity_alarm.alarm_id</code> 对 Alarm 声明级联。</p>
+      <h3>TimescaleDB</h3>
+      <p>本链不删除 hypertable <code>ts_kv</code>，也不删除普通 latest 表 <code>ts_kv_latest</code>。3.6.4 的 SQL/Timescale TTL 过程通过当前 <code>device</code> 表按 tenant/customer 反查 EntityId；Device 行删除后，orphan history 可能无法再由该路径命中。</p>
+      <h3>Cassandra</h3>
+      <p>删除 PostgreSQL Device 不调用 Cassandra DAO。History 只可能按写入 TTL 自行过期；latest 或无 TTL 数据需要独立清理。</p>
+      <h3>Redis/Caffeine</h3>
+      <p>事务内只发布缓存事件；默认 <code>@TransactionalEventListener</code> 在成功提交后清本地或 Redis key。跨服务运行时缓存通过 Cluster notification 传播。</p>
+      <pre class="mermaid">
+flowchart LR
+  D[(device)] --&gt;|delete| X[removed]
+  C[(credentials)] --&gt;|delete| X
+  R[(relations and alarms)] --&gt;|delete| X
+  A[(attribute_kv)] --&gt;|no call| K1[retained]
+  T[(Timescale ts_kv)] --&gt;|no call| K2[retained]
+  L[(ts_kv_latest)] --&gt;|no call| K3[retained]
+  CS[(Cassandra)] --&gt;|no call| K4[retained]
+  RPC[(rpc)] --&gt;|no call| K5[retained]
+      </pre>
+
+      <h2 id="section-11">十一、异常处理</h2>
+      <table>
+        <thead><tr><th>失败点</th><th>DB 结果</th><th>分布式副作用</th></tr></thead>
+        <tbody>
+          <tr><td>Entity View 存在</td><td>整个外层事务回滚，Alarm 恢复</td><td>Device 通知尚未发送</td></tr>
+          <tr><td>SQL/约束错误</td><td>回滚</td><td>发生在通知前时无 Device runtime 消息</td></tr>
+          <tr><td>前一个 Queue send 成功，后一个同步失败</td><td>回滚</td><td>已发送消息不会撤销，Session/State/Actor 可能误删</td></tr>
+          <tr><td>producer 异步失败</td><td>仍可 commit</td><td>部分节点收不到删除；HTTP 仍可能 200</td></tr>
+          <tr><td>ENTITY_DELETED push 失败</td><td>内部 catch，仍可 commit</td><td>Rule Chain 不感知删除</td></tr>
+          <tr><td>Audit executor 失败</td><td>Device 事务不受影响</td><td>审计缺失</td></tr>
+          <tr><td>客户端超时后重试</td><td>可能已 commit</td><td>重试会因 Device not found 失败</td></tr>
+        </tbody>
+      </table>
+      <p><code>JpaRelationDao</code> 和 <code>BaseRelationService</code> 捕获部分 <code>ConcurrencyFailureException</code> 只写 debug。PostgreSQL 事务可能已 abort，或关系未可靠清完；必须检查最终 commit 与 orphan relation，不能把 catch 后继续执行当成成功。</p>
+      <div class="notice"><strong>大告警量风险：</strong><code>TimePageLink(Integer.MAX_VALUE)</code> 一次加载全部 AlarmId，再逐条删除。高告警量设备会放大 JVM 内存、事务时长、锁、WAL 和 dead tuples。</div>
+
+      <h2 id="section-12">十二、源码阅读路线</h2>
+      <ol>
+        <li><code>DeviceController.deleteDevice(...)</code>：权限和删除前 Device 快照。</li>
+        <li><code>DefaultTbDeviceService.delete(...)</code>：先标出外层事务。</li>
+        <li><code>AbstractTbEntityService.removeAlarmsByOriginatorId(...)</code>、<code>BaseAlarmService.delAlarm(...)</code>：Alarm 聚合。</li>
+        <li><code>DeviceServiceImpl.deleteDevice(...)</code>：引用检查和实际删除顺序。</li>
+        <li><code>DeviceCredentialsServiceImpl</code>、<code>BaseRelationService</code>、<code>JpaRelationDao</code>：无 FK 聚合清理。</li>
+        <li><code>DefaultTbNotificationEntityService.notifyDeleteDevice(...)</code>：确认通知在 commit 前。</li>
+        <li><code>DefaultTbClusterService.onDeviceDeleted(...)</code>、<code>EntityActionService</code>：四类 Queue。</li>
+        <li><code>DefaultTransportService</code> 与协议 listener：Session 清理。</li>
+        <li><code>DefaultDeviceStateService</code>、<code>TenantActor</code>、<code>DeviceActor</code>：State 与 Actor 生命周期。</li>
+        <li><code>schema-entities.sql</code>、<code>schema-timescale.sql</code>、<code>schema-ts.cql</code>：用物理模型验证残留数据。</li>
+      </ol>
+
+      <h2 id="section-13">十三、常见面试题</h2>
+      <h3>标准删除的事务边界在哪里？</h3><p><code>DefaultTbDeviceService.delete(Device, User)</code> 的 <code>@Transactional</code>，Alarm 与 Device 聚合删除加入同一事务。</p>
+      <h3>Cluster 通知在 commit 后吗？</h3><p>不是。Gateway、Transport、Core、lifecycle 和 ENTITY_DELETED 都在 commit 前；transaction listener 的缓存与 Edge 事件才是 AFTER_COMMIT。</p>
+      <h3>为什么不能只用 ON DELETE CASCADE？</h3><p>关系、属性、告警传播和遥测是多态引用，且 Session、Actor、Rule Engine 不是数据库对象。</p>
+      <h3>删除会清 TimescaleDB/Cassandra 吗？</h3><p>不会。两种后端都没有进入调用链；SQL/Timescale orphan history 甚至可能无法再被基于当前 Device 表的 TTL 过程命中。</p>
+      <h3>删除会预建 Device Actor 吗？</h3><p>可能。TenantActor 的删除分支调用 getOrCreate，再用 DeviceDeleteMsg 立即停止；创建 lifecycle 则不会这样做。</p>
+      <h3>Queue send 成功是否代表 DB 已删除？</h3><p>不代表。send 发生在 commit 前，DB 后续仍可回滚。</p>
+      <h3>Kafka 是必需的吗？</h3><p>不是。默认 Queue 实现是 in-memory，Kafka 只是可选物理实现。</p>
+      <h3>如何实现严格删除一致性？</h3><p>数据库 outbox、幂等消费者、删除 tombstone、可重试的跨后端清理任务和明确补偿，不能依赖当前 pre-commit fire-and-forget 消息。</p>
+
+      <nav class="chapter-nav" aria-label="章节导航">
+        <a href="../02-device-create/index.html">← 02 Device 创建流程</a>
+        <a href="../04-device-profile/index.html">04 Device Profile 流程 →</a>
+      </nav>
+    </article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script>
+    mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'neutral',flowchart:{htmlLabels:true,curve:'basis'},sequence:{useMaxWidth:true,wrap:true}});
+    window.addEventListener('DOMContentLoaded', function () {
+      function scrollToHash() {
+        var target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
+        if (target) { target.scrollIntoView(); }
+      }
+      function waitForImages() {
+        return Promise.all(Array.from(document.images).map(function (img) {
+          if (img.complete) { return Promise.resolve(); }
+          return new Promise(function (resolve) {
+            img.addEventListener('load', resolve, {once:true});
+            img.addEventListener('error', resolve, {once:true});
+          });
+        }));
+      }
+      mermaid.run({querySelector:'.mermaid'}).then(waitForImages).then(scrollToHash);
+      window.addEventListener('hashchange', function () { window.requestAnimationFrame(scrollToHash); });
+    });
+  </script>
+</body>
+</html>

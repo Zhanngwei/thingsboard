@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>04 Device Profile 流程 · ThingsBoard 3.6 源码解析</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="全局导航"><a href="README.md">Markdown</a><a href="../../SUMMARY.md">全书目录</a><a href="sequence.puml">PlantUML</a><a href="sequence.svg">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="本章目录">
+      <strong>04 Device Profile 流程</strong>
+      <a href="#section-1">一、流程目标</a>
+      <a href="#section-2">二、入口</a>
+      <a href="#section-3">三、完整调用链</a>
+      <a href="#section-4">四、消息流</a>
+      <a href="#section-5">五、时序图</a>
+      <a href="#section-6">六、数据变化</a>
+      <a href="#section-7">七、源码分析</a>
+      <a href="#section-8">八、Actor 分析</a>
+      <a href="#section-9">九、Kafka 分析</a>
+      <a href="#section-10">十、数据库分析</a>
+      <a href="#section-11">十一、异常处理</a>
+      <a href="#section-12">十二、源码阅读路线</a>
+      <a href="#section-13">十三、常见面试题</a>
+    </aside>
+
+    <article class="content">
+      <p class="status">CHAPTER 04 · SOURCE VERIFIED</p>
+      <h1>Device Profile 流程</h1>
+      <div class="meta"><span>ThingsBoard 3.6.4</span><span>0cb411fc90</span><span>PostgreSQL JSONB</span><span>Transport Hot Update</span><span>Non-atomic Default Switch</span></div>
+      <p>本章覆盖 Device Profile 创建、更新、重命名、默认切换和删除，并追踪 Transport、Rule Engine、Alarm Rules、Provision、OTA、Edge 与三套 Profile cache。</p>
+      <div class="notice"><strong>核心结论：</strong>标准 Profile 保存没有应用层外事务。Profile 行先在 DAO 事务中提交，随后才逐台同步 <code>device.type</code>、广播 Cluster、扇出 OTA 并发送 entity action。默认切换由两个独立 DAO 事务完成，数据库也没有“每租户一个默认”的唯一约束。</div>
+
+      <h2 id="section-1">一、流程目标</h2>
+      <p>Device Profile 是设备群组的运行策略，而不是单纯分类。它决定协议解析、Provision、默认 Rule Chain/Queue、Alarm Rules、默认 Dashboard 与 OTA 继承。</p>
+      <table>
+        <thead><tr><th>配置区域</th><th>影响</th><th>主要消费者</th></tr></thead>
+        <tbody>
+          <tr><td><code>transport_type</code> + transportConfiguration</td><td>topic、payload、Protobuf、LwM2M/SNMP 参数</td><td>Transport cache 与 active Session</td></tr>
+          <tr><td><code>provision_type</code> + provisionConfiguration</td><td>自动创建设备、预注册、X.509</td><td>DeviceProvisionService / Transport API</td></tr>
+          <tr><td><code>default_rule_chain_id</code> / <code>default_queue_name</code></td><td>消息入队前改写路由</td><td>DefaultTbClusterService</td></tr>
+          <tr><td><code>profile_data.alarms</code></td><td>按 DeviceState 判断创建/清除告警</td><td>TbDeviceProfileNode</td></tr>
+          <tr><td><code>firmware_id</code> / <code>software_id</code></td><td>未覆盖 OTA 的 Device 继承</td><td>DefaultOtaPackageStateService</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart LR
+  DP[(device_profile)] --&gt; C[typed columns]
+  DP --&gt; J[profile_data JSONB]
+  J --&gt; T[transport configuration]
+  J --&gt; P[provision configuration]
+  J --&gt; A[alarm rules]
+  DP --&gt; D[(device.device_profile_id)]
+  D --&gt; M[Telemetry Attributes RPC Events]
+  M --&gt; R[Profile-controlled decoding and routing]
+      </pre>
+      <table>
+        <thead><tr><th>操作</th><th>事务事实</th><th>主要风险</th></tr></thead>
+        <tbody>
+          <tr><td>保存</td><td>Image 可独立提交；Profile saveAndFlush 单独提交</td><td>后续失败但 Profile 已存在</td></tr>
+          <tr><td>重命名</td><td>每台 Device 单独事务</td><td><code>device.type</code> 部分同步</td></tr>
+          <tr><td>默认切换</td><td>旧 false、新 true 两个事务</td><td>无默认或多默认</td></tr>
+          <tr><td>删除</td><td>relations、entity-alarm、Profile 同事务</td><td>提交后通知仍可能失败</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-2">二、入口</h2>
+      <table>
+        <thead><tr><th>入口</th><th>方法</th><th>语义</th></tr></thead>
+        <tbody>
+          <tr><td><code>POST /api/deviceProfile</code></td><td><code>DeviceProfileController.saveDeviceProfile(DeviceProfile)</code></td><td>Tenant Admin 创建或更新</td></tr>
+          <tr><td><code>POST /api/deviceProfile/{id}/default</code></td><td><code>setDefaultDeviceProfile(String)</code></td><td>切换租户默认 Profile</td></tr>
+          <tr><td><code>DELETE /api/deviceProfile/{id}</code></td><td><code>deleteDeviceProfile(String)</code></td><td>删除非默认、无 Device 引用的 Profile</td></tr>
+          <tr><td>GET detail/info/default/list/name/key</td><td><code>DeviceProfileController</code> 各 read 方法</td><td>读取 Profile；key discovery 最多采样 100 台 Device</td></tr>
+          <tr><td>Tenant 创建</td><td><code>TenantServiceImpl.saveTenant(Tenant)</code></td><td>在 Tenant 外层事务中创建 default Profile</td></tr>
+          <tr><td>Import / VC</td><td><code>DeviceProfileImportService.saveOrUpdate(...)</code></td><td>直接 DAO 保存后自行传播</td></tr>
+          <tr><td>Edge 上行</td><td><code>DeviceProfileEdgeProcessor.processDeviceProfileMsgFromEdge(...)</code></td><td>支持 create/update；upstream delete 不支持</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+flowchart TD
+  E{entry} --&gt;|REST save| A[Application service]
+  E --&gt;|Tenant create| T[Tenant outer transaction]
+  E --&gt;|Import| I[Import service]
+  E --&gt;|Edge create update| G[Edge processor]
+  A --&gt; D[DeviceProfileServiceImpl]
+  T --&gt; D
+  I --&gt; D
+  G --&gt; D
+  D --&gt; PG[(PostgreSQL)]
+      </pre>
+
+      <h2 id="section-3">三、完整调用链</h2>
+      <h3>3.1 创建与更新</h3>
+      <table>
+        <thead><tr><th>步骤</th><th>类与完整方法</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>org.thingsboard.server.controller.DeviceProfileController.saveDeviceProfile(DeviceProfile)</code></td><td>覆盖 tenantId、权限/实体检查</td></tr>
+          <tr><td>2</td><td><code>org.thingsboard.server.service.entitiy.device.profile.DefaultTbDeviceProfileService.save(DeviceProfile, User)</code></td><td>应用编排，无外层事务</td></tr>
+          <tr><td>3</td><td><code>org.thingsboard.server.dao.device.DeviceProfileServiceImpl.doSaveDeviceProfile(DeviceProfile, boolean)</code></td><td>校验、image、JPA、cache、rename</td></tr>
+          <tr><td>4</td><td><code>org.thingsboard.server.dao.service.validator.DeviceProfileDataValidator.validateDataImpl(TenantId, DeviceProfile)</code></td><td>Queue/Transport/Alarm/Rule Chain/Dashboard/OTA 校验</td></tr>
+          <tr><td>5</td><td><code>org.thingsboard.server.dao.resource.BaseImageService.replaceBase64WithImageUrl(HasImage, String)</code></td><td>独立 image transaction</td></tr>
+          <tr><td>6</td><td><code>org.thingsboard.server.dao.sql.device.JpaDeviceProfileDao.saveAndFlush(TenantId, DeviceProfile)</code></td><td>Profile 行事务、flush 约束、commit</td></tr>
+          <tr><td>7</td><td><code>org.thingsboard.server.dao.device.DeviceServiceImpl.saveDevice(Device)</code></td><td>重命名时每台 Device 独立保存 <code>type</code></td></tr>
+          <tr><td>8</td><td><code>DefaultTbClusterService.onDeviceProfileChange(DeviceProfile, TbQueueCallback)</code></td><td>广播完整 Profile 到 Transport</td></tr>
+          <tr><td>9</td><td><code>DefaultOtaPackageStateService.update(DeviceProfile, boolean, boolean)</code></td><td>每 100 台分页扇出 OTA 状态</td></tr>
+          <tr><td>10</td><td><code>EntityActionService.logEntityAction(...)</code></td><td>Rule Engine action、Notification Rule、Audit</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+sequenceDiagram
+  participant R as REST
+  participant I as Image Tx
+  participant P as Profile Tx
+  participant D as Device Tx x N
+  participant Q as Queues
+  R-&gt;&gt;I: convert image
+  I--&gt;&gt;R: independent commit
+  R-&gt;&gt;P: saveAndFlush Profile
+  P--&gt;&gt;R: Profile commit
+  loop rename pages
+    R-&gt;&gt;D: save one Device type
+    D--&gt;&gt;R: Device commit
+  end
+  R-&gt;&gt;Q: Transport lifecycle OTA entity action
+      </pre>
+
+      <h3>3.2 默认切换</h3>
+      <pre class="mermaid">
+flowchart TD
+  R[set default] --&gt; O[save old default false Tx 1]
+  O --&gt; N[save target true Tx 2]
+  N --&gt; E[DAO cache evict]
+  E --&gt; A[old and target ENTITY_UPDATED plus audit]
+  O --&gt;|target save fails| Z[tenant may have no default]
+  C[two concurrent requests] --&gt; M[multiple defaults possible]
+      </pre>
+      <p><code>DeviceProfileServiceImpl.setDefaultDeviceProfile(...)</code> 没有外层事务；DDL 也没有 partial unique index。默认切换不调用 Transport Profile 广播或 lifecycle，只发送旧/新 Profile 的 entity action 与审计。</p>
+
+      <h3>3.3 删除</h3>
+      <pre class="mermaid">
+flowchart TD
+  D[delete Profile] --&gt; F{default?}
+  F --&gt;|yes| X[reject]
+  F --&gt;|no| R[delete relations and entity_alarm]
+  R --&gt; P[DELETE device_profile]
+  P --&gt; K{Device FK reference?}
+  K --&gt;|yes| B[rollback and reference error]
+  K --&gt;|no| C[cascade owned ota_package and commit]
+  C --&gt; E[after-commit cache and Edge]
+  E --&gt; Q[Transport delete lifecycle entity action audit]
+      </pre>
+      <p>完整方法签名、源码位置、输入输出和设计原因见<a href="README.md#三完整调用链">Markdown 第三节</a>。</p>
+
+      <h2 id="section-4">四、消息流</h2>
+      <pre class="mermaid">
+flowchart TD
+  U[Profile full update] --&gt; TS[DefaultTransportService]
+  TS --&gt; TC[Transport Profile cache]
+  TC --&gt; S[matching active Sessions]
+  S --&gt; M[MQTT filters payload protobuf adaptor]
+  S --&gt; C[CoAP adaptor]
+  S --&gt; L[LwM2M observation and security state]
+  S --&gt; N[SNMP target configuration]
+  LC[Profile lifecycle] --&gt; CO[AbstractConsumerService]
+  CO --&gt; RC[Rule Engine Profile cache evict reload]
+  RC --&gt; RN[TbDeviceProfileNode listener]
+  RN --&gt; AR[Alarm Rule DeviceState refresh]
+      </pre>
+      <p><a href="../../assets/architecture/04-device-profile.svg"><img src="../../assets/architecture/04-device-profile.svg" alt="Device Profile static SVG architecture"></a></p>
+      <p>Profile 的 <code>defaultRuleChainId</code> 和 <code>defaultQueueName</code> 在 <code>DefaultTbClusterService.pushMsgToRuleEngine(...)</code> 中、producer 发送前改写 TbMsg。Profile cache 更新与设备遥测入队没有全局顺序。</p>
+
+      <h2 id="section-5">五、时序图</h2>
+      <p><a href="sequence.puml">PlantUML 源文件</a>覆盖 save/default/delete 及异步 consumer；<a href="sequence.svg">SVG 结果</a>可独立放大。</p>
+      <p><a href="sequence.svg"><img src="sequence.svg" alt="Device Profile PlantUML sequence diagram"></a></p>
+
+      <h2 id="section-6">六、数据变化</h2>
+      <table>
+        <thead><tr><th>对象</th><th>保存/更新</th><th>默认切换</th><th>删除</th></tr></thead>
+        <tbody>
+          <tr><td><code>device_profile</code></td><td>INSERT/UPDATE，包括 JSONB</td><td>两行分别更新</td><td>DELETE</td></tr>
+          <tr><td><code>device</code></td><td>重命名时逐台更新 type</td><td>不变</td><td>引用会阻止删除</td></tr>
+          <tr><td>DAO cache</td><td>同步 evict</td><td>同步 evict，旧 provision key 有风险</td><td>commit 后 evict</td></tr>
+          <tr><td>Transport Session</td><td>热更新协议配置</td><td>无通知</td><td>仅 cache evict</td></tr>
+          <tr><td>Rule Engine cache/Alarm</td><td>lifecycle 后 reload/listener</td><td>无 lifecycle</td><td>reload null，无 listener</td></tr>
+          <tr><td>OTA telemetry/attribute</td><td>Profile OTA 变化时按 Device 扇出</td><td>不变</td><td>不做 Device OTA 清理</td></tr>
+          <tr><td>Rule Engine/Audit</td><td>CREATED/UPDATED</td><td>旧/新各 UPDATED</td><td>DELETED</td></tr>
+        </tbody>
+      </table>
+      <pre class="mermaid">
+stateDiagram-v2
+  state "Default profile" as DefaultProfile
+  [*] --&gt; Candidate
+  Candidate --&gt; Persisted: Profile commit
+  Persisted --&gt; PartialRename: Device update fails
+  Persisted --&gt; RuntimeConverging: queue messages
+  RuntimeConverging --&gt; Active: consumers refresh
+  Active --&gt; DefaultProfile: default switch
+  Active --&gt; DeleteBlocked: default or referenced
+  Active --&gt; Deleted: delete commit
+  Deleted --&gt; RuntimeEvicted: notifications consumed
+      </pre>
+
+      <h2 id="section-7">七、源码分析</h2>
+      <pre class="mermaid">
+classDiagram
+  BaseController &lt;|-- DeviceProfileController
+  AbstractTbEntityService &lt;|-- DefaultTbDeviceProfileService
+  TbDeviceProfileService &lt;|.. DefaultTbDeviceProfileService
+  AbstractCachedEntityService &lt;|-- DeviceProfileServiceImpl
+  DeviceProfileService &lt;|.. DeviceProfileServiceImpl
+  JpaAbstractDao &lt;|-- JpaDeviceProfileDao
+  DeviceProfileDao &lt;|.. JpaDeviceProfileDao
+  TbDeviceProfileCache &lt;|.. DefaultTbDeviceProfileCache
+  TransportDeviceProfileCache &lt;|.. DefaultTransportDeviceProfileCache
+  DeviceProfileController --&gt; DefaultTbDeviceProfileService
+  DefaultTbDeviceProfileService --&gt; DeviceProfileServiceImpl
+  DefaultTbDeviceProfileService --&gt; DefaultTbClusterService
+  DefaultTbDeviceProfileCache --&gt; TbDeviceProfileNode
+      </pre>
+      <p>校验位于 DAO Service，供 REST、Import、Edge、Installer 复用。JSONB 的多态对象由 Jackson <code>@JsonTypeInfo/@JsonSubTypes</code> 还原；深层正确性主要依赖 Java validator，而名称、Provision key、关联对象由 PostgreSQL UNIQUE/FK 兜底。</p>
+      <table>
+        <thead><tr><th>职责</th><th>接口</th><th>实现</th></tr></thead>
+        <tbody>
+          <tr><td>应用用例</td><td><code>TbDeviceProfileService</code></td><td><code>DefaultTbDeviceProfileService</code></td></tr>
+          <tr><td>DAO Service</td><td><code>DeviceProfileService</code></td><td><code>DeviceProfileServiceImpl</code></td></tr>
+          <tr><td>SQL DAO</td><td><code>DeviceProfileDao</code></td><td><code>JpaDeviceProfileDao</code></td></tr>
+          <tr><td>Transport cache</td><td><code>TransportDeviceProfileCache</code></td><td><code>DefaultTransportDeviceProfileCache</code></td></tr>
+          <tr><td>Rule Engine cache</td><td><code>TbDeviceProfileCache</code></td><td><code>DefaultTbDeviceProfileCache</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-8">八、Actor 分析</h2>
+      <p>没有 Device Profile Actor。Lifecycle consumer 会把消息发送到 <code>AppActor -&gt; TenantActor</code>，但继承的 entity actor resolver 只解析 RULE_CHAIN，Profile 找不到目标。Rule Node 的 Profile/Alarm 状态由 cache listener 给自己发送 self message 后串行更新。</p>
+      <pre class="mermaid">
+sequenceDiagram
+  participant Q as Lifecycle Queue
+  participant C as Consumer
+  participant K as Profile cache
+  participant N as TbDeviceProfileNode
+  participant A as AppActor TenantActor
+  Q-&gt;&gt;C: Profile UPDATED
+  C-&gt;&gt;K: evict and reload
+  K-&gt;&gt;N: listener fresh Profile
+  N-&gt;&gt;N: self DEVICE_PROFILE_UPDATE_SELF_MSG
+  C-&gt;&gt;A: high priority lifecycle
+  A--&gt;&gt;A: no Profile Actor target
+      </pre>
+
+      <h2 id="section-9">九、Kafka 分析</h2>
+      <p>Kafka 是可选 Queue 实现，默认可使用 in-memory。启用 Kafka 后，Transport notification、Core lifecycle、Rule Engine lifecycle、Rule Engine data 和 OTA state 是独立逻辑通道。</p>
+      <table>
+        <thead><tr><th>通道</th><th>消息</th><th>路由</th></tr></thead>
+        <tbody>
+          <tr><td>Transport notification</td><td>完整 Profile update / ID delete</td><td>每个 Transport serviceId 一份</td></tr>
+          <tr><td>Core/RE lifecycle</td><td>ComponentLifecycleMsg</td><td>每个 Core/Rule Engine serviceId</td></tr>
+          <tr><td>Rule Engine data</td><td>ENTITY_CREATED/UPDATED/DELETED</td><td>queueName + tenantId + profileId</td></tr>
+          <tr><td>OTA state</td><td>每 Device ToOtaPackageStateServiceMsg</td><td>OTA producer 默认 topic</td></tr>
+        </tbody>
+      </table>
+      <div class="notice"><strong>顺序边界：</strong>这些通道没有跨 topic 全序，也没有 transactional outbox。多数调用传 <code>callback=null</code>，HTTP 不等待消费者完成。</div>
+
+      <h2 id="section-10">十、数据库分析</h2>
+      <pre class="mermaid">
+erDiagram
+  DEVICE_PROFILE ||--o{ DEVICE : "FK restrict"
+  DEVICE_PROFILE ||--o{ OTA_PACKAGE : "FK cascade"
+  RULE_CHAIN ||--o{ DEVICE_PROFILE : defaults
+  DASHBOARD ||--o{ DEVICE_PROFILE : default
+  OTA_PACKAGE ||--o{ DEVICE_PROFILE : firmware_software
+  DEVICE_PROFILE {
+    uuid id PK
+    uuid tenant_id
+    varchar name
+    varchar transport_type
+    varchar provision_type
+    jsonb profile_data
+    boolean is_default
+    uuid default_rule_chain_id
+    varchar default_queue_name
+  }
+  DEVICE {
+    uuid id PK
+    uuid device_profile_id FK
+    varchar type
+  }
+      </pre>
+      <p>PostgreSQL 保证 tenant/name、tenant/externalId、全局 provision key 唯一，并维护 Rule Chain、Dashboard、OTA、Device FK。没有 default partial unique index。Profile 本身不写 TimescaleDB/Cassandra；只有 OTA 扇出产生的 Device telemetry 才按部署选择时序后端。</p>
+      <p>三套 cache 必须分开排障：DAO Caffeine/Redis、Rule Engine 进程内 Profile cache、Transport 进程内 Profile cache/Session。一次 Redis DEL 不代表运行时全部刷新。</p>
+
+      <h2 id="section-11">十一、异常处理</h2>
+      <table>
+        <thead><tr><th>失败点</th><th>数据库结果</th><th>运行时风险</th></tr></thead>
+        <tbody>
+          <tr><td>校验失败</td><td>Profile 未写</td><td>无 Cluster 消息</td></tr>
+          <tr><td>Profile SQL 失败</td><td>Profile 回滚，image 可能已提交</td><td>可能留下未引用 image</td></tr>
+          <tr><td>重命名第 N 台 Device 失败</td><td>Profile 和前 N-1 台已提交</td><td>Cluster Profile update 尚未发送</td></tr>
+          <tr><td>Transport/lifecycle producer 失败</td><td>Profile 已提交</td><td>节点 cache/Session 分裂</td></tr>
+          <tr><td>默认切换第二次 save 失败</td><td>旧默认已 false</td><td>租户没有默认 Profile</td></tr>
+          <tr><td>并发默认切换</td><td>可能多个默认</td><td>请求各自产生 action/audit</td></tr>
+          <tr><td>删除遇到 Device FK</td><td>删除事务整体回滚</td><td>Cluster delete 尚未发送</td></tr>
+          <tr><td>删除 commit 后通知失败</td><td>Profile 已删除</td><td>Transport/RE/Edge 可保留旧 cache</td></tr>
+        </tbody>
+      </table>
+      <p>生产巡检应检查每个 tenant 的 default 数量、Profile 与 <code>device.type</code> 一致性、notification lag、活跃 Session 解析行为和 OTA 扇出进度。HTTP error 不足以判断 Profile 是否已提交。</p>
+
+      <h2 id="section-12">十二、源码阅读路线</h2>
+      <ol>
+        <li><code>DeviceProfile</code>、<code>DeviceProfileData</code> 和 <code>schema-entities.sql</code>：先建立字段/FK/JSONB 模型。</li>
+        <li><code>DeviceProfileController</code>、<code>DefaultTbDeviceProfileService</code>：标记三条写入口和应用副作用顺序。</li>
+        <li><code>DeviceProfileServiceImpl.doSaveDeviceProfile</code>：确认 Profile commit 与 rename loop 的先后。</li>
+        <li><code>DeviceProfileDataValidator</code>：把配置字段映射到 Queue、Transport、Alarm、Rule Chain、Dashboard 与 OTA。</li>
+        <li><code>setDefaultDeviceProfile</code> 与 DDL：审查两个事务、默认唯一约束缺口和 provision cache key。</li>
+        <li><code>deleteDeviceProfile</code>：确认 default 保护、Device FK、cascade 和 after-commit event。</li>
+        <li><code>DefaultTbClusterService</code>、<code>DefaultTransportService</code>、<code>DeviceSessionCtx</code>：追踪协议热更新。</li>
+        <li><code>AbstractConsumerService</code>、<code>DefaultTbDeviceProfileCache</code>、<code>TbDeviceProfileNode</code>：追踪 Alarm Rules 热更新。</li>
+        <li><code>DefaultOtaPackageStateService</code>：理解小配置更新如何扇出为大量 Device 时序写。</li>
+      </ol>
+
+      <h2 id="section-13">十三、常见面试题</h2>
+      <h3>Profile 保存是一个事务吗？</h3><p>Profile 行本身是一个 DAO 事务；Image、Device rename、Cluster、OTA、Rule Engine 与 Audit 不在同一个事务。</p>
+      <h3>为什么重命名可能部分成功？</h3><p>Profile 先 commit，关联 Device 每台各自 commit，失败无法回滚前序结果。</p>
+      <h3>数据库保证一个租户一个默认 Profile 吗？</h3><p>不保证；应用检查和两个独立 save 无法覆盖并发或中途失败。</p>
+      <h3>在线 MQTT Session 如何使用新 Profile？</h3><p>Transport 收到完整 Profile 后按 ProfileId 扫描 Session，重建 topic filters、payload/Protobuf descriptors 和 adaptor，无需正常重连。</p>
+      <h3>Profile 有 Actor 吗？</h3><p>没有。Actor lifecycle 找不到 Profile target；Rule Node 通过 cache listener + self message 更新 Alarm Rule 状态。</p>
+      <h3>Profile 如何决定 Rule Engine 路由？</h3><p>producer 前读取 Profile，使用 defaultRuleChainId/defaultQueueName 改写 TbMsg，再解析 partition。</p>
+      <h3>删除 Profile 会删除 Device 吗？</h3><p>不会；Device FK 会阻止删除，且 default Profile 由服务直接拒绝。</p>
+      <h3>Profile 为什么使用 JSONB？</h3><p>协议、Provision 和 Alarm Rule 是多态且演进快；常用约束字段仍拆列，深层结构由 Jackson 和 validator 管理。</p>
+      <h3>Kafka 是否让 Profile 与数据库一致？</h3><p>不会。无 outbox、跨 topic 无全序、consumer 异步，Kafka 只实现 Queue SPI 的一种部署。</p>
+      <p>更多问题与标准答案见<a href="README.md#十三常见面试题">Markdown 第十三节</a>。</p>
+
+      <nav class="chapter-nav" aria-label="章节导航">
+        <a href="../03-device-delete/index.html">← 03 Device 删除流程</a>
+        <a href="../../index.html#chapter-05">05 Rule Chain 执行流程（待分析）→</a>
+      </nav>
+    </article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script>
+    mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'neutral',flowchart:{htmlLabels:true,curve:'basis'},sequence:{useMaxWidth:true,wrap:true}});
+    window.addEventListener('DOMContentLoaded', function () {
+      function scrollToHash() {
+        var target = window.location.hash ? document.getElementById(window.location.hash.slice(1)) : null;
+        if (target) { target.scrollIntoView(); }
+      }
+      function waitForImages() {
+        return Promise.all(Array.from(document.images).map(function (img) {
+          if (img.complete) { return Promise.resolve(); }
+          return new Promise(function (resolve) {
+            img.addEventListener('load', resolve, {once:true});
+            img.addEventListener('error', resolve, {once:true});
+          });
+        }));
+      }
+      mermaid.run({querySelector:'.mermaid'}).then(waitForImages).then(scrollToHash);
+      window.addEventListener('hashchange', function () { window.requestAnimationFrame(scrollToHash); });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+@startuml
+title ThingsBoard 3.6.4 - MQTT telemetry ingress and persistence
+autonumber
+hide footbox
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ArrowColor #314654
+  ActorBorderColor #176B87
+  LifeLineBorderColor #8A99A6
+  ParticipantBorderColor #8A99A6
+  ParticipantBackgroundColor #F4F7F9
+  BoxBorderColor #CBD5DC
+  BoxBackgroundColor #FAFBFC
+}
+
+actor "MQTT Device" as Device
+
+box "MQTT Transport" #EEF7F8
+participant "org.thingsboard.server.transport.mqtt\n.MqttTransportHandler" as Handler
+participant "org.thingsboard.server.transport.mqtt.adaptors\n.MqttTransportAdaptor" as Adaptor
+participant "org.thingsboard.server.common.transport.service\n.DefaultTransportService" as Transport
+end box
+
+box "Core authentication and session" #F8F2E9
+participant "org.thingsboard.server.service.transport\n.DefaultTransportApiService" as Auth
+database "PostgreSQL\ndevice_credentials / device" as EntityDb
+collections "DeviceProfileCache" as ProfileCache
+queue "Core Queue" as CoreQ
+participant "AppActor -> TenantActor -> DeviceActor" as DeviceActors
+end box
+
+box "Rule Engine" #F1F5F8
+queue "Rule Engine Queue\ndefault base topic: tb_rule_engine" as RuleQ
+participant "org.thingsboard.server.service.queue.ruleengine\n.TbRuleEngineQueueConsumerManager" as Consumer
+participant "org.thingsboard.server.actors.app.AppActor\norg.thingsboard.server.actors.tenant.TenantActor" as TenantActors
+participant "org.thingsboard.server.actors.ruleChain.RuleChainActor\norg.thingsboard.server.actors.ruleChain.RuleNodeActor" as RuleActors
+participant "org.thingsboard.rule.engine.telemetry\n.TbMsgTimeseriesNode" as SaveNode
+end box
+
+box "Telemetry service and DAO" #EEF6F0
+participant "org.thingsboard.server.service.telemetry\n.DefaultTelemetrySubscriptionService" as Telemetry
+participant "org.thingsboard.server.dao.timeseries\n.BaseTimeseriesService" as TsService
+participant "org.thingsboard.server.dao.timeseries\n.TimeseriesDao" as HistoryDao
+participant "org.thingsboard.server.dao.timeseries\n.TimeseriesLatestDao" as LatestDao
+database "Selected telemetry backend" as TsDb
+end box
+
+== Connection and authentication ==
+Device -> Handler: CONNECT(clientId, username, password)
+activate Handler
+Handler -> Transport: process(MQTT, ValidateBasicMqttCredRequestMsg, callback)
+activate Transport
+Transport -> Auth: transportApiRequestTemplate.send(request)
+activate Auth
+Auth -> EntityDb: findDeviceCredentialsByCredentialsId(...)
+EntityDb --> Auth: DeviceCredentials or null
+alt credentials found
+  Auth -> EntityDb: findDeviceById(...)
+  EntityDb --> Auth: Device
+  Auth -> ProfileCache: get(tenantId, deviceProfileId)
+  ProfileCache --> Auth: DeviceProfile
+  Auth --> Transport: ValidateDeviceCredentialsResponse(device, profile)
+  deactivate Auth
+  Transport --> Handler: callback.onSuccess(response)
+  deactivate Transport
+  Handler -> Handler: SessionInfoCreator.create(...)
+  Handler -> Transport: process(sessionInfo, SESSION_EVENT_MSG_OPEN, callback)
+  activate Transport
+  Transport -> CoreQ: send(ToCoreMsg(TransportToDeviceActorMsg))
+  CoreQ --> Transport: producer success
+  Transport --> Handler: callback.onSuccess(null)
+  deactivate Transport
+  Handler -> Handler: registerAsyncSession(...), connected=true
+  Handler --> Device: CONNACK SUCCESS
+  CoreQ ->> DeviceActors: consume Session Open asynchronously
+  note right of CoreQ
+  Consumer timing relative to CONNACK is not guaranteed.
+  end note
+else credentials invalid
+  Auth --> Transport: empty credentials response
+  deactivate Auth
+  Transport --> Handler: callback.onSuccess(empty response)
+  deactivate Transport
+  Handler --> Device: CONNACK NOT_AUTHORIZED / BAD_CREDENTIALS
+  Handler -> Handler: closeCtx(ctx)
+end
+deactivate Handler
+
+== Telemetry publish and early protocol acknowledgement ==
+Device -> Handler: PUBLISH v1/devices/me/telemetry (QoS 1)
+activate Handler
+Handler -> Handler: channelRead -> processMqttMsg\n-> processRegularSessionMsg -> processPublish
+Handler -> Adaptor: convertToPostTelemetry(ctx, mqttMsg)
+activate Adaptor
+Adaptor --> Handler: PostTelemetryMsg(TsKvListProto...)
+deactivate Adaptor
+Handler -> Transport: process(sessionInfo, postTelemetry, metadata, callback)
+activate Transport
+Transport -> ProfileCache: get(deviceProfileId)
+ProfileCache --> Transport: defaultRuleChainId + defaultQueueName
+loop each TsKvListProto timestamp batch
+  Transport -> Transport: TbMsg.newMsg(POST_TELEMETRY_REQUEST, ...)
+  Transport -> RuleQ: producer.send(tpi, ToRuleEngineMsg(TbMsg bytes), callback)
+end
+alt all queue producer callbacks succeed
+  RuleQ --> Transport: producer success
+  Transport --> Handler: TransportServiceCallback.onSuccess(null)
+  Handler --> Device: PUBACK SUCCESS
+else queue producer fails
+  RuleQ --> Transport: producer failure
+  Transport --> Handler: TransportServiceCallback.onError(error)
+  Handler -> Handler: closeCtx(ctx)
+end
+deactivate Transport
+deactivate Handler
+
+note over Device,RuleQ
+PUBACK is coupled to Rule Engine Queue producer success.
+It does not wait for queue consumption or database persistence.
+end note
+
+== Queue consumption, actors and persistence ==
+Consumer -> RuleQ: poll(queue.pollInterval)
+RuleQ --> Consumer: List<TbProtoQueueMsg<ToRuleEngineMsg>>
+activate Consumer
+Consumer -> Consumer: submitStrategy.init(msgs)\ncreate TbMsgPackProcessingContext
+loop submitted messages
+  Consumer -> TenantActors: QueueToRuleEngineMsg(tenantId, TbMsg, callback)
+  activate TenantActors
+  TenantActors -> RuleActors: route ruleChainId / root chain
+  deactivate TenantActors
+  activate RuleActors
+  RuleActors -> SaveNode: onMsg(TbContext, TbMsg)
+  activate SaveNode
+  SaveNode -> SaveNode: parse JSON -> List<TsKvEntry>\nresolve timestamp and TTL
+  SaveNode -> Telemetry: saveAndNotify(tenantId, customerId, entityId, entries, ttl, callback)
+  activate Telemetry
+  Telemetry -> Telemetry: check API usage, entity and values
+  Telemetry -> TsService: save(tenantId, entityId, entries, ttl)
+  activate TsService
+  par history partition/registry
+    TsService -> HistoryDao: savePartition(tenantId, entityId, ts, key)
+  else history value
+    TsService -> HistoryDao: save(tenantId, entityId, entry, ttl)
+  else latest value
+    TsService -> LatestDao: saveLatest(tenantId, entityId, entry)
+  end
+
+  alt database.ts.type = timescale
+    HistoryDao -> TsDb: batch upsert ts_kv hypertable\nTimescale routes ts to chunk
+    LatestDao -> TsDb: upsert ts_kv_latest
+  else database.ts.type = sql
+    HistoryDao -> TsDb: ensure RANGE partition + batch upsert ts_kv
+    LatestDao -> TsDb: upsert ts_kv_latest
+  else database.ts.type = cassandra
+    HistoryDao -> TsDb: write ts_kv_partitions_cf + ts_kv_cf (optional TTL)
+    LatestDao -> TsDb: write ts_kv_latest_cf
+  end
+
+  alt all DAO futures succeed
+    TsDb --> TsService: Futures complete successfully
+    TsService --> Telemetry: save future success
+    deactivate TsService
+    Telemetry --> SaveNode: TelemetryNodeCallback.onSuccess(null)
+    deactivate Telemetry
+    SaveNode -> RuleActors: ctx.tellSuccess(msg)
+  else any DAO future fails
+    TsDb --> TsService: Future failure
+    TsService --> Telemetry: save future failure
+    deactivate TsService
+    Telemetry --> SaveNode: TelemetryNodeCallback.onFailure(error)
+    deactivate Telemetry
+    SaveNode -> RuleActors: ctx.tellFailure(msg, error)
+  end
+  deactivate SaveNode
+  RuleActors --> Consumer: final TbMsgCallback success/failure
+  deactivate RuleActors
+end
+
+Consumer -> Consumer: await(packProcessingTimeout)\nprocessingStrategy.analyze(result)
+alt decision.isCommit()
+  Consumer -> RuleQ: consumer.commit()
+else retry selected messages
+  Consumer -> Consumer: submitStrategy.update(reprocessMap)
+end
+deactivate Consumer
+
+note over TsService,TsDb
+History and latest writes are aggregated with Futures.allAsList.
+They are not one cross-queue or cross-DAO transaction;
+a completed child write is not rolled back when another child fails.
+end note
+
+@enduml

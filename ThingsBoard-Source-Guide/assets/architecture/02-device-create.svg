@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Device create architecture</title>
+  <desc id="desc">REST permission, PostgreSQL transaction, after-commit events, cluster queues, Rule Engine, Device State and lazy Device Actor.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#35586a"/>
+    </marker>
+    <style>
+      .bg{fill:#f5f7f8}.panel{fill:#fff;stroke:#cbd5db;stroke-width:2}.lane{fill:#eef3f5;stroke:#c6d2d8;stroke-width:1.5}.box{fill:#fff;stroke:#527386;stroke-width:2}.db{fill:#fff8ed;stroke:#99682f;stroke-width:2}.queue{fill:#eef8f8;stroke:#2f787c;stroke-width:2}.event{fill:#f8f2e9;stroke:#9a681f;stroke-width:2}.actor{fill:#f3f0f8;stroke:#66558a;stroke-width:2}.muted{fill:#f5f6f7;stroke:#8b969d;stroke-width:1.5;stroke-dasharray:7 5}.title{font:700 30px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#17232b}.subtitle{font:15px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#5b6871}.laneTitle{font:700 17px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#263842}.label{font:600 15px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#18313f}.small{font:13px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#41545f}.tiny{font:12px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#586a74}.edge{fill:none;stroke:#35586a;stroke-width:2.2;marker-end:url(#arrow)}.dash{fill:none;stroke:#7b8790;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#arrow)}.divider{stroke:#d7dfe3;stroke-width:1}.badge{fill:#1f6d70}.badgeText{font:700 12px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#fff}.warn{fill:#fff5e8;stroke:#b17322;stroke-width:1.5}.warnText{font:600 13px 'Segoe UI','Microsoft YaHei',sans-serif;fill:#754711}
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1080"/>
+  <rect class="panel" x="34" y="30" width="1532" height="1018" rx="8"/>
+  <text class="title" x="72" y="78">ThingsBoard 3.6 Device 创建：事务先于 Actor 与 Queue</text>
+  <text class="subtitle" x="72" y="108">源码基线 3.6.4 / 0cb411fc90 · 标准 REST 主链 · PostgreSQL 原子写入与提交后异步传播</text>
+
+  <rect class="lane" x="68" y="142" width="330" height="512" rx="6"/>
+  <rect class="lane" x="424" y="142" width="610" height="512" rx="6"/>
+  <rect class="lane" x="1060" y="142" width="470" height="512" rx="6"/>
+  <text class="laneTitle" x="88" y="174">1. HTTP 与权限</text>
+  <text class="laneTitle" x="444" y="174">2. PostgreSQL 本地事务</text>
+  <text class="laneTitle" x="1080" y="174">3. COMMIT 之后</text>
+
+  <rect class="box" x="98" y="202" width="270" height="68" rx="6"/>
+  <text class="label" x="233" y="229" text-anchor="middle">Tenant Admin</text>
+  <text class="small" x="233" y="251" text-anchor="middle">POST /api/device</text>
+
+  <rect class="box" x="98" y="305" width="270" height="84" rx="6"/>
+  <text class="label" x="233" y="333" text-anchor="middle">DeviceController</text>
+  <text class="small" x="233" y="355" text-anchor="middle">覆盖 tenantId · 区分 create/update</text>
+  <text class="tiny" x="233" y="375" text-anchor="middle">saveDevice / saveDeviceWithCredentials</text>
+
+  <rect class="box" x="98" y="424" width="270" height="84" rx="6"/>
+  <text class="label" x="233" y="452" text-anchor="middle">AccessControlService</text>
+  <text class="small" x="233" y="474" text-anchor="middle">Resource.DEVICE + CREATE</text>
+  <text class="tiny" x="233" y="494" text-anchor="middle">Customer User 在细粒度检查被拒绝</text>
+
+  <rect class="box" x="98" y="543" width="270" height="82" rx="6"/>
+  <text class="label" x="233" y="571" text-anchor="middle">DefaultTbDeviceService</text>
+  <text class="small" x="233" y="593" text-anchor="middle">用户用例编排</text>
+  <text class="tiny" x="233" y="613" text-anchor="middle">DAO → VC → Cluster → Action/Audit</text>
+
+  <path class="edge" d="M233 270 V305"/>
+  <path class="edge" d="M233 389 V424"/>
+  <path class="edge" d="M233 508 V543"/>
+
+  <rect class="box" x="454" y="202" width="550" height="72" rx="6"/>
+  <text class="label" x="729" y="229" text-anchor="middle">DeviceServiceImpl @Transactional</text>
+  <text class="small" x="729" y="251" text-anchor="middle">saveDeviceWithAccessToken / saveDeviceWithCredentials</text>
+
+  <rect class="box" x="454" y="310" width="164" height="92" rx="6"/>
+  <text class="label" x="536" y="338" text-anchor="middle">Validator</text>
+  <text class="tiny" x="536" y="360" text-anchor="middle">tenant/customer</text>
+  <text class="tiny" x="536" y="380" text-anchor="middle">limit/transport/OTA</text>
+
+  <rect class="box" x="646" y="310" width="164" height="92" rx="6"/>
+  <text class="label" x="728" y="338" text-anchor="middle">Device Profile</text>
+  <text class="tiny" x="728" y="360" text-anchor="middle">find / default</text>
+  <text class="tiny" x="728" y="380" text-anchor="middle">find-or-create by type</text>
+
+  <rect class="box" x="838" y="310" width="166" height="92" rx="6"/>
+  <text class="label" x="921" y="338" text-anchor="middle">Normalize</text>
+  <text class="tiny" x="921" y="360" text-anchor="middle">type = profile.name</text>
+  <text class="tiny" x="921" y="380" text-anchor="middle">sync DeviceData</text>
+
+  <rect class="db" x="454" y="445" width="244" height="105" rx="6"/>
+  <text class="label" x="576" y="474" text-anchor="middle">device</text>
+  <text class="small" x="576" y="497" text-anchor="middle">JpaDeviceDao.saveAndFlush</text>
+  <text class="tiny" x="576" y="520" text-anchor="middle">tenant+name / externalId UNIQUE</text>
+  <text class="tiny" x="576" y="539" text-anchor="middle">device_profile_id FK</text>
+
+  <rect class="db" x="730" y="445" width="274" height="105" rx="6"/>
+  <text class="label" x="867" y="474" text-anchor="middle">device_credentials</text>
+  <text class="small" x="867" y="497" text-anchor="middle">CredentialsService.saveAndFlush</text>
+  <text class="tiny" x="867" y="520" text-anchor="middle">credentials_id / device_id UNIQUE</text>
+  <text class="tiny" x="867" y="539" text-anchor="middle">脚本未声明 device_id FK</text>
+
+  <rect class="event" x="558" y="581" width="342" height="50" rx="25"/>
+  <text class="label" x="729" y="612" text-anchor="middle">COMMIT：两表同成同败</text>
+
+  <path class="edge" d="M368 584 H424 V238 H454"/>
+  <path class="edge" d="M729 274 V290 H536 V310"/>
+  <path class="edge" d="M729 274 V310"/>
+  <path class="edge" d="M729 274 V290 H921 V310"/>
+  <path class="edge" d="M536 402 V425 H576 V445"/>
+  <path class="edge" d="M728 402 V425 H576 V445"/>
+  <path class="edge" d="M921 402 V425 H867 V445"/>
+  <path class="edge" d="M698 497 H730"/>
+  <path class="edge" d="M576 550 V566 H729 V581"/>
+  <path class="edge" d="M867 550 V566 H729 V581"/>
+
+  <rect class="event" x="1090" y="202" width="410" height="78" rx="6"/>
+  <text class="label" x="1295" y="230" text-anchor="middle">Spring AFTER_COMMIT listeners</text>
+  <text class="small" x="1295" y="252" text-anchor="middle">Device / Credentials / Count cache evict</text>
+  <text class="tiny" x="1295" y="271" text-anchor="middle">SaveEntityEvent → Edge notification</text>
+
+  <rect class="box" x="1090" y="316" width="410" height="74" rx="6"/>
+  <text class="label" x="1295" y="344" text-anchor="middle">DefaultTbNotificationEntityService</text>
+  <text class="small" x="1295" y="367" text-anchor="middle">Cluster branch first · EntityAction branch second</text>
+
+  <rect class="queue" x="1090" y="426" width="190" height="84" rx="6"/>
+  <text class="label" x="1185" y="454" text-anchor="middle">Cluster messages</text>
+  <text class="tiny" x="1185" y="476" text-anchor="middle">Transport update</text>
+  <text class="tiny" x="1185" y="496" text-anchor="middle">Lifecycle + Core state</text>
+
+  <rect class="queue" x="1310" y="426" width="190" height="84" rx="6"/>
+  <text class="label" x="1405" y="454" text-anchor="middle">Entity actions</text>
+  <text class="tiny" x="1405" y="476" text-anchor="middle">ENTITY_CREATED</text>
+  <text class="tiny" x="1405" y="496" text-anchor="middle">Audit executor</text>
+
+  <rect class="warn" x="1090" y="548" width="410" height="82" rx="6"/>
+  <text class="warnText" x="1295" y="574" text-anchor="middle">REST 不等待 Queue consumer 或 Audit Future</text>
+  <text class="tiny" x="1295" y="596" text-anchor="middle">PostgreSQL 与 Queue 没有 outbox / 分布式事务</text>
+  <text class="tiny" x="1295" y="616" text-anchor="middle">提交后同步异常可导致“HTTP 失败但 Device 已存在”</text>
+
+  <path class="edge" d="M900 606 H1045 V241 H1090"/>
+  <path class="edge" d="M1295 280 V316"/>
+  <path class="edge" d="M1295 390 V407 H1185 V426"/>
+  <path class="edge" d="M1295 390 V407 H1405 V426"/>
+  <path class="dash" d="M1185 510 V548"/>
+  <path class="dash" d="M1405 510 V548"/>
+
+  <line class="divider" x1="68" y1="684" x2="1530" y2="684"/>
+  <text class="laneTitle" x="72" y="720">4. 独立异步消费者与派生状态</text>
+
+  <rect class="queue" x="72" y="752" width="250" height="80" rx="6"/>
+  <text class="label" x="197" y="781" text-anchor="middle">Core Queue</text>
+  <text class="small" x="197" y="806" text-anchor="middle">DeviceStateServiceMsg added=true</text>
+
+  <rect class="box" x="360" y="752" width="270" height="80" rx="6"/>
+  <text class="label" x="495" y="781" text-anchor="middle">DefaultDeviceStateService</text>
+  <text class="small" x="495" y="806" text-anchor="middle">register partition state · active=false</text>
+
+  <rect class="db" x="668" y="752" width="270" height="80" rx="6"/>
+  <text class="label" x="803" y="781" text-anchor="middle">Derived state store</text>
+  <text class="small" x="803" y="806" text-anchor="middle">attribute_kv default / telemetry optional</text>
+
+  <rect class="queue" x="72" y="872" width="250" height="80" rx="6"/>
+  <text class="label" x="197" y="901" text-anchor="middle">Lifecycle notification</text>
+  <text class="small" x="197" y="926" text-anchor="middle">ComponentLifecycle CREATED</text>
+
+  <rect class="actor" x="360" y="872" width="270" height="80" rx="6"/>
+  <text class="label" x="495" y="901" text-anchor="middle">AppActor → TenantActor</text>
+  <text class="small" x="495" y="926" text-anchor="middle">cache evict · no eager DeviceActor</text>
+
+  <rect class="muted" x="668" y="872" width="270" height="80" rx="6"/>
+  <text class="label" x="803" y="901" text-anchor="middle">Device Actor</text>
+  <text class="small" x="803" y="926" text-anchor="middle">首次 device-aware message 才创建</text>
+
+  <rect class="queue" x="1000" y="752" width="250" height="80" rx="6"/>
+  <text class="label" x="1125" y="781" text-anchor="middle">Rule Engine Queue</text>
+  <text class="small" x="1125" y="806" text-anchor="middle">TbMsg ENTITY_CREATED</text>
+
+  <rect class="actor" x="1288" y="752" width="240" height="80" rx="6"/>
+  <text class="label" x="1408" y="781" text-anchor="middle">Rule Actors</text>
+  <text class="small" x="1408" y="806" text-anchor="middle">RuleChainActor → RuleNodeActor</text>
+
+  <rect class="event" x="1000" y="872" width="250" height="80" rx="6"/>
+  <text class="label" x="1125" y="901" text-anchor="middle">Audit executor</text>
+  <text class="small" x="1125" y="926" text-anchor="middle">filter enabled: ADDED / SUCCESS</text>
+
+  <rect class="db" x="1288" y="872" width="240" height="80" rx="6"/>
+  <text class="label" x="1408" y="901" text-anchor="middle">audit_log</text>
+  <text class="small" x="1408" y="926" text-anchor="middle">created_time RANGE partition</text>
+
+  <path class="edge" d="M322 792 H360"/>
+  <path class="edge" d="M630 792 H668"/>
+  <path class="edge" d="M322 912 H360"/>
+  <path class="dash" d="M630 912 H668"/>
+  <path class="edge" d="M1250 792 H1288"/>
+  <path class="edge" d="M1250 912 H1288"/>
+
+  <rect class="badge" x="74" y="989" width="124" height="28" rx="4"/>
+  <text class="badgeText" x="136" y="1008" text-anchor="middle">关键边界</text>
+  <text class="small" x="214" y="1008">实体事务提交成功 ≠ Queue 已确认 ≠ Rule Chain 已执行 ≠ Device Actor 已创建</text>
+</svg>

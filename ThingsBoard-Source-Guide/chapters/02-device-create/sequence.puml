@@ -1,0 +1,168 @@
+@startuml
+title ThingsBoard 3.6.4 - Device create: REST, transaction, notifications and lazy Actor
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam sequence {
+  ArrowColor #315A6B
+  ActorBorderColor #315A6B
+  LifeLineBorderColor #8A99A3
+  ParticipantBorderColor #537487
+  ParticipantBackgroundColor #F5F8FA
+  DatabaseBorderColor #8B5A2B
+  DatabaseBackgroundColor #FFF8EE
+  GroupBorderColor #8796A0
+  GroupBackgroundColor #FAFBFC
+  DividerBackgroundColor #EAF2F5
+}
+
+actor "Tenant Admin" as Admin
+participant "DeviceController" as Controller
+participant "AccessControlService" as ACL
+participant "DefaultTbDeviceService" as AppService
+participant "DeviceServiceImpl\n@Transactional" as DeviceService
+participant "DeviceDataValidator" as Validator
+participant "DeviceProfileServiceImpl" as ProfileService
+participant "JpaDeviceDao" as DeviceDao
+participant "DeviceCredentialsServiceImpl" as CredentialsService
+participant "Spring transaction events" as TxEvents
+database "PostgreSQL" as PG
+participant "DefaultTbNotificationEntityService" as Notification
+participant "DefaultTbClusterService" as Cluster
+queue "Transport notification queue" as TransportQueue
+queue "Rule Engine notification queue" as LifecycleQueue
+queue "Core queue" as CoreQueue
+participant "EntityActionService" as EntityAction
+queue "Rule Engine data queue" as RuleQueue
+participant "AuditLogServiceImpl\nexecutor" as Audit
+
+== REST boundary ==
+Admin -> Controller: POST /api/device\nDevice JSON + optional accessToken
+Controller -> Controller: device.tenantId = currentUser.tenantId
+Controller -> ACL: checkPermission(user, DEVICE, CREATE, null, device)
+
+alt Customer User or invalid tenant permission
+  ACL --> Controller: permission denied
+  Controller --> Admin: HTTP 403
+else Tenant Admin and same tenant
+  ACL --> Controller: allowed
+  Controller -> AppService: save(device, null, accessToken, user)
+
+  == PostgreSQL transaction ==
+  AppService -> DeviceService: saveDeviceWithAccessToken(device, accessToken)
+  DeviceService -> Validator: validate(device, Device::getTenantId)
+  Validator -> PG: read tenant/customer/limits as required
+  PG --> Validator: validation data
+  Validator --> DeviceService: valid
+
+  alt deviceProfileId supplied
+    DeviceService -> ProfileService: findDeviceProfileById(tenantId, profileId, false)
+    ProfileService -> PG: SELECT device_profile
+    PG --> ProfileService: profile
+  else legacy type supplied
+    DeviceService -> ProfileService: findOrCreateDeviceProfile(tenantId, type)
+    ProfileService -> PG: SELECT, optional INSERT + flush
+    PG --> ProfileService: profile
+  else neither supplied
+    DeviceService -> ProfileService: findDefaultDeviceProfile(tenantId)
+    ProfileService -> PG: SELECT default profile
+    PG --> ProfileService: profile
+  end
+  ProfileService --> DeviceService: DeviceProfile
+  DeviceService -> DeviceService: type = profile.name\nsync DeviceData transport configuration
+
+  DeviceService -> DeviceDao: saveAndFlush(tenantId, device)
+  DeviceDao -> PG: INSERT device
+  PG --> DeviceDao: generated UUID row / constraint result
+  DeviceDao --> DeviceService: saved Device
+
+  DeviceService -> CredentialsService: createDeviceCredentials(tenantId, credentials)
+  CredentialsService -> PG: INSERT device_credentials + flush
+
+  alt duplicate credentials or other DB error
+    PG --> CredentialsService: constraint/error
+    CredentialsService -> TxEvents: direct defensive credentials cache evict
+    CredentialsService --> DeviceService: exception
+    DeviceService -> PG: ROLLBACK device + credentials + optional profile
+    DeviceService -> TxEvents: direct defensive Device cache evict
+    DeviceService --> AppService: DataValidationException / DB error
+    AppService -> Audit: async FAILURE audit request
+    AppService --> Controller: rethrow
+    Controller --> Admin: HTTP error; Device not committed
+  else credentials flushed
+    PG --> CredentialsService: saved credentials
+    CredentialsService -> TxEvents: publish DeviceCredentialsEvictEvent
+    CredentialsService --> DeviceService: saved credentials
+    DeviceService -> TxEvents: publish DeviceCacheEvictEvent\nCountEntityEvictEvent\nSaveEntityEvent
+    DeviceService -> PG: COMMIT
+    PG --> DeviceService: commit complete
+
+    par AFTER_COMMIT cache listeners
+      TxEvents -> TxEvents: evict Device, Credentials and count keys
+    else AFTER_COMMIT Edge listener
+      TxEvents -> Cluster: sendNotificationMsgToEdge(... ADDED)
+    end
+
+    DeviceService --> AppService: committed Device
+
+    == Post-commit orchestration ==
+    AppService -> AppService: autoCommit(user, deviceId)\nreturned Future is not awaited
+    AppService -> Notification: notifyCreateOrUpdateDevice(... ADDED ...)
+    Notification -> Cluster: onDeviceUpdated(device, null)
+
+    par Transport visibility
+      Cluster -> TransportQueue: EntityUpdateMsg(DEVICE, encoded Device)\nnull callback
+    else Lifecycle visibility
+      Cluster -> LifecycleQueue: ComponentLifecycle(CREATED)\nnull callback
+    else Device State initialization
+      Cluster -> CoreQueue: DeviceStateServiceMsg(added=true)\nnull callback
+    end
+
+    Notification -> EntityAction: logEntityAction(user, deviceId, device, ..., ADDED, null)
+    EntityAction -> RuleQueue: TbMsg(ENTITY_CREATED, Device JSON)\nnull callback
+    EntityAction -> Audit: logEntityAction(... SUCCESS ...)
+    opt AuditLogLevelFilter.logEnabled(DEVICE, ADDED)
+      Audit -> PG: async INSERT audit_log partition
+    end
+    EntityAction --> Notification: returns without waiting Queue/Audit
+    Notification --> AppService: returns
+    AppService --> Controller: Device
+    Controller --> Admin: HTTP 200 Device JSON
+  end
+end
+
+== Independent asynchronous consumers ==
+participant "DefaultTbCoreConsumerService" as CoreConsumer
+participant "DefaultDeviceStateService" as StateService
+database "attribute_kv or timeseries backend" as StateDb
+participant "DefaultTbRuleEngineConsumerService" as LifecycleConsumer
+participant "AppActor / TenantActor" as LifecycleActors
+participant "TbRuleEngineQueueConsumerManager" as RuleConsumer
+participant "RuleChainActor / RuleNodeActor" as RuleActors
+
+CoreQueue -> CoreConsumer: poll DeviceStateServiceMsg
+CoreConsumer -> StateService: onQueueMsg(proto, callback)
+StateService -> PG: find Device + fetch previous state
+StateService -> StateDb: save active=false\ndefault attribute_kv; optional telemetry
+
+LifecycleQueue -> LifecycleConsumer: poll ComponentLifecycle CREATED
+LifecycleConsumer -> LifecycleConsumer: evict Device -> Profile cache
+LifecycleConsumer -> LifecycleActors: high-priority lifecycle message
+note right of LifecycleActors
+  TenantActor does not call
+  getOrCreateDeviceActor() for CREATED.
+  Device Actor remains lazy.
+end note
+
+RuleQueue -> RuleConsumer: poll ToRuleEngineMsg
+RuleConsumer -> RuleActors: QueueToRuleEngineMsg(ENTITY_CREATED)
+RuleActors -> RuleActors: execute configured Rule Chain
+
+note over AppService,Cluster
+  DB commit and Queue sends are not one transaction.
+  A synchronous exception after commit may produce an HTTP error
+  even though the Device already exists.
+end note
+
+@enduml

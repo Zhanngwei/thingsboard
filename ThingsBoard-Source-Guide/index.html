@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ThingsBoard release-3.6 源码解析指南</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="全局导航"><a href="README.md">Markdown</a><a href="SUMMARY.md">全书目录</a></nav>
+  </header>
+  <main class="layout home-layout">
+    <article class="content">
+      <section class="hero">
+        <p class="status">SOURCE-VERIFIED GUIDE · CHAPTERS 01-03 COMPLETE</p>
+        <h1>ThingsBoard release-3.6 源码解析指南</h1>
+        <p>从协议入口一路追到 Queue、Actor、Rule Engine、DAO 和数据库。每个流程独立成章，并明确线程边界、确认语义、数据变化和失败路径。</p>
+        <div class="meta"><span>版本 3.6.4</span><span>提交 0cb411fc90</span><span>Markdown + HTML</span><span>Mermaid + PlantUML + SVG</span></div>
+      </section>
+
+      <h2>已完成章节</h2>
+      <div class="chapter-card" id="chapter-01">
+        <h3><a href="chapters/01-mqtt-message-ingress/index.html">01 MQTT 消息进入系统</a></h3>
+        <p>Netty Pipeline、MQTT 认证、Telemetry PUBLISH、Rule Engine Queue、Actor 路由、Save Timeseries 和 PostgreSQL/TimescaleDB/Cassandra 分支。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/01-mqtt-message-ingress/README.md">Markdown</a> · <a href="chapters/01-mqtt-message-ingress/sequence.puml">PlantUML</a> · <a href="chapters/01-mqtt-message-ingress/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/01-mqtt-ingress.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-02">
+        <h3><a href="chapters/02-device-create/index.html">02 Device 创建流程</a></h3>
+        <p>REST 权限、Device/Profile/凭据原子事务、提交后缓存、Cluster、Rule Engine、Device State、Audit 与惰性 Device Actor。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/02-device-create/README.md">Markdown</a> · <a href="chapters/02-device-create/sequence.puml">PlantUML</a> · <a href="chapters/02-device-create/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/02-device-create.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-03">
+        <h3><a href="chapters/03-device-delete/index.html">03 Device 删除流程</a></h3>
+        <p>REST 外层事务、Alarm/Credentials/Relation 删除、提交前 Queue、Session 与 Actor 清理，以及 TimescaleDB/Cassandra 遥测残留。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/03-device-delete/README.md">Markdown</a> · <a href="chapters/03-device-delete/sequence.puml">PlantUML</a> · <a href="chapters/03-device-delete/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/03-device-delete.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-04">
+        <h3><a href="chapters/04-device-profile/index.html">04 Device Profile 流程</a></h3>
+        <p>Profile CRUD 与 JSONB 模型、独立事务边界、默认切换、Transport Session 热更新、Rule Engine Alarm Rules、OTA 和 Edge 传播。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/04-device-profile/README.md">Markdown</a> · <a href="chapters/04-device-profile/sequence.puml">PlantUML</a> · <a href="chapters/04-device-profile/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/04-device-profile.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="notice"><strong>源码结论：</strong>3.6.4 中普通 MQTT 遥测不会先进入 Device Actor。Transport 直接投递 Rule Engine Queue，消费者再进入 App/Tenant/RuleChain/RuleNode Actor。MQTT PUBACK 表示队列 producer 写入成功，不表示数据库落库完成。</div>
+      <div class="notice"><strong>Device 创建结论：</strong><code>device</code> 与 <code>device_credentials</code> 在一个 PostgreSQL 事务中提交；Cluster、Rule Engine、State 和 Audit 是提交后的异步传播。DEVICE CREATED 生命周期不会预建 Device Actor。</div>
+      <div class="notice"><strong>Device 删除结论：</strong>Alarm 与 Device 聚合删除共享外层 PostgreSQL 事务，但运行时 Queue 在 COMMIT 前发送。删除不清理 Attribute、TimescaleDB/Cassandra telemetry 或设备 RPC；DEVICE DELETED 可能临时创建 Device Actor 再停止。</div>
+      <div class="notice"><strong>Device Profile 结论：</strong>Profile 行先于重命名、Cluster、OTA、Rule Engine 与 Audit 提交；默认切换由两个独立 DAO 事务完成，数据库没有每租户唯一默认约束。Transport 和 Rule Engine 分别通过通知队列热更新 Session 与 Alarm Rule 状态。</div>
+
+      <h2>全书规划</h2>
+      <div class="catalog">
+        <section class="chapter-card" id="chapter-05"><h3>05 Rule Chain 执行流程</h3><p class="pending">待分析</p><p>Chain/Node Actor、关系路由、回调和处理终态。</p></section>
+        <section class="chapter-card" id="chapter-06"><h3>06 Alarm 创建流程</h3><p class="pending">待分析</p><p>规则判断、去重、状态机、DAO、事件和通知。</p></section>
+        <section class="chapter-card" id="chapter-07"><h3>07 Alarm 清除流程</h3><p class="pending">待分析</p><p>clear/ack 状态、传播、回调和数据库更新。</p></section>
+        <section class="chapter-card" id="chapter-08"><h3>08 Attributes 保存流程</h3><p class="pending">待分析</p><p>Scope、最新值、订阅通知和设备下行。</p></section>
+        <section class="chapter-card" id="chapter-09"><h3>09 Telemetry 保存流程</h3><p class="pending">待分析</p><p>多入口汇合、history/latest 双写和实时通知。</p></section>
+        <section class="chapter-card" id="chapter-10"><h3>10 RPC 流程</h3><p class="pending">待分析</p><p>双向 RPC、会话、超时、持久化和状态。</p></section>
+        <section class="chapter-card" id="chapter-11"><h3>11 OTA 流程</h3><p class="pending">待分析</p><p>包元数据、分块下载、状态遥测与队列。</p></section>
+        <section class="chapter-card" id="chapter-12"><h3>12 Dashboard 流程</h3><p class="pending">待分析</p><p>授权、Widget 数据查询和 WebSocket 订阅。</p></section>
+        <section class="chapter-card" id="chapter-13"><h3>13 Login 流程</h3><p class="pending">待分析</p><p>认证、用户状态、密码策略、审计与 token。</p></section>
+        <section class="chapter-card" id="chapter-14"><h3>14 JWT 认证流程</h3><p class="pending">待分析</p><p>Filter、token 解析、权限上下文和刷新。</p></section>
+        <section class="chapter-card" id="chapter-15"><h3>15 Actor 模型</h3><p class="pending">待分析</p><p>ActorSystem、Mailbox、Dispatcher 和 Actor 层次。</p></section>
+        <section class="chapter-card" id="chapter-16"><h3>16 Kafka 发送流程</h3><p class="pending">待分析</p><p>Producer、分区、序列化、回调和配置。</p></section>
+        <section class="chapter-card" id="chapter-17"><h3>17 Kafka 消费流程</h3><p class="pending">待分析</p><p>poll、pack、commit、retry 和 rebalance。</p></section>
+        <section class="chapter-card" id="chapter-18"><h3>18 Queue 管理</h3><p class="pending">待分析</p><p>队列配置、策略、隔离队列和动态更新。</p></section>
+        <section class="chapter-card" id="chapter-19"><h3>19 Cluster 通信</h3><p class="pending">待分析</p><p>发现、分区、通知与远程 Actor 路由。</p></section>
+        <section class="chapter-card" id="chapter-20"><h3>20 Cassandra 写入流程</h3><p class="pending">待分析</p><p>分区键、TTL、异步 driver 和 latest/history。</p></section>
+        <section class="chapter-card" id="chapter-21"><h3>21 TimescaleDB 写入流程</h3><p class="pending">待分析</p><p>Hypertable、chunk、批量写和聚合查询。</p></section>
+        <section class="chapter-card" id="chapter-22"><h3>22 PostgreSQL 写入流程</h3><p class="pending">待分析</p><p>事务、JDBC/JPA、分区、批处理和连接池。</p></section>
+      </div>
+      <p>其余协议、查询、缓存、WebSocket、Edge、通知和运行时章节见 <a href="SUMMARY.md">完整目录</a>。</p>
+    </article>
+  </main>
+  <footer class="footer">ThingsBoard 3.6.4 source guide · source-backed, chapter by chapter</footer>
+</body>
+</html>

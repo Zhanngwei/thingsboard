@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ThingsBoard 3.6.4 核心数据库表与关系图</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #1b2530;
+      --muted: #607080;
+      --line: #d8e0e8;
+      --pg: #236b8e;
+      --ts: #0c7c70;
+      --cs: #8a4b21;
+      --accent: #9d2f3f;
+      --code: #14202b;
+      --shadow: 0 8px 26px rgba(24, 39, 56, .08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.68;
+    }
+
+    a { color: var(--pg); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: .92em;
+      background: #edf2f6;
+      border: 1px solid #dce4eb;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 290px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 28px 22px;
+      background: #18232d;
+      color: #dce6ee;
+    }
+
+    nav h2 { margin: 0 0 8px; color: #fff; font-size: 18px; }
+    nav p { margin: 0 0 20px; color: #9fb0bf; font-size: 12px; }
+    nav ol { margin: 0; padding-left: 20px; }
+    nav li { margin: 8px 0; font-size: 13px; }
+    nav a { color: #e5edf4; }
+
+    main {
+      width: min(1320px, 100%);
+      margin: 0 auto;
+      padding: 34px 38px 80px;
+    }
+
+    .hero, section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero { padding: 32px; margin-bottom: 22px; }
+    .hero h1 { margin: 0 0 12px; font-size: 38px; line-height: 1.2; letter-spacing: 0; }
+    .hero p { color: var(--muted); max-width: 980px; }
+
+    section { padding: 27px 30px; margin: 20px 0; }
+    h2 { margin: 0 0 16px; padding-bottom: 11px; border-bottom: 2px solid var(--line); font-size: 27px; }
+    h3 { margin: 27px 0 10px; font-size: 20px; }
+    h4 { margin: 20px 0 8px; font-size: 16px; }
+    p { margin: 9px 0; }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+    .badge { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; background: #f7fafc; }
+    .pg { border-color: #9dc4d7; color: var(--pg); }
+    .ts { border-color: #95cec7; color: var(--ts); }
+    .cs { border-color: #d8b496; color: var(--cs); }
+
+    .note, .warn {
+      margin: 14px 0;
+      padding: 13px 15px;
+      border: 1px solid #bed9e6;
+      border-left: 5px solid var(--pg);
+      border-radius: 7px;
+      background: #eff8fc;
+    }
+    .warn { border-color: #e3cfaa; border-left-color: #b97816; background: #fff8ea; }
+
+    table { width: 100%; border-collapse: collapse; margin: 13px 0 22px; font-size: 13.5px; }
+    th, td { border: 1px solid var(--line); padding: 9px 11px; vertical-align: top; }
+    th { background: #edf2f6; text-align: left; }
+    tr:nth-child(even) td { background: #fbfcfd; }
+
+    .mermaid {
+      margin: 14px 0 22px;
+      padding: 16px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      text-align: center;
+    }
+
+    pre.sql {
+      margin: 13px 0 20px;
+      padding: 15px;
+      overflow: auto;
+      color: #e6edf3;
+      background: var(--code);
+      border-radius: 7px;
+      font: 13px/1.55 "Cascadia Code", Consolas, monospace;
+    }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 13px; }
+    .line-solid::before, .line-dash::before { content: ""; display: inline-block; width: 28px; margin-right: 7px; vertical-align: middle; border-top: 2px solid #526675; }
+    .line-dash::before { border-top-style: dashed; }
+
+    .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+    .card { border: 1px solid var(--line); border-radius: 7px; padding: 14px 15px; background: #fbfcfd; }
+    .card h4 { margin-top: 0; }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { position: relative; height: auto; }
+      main { padding: 20px 14px 55px; }
+      .hero, section { padding: 21px 17px; }
+      .hero h1 { font-size: 30px; }
+      .cols { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <nav>
+    <h2>ThingsBoard 3.6 数据库地图</h2>
+    <p>基于当前仓库 3.6.4 schema</p>
+    <ol>
+      <li><a href="#boundary">存储职责边界</a></li>
+      <li><a href="#legend">关系阅读规则</a></li>
+      <li><a href="#tenant">租户与用户</a></li>
+      <li><a href="#entity">设备、资产与关系</a></li>
+      <li><a href="#rule">规则引擎</a></li>
+      <li><a href="#alarm">告警</a></li>
+      <li><a href="#attribute">属性</a></li>
+      <li><a href="#telemetry">遥测统一模型</a></li>
+      <li><a href="#postgres-ts">PostgreSQL 遥测</a></li>
+      <li><a href="#timescale">TimescaleDB 遥测</a></li>
+      <li><a href="#cassandra">Cassandra 遥测</a></li>
+      <li><a href="#catalog">核心表职责总表</a></li>
+      <li><a href="#sources">源码位置</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <div class="hero">
+      <h1>ThingsBoard 3.6.4 核心数据库表与关系图</h1>
+      <p>本图回答三个问题：核心表保存什么、主要字段是什么、表之间如何关联。实体元数据、告警、规则链等长期保存在 PostgreSQL；遥测后端可配置为 PostgreSQL 分区表、TimescaleDB hypertable 或 Cassandra 宽表。</p>
+      <div class="badges">
+        <span class="badge pg">PostgreSQL 元数据</span>
+        <span class="badge ts">TimescaleDB 遥测</span>
+        <span class="badge cs">Cassandra 遥测</span>
+        <span class="badge">ThingsBoard 3.6.4</span>
+      </div>
+    </div>
+
+    <section id="boundary">
+      <h2>1. 存储职责边界</h2>
+      <pre class="mermaid">flowchart TB
+  TB[ThingsBoard Services]
+  Meta[PostgreSQL 元数据层]
+  Attr[PostgreSQL attribute_kv]
+  Alarm[PostgreSQL alarm/entity_alarm]
+  TsChoice{database.ts.type}
+  LatestChoice{database.ts_latest.type}
+  SqlTs[PostgreSQL ts_kv&lt;br/&gt;RANGE partition]
+  Timescale[TimescaleDB ts_kv&lt;br/&gt;hypertable/chunks]
+  Cassandra[Cassandra ts_kv_cf&lt;br/&gt;partition key + time bucket]
+  SqlLatest[PostgreSQL ts_kv_latest]
+  CassandraLatest[Cassandra ts_kv_latest_cf]
+
+  TB --> Meta
+  TB --> Attr
+  TB --> Alarm
+  TB --> TsChoice
+  TB --> LatestChoice
+  TsChoice -- sql --> SqlTs
+  TsChoice -- timescale --> Timescale
+  TsChoice -- cassandra --> Cassandra
+  LatestChoice -- sql/timescale --> SqlLatest
+  LatestChoice -- cassandra --> CassandraLatest</pre>
+
+      <table>
+        <thead><tr><th>数据域</th><th>默认/可选后端</th><th>主要表</th><th>职责</th></tr></thead>
+        <tbody>
+        <tr><td>租户、用户、设备、资产、规则链、告警</td><td>PostgreSQL</td><td><code>tenant</code>、<code>device</code>、<code>asset</code>、<code>rule_chain</code>、<code>alarm</code></td><td>关系型元数据、事务更新、列表检索和权限归属。</td></tr>
+        <tr><td>属性</td><td>PostgreSQL</td><td><code>attribute_kv</code></td><td>保存实体当前属性值及作用域，不保存完整历史曲线。</td></tr>
+        <tr><td>历史遥测</td><td><code>cassandra</code> / <code>sql</code> / <code>timescale</code></td><td><code>ts_kv</code> 或 <code>ts_kv_cf</code></td><td>按实体、key、时间范围保存和查询历史数据点。</td></tr>
+        <tr><td>最新遥测</td><td><code>cassandra</code> / <code>sql</code> / <code>timescale</code></td><td><code>ts_kv_latest</code> 或 <code>ts_kv_latest_cf</code></td><td>每个实体每个 key 只保留当前最新值，服务仪表盘和实体查询。</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><strong>关键点：</strong><code>database.ts.type</code> 和 <code>database.ts_latest.type</code> 是两个开关。历史遥测与最新遥测可以走不同实现；选择 <code>timescale</code> 时，只有历史表 <code>ts_kv</code> 被转为 hypertable，<code>ts_kv_latest</code> 仍是普通 PostgreSQL 表。</div>
+    </section>
+
+    <section id="legend">
+      <h2>2. 关系阅读规则</h2>
+      <div class="legend">
+        <span class="line-solid">数据库真实外键</span>
+        <span class="line-dash">应用层逻辑关联/多态关联</span>
+      </div>
+      <p>ThingsBoard 为了支持多种实体类型，大量使用 <code>entity_type + entity_id</code>。例如属性、关系、告警传播、遥测都可能指向 Device、Asset、Customer、Tenant 等不同表，因此数据库无法给它们建立单一外键。</p>
+      <div class="warn"><strong>不要按传统 ER 图误读：</strong><code>tenant_id</code>、<code>customer_id</code>、<code>originator_id</code> 等很多列在业务上有关联，但 schema 未声明 FK。删除、权限校验和一致性主要由 ThingsBoard Service/DAO 层控制。</div>
+    </section>
+
+    <section id="tenant">
+      <h2>3. 租户、客户与用户</h2>
+      <pre class="mermaid">erDiagram
+  TENANT_PROFILE ||--o{ TENANT : "FK tenant_profile_id"
+  TENANT ||--o{ CUSTOMER : "logical tenant_id"
+  TENANT ||--o{ TB_USER : "logical tenant_id"
+  CUSTOMER ||--o{ TB_USER : "logical customer_id"
+  TB_USER ||--o| USER_CREDENTIALS : "logical user_id unique"
+
+  TENANT_PROFILE {
+    uuid id PK
+    varchar name UK
+    jsonb profile_data
+    boolean is_default
+    boolean isolated_tb_core
+    boolean isolated_tb_rule_engine
+  }
+  TENANT {
+    uuid id PK
+    uuid tenant_profile_id FK
+    bigint created_time
+    varchar title
+    varchar region
+  }
+  CUSTOMER {
+    uuid id PK
+    uuid tenant_id
+    varchar title
+    varchar email
+    uuid external_id
+  }
+  TB_USER {
+    uuid id PK
+    uuid tenant_id
+    uuid customer_id
+    varchar email UK
+    varchar authority
+  }
+  USER_CREDENTIALS {
+    uuid id PK
+    uuid user_id UK
+    boolean enabled
+    varchar password
+    varchar activate_token UK
+    varchar reset_token UK
+  }</pre>
+
+      <table>
+        <thead><tr><th>表</th><th>主要字段</th><th>主要功能</th></tr></thead>
+        <tbody>
+        <tr><td><code>tenant_profile</code></td><td><code>profile_data</code>、<code>is_default</code>、隔离开关</td><td>定义租户资源限制、存储 TTL、队列和隔离策略的模板。</td></tr>
+        <tr><td><code>tenant</code></td><td><code>tenant_profile_id</code>、<code>title</code>、联系方式</td><td>平台多租户边界；设备、资产、用户、规则链等都归属于租户。</td></tr>
+        <tr><td><code>customer</code></td><td><code>tenant_id</code>、<code>title</code>、<code>external_id</code></td><td>租户下的客户/组织，用于分配设备、资产和用户访问范围。</td></tr>
+        <tr><td><code>tb_user</code></td><td><code>authority</code>、<code>tenant_id</code>、<code>customer_id</code>、<code>email</code></td><td>用户身份和权限归属；系统管理员、租户管理员、客户用户共享此表。</td></tr>
+        <tr><td><code>user_credentials</code></td><td><code>user_id</code>、<code>password</code>、激活/重置 token</td><td>登录凭证和账号启用状态，与用户一对一。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="entity">
+      <h2>4. 设备、资产、Profile 与实体关系</h2>
+      <pre class="mermaid">erDiagram
+  TENANT ||--o{ DEVICE_PROFILE : "logical tenant_id"
+  TENANT ||--o{ ASSET_PROFILE : "logical tenant_id"
+  TENANT ||--o{ DEVICE : "logical tenant_id"
+  TENANT ||--o{ ASSET : "logical tenant_id"
+  CUSTOMER ||--o{ DEVICE : "logical customer_id"
+  CUSTOMER ||--o{ ASSET : "logical customer_id"
+  DEVICE_PROFILE ||--o{ DEVICE : "FK device_profile_id"
+  ASSET_PROFILE ||--o{ ASSET : "FK asset_profile_id"
+  DEVICE ||--o| DEVICE_CREDENTIALS : "logical device_id unique"
+  DEVICE_PROFILE }o--o| RULE_CHAIN : "FK default_rule_chain_id"
+  ASSET_PROFILE }o--o| RULE_CHAIN : "FK default_rule_chain_id"
+  DEVICE_PROFILE }o--o| DASHBOARD : "FK default_dashboard_id"
+  ASSET_PROFILE }o--o| DASHBOARD : "FK default_dashboard_id"
+  DEVICE }o--o| OTA_PACKAGE : "FK firmware_id/software_id"
+  RELATION }o--|| DEVICE : "polymorphic from/to"
+  RELATION }o--|| ASSET : "polymorphic from/to"
+  ENTITY_VIEW }o--|| DEVICE : "logical entity_type/entity_id"
+
+  DEVICE_PROFILE {
+    uuid id PK
+    uuid tenant_id
+    varchar name
+    varchar transport_type
+    varchar provision_type
+    jsonb profile_data
+    uuid default_rule_chain_id FK
+    varchar default_queue_name
+  }
+  DEVICE {
+    uuid id PK
+    uuid tenant_id
+    uuid customer_id
+    uuid device_profile_id FK
+    varchar name
+    varchar label
+    jsonb device_data
+    uuid firmware_id FK
+    uuid software_id FK
+  }
+  DEVICE_CREDENTIALS {
+    uuid id PK
+    uuid device_id UK
+    varchar credentials_type
+    varchar credentials_id UK
+    varchar credentials_value
+  }
+  ASSET_PROFILE {
+    uuid id PK
+    uuid tenant_id
+    varchar name
+    uuid default_rule_chain_id FK
+    uuid default_dashboard_id FK
+  }
+  ASSET {
+    uuid id PK
+    uuid tenant_id
+    uuid customer_id
+    uuid asset_profile_id FK
+    varchar name
+    varchar label
+    varchar type
+  }
+  RELATION {
+    uuid from_id PK
+    varchar from_type PK
+    uuid to_id PK
+    varchar to_type PK
+    varchar relation_type_group PK
+    varchar relation_type PK
+  }
+  ENTITY_VIEW {
+    uuid id PK
+    varchar entity_type
+    uuid entity_id
+    varchar keys
+    bigint start_ts
+    bigint end_ts
+  }</pre>
+
+      <div class="cols">
+        <div class="card"><h4><code>device</code></h4><p>设备主档案。只保存身份、归属、profile、固件和扩展配置，不把温度/电压等动态值做成列。</p></div>
+        <div class="card"><h4><code>device_profile</code></h4><p>设备行为模板。定义 transport/provision 类型、profile JSON、默认规则链、队列、仪表盘及固件关联。</p></div>
+        <div class="card"><h4><code>device_credentials</code></h4><p>设备认证凭证。<code>device_id</code> 唯一，表达设备与凭证的一对一关系。</p></div>
+        <div class="card"><h4><code>asset</code> / <code>asset_profile</code></h4><p>用于楼宇、产线、机房等业务资产建模；Asset 也可以拥有属性、遥测和告警。</p></div>
+        <div class="card"><h4><code>relation</code></h4><p>通用实体关系边。用 from/to 的 ID 和类型支持 Device-to-Asset、Asset-to-Asset 等任意拓扑。</p></div>
+        <div class="card"><h4><code>entity_view</code></h4><p>原实体的受限视图，可限定可见 keys 和时间范围，常用于客户侧数据授权。</p></div>
+      </div>
+    </section>
+
+    <section id="rule">
+      <h2>5. 规则引擎与事件表</h2>
+      <pre class="mermaid">erDiagram
+  TENANT ||--o{ RULE_CHAIN : "logical tenant_id"
+  RULE_CHAIN ||--o{ RULE_NODE : "logical rule_chain_id"
+  RULE_CHAIN }o--o| RULE_NODE : "logical first_rule_node_id"
+  RULE_NODE ||--o{ RULE_NODE_STATE : "FK rule_node_id"
+  TENANT ||--o{ QUEUE : "logical tenant_id"
+  RULE_NODE }o--o| QUEUE : "logical queue_name"
+  RULE_NODE ||--o{ RULE_NODE_DEBUG_EVENT : "logical entity_id"
+  RULE_CHAIN ||--o{ RULE_CHAIN_DEBUG_EVENT : "logical entity_id"
+
+  RULE_CHAIN {
+    uuid id PK
+    uuid tenant_id
+    varchar name
+    varchar type
+    uuid first_rule_node_id
+    boolean root
+    boolean debug_mode
+    varchar configuration
+  }
+  RULE_NODE {
+    uuid id PK
+    uuid rule_chain_id
+    varchar type
+    varchar name
+    varchar configuration
+    int configuration_version
+    varchar queue_name
+  }
+  RULE_NODE_STATE {
+    uuid id PK
+    uuid rule_node_id FK
+    varchar entity_type
+    uuid entity_id
+    varchar state_data
+  }
+  QUEUE {
+    uuid id PK
+    uuid tenant_id
+    varchar name
+    varchar topic
+    int partitions
+    varchar submit_strategy
+    varchar processing_strategy
+  }</pre>
+
+      <table>
+        <thead><tr><th>表</th><th>主要字段</th><th>主要功能</th></tr></thead>
+        <tbody>
+        <tr><td><code>rule_chain</code></td><td><code>first_rule_node_id</code>、<code>root</code>、<code>configuration</code></td><td>保存规则链元数据和入口节点。</td></tr>
+        <tr><td><code>rule_node</code></td><td><code>rule_chain_id</code>、<code>type</code>、<code>configuration</code>、<code>queue_name</code></td><td>保存每个过滤、转换、动作节点的类型与配置。</td></tr>
+        <tr><td><code>rule_node_state</code></td><td><code>rule_node_id</code>、<code>entity_id</code>、<code>state_data</code></td><td>保存有状态规则节点针对实体的持久状态。</td></tr>
+        <tr><td><code>queue</code></td><td><code>topic</code>、<code>partitions</code>、提交/处理策略</td><td>保存 ThingsBoard 队列配置；它不是 Kafka 消息本身的数据表。</td></tr>
+        <tr><td><code>rule_node_debug_event</code> 等事件表</td><td><code>tenant_id</code>、<code>entity_id</code>、<code>ts</code>、消息/错误字段</td><td>保存规则节点调试、生命周期、统计和错误事件；按时间分区。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="alarm">
+      <h2>6. 告警模型</h2>
+      <pre class="mermaid">erDiagram
+  TENANT ||--o{ ALARM : "logical tenant_id"
+  CUSTOMER ||--o{ ALARM : "logical customer_id"
+  TB_USER ||--o{ ALARM : "logical assignee_id"
+  DEVICE ||--o{ ALARM : "logical originator_type/id"
+  ASSET ||--o{ ALARM : "logical originator_type/id"
+  ALARM ||--o{ ENTITY_ALARM : "FK alarm_id"
+  ALARM ||--o{ ALARM_COMMENT : "FK alarm_id cascade"
+  TB_USER ||--o{ ALARM_COMMENT : "logical user_id"
+  TENANT ||--o{ ALARM_TYPES : "FK tenant_id cascade"
+  ENTITY_ALARM }o--|| DEVICE : "polymorphic entity_type/id"
+  ENTITY_ALARM }o--|| ASSET : "polymorphic entity_type/id"
+
+  ALARM {
+    uuid id PK
+    uuid tenant_id
+    uuid customer_id
+    uuid originator_id
+    int originator_type
+    varchar type
+    varchar severity
+    bigint start_ts
+    bigint end_ts
+    boolean acknowledged
+    boolean cleared
+    uuid assignee_id
+  }
+  ENTITY_ALARM {
+    uuid entity_id PK
+    uuid alarm_id PK,FK
+    varchar entity_type
+    uuid tenant_id
+    varchar alarm_type
+    bigint created_time
+  }
+  ALARM_COMMENT {
+    uuid id
+    uuid alarm_id FK
+    uuid user_id
+    bigint created_time
+    varchar type
+    varchar comment
+  }
+  ALARM_TYPES {
+    uuid tenant_id FK
+    varchar type UK
+  }</pre>
+
+      <p><code>alarm</code> 是告警本体；<code>entity_alarm</code> 是实体到告警的查询索引/关联表；<code>alarm_comment</code> 保存评论和系统事件；<code>alarm_types</code> 保存租户已经使用的告警类型集合。</p>
+      <table>
+        <thead><tr><th>字段组</th><th>含义</th></tr></thead>
+        <tbody>
+        <tr><td><code>originator_id + originator_type</code></td><td>最初产生告警的实体，多态关联 Device、Asset 等。</td></tr>
+        <tr><td><code>type + severity</code></td><td>业务告警类型和严重级别。</td></tr>
+        <tr><td><code>start_ts/end_ts</code></td><td>告警有效时间窗口。</td></tr>
+        <tr><td><code>acknowledged/ack_ts</code></td><td>用户是否已确认以及确认时间。</td></tr>
+        <tr><td><code>cleared/clear_ts</code></td><td>告警是否已清除以及清除时间。</td></tr>
+        <tr><td><code>propagate*</code></td><td>是否把告警传播到 owner、tenant 或特定关系类型。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="attribute">
+      <h2>7. 属性表</h2>
+      <pre class="mermaid">flowchart LR
+  Device[device.id]
+  Asset[asset.id]
+  Customer[customer.id]
+  Tenant[tenant.id]
+  Attr[attribute_kv&lt;br/&gt;entity_type + entity_id + scope + key]
+  Values[bool_v / str_v / long_v / dbl_v / json_v]
+
+  Device -. logical .-> Attr
+  Asset -. logical .-> Attr
+  Customer -. logical .-> Attr
+  Tenant -. logical .-> Attr
+  Attr --> Values</pre>
+
+      <table>
+        <thead><tr><th>字段</th><th>作用</th></tr></thead>
+        <tbody>
+        <tr><td><code>entity_type</code>、<code>entity_id</code></td><td>多态定位拥有属性的实体。</td></tr>
+        <tr><td><code>attribute_type</code></td><td>属性作用域，例如 <code>SERVER_SCOPE</code>、<code>CLIENT_SCOPE</code>、<code>SHARED_SCOPE</code>。</td></tr>
+        <tr><td><code>attribute_key</code></td><td>属性名称；3.6.4 中直接保存字符串。</td></tr>
+        <tr><td>五种 value 列</td><td>按实际值类型只使用其中一列。</td></tr>
+        <tr><td><code>last_update_ts</code></td><td>最新更新时间，用于避免较老更新覆盖新值以及按更新时间查询。</td></tr>
+        </tbody>
+      </table>
+      <p>复合主键是 <code>(entity_type, entity_id, attribute_type, attribute_key)</code>，所以每个实体在每个 scope 下每个 key 只有一个当前值。</p>
+    </section>
+
+    <section id="telemetry">
+      <h2>8. 遥测统一逻辑模型</h2>
+      <pre class="mermaid">flowchart TB
+  Entity[Device / Asset / Customer / Tenant / Other Entity]
+  Key[temperature / humidity / active]
+  Point[Telemetry Point]
+  Id[entity_id]
+  Time[ts 毫秒时间戳]
+  Value[bool / str / long / double / json]
+  History[历史遥测]
+  Latest[最新遥测]
+
+  Entity --> Id --> Point
+  Key --> Point
+  Time --> Point
+  Value --> Point
+  Point --> History
+  Point --> Latest</pre>
+
+      <p>无论使用哪种后端，业务对象都是 <code>TsKvEntry</code>：实体、key、时间戳、一个类型化值。区别只在物理表和分区方式。</p>
+      <table>
+        <thead><tr><th>逻辑概念</th><th>PostgreSQL/TimescaleDB</th><th>Cassandra</th></tr></thead>
+        <tbody>
+        <tr><td>实体类型</td><td>历史/最新表不存 <code>entity_type</code>，依赖全局 UUID 和业务上下文</td><td>显式存 <code>entity_type</code>，参与 partition key</td></tr>
+        <tr><td>key</td><td><code>ts_kv_dictionary</code> 把字符串映射为 int</td><td>直接保存 text key</td></tr>
+        <tr><td>历史点</td><td><code>ts_kv</code></td><td><code>ts_kv_cf</code></td></tr>
+        <tr><td>最新点</td><td><code>ts_kv_latest</code></td><td><code>ts_kv_latest_cf</code></td></tr>
+        <tr><td>类型化值</td><td colspan="2"><code>bool_v</code>、<code>str_v</code>、<code>long_v</code>、<code>dbl_v</code>、<code>json_v</code> 中仅一个有值</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="postgres-ts">
+      <h2>9. PostgreSQL SQL 遥测表</h2>
+      <pre class="mermaid">erDiagram
+  TS_KV_DICTIONARY ||--o{ TS_KV : "key_id"
+  TS_KV_DICTIONARY ||--o{ TS_KV_LATEST : "key_id"
+  TS_KV ||--o{ TS_KV_PARTITION : "RANGE ts"
+
+  TS_KV {
+    uuid entity_id PK
+    int key PK
+    bigint ts PK
+    boolean bool_v
+    varchar str_v
+    bigint long_v
+    double dbl_v
+    json json_v
+  }
+  TS_KV_LATEST {
+    uuid entity_id PK
+    int key PK
+    bigint ts
+    boolean bool_v
+    varchar str_v
+    bigint long_v
+    double dbl_v
+    json json_v
+  }
+  TS_KV_DICTIONARY {
+    varchar key PK
+    int key_id UK
+  }
+  TS_KV_PARTITION {
+    bigint from_ts
+    bigint to_ts
+  }</pre>
+
+      <table>
+        <thead><tr><th>表</th><th>主键</th><th>功能</th></tr></thead>
+        <tbody>
+        <tr><td><code>ts_kv</code></td><td><code>(entity_id, key, ts)</code></td><td>历史遥测父表，按 <code>ts</code> 做 PostgreSQL RANGE 分区；默认分区粒度配置为 MONTHS。</td></tr>
+        <tr><td><code>ts_kv_latest</code></td><td><code>(entity_id, key)</code></td><td>保存每个实体每个 key 的最新值，避免从历史表排序取最后一条。</td></tr>
+        <tr><td><code>ts_kv_dictionary</code></td><td><code>key</code>，另有唯一 <code>key_id</code></td><td>把重复的遥测字符串 key 压缩成整数，减少历史表和索引体积。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="timescale">
+      <h2>10. TimescaleDB 遥测表</h2>
+      <pre class="mermaid">flowchart TB
+  App[ThingsBoard TimescaleTimeseriesDao]
+  Logical[ts_kv logical hypertable]
+  Router[Timescale chunk router by ts]
+  C1[_hyper chunk A]
+  C2[_hyper chunk B]
+  C3[_hyper current chunk]
+  Index1[(entity_id,key,ts index)]
+  Index2[(entity_id,key,ts index)]
+  Index3[(entity_id,key,ts index)]
+  Latest[ts_kv_latest&lt;br/&gt;ordinary PostgreSQL table]
+  Dict[ts_kv_dictionary]
+
+  App --> Logical --> Router
+  Router --> C1 --> Index1
+  Router --> C2 --> Index2
+  Router --> C3 --> Index3
+  App --> Latest
+  App --> Dict</pre>
+
+      <p>TimescaleDB schema 先创建普通 <code>ts_kv</code>，安装服务再执行：</p>
+      <pre class="sql">SELECT create_hypertable(
+  'ts_kv',
+  'ts',
+  chunk_time_interval =&gt; 604800000,
+  if_not_exists =&gt; true
+);</pre>
+      <table>
+        <thead><tr><th>对象</th><th>主要字段/键</th><th>功能</th></tr></thead>
+        <tbody>
+        <tr><td><code>ts_kv</code> hypertable</td><td>仍为 <code>(entity_id, key, ts)</code></td><td>应用看到的逻辑大表；写入和查询 SQL 与 PostgreSQL 版本基本一致。</td></tr>
+        <tr><td>chunk</td><td>按 <code>ts</code> 的时间区间</td><td>TimescaleDB 自动创建的物理子表，负责写入路由和时间范围裁剪。</td></tr>
+        <tr><td><code>ts_kv_latest</code></td><td><code>(entity_id, key)</code></td><td>仍是普通 PostgreSQL 表，不是 hypertable。</td></tr>
+        <tr><td><code>ts_kv_dictionary</code></td><td><code>key</code> / <code>key_id</code></td><td>与 SQL 后端相同的 key 字典。</td></tr>
+        </tbody>
+      </table>
+      <div class="note">3.6.4 默认 Timescale chunk interval 配置为 <code>604800000 ms</code>，即 7 天。真实生产应按每日写入量、索引大小和查询窗口重新评估。</div>
+    </section>
+
+    <section id="cassandra">
+      <h2>11. Cassandra 遥测表</h2>
+      <pre class="mermaid">flowchart TB
+  Entry[Telemetry entry]
+  PartitionCalc[按时间计算 partition bucket]
+  Registry[ts_kv_partitions_cf&lt;br/&gt;记录存在的bucket]
+  History[ts_kv_cf]
+  PKey[Partition Key&lt;br/&gt;entity_type, entity_id, key, partition]
+  Cluster[Clustering key ts]
+  Latest[ts_kv_latest_cf]
+  LatestKey[Partition Key&lt;br/&gt;entity_type, entity_id]
+  LatestCluster[Clustering key key]
+
+  Entry --> PartitionCalc
+  PartitionCalc --> Registry
+  PartitionCalc --> History --> PKey --> Cluster
+  Entry --> Latest --> LatestKey --> LatestCluster</pre>
+
+      <table>
+        <thead><tr><th>表</th><th>Primary Key</th><th>主要功能</th></tr></thead>
+        <tbody>
+        <tr><td><code>ts_kv_cf</code></td><td><code>((entity_type, entity_id, key, partition), ts)</code></td><td>历史遥测。先按实体、key、时间桶定位分区，再按 <code>ts</code> 聚簇排序。</td></tr>
+        <tr><td><code>ts_kv_partitions_cf</code></td><td><code>((entity_type, entity_id, key), partition)</code></td><td>登记某实体/key 已存在的时间分区，帮助跨时间范围查询找到要扫的分区。</td></tr>
+        <tr><td><code>ts_kv_latest_cf</code></td><td><code>((entity_type, entity_id), key)</code></td><td>同一实体的各个最新 key 聚集在一个 Cassandra partition 中。</td></tr>
+        </tbody>
+      </table>
+      <div class="warn"><strong>Cassandra 没有关系型 JOIN：</strong>实体、key、时间分区信息必须完整地编码进主键。表结构不是从 ER 关系推导出来的，而是从查询模式反向设计。</div>
+    </section>
+
+    <section id="catalog">
+      <h2>12. 核心表职责总表</h2>
+      <table>
+        <thead><tr><th>模块</th><th>核心表</th><th>主要字段</th><th>负责功能</th></tr></thead>
+        <tbody>
+        <tr><td>租户</td><td><code>tenant_profile</code></td><td><code>profile_data</code>、隔离开关</td><td>租户资源、TTL 和隔离策略模板。</td></tr>
+        <tr><td>租户</td><td><code>tenant</code></td><td><code>tenant_profile_id</code>、<code>title</code></td><td>平台数据隔离的顶层业务边界。</td></tr>
+        <tr><td>客户</td><td><code>customer</code></td><td><code>tenant_id</code>、<code>title</code></td><td>租户下的客户组织和设备/资产分配边界。</td></tr>
+        <tr><td>用户</td><td><code>tb_user</code>、<code>user_credentials</code></td><td><code>authority</code>、<code>tenant_id</code>、<code>customer_id</code>、凭证字段</td><td>用户身份、权限归属和登录凭证。</td></tr>
+        <tr><td>设备</td><td><code>device_profile</code></td><td><code>transport_type</code>、<code>profile_data</code>、默认规则链</td><td>设备类型、传输协议、告警/规则行为模板。</td></tr>
+        <tr><td>设备</td><td><code>device</code></td><td><code>tenant_id</code>、<code>customer_id</code>、<code>device_profile_id</code></td><td>设备主档案和归属。</td></tr>
+        <tr><td>设备</td><td><code>device_credentials</code></td><td><code>device_id</code>、凭证类型/ID/值</td><td>MQTT/HTTP/CoAP 等设备接入认证。</td></tr>
+        <tr><td>资产</td><td><code>asset_profile</code>、<code>asset</code></td><td>profile、tenant/customer、name/type</td><td>产线、楼宇、机房等非设备业务实体。</td></tr>
+        <tr><td>实体图</td><td><code>relation</code></td><td>from/to ID、实体类型、关系类型</td><td>建立任意实体拓扑和告警传播路径。</td></tr>
+        <tr><td>属性</td><td><code>attribute_kv</code></td><td>实体、scope、key、类型化值、更新时间</td><td>实体当前属性和配置状态。</td></tr>
+        <tr><td>规则引擎</td><td><code>rule_chain</code>、<code>rule_node</code></td><td>入口节点、节点类型、配置、队列名</td><td>规则链拓扑和节点配置。</td></tr>
+        <tr><td>规则引擎</td><td><code>rule_node_state</code></td><td>node、entity、state_data</td><td>有状态节点持久状态。</td></tr>
+        <tr><td>队列</td><td><code>queue</code></td><td>topic、partitions、提交/处理策略</td><td>队列配置，不保存实际 Kafka 消息。</td></tr>
+        <tr><td>告警</td><td><code>alarm</code></td><td>originator、type、severity、时间、ack/clear</td><td>告警主状态和生命周期。</td></tr>
+        <tr><td>告警</td><td><code>entity_alarm</code></td><td>entity、alarm、type、created_time</td><td>实体告警关联和按实体查询索引。</td></tr>
+        <tr><td>告警</td><td><code>alarm_comment</code>、<code>alarm_types</code></td><td>评论、用户、租户告警类型</td><td>告警评论/事件和类型集合。</td></tr>
+        <tr><td>UI</td><td><code>dashboard</code></td><td><code>configuration</code>、<code>tenant_id</code>、<code>title</code></td><td>仪表盘布局、数据源和组件配置。</td></tr>
+        <tr><td>UI</td><td><code>widget_type</code>、<code>widgets_bundle</code>、映射表</td><td>组件描述、bundle、顺序</td><td>Widget 定义和组件包组织。</td></tr>
+        <tr><td>遥测 SQL/Timescale</td><td><code>ts_kv_dictionary</code></td><td><code>key</code>、<code>key_id</code></td><td>遥测 key 字符串到整数映射。</td></tr>
+        <tr><td>遥测 SQL/Timescale</td><td><code>ts_kv</code>、<code>ts_kv_latest</code></td><td>entity、key、ts、类型化值</td><td>历史遥测与最新遥测。</td></tr>
+        <tr><td>遥测 Cassandra</td><td><code>ts_kv_cf</code>、<code>ts_kv_partitions_cf</code>、<code>ts_kv_latest_cf</code></td><td>entity_type、entity_id、key、partition、ts、类型化值</td><td>可水平扩展的历史/最新遥测宽表。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sources">
+      <h2>13. 对应源码与 schema</h2>
+      <table>
+        <thead><tr><th>内容</th><th>仓库路径</th></tr></thead>
+        <tbody>
+        <tr><td>版本</td><td><code>pom.xml</code>：<code>3.6.4</code></td></tr>
+        <tr><td>PostgreSQL 元数据表</td><td><code>dao/src/main/resources/sql/schema-entities.sql</code></td></tr>
+        <tr><td>核心索引</td><td><code>dao/src/main/resources/sql/schema-entities-idx.sql</code></td></tr>
+        <tr><td>PostgreSQL 历史遥测</td><td><code>dao/src/main/resources/sql/schema-ts-psql.sql</code></td></tr>
+        <tr><td>PostgreSQL 最新遥测</td><td><code>dao/src/main/resources/sql/schema-ts-latest-psql.sql</code></td></tr>
+        <tr><td>TimescaleDB schema</td><td><code>dao/src/main/resources/sql/schema-timescale.sql</code></td></tr>
+        <tr><td>Cassandra 历史遥测</td><td><code>dao/src/main/resources/cassandra/schema-ts.cql</code></td></tr>
+        <tr><td>Cassandra 最新遥测</td><td><code>dao/src/main/resources/cassandra/schema-ts-latest.cql</code></td></tr>
+        <tr><td>后端选择配置</td><td><code>application/src/main/resources/thingsboard.yml</code></td></tr>
+        </tbody>
+      </table>
+      <p>此 HTML 使用 Mermaid CDN 渲染图形；联网直接打开即可。离线查看时，将 Mermaid 脚本下载到本地并替换页面底部的 CDN 地址。</p>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: 'loose',
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#eef6fa',
+      primaryTextColor: '#1b2530',
+      primaryBorderColor: '#236b8e',
+      lineColor: '#617586',
+      secondaryColor: '#edf8f5',
+      tertiaryColor: '#fff7ec',
+      fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Microsoft YaHei, sans-serif'
+    }
+  });
+</script>
+</body>
+</html>

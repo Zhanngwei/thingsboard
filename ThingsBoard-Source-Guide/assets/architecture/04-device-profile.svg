@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6.4 Device Profile architecture</title>
+  <desc id="desc">Device Profile REST save, independent PostgreSQL transactions, cluster queues, Transport sessions, Rule Engine cache, alarm rules, OTA and Edge propagation.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#375d6b"/>
+    </marker>
+    <marker id="arrow-warn" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#a34f37"/>
+    </marker>
+    <style>
+      .bg{fill:#f6f8f7}.band{fill:#ffffff;stroke:#c8d1d3;stroke-width:1.5}.box{fill:#f9fbfb;stroke:#557684;stroke-width:1.6}.db{fill:#fff7e8;stroke:#9b6a2f;stroke-width:1.8}.queue{fill:#eef5ef;stroke:#4f7a59;stroke-width:1.7}.runtime{fill:#f3f1f8;stroke:#655b83;stroke-width:1.7}.warn{fill:#fff2ed;stroke:#a34f37;stroke-width:1.7}.title{font:700 30px Arial,sans-serif;fill:#20333b}.subtitle{font:400 15px Arial,sans-serif;fill:#52646b}.bandtitle{font:700 17px Arial,sans-serif;fill:#2d4853}.label{font:700 14px Arial,sans-serif;fill:#22363e}.small{font:400 12px Arial,sans-serif;fill:#43575f}.tiny{font:400 11px Arial,sans-serif;fill:#52646b}.line{stroke:#375d6b;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke:#66777d;stroke-width:1.7;stroke-dasharray:6 5;fill:none;marker-end:url(#arrow)}.warnline{stroke:#a34f37;stroke-width:2;fill:none;marker-end:url(#arrow-warn)}
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1040"/>
+  <text class="title" x="60" y="52">ThingsBoard 3.6.4 · Device Profile Control Plane</text>
+  <text class="subtitle" x="60" y="79">Profile row commit, compatibility updates and runtime propagation are separate consistency domains</text>
+
+  <rect class="band" x="40" y="105" width="1520" height="170" rx="6"/>
+  <text class="bandtitle" x="62" y="133">1 · Application entry and orchestration</text>
+  <rect class="box" x="70" y="158" width="205" height="78" rx="6"/>
+  <text class="label" x="172" y="185" text-anchor="middle">DeviceProfileController</text>
+  <text class="small" x="172" y="207" text-anchor="middle">save · set default · delete</text>
+  <rect class="box" x="345" y="151" width="280" height="92" rx="6"/>
+  <text class="label" x="485" y="179" text-anchor="middle">DefaultTbDeviceProfileService</text>
+  <text class="small" x="485" y="201" text-anchor="middle">No outer transaction</text>
+  <text class="tiny" x="485" y="222" text-anchor="middle">VC · Cluster · OTA · entity action · audit</text>
+  <rect class="box" x="700" y="151" width="300" height="92" rx="6"/>
+  <text class="label" x="850" y="179" text-anchor="middle">DeviceProfileServiceImpl</text>
+  <text class="small" x="850" y="201" text-anchor="middle">validate · persist · rename · cache event</text>
+  <text class="tiny" x="850" y="222" text-anchor="middle">Shared by REST, import, Edge and installer</text>
+  <rect class="box" x="1080" y="151" width="205" height="92" rx="6"/>
+  <text class="label" x="1182" y="179" text-anchor="middle">Profile Validator</text>
+  <text class="small" x="1182" y="201" text-anchor="middle">Transport · Alarm · Queue</text>
+  <text class="tiny" x="1182" y="222" text-anchor="middle">Rule Chain · OTA · Dashboard</text>
+  <rect class="warn" x="1350" y="151" width="175" height="92" rx="6"/>
+  <text class="label" x="1437" y="179" text-anchor="middle">Default switch</text>
+  <text class="small" x="1437" y="201" text-anchor="middle">2 independent saves</text>
+  <text class="tiny" x="1437" y="222" text-anchor="middle">No DB unique default</text>
+  <path class="line" d="M275 197 H345"/>
+  <path class="line" d="M625 197 H700"/>
+  <path class="line" d="M1000 197 H1080"/>
+  <path class="warnline" d="M1000 225 C1130 270 1270 270 1350 225"/>
+
+  <rect class="band" x="40" y="300" width="1520" height="220" rx="6"/>
+  <text class="bandtitle" x="62" y="329">2 · PostgreSQL transactions and physical model</text>
+  <rect class="db" x="75" y="360" width="260" height="118" rx="6"/>
+  <text class="label" x="205" y="389" text-anchor="middle">Image transaction</text>
+  <text class="small" x="205" y="414" text-anchor="middle">tb_resource / image URL</text>
+  <text class="tiny" x="205" y="438" text-anchor="middle">May commit before Profile</text>
+  <text class="tiny" x="205" y="458" text-anchor="middle">noRollbackFor Exception</text>
+  <rect class="db" x="410" y="350" width="340" height="138" rx="6"/>
+  <text class="label" x="580" y="379" text-anchor="middle">device_profile transaction</text>
+  <text class="small" x="580" y="403" text-anchor="middle">columns + profile_data JSONB</text>
+  <text class="tiny" x="580" y="427" text-anchor="middle">UNIQUE tenant/name · global provision key</text>
+  <text class="tiny" x="580" y="448" text-anchor="middle">FK Rule Chain · Dashboard · OTA</text>
+  <text class="tiny" x="580" y="469" text-anchor="middle">saveAndFlush commits before propagation</text>
+  <rect class="db" x="830" y="360" width="290" height="118" rx="6"/>
+  <text class="label" x="975" y="389" text-anchor="middle">Device rename transactions</text>
+  <text class="small" x="975" y="414" text-anchor="middle">page 100 · one save per Device</text>
+  <text class="tiny" x="975" y="438" text-anchor="middle">device.type compatibility field</text>
+  <text class="tiny" x="975" y="458" text-anchor="middle">partial completion is possible</text>
+  <rect class="db" x="1195" y="350" width="325" height="138" rx="6"/>
+  <text class="label" x="1357" y="379" text-anchor="middle">Delete transaction</text>
+  <text class="small" x="1357" y="403" text-anchor="middle">relations · entity_alarm · Profile</text>
+  <text class="tiny" x="1357" y="427" text-anchor="middle">default Profile rejected in service</text>
+  <text class="tiny" x="1357" y="448" text-anchor="middle">Device FK restricts delete</text>
+  <text class="tiny" x="1357" y="469" text-anchor="middle">ota_package profile FK cascades</text>
+  <path class="line" d="M335 419 H410"/>
+  <path class="line" d="M750 419 H830"/>
+  <path class="dash" d="M750 463 C900 520 1080 520 1195 463"/>
+
+  <rect class="band" x="40" y="545" width="1520" height="195" rx="6"/>
+  <text class="bandtitle" x="62" y="574">3 · Independent queue propagation after Profile persistence</text>
+  <rect class="queue" x="70" y="610" width="245" height="88" rx="6"/>
+  <text class="label" x="192" y="638" text-anchor="middle">Transport notifications</text>
+  <text class="small" x="192" y="661" text-anchor="middle">full Profile update / ID delete</text>
+  <text class="tiny" x="192" y="682" text-anchor="middle">one copy per Transport serviceId</text>
+  <rect class="queue" x="375" y="610" width="245" height="88" rx="6"/>
+  <text class="label" x="497" y="638" text-anchor="middle">Lifecycle notifications</text>
+  <text class="small" x="497" y="661" text-anchor="middle">Core + Rule Engine services</text>
+  <text class="tiny" x="497" y="682" text-anchor="middle">cache eviction signal</text>
+  <rect class="queue" x="680" y="610" width="245" height="88" rx="6"/>
+  <text class="label" x="802" y="638" text-anchor="middle">Rule Engine data</text>
+  <text class="small" x="802" y="661" text-anchor="middle">ENTITY_CREATED / UPDATED / DELETED</text>
+  <text class="tiny" x="802" y="682" text-anchor="middle">Profile JSON body</text>
+  <rect class="queue" x="985" y="610" width="225" height="88" rx="6"/>
+  <text class="label" x="1097" y="638" text-anchor="middle">OTA state queue</text>
+  <text class="small" x="1097" y="661" text-anchor="middle">per inherited Device</text>
+  <text class="tiny" x="1097" y="682" text-anchor="middle">state telemetry / attributes</text>
+  <rect class="queue" x="1270" y="610" width="250" height="88" rx="6"/>
+  <text class="label" x="1395" y="638" text-anchor="middle">Edge event / gRPC</text>
+  <text class="small" x="1395" y="661" text-anchor="middle">ADDED · UPDATED · DELETED</text>
+  <text class="tiny" x="1395" y="682" text-anchor="middle">upstream delete unsupported</text>
+  <path class="dash" d="M580 488 C500 555 270 560 192 610"/>
+  <path class="dash" d="M580 488 C560 545 515 570 497 610"/>
+  <path class="dash" d="M580 488 C650 545 750 570 802 610"/>
+  <path class="dash" d="M580 488 C760 535 980 555 1097 610"/>
+  <path class="dash" d="M580 488 C880 525 1240 550 1395 610"/>
+
+  <rect class="band" x="40" y="765" width="1520" height="210" rx="6"/>
+  <text class="bandtitle" x="62" y="794">4 · Runtime consumers and behavior</text>
+  <rect class="runtime" x="70" y="830" width="330" height="102" rx="6"/>
+  <text class="label" x="235" y="858" text-anchor="middle">Transport cache + active Sessions</text>
+  <text class="small" x="235" y="881" text-anchor="middle">MQTT topic/payload/Protobuf adaptor</text>
+  <text class="tiny" x="235" y="903" text-anchor="middle">CoAP · LwM2M · SNMP protocol state</text>
+  <rect class="runtime" x="475" y="830" width="330" height="102" rx="6"/>
+  <text class="label" x="640" y="858" text-anchor="middle">Rule Engine Profile cache</text>
+  <text class="small" x="640" y="881" text-anchor="middle">evict · reload · listener notification</text>
+  <text class="tiny" x="640" y="903" text-anchor="middle">DeviceId → ProfileId → Profile</text>
+  <rect class="runtime" x="880" y="830" width="330" height="102" rx="6"/>
+  <text class="label" x="1045" y="858" text-anchor="middle">TbDeviceProfileNode</text>
+  <text class="small" x="1045" y="881" text-anchor="middle">self message serializes state update</text>
+  <text class="tiny" x="1045" y="903" text-anchor="middle">refreshes per-Device Alarm Rules</text>
+  <rect class="warn" x="1285" y="830" width="235" height="102" rx="6"/>
+  <text class="label" x="1402" y="858" text-anchor="middle">No Profile Actor</text>
+  <text class="small" x="1402" y="881" text-anchor="middle">AppActor → TenantActor</text>
+  <text class="tiny" x="1402" y="903" text-anchor="middle">no entity actor target</text>
+  <path class="line" d="M192 698 C192 760 215 790 235 830"/>
+  <path class="line" d="M497 698 C500 760 585 790 640 830"/>
+  <path class="line" d="M805 881 H880"/>
+  <path class="warnline" d="M620 655 C930 735 1290 745 1402 830"/>
+
+  <rect class="warn" x="430" y="990" width="740" height="34" rx="5"/>
+  <text class="small" x="800" y="1012" text-anchor="middle">No shared transaction, no cross-topic total order, no transactional outbox, no Profile version epoch</text>
+</svg>

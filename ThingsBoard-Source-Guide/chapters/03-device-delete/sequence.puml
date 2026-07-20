@@ -1,0 +1,195 @@
+@startuml
+title ThingsBoard 3.6.4 - Device delete: database transaction, pre-commit queues and runtime cleanup
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam sequence {
+  ArrowColor #315A6B
+  ActorBorderColor #315A6B
+  LifeLineBorderColor #8A99A3
+  ParticipantBorderColor #537487
+  ParticipantBackgroundColor #F5F8FA
+  DatabaseBorderColor #8B5A2B
+  DatabaseBackgroundColor #FFF8EE
+  GroupBorderColor #8796A0
+  GroupBackgroundColor #FAFBFC
+  DividerBackgroundColor #EAF2F5
+}
+
+actor "Tenant Admin" as Admin
+participant "DeviceController" as Controller
+participant "AccessControlService" as ACL
+participant "DefaultTbDeviceService\n@Transactional" as AppService
+participant "AlarmService" as AlarmService
+participant "DeviceServiceImpl" as DeviceService
+participant "EntityViewService" as EntityView
+participant "DeviceCredentialsServiceImpl" as Credentials
+participant "BaseRelationService" as Relations
+participant "Spring transaction events" as TxEvents
+database "PostgreSQL" as PG
+participant "DefaultTbNotificationEntityService" as Notification
+participant "GatewayNotificationsService" as GatewayNf
+participant "DefaultTbClusterService" as Cluster
+queue "Transport notifications" as TransportQueue
+queue "Core queue" as CoreQueue
+queue "Lifecycle notifications" as LifecycleQueue
+participant "EntityActionService" as EntityAction
+queue "Rule Engine data queue" as RuleQueue
+participant "AuditLogServiceImpl\nexecutor" as Audit
+
+== REST authorization ==
+Admin -> Controller: DELETE /api/device/{deviceId}
+Controller -> Controller: parse UUID -> DeviceId
+Controller -> ACL: checkPermission(user, DEVICE, DELETE, deviceId, device)
+
+alt not Tenant Admin, not found, or permission denied
+  ACL --> Controller: exception
+  Controller --> Admin: HTTP 403 / 404
+else authorized and Device loaded
+  ACL --> Controller: Device snapshot
+  Controller -> AppService: delete(device, currentUser)
+
+  == Outer PostgreSQL transaction ==
+  AppService -> AlarmService: findAlarmIdsByOriginatorId(tenantId, deviceId, max page)
+  AlarmService -> PG: SELECT all originator Alarm IDs
+  PG --> AlarmService: Alarm IDs
+  loop each originator Alarm
+    AppService -> AlarmService: delAlarm(tenantId, alarmId)
+    AlarmService -> PG: SELECT AlarmInfo
+    AlarmService -> Relations: deleteEntityRelations(tenantId, alarmId)
+    Relations -> PG: DELETE Alarm inbound/outbound relations
+    AlarmService -> PG: DELETE alarm
+    note right of PG
+      alarm_comment and entity_alarm
+      cascade by alarm_id FK.
+    end note
+    AlarmService -> TxEvents: publish DeleteEntityEvent<AlarmInfo>\nand AlarmTypes cache event
+  end
+
+  AppService -> DeviceService: deleteDevice(tenantId, deviceId)
+  DeviceService -> EntityView: existsByTenantIdAndEntityId(tenantId, deviceId)
+  EntityView -> PG: SELECT existence
+  PG --> EntityView: exists?
+
+  alt Entity View references Device
+    EntityView --> DeviceService: true
+    DeviceService --> AppService: DataValidationException
+    AppService -> Audit: async FAILURE audit request
+    AppService -> PG: ROLLBACK all Alarm and Device work
+    note over TxEvents
+      Default AFTER_COMMIT listeners do not run.
+      No Device cluster notification was sent yet.
+    end note
+    AppService --> Controller: exception
+    Controller --> Admin: HTTP error
+  else no Entity View reference
+    EntityView --> DeviceService: false
+    DeviceService -> PG: SELECT Device snapshot
+    DeviceService -> AlarmService: deleteEntityAlarmRelations(tenantId, deviceId)
+    AlarmService -> PG: DELETE propagated entity_alarm rows
+
+    DeviceService -> Credentials: deleteDeviceCredentialsByDeviceId(tenantId, deviceId)
+    Credentials -> PG: DELETE device_credentials RETURNING row
+    PG --> Credentials: credentialsId
+    Credentials -> TxEvents: DeviceCredentialsEvictEvent
+
+    DeviceService -> Relations: deleteEntityRelations(tenantId, deviceId)
+    Relations -> PG: SELECT inbound and outbound relations
+    Relations -> PG: DELETE inbound relations
+    Relations -> PG: DELETE outbound relations
+    Relations -> TxEvents: EntityRelationEvent for old relations
+
+    DeviceService -> PG: DELETE device WHERE id = ?
+    DeviceService -> TxEvents: DeviceCacheEvictEvent\nEntityCountCacheEvictEvent\nDeleteEntityEvent(entity=null)
+    DeviceService --> AppService: DB statements completed, not committed
+
+    == Pre-commit runtime notifications ==
+    AppService -> Notification: notifyDeleteDevice(tenantId, deviceId, customerId, device, user)
+    Notification -> GatewayNf: onDeviceDeleted(device)
+    opt additionalInfo.lastConnectedGateway exists
+      GatewayNf -> RuleQueue: persistent RPC gateway_device_deleted(deviceName)
+    end
+
+    Notification -> Cluster: onDeviceDeleted(tenantId, device, null)
+    par Transport session cleanup
+      Cluster -> TransportQueue: EntityDeleteMsg(DEVICE, deviceId)\ncallback=null
+    else Device State cleanup
+      Cluster -> CoreQueue: DeviceStateServiceMsg(deleted=true)\ncallback=null
+    else Actor/lifecycle cleanup
+      Cluster -> LifecycleQueue: ComponentLifecycle(Device, DELETED)\ncallback=null
+    end
+
+    Notification -> EntityAction: logEntityAction(... DELETED ...)
+    EntityAction -> EntityAction: process Notification EntityActionTrigger
+    EntityAction -> RuleQueue: TbMsg(ENTITY_DELETED, old Device JSON)\ncallback=null
+    EntityAction -> Audit: logEntityAction(... SUCCESS ...)
+    opt AuditLogLevelFilter allows DEVICE write
+      Audit -> PG: async INSERT audit_log in independent transaction
+    end
+    EntityAction --> Notification: returns without waiting Queue or Audit
+    Notification --> AppService: returns
+
+    alt synchronous exception or commit failure
+      AppService -> PG: ROLLBACK
+      note over TransportQueue,RuleQueue
+        Messages already accepted or consumed are not recalled.
+        Session/Actor/State may observe delete while Device remains.
+      end note
+      AppService --> Controller: exception
+      Controller --> Admin: HTTP error
+    else COMMIT succeeds
+      AppService -> PG: COMMIT
+      PG --> AppService: committed
+      par AFTER_COMMIT cache listeners
+        TxEvents -> TxEvents: evict Device, Credentials, Count,\nRelation and Alarm Type cache keys
+      else AFTER_COMMIT Edge listener
+        TxEvents -> Cluster: sendNotificationMsgToEdge(Device DELETED)
+      end
+      AppService --> Controller: void
+      Controller --> Admin: HTTP 200 OK
+    end
+  end
+end
+
+== Independent asynchronous consumers ==
+participant "DefaultTransportService" as TransportService
+participant "MQTT / CoAP / LwM2M / Gateway" as Protocols
+participant "DefaultTbCoreConsumerService" as CoreConsumer
+participant "DefaultDeviceStateService" as StateService
+participant "DefaultTbRuleEngineConsumerService" as LifecycleConsumer
+participant "AppActor / TenantActor" as TenantActors
+participant "DeviceActor" as DeviceActor
+participant "TbRuleEngineQueueConsumerManager" as RuleConsumer
+participant "RuleChainActor / RuleNodeActor" as RuleActors
+
+TransportQueue -> TransportService: poll EntityDeleteMsg
+TransportService -> TransportService: remove Device rate limit\nmatch local sessions
+TransportService -> Protocols: SessionMsgListener.onDeviceDeleted(deviceId)
+Protocols -> Protocols: close channel / cancel subscriptions / deregister
+
+CoreQueue -> CoreConsumer: poll DeviceStateServiceMsg(deleted=true)
+CoreConsumer -> StateService: onQueueMsg(proto, callback)
+StateService -> StateService: deviceStates.remove(deviceId)\nremove from partition entity set
+
+LifecycleQueue -> LifecycleConsumer: poll ComponentLifecycle DELETED
+LifecycleConsumer -> LifecycleConsumer: evict Device -> Profile mapping
+LifecycleConsumer -> TenantActors: high-priority lifecycle message
+TenantActors -> DeviceActor: getOrCreateDeviceActor\nDeviceDeleteMsg high priority
+TenantActors -> TenantActors: deletedDevices.add(deviceId)
+DeviceActor -> DeviceActor: ctx.stop(self)
+note right of DeviceActor
+  If no actor existed, deletion may create
+  one briefly just to process the stop command.
+end note
+
+RuleQueue -> RuleConsumer: poll ToRuleEngineMsg
+RuleConsumer -> RuleActors: QueueToRuleEngineMsg(ENTITY_DELETED)
+RuleActors -> RuleActors: execute configured Rule Chain
+
+note over PG,StateService
+  Device deletion does not call AttributeService or TimeseriesService.
+  attribute_kv, ts_kv, ts_kv_latest, Cassandra telemetry and per-device RPC rows remain.
+end note
+
+@enduml
