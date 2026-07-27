@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>10 RPC 流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航">
+      <a href="README.md">Markdown</a>
+      <a href="../../index.html">全书目录</a>
+      <a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a>
+    </nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>10 RPC 流程</strong>
+      <a href="#一-流程目标">一、流程目标</a>
+      <a href="#二-入口">二、入口</a>
+      <a href="#三-完整调用链">三、完整调用链</a>
+      <a href="#四-消息流">四、消息流</a>
+      <a href="#五-时序图">五、时序图</a>
+      <a href="#六-数据变化">六、数据变化</a>
+      <a href="#七-源码分析">七、源码分析</a>
+      <a href="#八-actor-分析">八、Actor 分析</a>
+      <a href="#九-kafka-分析">九、Kafka 分析</a>
+      <a href="#十-数据库分析">十、数据库分析</a>
+      <a href="#十一-异常处理">十一、异常处理</a>
+      <a href="#十二-源码阅读路线">十二、源码阅读路线</a>
+      <a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script id="markdown-source" type="text/plain"># 10 RPC 流程
+
+> 源码基线：ThingsBoard `3.6.4`，行为提交 `0cb411fc90`；源码链接按当前 `release-3.6` 工作树行号校准。本章同时分析 server-side RPC、client-side RPC、轻量/持久化模式、MQTT 会话、Actor 状态机与 Edge 分支。
+
+[上一篇：09 Telemetry 保存流程](../09-telemetry-save/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/10-rpc.svg) | [下一篇：11 OTA 流程](../11-ota/index.html)
+
+---
+
+## 一、流程目标
+
+RPC 让平台和设备进行有请求标识、超时和可选响应的命令交互。ThingsBoard 将它拆成两个方向：
+
+- server-side RPC：REST/Rule Engine 发起，设备执行；经过规则链、Core 分区、Device Actor 和 Transport session。
+- client-side RPC：设备发起，规则链处理并回复；Transport 直接产生 `TO_SERVER_RPC_REQUEST`，通常不经过 Device Actor。
+
+### 1.1 四种 server-side 语义
+
+| 模式 | REST 何时返回 | 离线能否排队 | 是否写 `rpc` 表 | 是否等待设备 payload |
+|---|---|---:|---:|---:|
+| 轻量 one-way | Device Actor 找到 RPC subscription 并发出 Transport message 后 | 仅当前 Actor 内存等待到超时，不抗重启 | 否 | 否 |
+| 轻量 two-way | 收到设备 response 或到期 | 同上 | 否 | 是 |
+| 持久化 one-way | `rpc` 行保存为 `QUEUED` 后立即返回 `rpcId` | 是 | 是 | REST 不等待 |
+| 持久化 two-way | 同样立即返回 `rpcId` | 是 | 是 | 状态/response 以后查询 |
+
+持久化不是“同步等待更可靠”，而是把命令状态做成可查询的异步任务。
+
+### 1.2 三套 request id
+
+| 标识 | 类型/范围 | 用途 |
+|---|---|---|
+| `requestUUID` / RPC id | UUID，跨服务与数据库稳定 | REST、Rule Engine、Core、`rpc.id`、最终响应关联；标准 MQTT 不向设备暴露它 |
+| Device Actor `requestId` / `rpcSeq` | 单个 Device Actor 实例内递增 int | 该设备当前所有 session 共用的 MQTT topic 后缀和 pending map key，不是 per session 计数器 |
+| Queue message id | 每次 `TbMsg` 的 UUID | Queue 重放/追踪，不等于业务 RPC id |
+
+### 1.3 本章核心结论
+
+1. REST server-side RPC 不是直接调用 Device Actor；它先创建 `RPC_CALL_FROM_SERVER_TO_DEVICE` root message，经规则链的 RPC Call Request Node 才路由到 Core。
+2. 如果默认规则链没有正确连接 RPC Call Request Node，REST 会等待到 Core 层 timeout，即使设备在线。
+3. 持久化 RPC 只有在到达 Device Actor 时尚未过期，才保存 `QUEUED` 并向 REST 返回 `rpcId`；到达前已过期则创建 `EXPIRED` 行且不发 `rpcId` callback，REST 最终 Core timeout/HTTP 504。
+4. 轻量 one-way 在“存在订阅且已向 Transport 发消息”后返回成功，也不等待 MQTT PUBACK；轻量 two-way 才等待设备 response。
+5. `rpc` 表只保存 persistent RPC；在线 session、subscription、int requestId 和 pending callback 主要在 Device Actor/服务内存中。Actor init 只恢复 `QUEUED`，不会从 `SENT/DELIVERED` 重建 pending。
+6. RPC Call Request Node 发起异步调用后立即 `ctx.ack(msg)`；callback 后再 enqueue 一条新的 continuation，原 Queue record 可在 RPC 完成前提交。
+7. MQTT QoS 状态 `SENT/DELIVERED/TIMEOUT`、业务 response `SUCCESSFUL/FAILED` 和总 expiration `EXPIRED` 是不同阶段。
+8. `TbRpcService` 在数据库保存后生产具体的 `RPC_<STATUS>` Rule Engine message，例如 `RPC_QUEUED/RPC_SENT`；DB 不是 producer，也不存在泛型 `RPC_STATUS` 消息，两步没有共同 outbox 事务。
+9. 标准 MQTT JSON payload 只有 `method/params`，topic 后缀使用 Actor 运行期 int requestId；内部稳定 UUID 不下发。设备幂等键必须由调用方或规则链显式放入 `params.commandId/requestUUID`。
+
+---
+
+## 二、入口
+
+### 2.1 REST server-side RPC
+
+V2 入口：
+
+| API | 方法 | 模式 |
+|---|---|---|
+| `POST /api/rpc/oneway/{deviceId}` | [`RpcV2Controller.handleOneWayDeviceRPCRequest(...)`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L150) | one-way |
+| `POST /api/rpc/twoway/{deviceId}` | [`RpcV2Controller.handleTwoWayDeviceRPCRequest(...)`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L175) | two-way |
+| `GET /api/rpc/persistent/{rpcId}` | [`RpcV2Controller.getPersistedRpc(...)`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L194) | 查询持久化状态 |
+| `GET /api/rpc/persistent/device/{deviceId}` | [`getPersistedRpcByDevice(...)`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L216) | 分页查询 |
+| `DELETE /api/rpc/persistent/{rpcId}` | [`deleteRpc(...)`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L278) | 删除并通知 pending Actor |
+
+V1 [`RpcV1Controller`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV1Controller.java#L66) 保留兼容 API。公共 [`AbstractRpcController.handleDeviceRPCRequest(...)`](../../../application/src/main/java/org/thingsboard/server/controller/AbstractRpcController.java#L102) 解析 `method/params/timeout/expirationTime/persistent/retries/requestUUID/additionalInfo`，并校验 `Operation.RPC_CALL`。
+
+### 2.2 Rule Engine server-side RPC
+
+任何以 Device 为 originator、data 含 `method/params` 的 `TbMsg` 都可进入 [`TbSendRPCRequestNode.onMsg(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/rpc/TbSendRPCRequestNode.java#L94)。非 REST 消息没有 `RPC_CALL_FROM_SERVER_TO_DEVICE` 类型时，节点仍可生成业务 UUID、按配置 timeout 调设备。
+
+### 2.3 MQTT client-side RPC
+
+设备发布：
+
+```text
+v1/devices/me/rpc/request/{requestId}
+payload: {"method":"getValue","params":{...}}
+```
+
+[`MqttTransportHandler.processDevicePublish(...)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L584) 转成 `ToServerRpcRequestMsg`。平台回复：
+
+```text
+v1/devices/me/rpc/response/{requestId}
+```
+
+V2 short/json/proto topics 由同一个 handler 和 `TopicType` 适配。
+
+### 2.4 MQTT server-side RPC subscription/response
+
+[`MqttTransportHandler.processRpcSubscribe(...)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1078) 对以下四种受支持的 request subscription 都向 Device Actor 发送 `SubscribeToRPCMsg`，并用对应 response topic 接收设备业务响应：
+
+| TopicType | 设备订阅 server-side request | 设备发布 response |
+|---|---|---|
+| V1 | `v1/devices/me/rpc/request/+` | `v1/devices/me/rpc/response/{requestId}` |
+| V2 | `v2/r/req/+` | `v2/r/res/{requestId}` |
+| V2 JSON | `v2/r/req/j/+` | `v2/r/res/j/{requestId}` |
+| V2 Proto | `v2/r/req/p/+` | `v2/r/res/p/{requestId}` |
+
+handler 的 subscribe 分支见 [L1014-L1031](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1014)，response publish 分支见 [L600-L658](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L600)。标准 JSON request payload 是 `{"method":"...","params":...}`，运行期 int requestId 位于 topic 后缀；V2 Proto 也只有运行期 int requestId，不携带内部 UUID。需要稳定幂等时，调用方或规则链必须把业务 `commandId`/`requestUUID` 显式放进 `params`。
+
+### 2.5 HTTP/CoAP/LwM2M 与 Edge
+
+HTTP Device API、CoAP 和 LwM2M 都实现 `SessionMsgListener.onToDeviceRpcRequest(...)` 与对应 request/response 适配。同步 HTTP/CoAP session 在完成一次下行后可能移除 subscription。
+
+设备归属 Edge 时，Central Device Actor 将 server-side RPC 保存为 `EdgeEventActionType.RPC_CALL`；Edge 下发设备，response 再通过 `FromDeviceRpcResponseActorMsg` 回到 Central Core。client-side Edge RPC 则在 Central 构造 `TO_SERVER_RPC_REQUEST`，metadata 带 `edgeId/deviceId`，回复由 RPC Reply Node 写回 Edge queue。
+
+---
+
+## 三、完整调用链
+
+### 3.1 REST server-side two-way 轻量 RPC
+
+| 步骤 | 类与方法 | 源码 | 输入 -> 输出 | 职责与设计原因 |
+|---|---|---|---|---|
+| 1 | `org.thingsboard.server.controller.RpcV2Controller.handleTwoWayDeviceRPCRequest(...)` | [L175](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L175) | HTTP JSON -> DeferredResult | V2 API 和状态码 |
+| 2 | `org.thingsboard.server.controller.AbstractRpcController.handleDeviceRPCRequest(...)` | [L102](../../../application/src/main/java/org/thingsboard/server/controller/AbstractRpcController.java#L102) | body -> `ToDeviceRpcRequest` | 参数、expiration、权限 |
+| 3 | `org.thingsboard.server.service.rpc.DefaultTbCoreDeviceRpcService.processRestApiRpcRequest(...)` | [L155](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbCoreDeviceRpcService.java#L155) | request + response consumer | 注册 REST callback，启动 Rule Engine timeout |
+| 4 | `DefaultTbCoreDeviceRpcService.sendRpcRequestToRuleEngine(...)` | [L253](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbCoreDeviceRpcService.java#L253) | request -> `RPC_CALL_FROM_SERVER_TO_DEVICE` | 将权限入口与可编排规则链连接 |
+| 5 | Rule Engine Queue + Actors | [05 章](../05-rule-chain-execution/index.html) | root `TbMsg` -> node | 按设备 profile/default chain 执行 |
+| 6 | `org.thingsboard.rule.engine.rpc.TbSendRPCRequestNode.onMsg(...)` | [L94](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/rpc/TbSendRPCRequestNode.java#L94) | JSON/metadata -> `RuleEngineDeviceRpcRequest` | 校验、恢复 UUID/expiration/persistence |
+| 7 | `org.thingsboard.server.service.rpc.DefaultTbRuleEngineRpcService.sendRpcRequestToDevice(...)` | [L176](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbRuleEngineRpcService.java#L176) | rule request -> core request | 保存 callback 并按 Core partition 路由 |
+| 8 | `DefaultTbRuleEngineRpcService.sendRpcRequestToDevice(ToDeviceRpcRequest)` | [L243](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbRuleEngineRpcService.java#L243) | request -> local service 或 Core Queue | DeviceId ownership routing |
+| 9 | `org.thingsboard.server.service.rpc.DefaultTbCoreDeviceRpcService.forwardRpcRequestToDeviceActor(...)` | [L188](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbCoreDeviceRpcService.java#L188) | actor msg -> high-priority AppActor | 跟踪 origin service 与超时 |
+| 10 | `org.thingsboard.server.actors.device.DeviceActor.doProcess(TbActorMsg)` | [RPC branch L100](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActor.java#L100) | actor msg -> processor | per-device mailbox 串行化 |
+| 11 | `org.thingsboard.server.actors.device.DeviceActorMessageProcessor.processRpcRequest(...)` | [L242](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L242) | request -> proto/int requestId | subscription、offline、pending、timeout |
+| 12 | `DeviceActorMessageProcessor.sendToTransport(...)` | [L1224](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1224) | `ToDeviceRpcRequestMsg` -> transport node | 按 session nodeId 路由 |
+| 13 | `org.thingsboard.server.transport.mqtt.MqttTransportHandler.onToDeviceRpcRequest(...)` | [L1710](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1710) | proto -> MQTT PUBLISH | topic/payload/QoS 适配 |
+| 14 | `MqttTransportHandler.sendToDeviceRpcRequest(...)` | [L1767](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1767) | publish -> delivery status | channel write 后仅 persistent + 需 ACK 才报 SENT；轻量 QoS1 等 PUBACK 报 DELIVERED，或报 TIMEOUT |
+| 15 | `DefaultTransportService.process(SessionInfoProto,ToDeviceRpcResponseMsg,TransportServiceCallback)` | [L971](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L971) | device response -> Device Actor | activity、limits、Core routing |
+| 16 | `DeviceActorMessageProcessor.processRpcResponses(...)` | [L829](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L829) | int requestId -> business UUID | 清 pending，构造 `FromDeviceRpcResponse` |
+| 17 | Core -> Rule Engine RPC services | [Core L204](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbCoreDeviceRpcService.java#L204) | response -> origin service callback | 跨服务返回 |
+| 18 | `TbSendRPCRequestNode` callback | [L143](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/rpc/TbSendRPCRequestNode.java#L143) | response/error -> new `TbMsg` | enqueue Success/Failure result |
+| 19 | `AbstractRpcController.reply(...)` | [L158](../../../application/src/main/java/org/thingsboard/server/controller/AbstractRpcController.java#L158) | response -> HTTP status/body | 完成 DeferredResult 和 audit |
+
+### 3.2 持久化 RPC 的差异点
+
+Device Actor 先在 [L251-L259](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L251) 检查 expiration。未过期的 persistent 请求在 L258 调用真实签名 [`createRpc(ToDeviceRpcRequest request, RpcStatus status)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L327) 创建 `QUEUED`；[`TbRpcService.save(...)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/TbRpcService.java#L64) 先保存 PostgreSQL，再推送 `RPC_QUEUED` 到规则引擎。
+
+如果请求到达 Actor 时已经过期，L254 只创建 `EXPIRED` 行并直接 return：没有 pending、没有 `rpcId` callback，Core 中已注册的 REST consumer 最终由 `scheduleToRuleEngineTimeout` 完成，V2 REST 返回 HTTP 504。
+
+未过期时，Actor 不等待设备，立刻合成首次 callback，并通过 Core/Rule Engine/Core 链返回：
+
+```json
+{"rpcId":"<requestUUID>"}
+```
+
+这个首次 `{rpcId}` callback 依次触发 REST response 路径和 RPC Request Node 的第一次 continuation；跨服务时两条路径的最终完成顺序不保证。之后设备 delivery/response 仍更新同一 `rpc` 行，并由 `TbRpcService` 产生 `RPC_SENT/RPC_DELIVERED/RPC_SUCCESSFUL/...`；原 Rule Engine RPC callback 已被移除，迟到的业务 response 不会再次继续原 Request Node。
+
+### 3.3 MQTT client-side RPC
+
+```mermaid
+sequenceDiagram
+  participant D as MQTT Device
+  participant M as MqttTransportHandler
+  participant T as DefaultTransportService
+  participant Q as Rule Engine Queue
+  participant R as Rule Chain
+  participant N as TbSendRPCReplyNode
+  participant RS as DefaultTbRuleEngineRpcService
+  D->>M: PUBLISH rpc/request/42
+  M->>T: process(ToServerRpcRequestMsg)
+  T->>Q: TO_SERVER_RPC_REQUEST with session metadata
+  Q-->>T: producer success
+  T-->>M: callback
+  M-->>D: PUBACK
+  Q->>R: consume request
+  R->>N: response TbMsg
+  N->>RS: sendRpcReplyToDevice(serviceId,sessionId,42,body)
+  RS->>M: ToTransportMsg via transport notification
+  M-->>D: PUBLISH rpc/response/42
+```
+
+Transport 在 [`DefaultTransportService.process(SessionInfoProto,ToServerRpcRequestMsg,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1074) 保存 `(sessionId,requestId)` 到 `toServerRpcPendingMap` 并启动 client-side timeout。若规则链未在时限内回复，Transport 自行向 session 发送 error=`timeout`。
+
+### 3.4 REST callback 与 Rule Node continuation
+
+**REST callback。** [`DefaultTbRuleEngineRpcService.sendRpcRequestToDevice(...)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbRuleEngineRpcService.java#L176) 的同一个 RPC callback 中，代码先在 L181 调用 `sendRpcResponseToTbCore(...)`。本地 Core 可直接查找 HTTP consumer，跨服务则先异步投递响应；这条路径不依赖 RPC Request Node 是否成功 `enqueueForTellNext`。
+
+**Rule Node continuation。** 上述 callback 随后在 L183 调用 `consumer.accept(...)`，进入 [`TbSendRPCRequestNode` callback](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/rpc/TbSendRPCRequestNode.java#L143)，再 enqueue Success/Failure 新消息。源码只保证这两个方法的调用顺序；跨服务响应经过异步 Queue 时，HTTP 实际完成与 continuation enqueue/消费的先后不受保证。节点注册 callback 后已在 L152 立即 `ctx.ack(msg)`，所以原 Queue record 的提交不依赖 RPC 完成；callback continuation 是另一条新 record。持久化模式的首次 `{rpcId}` 也按此调用顺序分叉，后续设备 response 因 callback 已移除而不会再次 enqueue 原节点 continuation。
+
+---
+
+## 四、消息流
+
+[点击打开独立架构 SVG](../../assets/architecture/10-rpc.svg)
+
+![RPC 架构图](../../assets/architecture/10-rpc.svg)
+
+```mermaid
+flowchart TB
+  subgraph ServerSide[Server-side RPC]
+    REST[REST V1/V2]
+    COREAPI[DefaultTbCoreDeviceRpcService]
+    REQ[(Rule Engine Queue)]
+    RN[TbSendRPCRequestNode]
+    RERPC[DefaultTbRuleEngineRpcService]
+    CQ[(Core Queue)]
+    DA[Device Actor]
+    RPCSVC[TbRpcService]
+    RPCDB[(PostgreSQL rpc table)]
+  end
+  subgraph Transport[Session and protocol]
+    TQ[(Transport notification)]
+    MQTT[MqttTransportHandler]
+    DEV[MQTT Device]
+  end
+  subgraph ClientSide[Client-side RPC]
+    CMSG[TO_SERVER_RPC_REQUEST]
+    REPLY[TbSendRPCReplyNode]
+  end
+  REST --> COREAPI --> REQ --> RN --> RERPC
+  RERPC --> CQ --> DA
+  DA -. persistent save .-> RPCSVC --> RPCDB
+  RPCSVC -. RPC status event .-> REQ
+  DA --> TQ --> MQTT --> DEV
+  DEV --> MQTT --> DA
+  DA --> CQ --> RERPC --> RN --> COREAPI --> REST
+  DEV -. rpc request topic .-> MQTT --> CMSG --> REQ
+  REQ --> REPLY --> TQ --> MQTT
+```
+
+---
+
+## 五、时序图
+
+本章按要求只保留渲染后的矢量图，不在章节目录生成 `sequence.puml`。
+
+[新窗口打开完整时序图 SVG](sequence.svg)
+
+![RPC 完整时序图](sequence.svg)
+
+时序图覆盖轻量 two-way、持久化立即返回、MQTT QoS status、设备 response 和 client-side reply，并标出 Core/Rule Engine 服务可能位于不同节点。
+
+---
+
+## 六、数据变化
+
+### 6.1 server-side RPC 状态
+
+```mermaid
+stateDiagram-v2
+  [*] --> QUEUED: 到达 Actor 时未过期
+  [*] --> EXPIRED: 到达 Actor 前已过期
+  QUEUED --> SENT: persistent + 需 ACK + channel write 成功
+  QUEUED --> DELIVERED: 无需 ACK 的 delivery
+  SENT --> DELIVERED: MQTT PUBACK
+  SENT --> TIMEOUT: ACK timeout
+  TIMEOUT --> TIMEOUT: BURST 仅 retry++ / 保存，不立即重发
+  TIMEOUT --> SENT: SEQUENTIAL 且 retry 未耗尽，立即重发
+  TIMEOUT --> FAILED: retry 耗尽
+  QUEUED --> SUCCESSFUL: 无 error 的业务 response
+  SENT --> SUCCESSFUL: 无 error 的业务 response
+  DELIVERED --> SUCCESSFUL: 无 error 的业务 response
+  TIMEOUT --> SUCCESSFUL: pending 尚在时收到业务 response
+  QUEUED --> FAILED: 业务 error response
+  SENT --> FAILED: 业务 error response
+  DELIVERED --> FAILED: 业务 error；或仅 SEQUENTIAL_ON_RESPONSE 的 response timeout
+  TIMEOUT --> FAILED: 业务 error response
+  QUEUED --> EXPIRED: overall expiration
+  SENT --> EXPIRED: overall expiration
+  DELIVERED --> EXPIRED: 非 response-sequential 等待到总期限
+  TIMEOUT --> EXPIRED: overall expiration
+  state "DELETE operation\n(delete DB row, then in-memory DELETED event)" as DELETE_OP
+  QUEUED --> DELETE_OP: REST delete
+  SENT --> DELETE_OP: REST delete
+  DELIVERED --> DELETE_OP: REST delete
+  TIMEOUT --> DELETE_OP: REST delete
+  SUCCESSFUL --> DELETE_OP: REST delete
+  FAILED --> DELETE_OP: REST delete
+  EXPIRED --> DELETE_OP: REST delete
+  DELETE_OP --> [*]: RPC_DELETED event
+```
+
+这是 persistent RPC 的数据库状态图。默认 `BURST` 收到 ACK `TIMEOUT` 后仍会增加 retry 计数并保存 `TIMEOUT`，但 `sendNextPendingRequest` 因 `rpcSequential=false` 不立即重发；只有两种 sequential 策略会立即选择 pending 请求再发。`response_timeout_ms` 只由 `SEQUENTIAL_ON_RESPONSE_FROM_DEVICE` 在 DELIVERED 后调度；BURST 和 `SEQUENTIAL_ON_ACK_FROM_DEVICE` 的 two-way 最终受总 `expirationTime` 约束并转 `EXPIRED`。设备业务 response 可在 delivery status 前后到达，因此不能把 `DELIVERED -> FAILED` 当作无条件链路。
+
+### 6.2 运行时对象
+
+| 位置 | 状态 | 生命周期 |
+|---|---|---|
+| `DefaultTbCoreDeviceRpcService.localToRuleEngineRpcRequests` | REST UUID -> HTTP response consumer | 到 response 或 Rule Engine timeout |
+| `DefaultTbRuleEngineRpcService.toDeviceRpcRequests` | UUID -> Rule Node consumer | 到 device response 或 timeout |
+| `DefaultTbCoreDeviceRpcService.localToDeviceRpcRequests` | UUID -> origin service actor msg | 到 Device Actor response 或 timeout cleanup |
+| `DeviceActorMessageProcessor.rpcSubscriptions` | session UUID -> node/type | 单个 Device Actor 实例持有，subscribe 到 unsubscribe/session close |
+| `toDeviceRpcPendingMap` + `rpcSeq` | int requestId -> request metadata/retry/delivered | 单个 Device Actor 实例内对该设备所有当前 session 共享；response、delete、timeout 或 actor stop 时结束 |
+| MQTT `rpcAwaitingAck` | packet id -> request proto | PUBACK 或 transport timeout |
+| Transport `toServerRpcPendingMap` | sessionId-requestId -> metadata | client reply 或 timeout |
+
+### 6.3 持久化和消息副作用
+
+| 系统 | 变化 | 是否同事务 |
+|---|---|---:|
+| `rpc` | INSERT QUEUED；后续覆盖 status/response | 单次 JPA save 事务 |
+| Rule Engine Queue | 每次持久化状态产生 `RPC_<STATUS>` | 否，DB save 后发送 |
+| Device Actor | pending map、subscription、retry counter | 内存，不是 DB 事务 |
+| MQTT session | request publish、packet ack map | 内存/网络 |
+| `audit_log` | REST RPC_CALL 最终结果 | 独立异步写 |
+| Edge `edge_event` | Central request/Edge reply 跨边缘传输 | 独立事务和 gRPC queue |
+
+---
+
+## 七、源码分析
+
+### 7.1 服务分层为什么看起来绕
+
+| 服务 | 所在角色 | 主要职责 |
+|---|---|---|
+| `DefaultTbCoreDeviceRpcService` | TB Core | 接 REST、保存 HTTP callback、Core partition/Actor 路由 |
+| `DefaultTbRuleEngineRpcService` | Rule Engine | 给 Rule Node 提供 API、保存 node callback、跨 Core 路由 |
+| `TbRpcService` | Core application | 包装 persistent DAO save，并产生具体 `RPC_<STATUS>` TbMsg |
+| DAO `RpcService` / `JpaRpcDao` | PostgreSQL | CRUD、分页、TTL 删除 |
+
+微服务部署下 Core 和 Rule Engine 可分离，因此 request/response 都要携带 `originServiceId` 并通过 Core/Rule Engine notification queue 返回；单体部署则走 optional local service 直接调用。
+
+### 7.2 REST 到 Rule Engine 的 metadata contract
+
+[`DefaultTbCoreDeviceRpcService.sendRpcRequestToRuleEngine(...)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbCoreDeviceRpcService.java#L253) 写入：
+
+- `requestUUID`
+- `originServiceId`
+- `expirationTime`
+- `oneway`
+- `persistent`
+- 可选 `retries`
+- device name/type
+
+[`TbSendRPCRequestNode`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/rpc/TbSendRPCRequestNode.java#L104) 再恢复这些字段。自定义 Rule Node 修改或丢失 metadata 会改变 RPC 语义。
+
+### 7.3 Device Actor 的提交策略
+
+[`RpcSubmitStrategy`](../../../application/src/main/java/org/thingsboard/server/service/rpc/RpcSubmitStrategy.java#L29) 有：
+
+| 策略 | 下一条何时可发 | 适用场景 |
+|---|---|---|
+| `BURST` | 不等待上一条 | 高吞吐、设备可并发处理 |
+| `SEQUENTIAL_ON_ACK_FROM_DEVICE` | 收到 delivery ack/失败后 | 设备命令必须按送达顺序 |
+| `SEQUENTIAL_ON_RESPONSE_FROM_DEVICE` | 收到业务 response 或 response timeout | 严格串行设备执行 |
+
+配置位于 [`thingsboard.yml`](../../../application/src/main/resources/thingsboard.yml#L469)，另有 `actors.rpc.max_retries` 和 `response_timeout_ms`。per-request `retries` 会被系统最大值截断。
+
+ACK TIMEOUT 时 [`processRpcResponseStatus(...)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L877) 总会检查/增加 retry，并为 persistent 保存 TIMEOUT 或在耗尽时保存 FAILED；但 L923-L925 调用的 `sendNextPendingRequest` 只有 `rpcSequential=true` 才真正发包。因此默认 BURST 不即时 retry，两种 sequential 策略才即时重发。`response_timeout_ms` 对应的 scheduler 只在 `SEQUENTIAL_ON_RESPONSE_FROM_DEVICE` + two-way + DELIVERED 时创建。
+
+### 7.4 MQTT QoS 状态
+
+[`MqttTransportHandler.sendToDeviceRpcRequest(...)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1767)：
+
+- QoS0/无需 ack：channel publish 成功后报告 DELIVERED。
+- 需要 ack：先放入 `rpcAwaitingAck`；persistent RPC 在 channel publish 成功后报告 SENT。
+- 收到 MQTT PUBACK：handler [L443](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L443) 报告 DELIVERED。
+- 超时未 ACK：报告 TIMEOUT；Actor 按 submit strategy 计数/保存，只有 sequential 立即重发，retry 耗尽才 FAILED。
+
+轻量 QoS1 在 channel write 成功后不报告 SENT，只在 PUBACK 后报告 DELIVERED，或超时报 TIMEOUT；SENT 仅用于 persistent 且需要 ACK 的 publish。DELIVERED 是协议送达确认，不是设备业务执行成功。two-way 还要等 response topic 才变 SUCCESSFUL。
+
+### 7.5 Actor 重启恢复
+
+[`DeviceActorMessageProcessor.init(TbActorCtx)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1405) 只分页读取该设备 `RpcStatus.QUEUED` 行：已过期改 EXPIRED，否则重建 pending map 和总 expiration timeout。`SENT/DELIVERED` 不会恢复为 pending；Actor 重启后对应 int requestId 路由已丢失，设备迟到 response 会 stale，数据库行则保留在原状态直到 TTL 清理或 REST 删除。
+
+### 7.6 删除语义
+
+REST delete 对 `QUEUED/SENT/DELIVERED` 先发 [`RemoveRpcActorMsg`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L286)；任何现存状态（包括 TIMEOUT）随后都删除数据库行。Controller 只在删除后把已加载的内存 `Rpc` 对象设为 `DELETED`，再产生 `RPC_DELETED` Rule Engine message，数据库不会持久化 DELETED 状态。remove、delete、event 三步无共同事务。
+
+---
+
+## 八、Actor 分析
+
+### 8.1 Actor 层级与高优先级消息
+
+```mermaid
+flowchart LR
+  CORE[(Core Queue)] --> CS[DefaultTbCoreDeviceRpcService]
+  CS -->|tellWithHighPriority| APP[AppActor]
+  APP --> TENANT[TenantActor]
+  TENANT --> DEVICE[DeviceActor]
+  DEVICE --> PROC[DeviceActorMessageProcessor]
+  PROC --> SUBS[rpcSubscriptions]
+  PROC --> PENDING[toDeviceRpcPendingMap]
+  PROC --> TIMER[Actor timeout messages]
+  PROC --> TRANSPORT[Transport node routing]
+```
+
+Device Actor 的必要性不是“异步写法”，而是每个设备需要一个串行 owner 管理多个 session、RPC subscription、int requestId、pending 请求、重试和提交策略。`rpcSeq` 与 `toDeviceRpcPendingMap` 属于该 Device Actor 实例，跨该设备当前所有 session 共享，并非每个 session 各自计数。普通 Spring singleton + concurrent map 很难在 session close、跨节点迁移和顺序策略下保持同一边界。
+
+### 8.2 Actor 不提供的保证
+
+1. Actor mailbox 顺序不等于 MQTT 网络 delivery 顺序，尤其 BURST 和多 session。
+2. Actor 内存状态不是持久化事务；轻量 RPC 在 Actor 重启后丢失 pending callback。
+3. persistent DB save、status Queue message 和 Transport publish 没有原子提交。
+4. Actor timeout、Core service timeout、Rule Engine service timeout 和 REST expiration 是多层保护，可能产生先到者完成、后到 response 被视为 stale 的情况。
+
+### 8.3 多 session
+
+Device Actor 会向所有 `rpcSubscriptions` session 发送同一 request proto。第一个有效 response 从 pending map 移除请求，其他 session 的迟到 response 被记录为 stale。业务若允许设备多连接，需要避免两个客户端同时执行不可幂等命令。
+
+---
+
+## 九、Kafka 分析
+
+RPC 使用多类 ThingsBoard Queue；Kafka provider 下不存在单一“RPC topic”。
+
+| 方向 | Producer | Queue/消息 | Consumer | callback/确认语义 |
+|---|---|---|---|---|
+| REST -> Rule Engine | Core RPC service | `RPC_CALL_FROM_SERVER_TO_DEVICE` | Rule Engine consumer | REST 不等 producer callback；由独立 timeout 兜底 |
+| Rule Engine -> Core | Rule RPC service | `ToDeviceRpcRequestActorMsg` | Core consumer | producer handoff，不等 Actor/设备 |
+| Core -> Rule Engine response | Core RPC service | `FromDeviceRpcResponse` notification | Rule Engine RPC service | 路由 callback，不持久化响应队列状态 |
+| Core -> Transport | Device Actor | `ToTransportMsg` notification | Transport notification consumer | 不等 MQTT device ack |
+| Transport -> Core status/response | TransportService | `TransportToDeviceActorMsg` | Core consumer -> Device Actor | producer handoff |
+| persistent status | `TbRpcService` | `RPC_QUEUED/SENT/...` | Rule Engine consumer | DB save 后 fire-and-forget |
+| client RPC | Transport | `TO_SERVER_RPC_REQUEST` | Rule Engine consumer | producer callback 可触发 MQTT PUBACK |
+
+### 9.1 为什么不是 exactly-once
+
+- REST root message producer 失败与 callback timeout 之间没有 outbox。
+- Rule Node 先 ack 原 record，后续 RPC response 作为新消息；中间崩溃会丢 continuation。
+- status 行先保存、再由 `TbRpcService` 发具体 `RPC_<STATUS>`；Queue 失败不会回滚行。
+- MQTT QoS 只能约束 broker/session delivery，不能使设备业务方法 exactly-once。
+
+设备看不到内部稳定 RPC UUID。不可重复命令必须由 REST 调用方或规则链把稳定业务 `commandId`（或选定的 requestUUID）显式写入 `params`，设备再据此去重；不要只用 topic 中的 int requestId，因为它由 Actor 运行期生成并可复用。
+
+---
+
+## 十、数据库分析
+
+### 10.1 `rpc` 表
+
+```mermaid
+erDiagram
+  TENANT {
+    uuid id PK
+  }
+  DEVICE {
+    uuid id PK
+    uuid tenant_id
+  }
+  RPC {
+    uuid id PK
+    bigint created_time
+    uuid tenant_id
+    uuid device_id
+    bigint expiration_time
+    json request
+    json response
+    json additional_info
+    varchar status
+  }
+  AUDIT_LOG {
+    uuid id PK
+    uuid tenant_id
+    uuid entity_id
+    varchar action_type
+  }
+  TENANT ||--o{ RPC : owns
+  DEVICE ||--o{ RPC : target_logical_reference
+  DEVICE ||..o{ AUDIT_LOG : rpc_call_audit
+```
+
+DDL [`schema-entities.sql`](../../../dao/src/main/resources/sql/schema-entities.sql#L760) 没有 `rpc.device_id -> device.id` 外键。`request/response/additional_info` 在 DDL 是大 varchar，通过 [`RpcEntity`](../../../dao/src/main/java/org/thingsboard/server/dao/model/sql/RpcEntity.java#L85) 的 Hibernate JSON type 映射为 `JsonNode`。
+
+### 10.2 保存与状态事件
+
+[`TbRpcService.save(TenantId,Rpc)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/TbRpcService.java#L64) 先调用 DAO JPA save，再调用 `pushRpcMsgToRuleEngine`。状态更新版本先 find，再 mutate/save，没有数据库 compare-and-set 或状态转换约束；Actor 串行化是主要保护，但 REST delete、timeout 和跨节点迟到 response 仍可竞争。
+
+### 10.3 查询索引与 TTL
+
+建表索引 [`idx_rpc_tenant_id_device_id`](../../../dao/src/main/resources/sql/schema-entities-idx.sql#L74) 支持 tenant/device 分页。清理服务 [`RpcCleanUpService.cleanUp()`](../../../application/src/main/java/org/thingsboard/server/service/ttl/rpc/RpcCleanUpService.java#L74) 按 tenant profile `rpcTtlDays` 删除 `created_time < cutoff` 的记录；它不看业务 `expiration_time` 和 status。
+
+因此：
+
+- `expiration_time` 控制命令执行期限。
+- `rpcTtlDays` 控制持久化记录保留期限。
+- 即使 SUCCESSFUL/FAILED，也会按 created_time 的保留策略删除。
+
+### 10.4 为什么 RPC 不写 TimescaleDB/Cassandra
+
+RPC 是小规模可变状态机，需要按 UUID point lookup、状态更新、分页和 JSON response；普通 PostgreSQL 比时序 history 后端合适。它不是 telemetry，`created_time` 仅用于排序/TTL，不代表应放入 hypertable。
+
+### 10.5 MySQL 工程师的理解方式
+
+可以把 `rpc` 行看作异步任务表，但 ThingsBoard 3.6 没有数据库级状态机约束、版本列或 `SELECT ... FOR UPDATE`。正确性主要来自 Device Actor 的单设备串行处理和 stale response 检查。数据库负责可查询恢复点，不是唯一调度器。
+
+---
+
+## 十一、异常处理
+
+| 失败点 | 调用方/状态 | 已可能完成 | 恢复语义 |
+|---|---|---|---|
+| REST JSON/UUID/权限错误 | HTTP 400/401/403 | 无 | 修正请求 |
+| root Rule Engine producer 丢失 | REST 最终 timeout | Core callback 已注册 | 无 DB 行（除后续路径已到 Actor） |
+| 默认规则链无 RPC Request Node | REST timeout | root message 可已消费 | 修正规则链 |
+| RPC Request Node metadata 非法 | Node Failure，REST timeout | 原消息后续按 queue 策略处理 | 保留 contract |
+| Rule Node 已 ack，服务随后崩溃 | 原 Queue record 可已 commit | 设备 RPC 可能已发或未发 | 轻量 continuation 可丢失 |
+| 设备无 RPC subscription | 轻量最终 `NO_ACTIVE_CONNECTION`；未过期 persistent 返回 rpcId/QUEUED | persistent 行已保存 | 设备订阅后 pending 可发送 |
+| persistent 到达 Actor 前已过期 | Core timeout / HTTP 504 | 创建 EXPIRED 行和 `RPC_EXPIRED`，无 rpcId callback | 查询需另有已知 UUID；原 REST 不会成功返回 rpcId |
+| Actor 在 persistent DB save 后崩溃 | REST 可能已获 rpcId | QUEUED 行存在，Queue status 可能缺失 | Actor init 可恢复 QUEUED |
+| history status Queue producer 失败 | RPC 行状态已更新 | DB 已提交 | 无 outbox；下游状态事件缺失 |
+| MQTT channel publish 失败 | handler 生成 error response | pending/status 可能已建立 | Actor response 路径清理 |
+| MQTT PUBACK timeout | TIMEOUT；sequential 可即时重试，BURST 不即时重发，耗尽才 FAILED | 设备可能实际收到并执行 | 用 params 中稳定 commandId 幂等 |
+| 业务 response 超时 | 仅 `SEQUENTIAL_ON_RESPONSE_FROM_DEVICE` 用 `response_timeout_ms` 转 FAILED；其他策略等总 expiration/EXPIRED | 设备可能稍后完成 | 迟到 response 变 stale |
+| 总 expiration 到达 | EXPIRED / HTTP timeout | 命令可能已在设备执行 | expiration 不能撤销设备副作用 |
+| 多 session 重复执行 | 首个 response 完成请求 | 多设备客户端可能都执行 | 业务 command id 去重 |
+| REST delete 与 response 并发 | 行删除；response/status update 可能 warning | Actor pending/Queue message部分完成 | 无统一事务 |
+| Edge 离线 | Central 记录 error；persistent 仍可 QUEUED | DB 行可能存在 | Edge 恢复路径依赖 queue/event |
+| RPC TTL cleanup | 老记录直接删除 | Actor pending 理论上可能仍存在于极端配置 | 保留期应大于最长 expiration |
+
+### 11.1 生产监控建议
+
+1. 统计 `rpc` 各 status 数量与停留时长，重点观察 QUEUED、SENT、TIMEOUT。
+2. 分开监控 Rule Engine Queue、Core Queue、Transport notifications 和 MQTT ack latency。
+3. 对比 REST timeout、Actor expiration、response-await timeout，避免层级配置互相矛盾。
+4. 在平台日志记录内部 `requestUUID`；若需要贯穿到设备日志，由调用方/规则链把稳定 `commandId` 或 requestUUID 显式放入 `params`。
+5. 所有不可重复执行命令都用该显式业务键实现设备端幂等；MQTT QoS 和 persistent RPC 都不能替代它。
+
+---
+
+## 十二、源码阅读路线
+
+1. [`RpcV2Controller.handleTwoWayDeviceRPCRequest(...)`](../../../application/src/main/java/org/thingsboard/server/controller/RpcV2Controller.java#L175)：建立 REST 入口。
+2. [`AbstractRpcController.handleDeviceRPCRequest(...)`](../../../application/src/main/java/org/thingsboard/server/controller/AbstractRpcController.java#L102)：看参数、expiration 和 persistent。
+3. [`DefaultTbCoreDeviceRpcService.processRestApiRpcRequest(...)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbCoreDeviceRpcService.java#L155)：理解第一层 callback map/timeout。
+4. [`DefaultTbCoreDeviceRpcService.sendRpcRequestToRuleEngine(...)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbCoreDeviceRpcService.java#L253)：记住 metadata contract。
+5. [`TbSendRPCRequestNode.onMsg(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/rpc/TbSendRPCRequestNode.java#L94)：看立即 ack 和异步 continuation。
+6. [`DefaultTbRuleEngineRpcService.sendRpcRequestToDevice(...)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbRuleEngineRpcService.java#L176)：看 Rule Engine/Core 分界。
+7. [`DefaultTbRuleEngineRpcService.sendRpcRequestToDevice(ToDeviceRpcRequest)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/DefaultTbRuleEngineRpcService.java#L243)：看 Core partition routing。
+8. [`DeviceActorMessageProcessor.processRpcRequest(...)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L242)：精读 persistent/offline/multi-session 分支。
+9. [`DeviceActorMessageProcessor.processRpcResponseStatus(...)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L877)：看 SENT/DELIVERED/TIMEOUT/retry。
+10. [`DeviceActorMessageProcessor.processRpcResponses(...)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L829)：看业务 response 和 stale 判断。
+11. [`MqttTransportHandler.sendToDeviceRpcRequest(...)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1767)：对照 MQTT QoS。
+12. [`TbRpcService.save(...)`](../../../application/src/main/java/org/thingsboard/server/service/rpc/TbRpcService.java#L64)：确认 DB 与 status message 边界。
+13. [`DeviceActorMessageProcessor.init(...)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1405)：看 QUEUED 恢复。
+14. [`DefaultTransportService.process(SessionInfoProto,ToServerRpcRequestMsg,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1074)：切换到 client-side RPC。
+15. [`TbSendRPCReplyNode.onMsg(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/rpc/TbSendRPCReplyNode.java#L85)：闭合设备发起的 reply。
+16. [`RpcCleanUpService.cleanUp()`](../../../application/src/main/java/org/thingsboard/server/service/ttl/rpc/RpcCleanUpService.java#L74)：最后区分执行 expiration 与记录 TTL。
+
+---
+
+## 十三、常见面试题
+
+### 1. server-side 和 client-side RPC 的方向是什么？
+
+server-side 由平台/规则链请求设备；client-side 由设备请求平台规则链。前者依赖 Device Actor 和 RPC subscription，后者通常由 Transport 直接投递 Rule Engine。
+
+### 2. 持久化 RPC 的 HTTP 200 表示什么？
+
+表示请求到达 Actor 时未过期、`rpc` 行已保存为 QUEUED，并返回可查询 `rpcId`；不表示设备在线、命令已发送、MQTT 已确认或执行成功。若到达 Actor 前已过期，只创建 EXPIRED 且不回 rpcId，REST 最终 504。
+
+### 3. 轻量 one-way 的 HTTP 200 表示设备收到吗？
+
+只表示 Device Actor 当时存在至少一个 RPC subscription，并已把消息发向 Transport；它不等待 MQTT PUBACK 或设备业务执行。
+
+### 4. two-way RPC 为什么先经过 Rule Engine？
+
+平台允许租户在规则链中校验、转换、拦截或路由 RPC。REST 只产生 root action，RPC Call Request Node 才真正调用设备。
+
+### 5. 默认规则链没有 RPC Call Request Node 会怎样？
+
+请求不会到 Device Actor，Core 中的 REST callback 最终按 expiration timeout，设备即使在线也收不到。
+
+### 6. `requestUUID` 与 MQTT topic 的 requestId 有何区别？
+
+UUID 是平台内部跨服务/数据库的稳定 id；topic requestId 是单个 Device Actor 实例生成的运行期 int，由该设备所有当前 session 共用。标准 MQTT 不下发内部 UUID，设备幂等必须依赖调用方/规则链显式放进 `params` 的稳定 commandId/requestUUID。
+
+### 7. SENT、DELIVERED、SUCCESSFUL 有何区别？
+
+SENT 表示 persistent 且需要 ack 的 publish 已写向 channel；轻量 QoS1 channel write 不报 SENT。DELIVERED 表示协议 delivery ack 或无需 ack 的发送完成；SUCCESSFUL 表示 two-way 收到无 error 的业务 response。
+
+### 8. MQTT QoS1 能保证 RPC 业务 exactly-once 吗？
+
+不能。PUBACK 只确认协议 packet，超时重发可能让设备重复执行；业务方法必须幂等。
+
+### 9. persistent RPC 如何支持离线设备？
+
+Actor 保存 QUEUED 行和 pending metadata；设备以后订阅 RPC 时 `sendPendingRequests` 下发。Actor 重启时会从 DB 恢复未过期 QUEUED 行。
+
+### 10. 为什么只恢复 QUEUED 行值得注意？
+
+说明数据库不是完整 workflow engine。SENT/DELIVERED 不会重建 pending，重启后的迟到 response stale；行仍可停留原状态直到 TTL 或 REST 删除，需要生产对账。
+
+### 11. RPC Request Node 为什么立即 ack 原消息？
+
+避免长时间设备交互占住 Rule Engine Queue pack；response 到来时另行 enqueue continuation。代价是原 record commit 后的中间崩溃不能自动重放完整 RPC。
+
+### 12. client-side RPC 超时在哪里实现？
+
+`DefaultTransportService` 的 `toServerRpcPendingMap` 和 scheduler；规则链未及时通过 RPC Reply Node 回复时，Transport 向原 session 发送 timeout error。
+
+### 13. 多个 MQTT session 同时订阅 RPC 会怎样？
+
+Actor 向所有 subscription 发同一命令；首个 response 完成 pending，其他 response stale。设备端需避免重复执行。
+
+### 14. `rpc.expiration_time` 与 `rpcTtlDays` 有何区别？
+
+前者是命令有效期，驱动 timeout/EXPIRED；后者是历史记录保留期，清理按 created_time 删除行。
+
+### 15. REST 删除 persistent RPC 是否原子？
+
+不是。RemoveRpcActorMsg、数据库 delete、内存对象置 DELETED 后发送 `RPC_DELETED` 分三步执行，可能部分成功；DELETED 不会写回数据库，TIMEOUT 行也可直接删除。
+
+### 16. RPC status 与 Rule Engine message 是否一致？
+
+不具备事务一致性。`TbRpcService` 先保存行再 fire-and-forget 推消息；Queue 失败会留下状态已变但事件缺失。
+
+### 17. Actor 在 RPC 中解决了什么问题？
+
+它为单设备串行维护 session/subscription/pending/retry/提交策略，并屏蔽 Transport 所在节点；它不解决数据库和 Queue 原子性。
+
+### 18. Edge 设备的 RPC 如何路由？
+
+Central Device Actor 把命令写 Edge event queue，Edge 下发设备；response 通过 gRPC uplink 构造 `FromDeviceRpcResponseActorMsg` 回 Central pending map。每段都有独立 timeout 和失败窗口。
+
+### 19. 如何定位“设备在线但 REST RPC 超时”？
+
+依次检查 root `RPC_CALL_FROM_SERVER_TO_DEVICE` 是否入队、规则链是否经过 RPC Request Node、Core partition routing、Device Actor `rpcSubscriptions`、Transport notification、MQTT publish/PUBACK 和 response topic。
+
+### 20. 持久化 RPC 是否可以替代业务命令表？
+
+只适合平台 RPC 生命周期。跨设备事务、人工审批、严格补偿、长期审计或 exactly-once 需要独立业务状态机和幂等设计。
+
+---
+
+[上一篇：09 Telemetry 保存流程](../09-telemetry-save/index.html) | [返回目录](../../SUMMARY.md) | [下一篇：11 OTA 流程](../11-ota/index.html)
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

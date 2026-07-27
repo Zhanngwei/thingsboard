@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1160" viewBox="0 0 1900 1160" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard Telemetry 保存架构</title>
+  <desc id="desc">展示 telemetry 入口、Rule Engine、独立 history 与 latest DAO、Entity View、WebSocket、REST action、audit 和仅作用于 history 的 TTL cleanup。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1f2937"/></marker>
+    <marker id="redArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#9f2d20"/></marker>
+    <marker id="greenArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#236b3a"/></marker>
+    <style>
+      .title{font:700 29px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.subtitle{font:15px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#243447}.section{font:700 19px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.head{font:700 16px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.body{font:14px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#243447}.small{font:13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#374151}.whiteHead{font:700 16px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#fff}.whiteBody{font:13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#fff}.panel{stroke:#263746;stroke-width:2}.box{fill:#fff;stroke:#263746;stroke-width:2}.arrow{fill:none;stroke:#1f2937;stroke-width:2.3;marker-end:url(#arrow)}.async{fill:none;stroke:#9f2d20;stroke-width:2.3;stroke-dasharray:8 6;marker-end:url(#redArrow)}.cleanup{fill:none;stroke:#236b3a;stroke-width:2.3;stroke-dasharray:7 5;marker-end:url(#greenArrow)}
+    </style>
+  </defs>
+
+  <rect width="1900" height="1160" fill="#fff"/>
+  <text x="42" y="44" class="title">09 Telemetry 保存流程</text>
+  <text x="42" y="72" class="subtitle">history/latest 独立选型；Entity View 与通知独立完成；TTL cleanup 只到 history</text>
+
+  <rect x="28" y="95" width="275" height="985" rx="6" fill="#e8f3f8" class="panel"/>
+  <rect x="326" y="95" width="300" height="985" rx="6" fill="#eef5e9" class="panel"/>
+  <rect x="649" y="95" width="405" height="985" rx="6" fill="#fff3df" class="panel"/>
+  <rect x="1077" y="95" width="795" height="985" rx="6" fill="#f4ecf7" class="panel"/>
+  <text x="50" y="130" class="section">入口</text>
+  <text x="350" y="130" class="section">Queue 与 Rule Engine</text>
+  <text x="674" y="130" class="section">应用与 Future 编排</text>
+  <text x="1102" y="130" class="section">存储后端与独立副作用</text>
+
+  <rect x="55" y="165" width="220" height="105" rx="5" class="box"/>
+  <text x="165" y="199" text-anchor="middle" class="head">MQTT / HTTP / CoAP</text>
+  <text x="165" y="225" text-anchor="middle" class="body">LwM2M / SNMP</text>
+  <text x="165" y="250" text-anchor="middle" class="small">PostTelemetryMsg</text>
+  <rect x="55" y="310" width="220" height="90" rx="5" class="box"/>
+  <text x="165" y="344" text-anchor="middle" class="head">平台 Telemetry REST</text>
+  <text x="165" y="372" text-anchor="middle" class="body">直接 saveAndNotify</text>
+  <rect x="55" y="445" width="220" height="100" rx="5" class="box"/>
+  <text x="165" y="480" text-anchor="middle" class="head">Edge gRPC</text>
+  <text x="165" y="507" text-anchor="middle" class="body">多 ts 共用 SettableFuture</text>
+  <text x="165" y="529" text-anchor="middle" class="small">首个 producer callback 定结果</text>
+  <rect x="55" y="590" width="220" height="90" rx="5" class="box"/>
+  <text x="165" y="625" text-anchor="middle" class="head">Rule Engine 内部</text>
+  <text x="165" y="653" text-anchor="middle" class="body">Math / custom nodes</text>
+
+  <rect x="356" y="180" width="240" height="90" rx="5" class="box"/>
+  <text x="476" y="215" text-anchor="middle" class="head">Rule Engine Queue</text>
+  <text x="476" y="244" text-anchor="middle" class="small">POST_TELEMETRY_REQUEST</text>
+  <rect x="356" y="335" width="240" height="105" rx="5" class="box"/>
+  <text x="476" y="370" text-anchor="middle" class="head">Rule Engine Actors</text>
+  <text x="476" y="398" text-anchor="middle" class="body">App → Tenant → Chain → Node</text>
+  <text x="476" y="423" text-anchor="middle" class="small">普通 telemetry 不走 Device Actor</text>
+  <rect x="356" y="510" width="240" height="130" rx="5" class="box"/>
+  <text x="476" y="545" text-anchor="middle" class="head">Save Timeseries Node</text>
+  <text x="476" y="573" text-anchor="middle" class="body">useServerTs 仅选默认时间</text>
+  <text x="476" y="597" text-anchor="middle" class="body">TTL / skipLatestPersistence</text>
+  <text x="476" y="621" text-anchor="middle" class="small">DAO Future → Success / Failure</text>
+
+  <rect x="682" y="175" width="340" height="125" rx="5" class="box"/>
+  <text x="852" y="210" text-anchor="middle" class="head">TelemetrySubscriptionService</text>
+  <text x="852" y="238" text-anchor="middle" class="body">main + WS callbacks use saveFuture</text>
+  <text x="852" y="263" text-anchor="middle" class="body">Entity View lookup starts immediately</text>
+  <text x="852" y="284" text-anchor="middle" class="small">no saveFuture dependency</text>
+  <rect x="682" y="405" width="340" height="155" rx="5" class="box"/>
+  <text x="852" y="440" text-anchor="middle" class="head">BaseTimeseriesService</text>
+  <text x="852" y="469" text-anchor="middle" class="body">partition + history(ttl) + latest(no ttl)</text>
+  <text x="852" y="495" text-anchor="middle" class="body">Futures.allAsList aggregates results</text>
+  <text x="852" y="520" text-anchor="middle" class="small">independent queue / statement / transaction</text>
+  <text x="852" y="543" text-anchor="middle" class="small">no cross-store rollback</text>
+  <rect x="682" y="680" width="340" height="175" rx="5" fill="#fff7d6" class="panel"/>
+  <text x="852" y="715" text-anchor="middle" class="head">Entity View</text>
+  <text x="852" y="744" text-anchor="middle" class="body">history: proxy source entity</text>
+  <text x="852" y="769" text-anchor="middle" class="body">latest: materialize to View id</text>
+  <text x="852" y="794" text-anchor="middle" class="body">key filter + (startTs,endTs]</text>
+  <text x="852" y="819" text-anchor="middle" class="small">lookup failure logs; save failure ignored</text>
+  <text x="852" y="841" text-anchor="middle" class="small">history/latest may be temporarily inconsistent</text>
+  <rect x="682" y="925" width="340" height="105" rx="5" class="box"/>
+  <text x="852" y="960" text-anchor="middle" class="head">REST success callback</text>
+  <text x="852" y="988" text-anchor="middle" class="body">logTelemetryUpdated before HTTP 200</text>
+  <text x="852" y="1012" text-anchor="middle" class="small">action / audit remain independent</text>
+
+  <rect x="1108" y="148" width="732" height="55" rx="5" fill="#263746" class="panel"/>
+  <text x="1474" y="181" text-anchor="middle" class="whiteHead">database.ts.type selects exactly one history DAO</text>
+  <rect x="1102" y="235" width="230" height="195" rx="5" class="box"/>
+  <text x="1217" y="269" text-anchor="middle" class="head">PostgreSQL history</text>
+  <text x="1217" y="297" text-anchor="middle" class="body">public savePartition: no-op</text>
+  <text x="1217" y="322" text-anchor="middle" class="body">save(): ensure RANGE partition</text>
+  <text x="1217" y="347" text-anchor="middle" class="body">history queue prefix: ts</text>
+  <text x="1217" y="372" text-anchor="middle" class="small">SqlInsertTsRepository</text>
+  <text x="1217" y="397" text-anchor="middle" class="small">ts_kv upsert</text>
+  <rect x="1352" y="235" width="230" height="195" rx="5" class="box"/>
+  <text x="1467" y="269" text-anchor="middle" class="head">Timescale history</text>
+  <text x="1467" y="297" text-anchor="middle" class="body">savePartition: immediate 0</text>
+  <text x="1467" y="322" text-anchor="middle" class="body">chunk auto routing</text>
+  <text x="1467" y="347" text-anchor="middle" class="body">queue prefix: ts.timescale</text>
+  <text x="1467" y="372" text-anchor="middle" class="small">TimescaleInsertTsRepository</text>
+  <text x="1467" y="397" text-anchor="middle" class="small">ts_kv hypertable</text>
+  <rect x="1602" y="235" width="240" height="195" rx="5" class="box"/>
+  <text x="1722" y="269" text-anchor="middle" class="head">Cassandra history</text>
+  <text x="1722" y="297" text-anchor="middle" class="body">partition registry Future</text>
+  <text x="1722" y="322" text-anchor="middle" class="body">history async write Future</text>
+  <text x="1722" y="347" text-anchor="middle" class="body">optional native TTL</text>
+  <text x="1722" y="372" text-anchor="middle" class="small">ts_kv_partitions_cf</text>
+  <text x="1722" y="397" text-anchor="middle" class="small">ts_kv_cf</text>
+
+  <rect x="1115" y="475" width="715" height="105" rx="5" fill="#e9f7ec" class="panel"/>
+  <text x="1472" y="507" text-anchor="middle" class="head">SQL TTL cleanup → history only</text>
+  <text x="1472" y="534" text-anchor="middle" class="body">DELETE ts_kv only; Timescale tenant/customer path finds device / asset / customer</text>
+  <text x="1472" y="558" text-anchor="middle" class="small">ordinary PostgreSQL system TTL may also drop history partitions</text>
+
+  <rect x="1108" y="625" width="732" height="55" rx="5" fill="#263746" class="panel"/>
+  <text x="1474" y="658" text-anchor="middle" class="whiteHead">database.ts_latest.type independently selects latest DAO</text>
+  <rect x="1145" y="720" width="315" height="160" rx="5" class="box"/>
+  <text x="1302" y="754" text-anchor="middle" class="head">SQL / Timescale latest</text>
+  <text x="1302" y="782" text-anchor="middle" class="body">SqlTimeseriesLatestDao</text>
+  <text x="1302" y="807" text-anchor="middle" class="body">queue prefix: ts.latest</text>
+  <text x="1302" y="832" text-anchor="middle" class="body">optional timestamp guard</text>
+  <text x="1302" y="857" text-anchor="middle" class="small">ts_kv_latest; no TTL</text>
+  <rect x="1490" y="720" width="315" height="160" rx="5" class="box"/>
+  <text x="1647" y="754" text-anchor="middle" class="head">Cassandra latest</text>
+  <text x="1647" y="782" text-anchor="middle" class="body">unconditional CQL INSERT</text>
+  <text x="1647" y="807" text-anchor="middle" class="body">no TTL / no timestamp condition</text>
+  <text x="1647" y="832" text-anchor="middle" class="body">Cassandra write timestamp LWW</text>
+  <text x="1647" y="857" text-anchor="middle" class="small">old event may overwrite when run later</text>
+
+  <rect x="1110" y="950" width="220" height="90" rx="5" class="box"/>
+  <text x="1220" y="984" text-anchor="middle" class="head">WebSocket</text>
+  <text x="1220" y="1012" text-anchor="middle" class="body">aggregate success only</text>
+  <rect x="1360" y="950" width="230" height="90" rx="5" class="box"/>
+  <text x="1475" y="984" text-anchor="middle" class="head">TIMESERIES_UPDATED</text>
+  <text x="1475" y="1012" text-anchor="middle" class="body">Rule Engine, null callback</text>
+  <rect x="1620" y="950" width="220" height="90" rx="5" class="box"/>
+  <text x="1730" y="984" text-anchor="middle" class="head">audit service</text>
+  <text x="1730" y="1012" text-anchor="middle" class="body">independent persistence</text>
+
+  <path d="M275 215 H326 V225 H356" class="arrow"/>
+  <path d="M275 495 H316 V225 H356" class="arrow"/>
+  <path d="M275 635 H306 V225 H356" class="arrow"/>
+  <path d="M476 270 V335" class="arrow"/>
+  <path d="M476 440 V510" class="arrow"/>
+  <path d="M596 575 H642 V238 H682" class="arrow"/>
+  <path d="M275 355 H640 V238 H682" class="arrow"/>
+  <path d="M852 300 V405" class="arrow"/>
+  <path d="M1022 452 H1065 V175 H1108" class="arrow"/>
+  <path d="M1217 203 V235 M1467 203 V235 M1722 203 V235" class="arrow"/>
+  <path d="M1022 500 H1067 V652 H1108" class="arrow"/>
+  <path d="M1302 680 V720 M1647 680 V720" class="arrow"/>
+  <path d="M1022 260 H1040 V650 H852 V680" class="async"/>
+  <text x="930" y="640" class="small" fill="#9f2d20">immediate async</text>
+  <path d="M1022 770 H1080 V652 H1108" class="async"/>
+  <text x="1035" y="748" class="small" fill="#9f2d20">View latest only</text>
+  <path d="M1217 475 V430 M1467 475 V430" class="cleanup"/>
+  <path d="M1022 238 H1060 V995 H1110" class="async"/>
+  <text x="1068" y="925" class="small" fill="#9f2d20">aggregate success</text>
+  <path d="M1022 960 H1045 V910 H1475 V950" class="async"/>
+  <path d="M1022 1000 H1045 V1060 H1730 V1040" class="async"/>
+  <path d="M900 405 V300" class="async"/>
+  <text x="912" y="360" class="small" fill="#9f2d20">aggregate result</text>
+
+  <text x="42" y="1125" class="subtitle">关键边界：history、latest、Entity View、WS、REST action 与 audit 使用独立 Future / queue / statement / transaction；任何一支失败都不能回滚已提交的其他分支。</text>
+</svg>

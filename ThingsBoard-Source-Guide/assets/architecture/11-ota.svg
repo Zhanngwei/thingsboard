@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1240" viewBox="0 0 1900 1240" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 OTA 分层架构</title>
+  <desc id="desc">展示 OTA 包管理、Device 与 Profile 分配、状态队列、Shared Attributes、Device Actor、Transport API、数据缓存、PostgreSQL 和设备状态遥测之间的边界。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#253746"/>
+    </marker>
+    <marker id="redArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9F2D20"/>
+    </marker>
+    <style>
+      .title{font:700 30px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.subtitle{font:15px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#243447}.section{font:700 19px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.head{font:700 16px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.body{font:14px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#243447}.small{font:13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#374151}.whiteHead{font:700 16px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#FFFFFF}.whiteBody{font:13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#FFFFFF}.panel{stroke:#334155;stroke-width:2}.box{fill:#FFFFFF;stroke:#334155;stroke-width:2}.arrow{fill:none;stroke:#253746;stroke-width:2.2;marker-end:url(#arrow)}.async{fill:none;stroke:#9F2D20;stroke-width:2.2;stroke-dasharray:8 6;marker-end:url(#redArrow)}.dash{fill:none;stroke:#176B87;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <rect width="1900" height="1240" fill="#FFFFFF"/>
+  <text x="45" y="52" class="title">ThingsBoard 3.6 OTA：四类状态、两条 Queue 链与一个 binary cache</text>
+  <text x="45" y="80" class="subtitle">实线表示同步调用或数据读取；红色虚线表示不等待结果的异步副作用。包指针、通知和设备最终结果没有共同事务。</text>
+
+  <rect x="30" y="110" width="350" height="1060" rx="6" fill="#E8F3F8" class="panel"/>
+  <text x="55" y="145" class="section">管理与分配</text>
+  <rect x="65" y="180" width="280" height="92" rx="5" class="box"/>
+  <text x="205" y="216" text-anchor="middle" class="head">OtaPackageController</text>
+  <text x="205" y="244" text-anchor="middle" class="body">metadata / multipart / URL</text>
+  <rect x="65" y="315" width="280" height="92" rx="5" class="box"/>
+  <text x="205" y="350" text-anchor="middle" class="head">Device / Profile REST</text>
+  <text x="205" y="378" text-anchor="middle" class="body">firmware_id / software_id</text>
+  <rect x="65" y="455" width="280" height="128" rx="5" class="box"/>
+  <text x="205" y="492" text-anchor="middle" class="head">Effective package</text>
+  <text x="205" y="520" text-anchor="middle" class="body">Device override first</text>
+  <text x="205" y="546" text-anchor="middle" class="body">Profile fallback second</text>
+  <text x="205" y="570" text-anchor="middle" class="small">Profile scan: only override is null</text>
+  <rect x="65" y="640" width="280" height="120" rx="5" fill="#263746" class="panel"/>
+  <text x="205" y="681" text-anchor="middle" class="whiteHead">PostgreSQL entity DB</text>
+  <text x="205" y="710" text-anchor="middle" class="whiteBody">ota_package.data OID</text>
+  <text x="205" y="736" text-anchor="middle" class="whiteBody">device / device_profile pointers</text>
+  <rect x="65" y="825" width="280" height="126" rx="5" fill="#FFF7D6" class="panel"/>
+  <text x="205" y="864" text-anchor="middle" class="head">Two-stage package save</text>
+  <text x="205" y="893" text-anchor="middle" class="body">1. metadata transaction</text>
+  <text x="205" y="920" text-anchor="middle" class="body">2. full byte[] transaction</text>
+  <rect x="65" y="1010" width="280" height="104" rx="5" fill="#FDECEC" class="panel"/>
+  <text x="205" y="1047" text-anchor="middle" class="head">Memory boundary</text>
+  <text x="205" y="1076" text-anchor="middle" class="body">upload / hash / OID load</text>
+  <text x="205" y="1102" text-anchor="middle" class="body">all materialize full byte[]</text>
+
+  <rect x="405" y="110" width="430" height="1060" rx="6" fill="#EEF5E9" class="panel"/>
+  <text x="430" y="145" class="section">状态编排</text>
+  <rect x="450" y="190" width="340" height="112" rx="5" class="box"/>
+  <text x="620" y="228" text-anchor="middle" class="head">DefaultOtaPackageStateService</text>
+  <text x="620" y="257" text-anchor="middle" class="body">one call, two independent branches</text>
+  <text x="620" y="283" text-anchor="middle" class="small">producer callback=null</text>
+  <rect x="450" y="365" width="340" height="100" rx="5" fill="#0B3A53" class="panel"/>
+  <text x="620" y="404" text-anchor="middle" class="whiteHead">OTA Queue: tb_ota_package</text>
+  <text x="620" y="433" text-anchor="middle" class="whiteBody">random UUID key / provider-agnostic</text>
+  <rect x="450" y="525" width="340" height="126" rx="5" class="box"/>
+  <text x="620" y="564" text-anchor="middle" class="head">Core OTA consumer</text>
+  <text x="620" y="592" text-anchor="middle" class="body">recheck current effective target</text>
+  <text x="620" y="618" text-anchor="middle" class="body">rate-limit accepted messages</text>
+  <text x="620" y="642" text-anchor="middle" class="small">catch per record, commit whole pack</text>
+  <rect x="450" y="720" width="340" height="126" rx="5" fill="#FFF7D6" class="panel"/>
+  <text x="620" y="758" text-anchor="middle" class="head">Telemetry state</text>
+  <text x="620" y="787" text-anchor="middle" class="body">target_* + QUEUED</text>
+  <text x="620" y="814" text-anchor="middle" class="body">INITIATED then device states</text>
+  <rect x="450" y="915" width="340" height="126" rx="5" class="box"/>
+  <text x="620" y="953" text-anchor="middle" class="head">Shared Attributes</text>
+  <text x="620" y="982" text-anchor="middle" class="body">fw_* / sw_* metadata</text>
+  <text x="620" y="1009" text-anchor="middle" class="body">save and notifyDevice=true</text>
+
+  <rect x="860" y="110" width="440" height="1060" rx="6" fill="#FFF3DF" class="panel"/>
+  <text x="885" y="145" class="section">在线通知与协议</text>
+  <rect x="905" y="190" width="350" height="112" rx="5" class="box"/>
+  <text x="1080" y="228" text-anchor="middle" class="head">SubscriptionManager</text>
+  <text x="1080" y="257" text-anchor="middle" class="body">attributes committed first</text>
+  <text x="1080" y="283" text-anchor="middle" class="small">then DeviceAttributesEventNotificationMsg</text>
+  <rect x="905" y="365" width="350" height="100" rx="5" fill="#263746" class="panel"/>
+  <text x="1080" y="404" text-anchor="middle" class="whiteHead">Device Actor</text>
+  <text x="1080" y="433" text-anchor="middle" class="whiteBody">only attribute subscriptions/session routing</text>
+  <rect x="905" y="525" width="350" height="126" rx="5" class="box"/>
+  <text x="1080" y="563" text-anchor="middle" class="head">MQTT</text>
+  <text x="1080" y="592" text-anchor="middle" class="body">requestId -> packageId</text>
+  <text x="1080" y="619" text-anchor="middle" class="body">chunk size / chunk index</text>
+  <rect x="905" y="710" width="350" height="112" rx="5" class="box"/>
+  <text x="1080" y="748" text-anchor="middle" class="head">HTTP / CoAP</text>
+  <text x="1080" y="777" text-anchor="middle" class="body">per-request effective package</text>
+  <text x="1080" y="804" text-anchor="middle" class="small">HTTP title/version optimistic guard</text>
+  <rect x="905" y="885" width="350" height="132" rx="5" class="box"/>
+  <text x="1080" y="923" text-anchor="middle" class="head">LwM2M Object 5 / 9</text>
+  <text x="1080" y="952" text-anchor="middle" class="body">binary / temp URL / external URL</text>
+  <text x="1080" y="979" text-anchor="middle" class="body">dedicated state/result mapping</text>
+
+  <rect x="1325" y="110" width="545" height="1060" rx="6" fill="#F4ECF7" class="panel"/>
+  <text x="1350" y="145" class="section">下载数据面</text>
+  <rect x="1370" y="190" width="455" height="112" rx="5" class="box"/>
+  <text x="1598" y="228" text-anchor="middle" class="head">DefaultTransportService</text>
+  <text x="1598" y="257" text-anchor="middle" class="body">Transport API request/reply Queue</text>
+  <text x="1598" y="283" text-anchor="middle" class="small">no Device Actor on binary request</text>
+  <rect x="1370" y="365" width="455" height="126" rx="5" class="box"/>
+  <text x="1598" y="403" text-anchor="middle" class="head">DefaultTransportApiService</text>
+  <text x="1598" y="432" text-anchor="middle" class="body">resolve Device override / Profile fallback</text>
+  <text x="1598" y="459" text-anchor="middle" class="body">reject URL package for binary API</text>
+  <rect x="1370" y="555" width="455" height="140" rx="5" fill="#0B3A53" class="panel"/>
+  <text x="1598" y="596" text-anchor="middle" class="whiteHead">OtaPackageDataCache</text>
+  <text x="1598" y="626" text-anchor="middle" class="whiteBody">Caffeine: full byte[] + array copy</text>
+  <text x="1598" y="654" text-anchor="middle" class="whiteBody">Redis: shared value + GETRANGE</text>
+  <text x="1598" y="680" text-anchor="middle" class="whiteBody">cache miss loads full PostgreSQL OID</text>
+  <rect x="1370" y="765" width="455" height="126" rx="5" class="box"/>
+  <text x="1598" y="803" text-anchor="middle" class="head">Device binary consumer</text>
+  <text x="1598" y="832" text-anchor="middle" class="body">download -> checksum -> install</text>
+  <text x="1598" y="859" text-anchor="middle" class="body">reports final telemetry status</text>
+  <rect x="1370" y="960" width="455" height="126" rx="5" fill="#FDECEC" class="panel"/>
+  <text x="1598" y="998" text-anchor="middle" class="head">Failure boundary</text>
+  <text x="1598" y="1027" text-anchor="middle" class="body">pointer / Queue / attributes / chunks</text>
+  <text x="1598" y="1054" text-anchor="middle" class="body">and final UPDATED are independent</text>
+
+  <path d="M65 226 H45 V700 H65" class="arrow"/>
+  <path d="M345 361 C390 361 405 246 450 246" class="arrow"/>
+  <path d="M205 407 V455" class="arrow"/>
+  <path d="M205 583 V640" class="arrow"/>
+  <path d="M790 246 V365" class="async"/>
+  <path d="M790 246 H815 V783 H790" class="async"/>
+  <path d="M620 465 V525" class="arrow"/>
+  <path d="M620 651 V720" class="arrow"/>
+  <path d="M620 846 V915" class="arrow"/>
+  <path d="M790 978 H905" class="arrow"/>
+  <path d="M1080 302 V365" class="arrow"/>
+  <path d="M1080 465 V525" class="arrow"/>
+  <path d="M1255 588 H1370" class="arrow"/>
+  <path d="M1255 766 C1300 766 1325 246 1370 246" class="arrow"/>
+  <path d="M1255 951 C1310 951 1320 428 1370 428" class="arrow"/>
+  <path d="M1598 302 V365" class="arrow"/>
+  <path d="M1598 491 V555" class="arrow"/>
+  <path d="M1598 695 V765" class="arrow"/>
+  <path d="M345 700 H392 V165 H1340 V625 H1370" class="dash"/>
+  <path d="M450 783 C400 783 390 700 345 700" class="dash"/>
+
+  <rect x="30" y="1190" width="1840" height="24" fill="#263746"/>
+  <text x="950" y="1208" text-anchor="middle" class="whiteBody">Source-backed boundary: PostgreSQL is source of truth; Redis/Caffeine are rebuildable; TimescaleDB/Cassandra store only OTA telemetry when selected.</text>
+</svg>

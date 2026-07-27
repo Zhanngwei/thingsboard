@@ -2,7 +2,7 @@
 
 > 源码基线：ThingsBoard `3.6.4`，行为提交 `0cb411fc90`；源码链接已按当前 `release-3.6` 工作树行号校准。本章讨论 CLEAR，并用 ACK 对照状态机；Alarm 删除、指派和查询另章展开。
 
-[上一篇：06 Alarm 创建流程](../06-alarm-create/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/07-alarm-clear.svg) | [下一篇：08 Attributes 保存流程（待分析）](../../SUMMARY.md#chapter-08)
+[上一篇：06 Alarm 创建流程](../06-alarm-create/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/07-alarm-clear.svg) | [下一篇：08 Attributes 保存流程](../08-attributes-save/README.md)
 
 ---
 
@@ -802,4 +802,4 @@ Subscription 首次清除产生 `AlarmTrigger`，可匹配 `CLEARED`；`EntityAc
 
 ---
 
-[上一篇：06 Alarm 创建流程](../06-alarm-create/README.md) | [返回目录](../../SUMMARY.md) | [下一篇：08 Attributes 保存流程（待分析）](../../SUMMARY.md#chapter-08)
+[上一篇：06 Alarm 创建流程](../06-alarm-create/README.md) | [返回目录](../../SUMMARY.md) | [下一篇：08 Attributes 保存流程](../08-attributes-save/README.md)

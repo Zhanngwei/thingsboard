@@ -1,0 +1,170 @@
+@startuml
+title ThingsBoard 3.6 OTA 包保存、分配、状态通知与 MQTT 分块下载
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #F8FAFC
+skinparam ActorBorderColor #334155
+skinparam ActorBackgroundColor #FFFFFF
+skinparam DatabaseBorderColor #7C2D12
+skinparam DatabaseBackgroundColor #FFF7D6
+skinparam QueueBorderColor #176B87
+skinparam QueueBackgroundColor #E8F3F8
+skinparam NoteBorderColor #7C2D12
+skinparam NoteBackgroundColor #FFF7D6
+skinparam SequenceGroupBorderColor #374151
+skinparam SequenceGroupBackgroundColor #F8FAFC
+skinparam BoxBorderColor #475569
+skinparam BoxBackgroundColor #FFFFFF
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 130
+
+actor "Tenant Admin" as Admin
+participant "REST Controllers\nPackage / Device / Profile" as REST
+participant "Application + DAO\nServices" as Service
+database "PostgreSQL\nota_package / device\ndevice_profile" as PG
+participant "OTA State\nService" as State
+queue "OTA Queue\ntb_ota_package" as Queue
+participant "Core OTA\nConsumer" as Consumer
+participant "Telemetry +\nAttribute Service" as Telemetry
+participant "Device Actor\nattribute subscription" as Actor
+actor "MQTT Device" as Device
+participant "MQTT Transport" as MQTT
+participant "Transport API +\nData Cache" as API
+
+== Phase A: package metadata and binary ==
+Admin -> REST: POST /api/otaPackage\nmetadata + usesUrl
+activate REST
+REST -> Service: save(request, user)
+activate Service
+Service -> PG: INSERT/UPDATE ota_package metadata
+activate PG
+PG --> Service: COMMIT metadata row\nmay have data IS NULL
+deactivate PG
+Service -> Service: evict metadata/data cache\npublish SaveEntityEvent + action
+Service --> REST: OtaPackageInfo(hasData)
+deactivate Service
+REST --> Admin: HTTP 200
+deactivate REST
+
+opt binary package uploaded in second request
+  Admin -> REST: multipart POST /api/otaPackage/{id}
+  REST -> REST: MultipartFile.getBytes()
+  REST -> Service: saveOtaPackageData(full byte[])
+  Service -> Service: generate + validate checksum\nvalidate tenant quota
+  Service -> PG: UPDATE same row\ndata OID + file metadata
+  PG --> Service: COMMIT
+  Service -> Service: evict otaPackagesData
+  Service --> REST: OtaPackageInfo(hasData=true)
+  REST --> Admin: HTTP 200
+end
+
+note over REST,PG
+Metadata and binary are separate transactions.
+The upload, hash and JPA entity all materialize the full byte array.
+end note
+
+== Phase B: Device or Profile assignment ==
+Admin -> REST: POST Device or DeviceProfile\nfirmwareId/softwareId
+activate REST
+REST -> Service: save entity
+Service -> PG: validate full package + save pointer
+PG --> Service: pointer COMMIT
+Service -> State: update(saved, old)
+activate State
+State -> State: effective id = Device override\nelse Profile fallback
+
+par fire-and-forget Queue branch
+  State ->> Queue: ToOtaPackageStateServiceMsg\nrandom UUID key, callback=null
+else asynchronous Telemetry branch
+  State ->> Telemetry: target_* + state=QUEUED
+end
+State --> Service: return without joining branches
+deactivate State
+Service --> REST: saved entity
+REST --> Admin: HTTP response
+deactivate REST
+
+Queue -> Consumer: poll pack
+activate Consumer
+Consumer -> State: process(message)
+activate State
+State -> PG: reload Device + Profile
+PG --> State: current effective package
+alt queued target is stale or Device removed
+  State --> Consumer: false
+  Consumer -> Consumer: skip; pack will still commit
+else target is still current
+  State ->> Telemetry: state=INITIATED
+  State --> Consumer: true immediately after scheduling Future
+end
+deactivate State
+Consumer -> Queue: commit whole polled pack
+deactivate Consumer
+
+opt target was accepted
+  ... INITIATED callback may run before or after Queue commit ...
+  Telemetry -->> State: success or failure callback
+  State ->> Telemetry: save/remove fw_* or sw_*\nShared Attributes
+  Telemetry ->> Actor: DeviceAttributesEventNotificationMsg\nafter attribute save succeeds
+  Actor ->> Device: attribute notification\nonly if session subscribed
+end
+
+note over Queue,Consumer
+Only synchronous process() exceptions are caught and logged.
+Async Telemetry/Attribute failures happen outside this catch and do not retry the Queue record.
+end note
+
+== Phase C: MQTT binary chunk ==
+Device -> MQTT: PUBLISH v2/fw/request/42/chunk/0\npayload 16384
+activate MQTT
+alt requestId already bound in this connection
+  MQTT -> API: get(packageId, 16384, 0)
+else first chunk for requestId
+  MQTT -> API: GetOtaPackageRequestMsg(Device,type)\nvia Transport API request/reply Queue
+  activate API
+  API -> PG: load Device, Profile, OtaPackageInfo
+  PG --> API: effective binary package metadata
+  alt URL package or missing target
+    API --> MQTT: FAILURE / NOT_FOUND
+    MQTT -> Device: error topic + close session
+  else binary package
+    API -> API: cache.has(packageId)
+    opt cache miss
+      API -> PG: load full OID binary
+      PG --> API: byte[]
+      API -> API: cache.put(full byte[])
+    end
+    API --> MQTT: SUCCESS + package id + metadata
+    MQTT -> MQTT: otaPackSessions[42] = packageId
+  end
+  deactivate API
+end
+
+MQTT --> Device: PUBACK before cache range read
+MQTT -> API: cache.get(packageId, 16384, 0)
+API --> MQTT: chunk bytes
+MQTT ->> Device: PUBLISH v2/fw/response/42/chunk/0
+deactivate MQTT
+
+loop remaining chunks use same requestId
+  Device -> MQTT: request chunk N
+  MQTT -> API: range read cached package id
+  API --> MQTT: bytes
+  MQTT ->> Device: response chunk N
+end
+
+Device ->> Telemetry: fw_state DOWNLOADING / VERIFIED / UPDATED / FAILED
+note over Device,Telemetry
+Generic device telemetry has no server-side transition validator.
+LwM2M uses a separate Object 5/9 state machine.
+end note
+
+note over PG,Device
+Pointer DB, Queue, target/state telemetry, Shared Attributes,
+Actor delivery, binary chunks and final device result do not share a transaction.
+end note
+
+@enduml

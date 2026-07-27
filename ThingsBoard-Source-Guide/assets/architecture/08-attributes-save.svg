@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="920" viewBox="0 0 1680 920" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard Attributes 保存架构</title>
+  <desc id="desc">展示 REST、设备 Transport、Rule Engine、SQL batch、数据库后 cache transform、组合 Future、本地与远程订阅通知以及 REST 成功后的 Rule Engine action。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#1f2937"/></marker>
+    <style>
+      .t{font:700 28px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.h{font:700 19px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.b{font:600 16px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.s{font:14px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#243447}.box{stroke:#263746;stroke-width:2;rx:6}.line{fill:none;stroke:#1f2937;stroke-width:2.4;marker-end:url(#arrow)}.dash{fill:none;stroke:#7c2d12;stroke-width:2.4;stroke-dasharray:8 6;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1680" height="920" fill="#ffffff"/>
+  <text x="60" y="52" class="t">08 Attributes 保存流程</text>
+  <text x="60" y="82" class="s">实线：主调用或数据写入　虚线：事务外通知/副作用</text>
+
+  <rect x="45" y="115" width="330" height="720" fill="#e8f3f8" class="box"/><text x="70" y="150" class="h">入口层</text>
+  <rect x="75" y="185" width="270" height="90" fill="#ffffff" class="box"/><text x="210" y="220" text-anchor="middle" class="b">平台 REST</text><text x="210" y="248" text-anchor="middle" class="s">SERVER / SHARED</text>
+  <rect x="75" y="320" width="270" height="100" fill="#ffffff" class="box"/><text x="210" y="355" text-anchor="middle" class="b">MQTT / CoAP / HTTP</text><text x="210" y="382" text-anchor="middle" class="s">PostAttributeMsg</text><text x="210" y="404" text-anchor="middle" class="s">PUBACK 只等 Queue producer</text>
+  <rect x="75" y="465" width="270" height="90" fill="#ffffff" class="box"/><text x="210" y="500" text-anchor="middle" class="b">Edge gRPC</text><text x="210" y="528" text-anchor="middle" class="s">post / updated 两种语义</text>
+  <rect x="75" y="600" width="270" height="90" fill="#ffffff" class="box"/><text x="210" y="635" text-anchor="middle" class="b">内部服务</text><text x="210" y="663" text-anchor="middle" class="s">Entity View / state</text>
+
+  <rect x="425" y="115" width="360" height="720" fill="#eef5e9" class="box"/><text x="450" y="150" class="h">Rule Engine 与应用编排</text>
+  <rect x="465" y="205" width="280" height="86" fill="#ffffff" class="box"/><text x="605" y="238" text-anchor="middle" class="b">Rule Engine Queue</text><text x="605" y="265" text-anchor="middle" class="s">POST_ATTRIBUTES_REQUEST</text>
+  <rect x="465" y="340" width="280" height="105" fill="#ffffff" class="box"/><text x="605" y="375" text-anchor="middle" class="b">Save Attributes Node</text><text x="605" y="402" text-anchor="middle" class="s">scope / change filter</text><text x="605" y="425" text-anchor="middle" class="s">optional ATTRIBUTES_UPDATED</text>
+  <rect x="465" y="515" width="280" height="105" fill="#ffffff" class="box"/><text x="605" y="550" text-anchor="middle" class="b">TelemetrySubscriptionService</text><text x="605" y="578" text-anchor="middle" class="s">业务 callback 与 WS callback</text><text x="605" y="601" text-anchor="middle" class="s">都等待组合 Future</text>
+
+  <rect x="835" y="115" width="390" height="720" fill="#fff3df" class="box"/><text x="860" y="150" class="h">DAO 与 PostgreSQL</text>
+  <rect x="875" y="195" width="310" height="105" fill="#ffffff" class="box"/><text x="1030" y="229" text-anchor="middle" class="b">Base / CachedAttributesService</text><text x="1030" y="256" text-anchor="middle" class="s">每个 key 一个 DAO Future</text><text x="1030" y="279" text-anchor="middle" class="s">Cached: DB 后接 cache transform</text>
+  <rect x="875" y="340" width="310" height="100" fill="#ffffff" class="box"/><text x="1030" y="371" text-anchor="middle" class="b">JpaAttributeDao Queue</text><text x="1030" y="398" text-anchor="middle" class="s">每 key 独立入队；entity UUID hash</text><text x="1030" y="421" text-anchor="middle" class="s">请求可跨 batch；batch 可混请求</text>
+  <rect x="875" y="475" width="310" height="110" fill="#ffffff" class="box"/><text x="1030" y="510" text-anchor="middle" class="b">AttributeKvInsertRepository</text><text x="1030" y="538" text-anchor="middle" class="s">UPDATE + INSERT ON CONFLICT</text><text x="1030" y="561" text-anchor="middle" class="s">batch = transaction / failure unit</text>
+  <rect x="875" y="645" width="310" height="105" fill="#263746" class="box"/><text x="1030" y="682" text-anchor="middle" style="font:700 18px 'Microsoft YaHei';fill:#ffffff">attribute_kv</text><text x="1030" y="711" text-anchor="middle" style="font:14px 'Microsoft YaHei';fill:#ffffff">entity + scope + key = latest row</text>
+
+  <rect x="1275" y="115" width="360" height="720" fill="#f4ecf7" class="box"/><text x="1300" y="150" class="h">组合 Future 与事务外副作用</text>
+  <rect x="1315" y="180" width="280" height="95" fill="#ffffff" class="box"/><text x="1455" y="212" text-anchor="middle" class="b">Caffeine / Redis Cache</text><text x="1455" y="239" text-anchor="middle" class="s">DB Future 后 transform</text><text x="1455" y="262" text-anchor="middle" class="s">evictOrPut 使用原值</text>
+  <rect x="1315" y="300" width="280" height="80" fill="#263746" class="box"/><text x="1455" y="332" text-anchor="middle" style="font:700 16px 'Microsoft YaHei';fill:#ffffff">AttributesService Future</text><text x="1455" y="359" text-anchor="middle" style="font:14px 'Microsoft YaHei';fill:#ffffff">DB + optional cache transform</text>
+  <rect x="1315" y="410" width="280" height="70" fill="#ffffff" class="box"/><text x="1455" y="440" text-anchor="middle" class="b">WebSocket</text><text x="1455" y="465" text-anchor="middle" class="s">组合 Future success 后更新</text>
+  <rect x="1315" y="505" width="280" height="115" fill="#ffffff" class="box"/><text x="1455" y="536" text-anchor="middle" class="b">Subscription → Device Actor</text><text x="1455" y="563" text-anchor="middle" class="s">本地保留 notifyDevice</text><text x="1455" y="586" text-anchor="middle" class="s">远程 update proto 丢失标志 → true</text><text x="1455" y="609" text-anchor="middle" class="s">仅已订阅在线 session 最终收到</text>
+  <rect x="1315" y="650" width="280" height="85" fill="#ffffff" class="box"/><text x="1455" y="676" text-anchor="middle" class="b">Rule Engine Action</text><text x="1455" y="701" text-anchor="middle" class="s">REST success / Node optional</text><text x="1455" y="723" text-anchor="middle" class="s">ATTRIBUTES_UPDATED</text>
+  <rect x="1315" y="750" width="280" height="55" fill="#ffffff" class="box"/><text x="1455" y="773" text-anchor="middle" class="b">audit_log</text><text x="1455" y="796" text-anchor="middle" class="s">success/failure；仅配置允许时异步写</text>
+
+  <path d="M345 365 H420 V248 H465" class="line"/><path d="M745 248 H780 V390 H745" class="line"/><path d="M605 445 V515" class="line"/>
+  <path d="M345 230 H400 V568 H465" class="line"/><path d="M345 510 H400 V568 H465" class="line"/><path d="M345 645 H400 V568 H465" class="line"/>
+  <path d="M745 568 H875" class="line"/><path d="M1030 300 V340" class="line"/><path d="M1030 440 V475" class="line"/><path d="M1030 585 V645" class="line"/>
+  <path d="M1185 697 H1260 V227 H1315" class="dash"/><path d="M1185 697 H1280 V340 H1315" class="line"/><path d="M1455 275 V300" class="dash"/>
+  <path d="M1595 340 H1610 V445 H1595" class="dash"/><path d="M1595 340 H1620 V562 H1595" class="dash"/>
+  <path d="M745 390 H810 V687 H1315" class="dash"/><path d="M345 230 H405 V687 H1315" class="dash"/><path d="M345 230 H390 V777 H1315" class="dash"/>
+  <text x="60" y="885" class="s">关键边界：DB commit 后仍可能 cache Future 失败；此时上层失败且 WS、Device Actor、REST/Node action 被抑制。SQL batch、通知与 audit 不共享事务。</text>
+</svg>

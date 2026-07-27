@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2780" height="2395" viewBox="0 0 2780 2395" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard Telemetry 保存完整时序</title>
+  <desc id="desc">覆盖 MQTT producer handoff、Save Timeseries history/latest 独立写入、Entity View 提前分叉、WebSocket、skip latest，以及 REST EntityAction、audit 和 TIMESERIES_UPDATED。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1f2937"/></marker>
+    <marker id="redArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#9f2d20"/></marker>
+    <style>
+      .title{font:700 30px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.sub{font:15px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#374151}.participant{fill:#e8f3f8;stroke:#176b87;stroke-width:2}.participant2{fill:#eef5e9;stroke:#476b2f;stroke-width:2}.participant3{fill:#fff3df;stroke:#9a6114;stroke-width:2}.participant4{fill:#f4ecf7;stroke:#6b3f78;stroke-width:2}.ptext{font:700 15px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.life{stroke:#7b8794;stroke-width:1.5;stroke-dasharray:7 6}.msg{stroke:#1f2937;stroke-width:2;marker-end:url(#arrow)}.reply{stroke:#1f2937;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#arrow)}.async{stroke:#9f2d20;stroke-width:2.2;stroke-dasharray:8 6;marker-end:url(#redArrow)}.label{font:14px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.small{font:13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#374151}.section{fill:#263746;stroke:#263746;stroke-width:2}.sectionText{font:700 17px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#fff}.note{fill:#fff7d6;stroke:#9f2d20;stroke-width:1.5}.noteText{font:13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#3f2a1d}.loop{fill:#f3f8fa;fill-opacity:.75;stroke:#176b87;stroke-width:1.5}.loopText{font:700 13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#176b87}.restBox{fill:#fff;stroke:#263746;stroke-width:2}.alt{fill:#f7fafc;stroke:#476b2f;stroke-width:1.5}.success{fill:#e9f7ec;stroke:#236b3a;stroke-width:1.5}.warn{fill:#fdecec;stroke:#9f2d20;stroke-width:1.5}
+    </style>
+  </defs>
+
+  <rect width="2780" height="2395" fill="#fff"/>
+  <text x="42" y="45" class="title">09 Telemetry 保存完整时序</text>
+  <text x="42" y="74" class="sub">producer handoff、独立 history/latest、Entity View、WebSocket 与 REST action 的真实完成边界</text>
+
+  <g id="participants">
+    <rect x="35" y="100" width="170" height="68" rx="5" class="participant"/><text x="120" y="141" text-anchor="middle" class="ptext">Device</text>
+    <rect x="270" y="100" width="190" height="68" rx="5" class="participant"/><text x="365" y="130" text-anchor="middle" class="ptext">MQTT</text><text x="365" y="151" text-anchor="middle" class="small">Handler</text>
+    <rect x="525" y="100" width="210" height="68" rx="5" class="participant"/><text x="630" y="130" text-anchor="middle" class="ptext">Transport</text><text x="630" y="151" text-anchor="middle" class="small">Service</text>
+    <rect x="795" y="100" width="210" height="68" rx="5" class="participant2"/><text x="900" y="130" text-anchor="middle" class="ptext">Rule Engine</text><text x="900" y="151" text-anchor="middle" class="small">Queue</text>
+    <rect x="1060" y="100" width="220" height="68" rx="5" class="participant2"/><text x="1170" y="130" text-anchor="middle" class="ptext">Save Timeseries</text><text x="1170" y="151" text-anchor="middle" class="small">Node</text>
+    <rect x="1340" y="100" width="240" height="68" rx="5" class="participant3"/><text x="1460" y="130" text-anchor="middle" class="ptext">Telemetry</text><text x="1460" y="151" text-anchor="middle" class="small">Subscription</text>
+    <rect x="1635" y="100" width="230" height="68" rx="5" class="participant3"/><text x="1750" y="130" text-anchor="middle" class="ptext">BaseTimeseries</text><text x="1750" y="151" text-anchor="middle" class="small">Service</text>
+    <rect x="1930" y="100" width="240" height="68" rx="5" class="participant4"/><text x="2050" y="130" text-anchor="middle" class="ptext">selected history</text><text x="2050" y="151" text-anchor="middle" class="small">TimeseriesDao</text>
+    <rect x="2230" y="100" width="240" height="68" rx="5" class="participant4"/><text x="2350" y="130" text-anchor="middle" class="ptext">selected latest</text><text x="2350" y="151" text-anchor="middle" class="small">TimeseriesLatestDao</text>
+    <rect x="2530" y="100" width="210" height="68" rx="5" class="participant4"/><text x="2635" y="130" text-anchor="middle" class="ptext">Entity View</text><text x="2635" y="151" text-anchor="middle" class="small">/ WebSocket</text>
+    <path d="M120 168 V1595 M365 168 V1595 M630 168 V1595 M900 168 V1595 M1170 168 V1595 M1460 168 V1595 M1750 168 V1595 M2050 168 V1595 M2350 168 V1595 M2635 168 V1595" class="life"/>
+  </g>
+
+  <rect x="30" y="188" width="2720" height="38" rx="4" class="section"/><text x="48" y="214" class="sectionText">A. Transport 与 Queue producer handoff</text>
+  <line x1="120" y1="265" x2="365" y2="265" class="msg"/><text x="242" y="255" text-anchor="middle" class="label">PUBLISH telemetry (one or more timestamps)</text>
+  <line x1="365" y1="310" x2="630" y2="310" class="msg"/><text x="497" y="300" text-anchor="middle" class="label">processDevicePublish → process(PostTelemetryMsg)</text>
+  <rect x="500" y="342" width="560" height="150" rx="4" class="loop"/><text x="518" y="368" class="loopText">loop 每个 TsKvListProto</text>
+  <line x1="630" y1="405" x2="900" y2="405" class="msg"/><text x="765" y="395" text-anchor="middle" class="label">POST_TELEMETRY_REQUEST + metadata ts</text>
+  <line x1="900" y1="452" x2="630" y2="452" class="reply"/><text x="765" y="442" text-anchor="middle" class="label">producer callback</text>
+  <line x1="630" y1="525" x2="365" y2="525" class="reply"/><text x="497" y="515" text-anchor="middle" class="label">MsgPackCallback success</text>
+  <line x1="365" y1="568" x2="120" y2="568" class="reply"/><text x="242" y="558" text-anchor="middle" class="label">PUBACK</text>
+  <rect x="400" y="585" width="690" height="60" rx="4" class="note"/><text x="745" y="609" text-anchor="middle" class="noteText">PUBACK 只聚合 Queue producer callback；</text><text x="745" y="630" text-anchor="middle" class="noteText">不等待规则链、数据库，也不是 Edge 多 timestamp 的完成语义。</text>
+
+  <rect x="30" y="675" width="2720" height="38" rx="4" class="section"/><text x="48" y="701" class="sectionText">B. Save Timeseries：history/latest 聚合与 Entity View 提前分叉</text>
+  <rect x="1690" y="728" width="1010" height="76" rx="4" class="note"/>
+  <text x="2195" y="754" text-anchor="middle" class="noteText">database.ts.type → history DAO；database.ts_latest.type → latest DAO；两者独立，支持 hybrid。</text>
+  <text x="2195" y="779" text-anchor="middle" class="noteText">TTL 只传 history；SQL latest 才有 timestamp guard，Cassandra latest 是无条件 INSERT 且无 TTL。</text>
+  <line x1="900" y1="750" x2="1170" y2="750" class="msg"/><text x="1035" y="740" text-anchor="middle" class="label">consume TbMsg</text>
+  <line x1="1170" y1="835" x2="1170" y2="835" class="msg"/>
+  <text x="1185" y="828" class="label">compute default timestamp / TTL / skipLatest</text>
+  <text x="1185" y="850" class="small">{ts,values} explicit ts overrides useServerTs default</text>
+  <line x1="1170" y1="890" x2="1460" y2="890" class="msg"/><text x="1315" y="880" text-anchor="middle" class="label">saveAndNotify(entries, ttl)</text>
+  <line x1="1460" y1="935" x2="1750" y2="935" class="msg"/><text x="1605" y="925" text-anchor="middle" class="label">tsService.save(entries, ttl)</text>
+  <line x1="1750" y1="985" x2="2050" y2="985" class="msg"/><text x="1900" y="975" text-anchor="middle" class="label">savePartition Future</text>
+  <text x="1900" y="1008" text-anchor="middle" class="small">PG/Timescale: immediate no-op; Cassandra: partition registry</text>
+  <line x1="1750" y1="1045" x2="2050" y2="1045" class="msg"/><text x="1900" y="1035" text-anchor="middle" class="label">save history(entry, ttl)</text>
+  <text x="1900" y="1068" text-anchor="middle" class="small">PG queue ts / Timescale ts.timescale / Cassandra async write + optional TTL</text>
+  <line x1="1750" y1="1110" x2="2350" y2="1110" class="msg"/><text x="2050" y="1100" text-anchor="middle" class="label">saveLatest(entry) without TTL</text>
+  <text x="2050" y="1133" text-anchor="middle" class="small">SQL queue ts.latest + guard OR Cassandra unconditional INSERT / write timestamp LWW</text>
+  <line x1="1750" y1="1165" x2="1460" y2="1165" class="reply"/><text x="1605" y="1155" text-anchor="middle" class="label">aggregate saveFuture returned; callbacks registered</text>
+  <line x1="1460" y1="1218" x2="2635" y2="1218" class="async"/><text x="2047" y="1208" text-anchor="middle" class="label">addEntityViewCallback: async lookup starts now, no saveFuture dependency</text>
+  <line x1="2635" y1="1265" x2="2350" y2="1265" class="async"/><text x="2492" y="1255" text-anchor="middle" class="label">save View latest: key + (startTs,endTs]</text>
+  <rect x="2210" y="1280" width="520" height="66" rx="4" class="warn"/><text x="2470" y="1305" text-anchor="middle" class="noteText">lookup failure logs error；View latest save failure callback is empty。</text><text x="2470" y="1328" text-anchor="middle" class="noteText">View latest may finish before source aggregate later fails。</text>
+  <line x1="2050" y1="1375" x2="1750" y2="1375" class="reply"/><text x="1900" y="1365" text-anchor="middle" class="label">partition + history Futures</text>
+  <line x1="2350" y1="1420" x2="1750" y2="1420" class="reply"/><text x="2050" y="1410" text-anchor="middle" class="label">latest Futures</text>
+  <line x1="1750" y1="1465" x2="1460" y2="1465" class="reply"/><text x="1605" y="1455" text-anchor="middle" class="label">Futures.allAsList success</text>
+  <line x1="1460" y1="1508" x2="1170" y2="1508" class="reply"/><text x="1315" y="1498" text-anchor="middle" class="label">main callback → TelemetryNodeCallback success</text>
+  <line x1="1460" y1="1550" x2="2635" y2="1550" class="async"/><text x="2047" y="1540" text-anchor="middle" class="label">WS onTimeSeriesUpdate only after aggregate success</text>
+
+  <rect x="30" y="1618" width="2720" height="38" rx="4" class="section"/><text x="48" y="1644" class="sectionText">C. skipLatestPersistence</text>
+  <rect x="785" y="1682" width="1450" height="142" rx="5" class="alt"/>
+  <line x1="1170" y1="1718" x2="1460" y2="1718" class="msg"/><text x="1315" y="1708" text-anchor="middle" class="label">saveWithoutLatestAndNotify</text>
+  <line x1="1460" y1="1758" x2="1750" y2="1758" class="msg"/><text x="1605" y="1748" text-anchor="middle" class="label">saveWithoutLatest</text>
+  <line x1="1750" y1="1798" x2="2050" y2="1798" class="msg"/><text x="1900" y="1788" text-anchor="middle" class="label">partition + history only</text>
+  <text x="1500" y="1817" text-anchor="middle" class="small">aggregate success still triggers WS; no source latest and no Entity View callback</text>
+
+  <rect x="30" y="1855" width="2720" height="38" rx="4" class="section"/><text x="48" y="1881" class="sectionText">D. 平台 REST 保存成功后的 EntityAction 与 audit</text>
+  <rect x="70" y="1920" width="250" height="64" rx="5" class="restBox"/><text x="195" y="1958" text-anchor="middle" class="ptext">REST client</text>
+  <rect x="430" y="1920" width="280" height="64" rx="5" class="restBox"/><text x="570" y="1958" text-anchor="middle" class="ptext">TelemetryController</text>
+  <rect x="830" y="1920" width="280" height="64" rx="5" class="restBox"/><text x="970" y="1958" text-anchor="middle" class="ptext">Subscription Service</text>
+  <rect x="1230" y="1920" width="280" height="64" rx="5" class="restBox"/><text x="1370" y="1958" text-anchor="middle" class="ptext">EntityActionService</text>
+  <rect x="1630" y="1920" width="280" height="64" rx="5" class="restBox"/><text x="1770" y="1958" text-anchor="middle" class="ptext">Rule Engine Queue</text>
+  <rect x="2030" y="1920" width="280" height="64" rx="5" class="restBox"/><text x="2170" y="1958" text-anchor="middle" class="ptext">audit service</text>
+  <line x1="195" y1="2018" x2="570" y2="2018" class="msg"/><text x="382" y="2008" text-anchor="middle" class="label">POST entity timeseries</text>
+  <line x1="570" y1="2058" x2="970" y2="2058" class="msg"/><text x="770" y="2048" text-anchor="middle" class="label">saveAndNotify(entries, ttl)</text>
+  <line x1="970" y1="2098" x2="570" y2="2098" class="reply"/><text x="770" y="2088" text-anchor="middle" class="label">storage aggregate success callback</text>
+  <line x1="570" y1="2138" x2="1370" y2="2138" class="async"/><text x="970" y="2128" text-anchor="middle" class="label">logTelemetryUpdated(TIMESERIES_UPDATED)</text>
+  <line x1="1370" y1="2180" x2="1770" y2="2180" class="async"/><text x="1570" y="2170" text-anchor="middle" class="label">TbMsg TIMESERIES_UPDATED, callback null</text>
+  <line x1="1370" y1="2222" x2="2170" y2="2222" class="async"/><text x="1770" y="2212" text-anchor="middle" class="label">auditLogService.logEntityAction</text>
+  <line x1="570" y1="2264" x2="195" y2="2264" class="reply"/><text x="382" y="2254" text-anchor="middle" class="label">HTTP 200 after calls return</text>
+  <rect x="650" y="2290" width="2020" height="68" rx="4" class="note"/><text x="1660" y="2315" text-anchor="middle" class="noteText">HTTP 200 does not wait for TIMESERIES_UPDATED consumption, final WS delivery, or durable audit completion。</text><text x="1660" y="2339" text-anchor="middle" class="noteText">history / latest / Entity View / WS / action / audit use independent Future, queue, statement or transaction; there is no cross-store rollback。</text>
+</svg>

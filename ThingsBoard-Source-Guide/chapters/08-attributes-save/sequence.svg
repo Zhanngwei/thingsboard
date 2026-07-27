@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1640" viewBox="0 0 1800 1640" role="img" aria-labelledby="title desc">
+  <title id="title">08 Attributes 保存完整时序</title>
+  <desc id="desc">展示 MQTT 与 REST 属性保存、SQL batch、数据库后 cache transform、组合 Future、本地与远程订阅通知以及 EntityAction 和 audit。</desc>
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1f2937"/></marker>
+    <style>
+      .title{font:700 28px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.head{font:700 15px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.txt{font:14px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#111827}.small{font:13px 'Microsoft YaHei','Segoe UI',sans-serif;fill:#243447}.p{fill:#e8f3f8;stroke:#263746;stroke-width:2;rx:5}.life{stroke:#176b87;stroke-width:1.5;stroke-dasharray:6 5}.call{fill:none;stroke:#1f2937;stroke-width:2;marker-end:url(#a)}.ret{fill:none;stroke:#1f2937;stroke-width:1.7;stroke-dasharray:6 5;marker-end:url(#a)}.group{fill:#f3f8fa;stroke:#176b87;stroke-width:1.5;rx:5}.note{fill:#fff7d6;stroke:#7c2d12;stroke-width:1.5;rx:5}.fail{fill:#fff1f1;stroke:#9b1c1c;stroke-width:1.5;rx:5}.ok{fill:#eef5e9;stroke:#3f6212;stroke-width:1.5;rx:5}
+    </style>
+  </defs>
+  <rect width="1800" height="1640" fill="#fff"/>
+  <text x="45" y="48" class="title">08 Attributes 保存完整时序：DB → Cache 组合 Future</text>
+
+  <g>
+    <rect x="35" y="75" width="135" height="54" class="p"/><text x="102" y="107" text-anchor="middle" class="head">Device</text>
+    <rect x="195" y="75" width="150" height="54" class="p"/><text x="270" y="99" text-anchor="middle" class="head">MQTT / Transport</text><text x="270" y="119" text-anchor="middle" class="small">processDevicePublish</text>
+    <rect x="370" y="75" width="140" height="54" class="p"/><text x="440" y="107" text-anchor="middle" class="head">Rule Queue</text>
+    <rect x="535" y="75" width="150" height="54" class="p"/><text x="610" y="99" text-anchor="middle" class="head">Save Attributes</text><text x="610" y="119" text-anchor="middle" class="small">Rule Node</text>
+    <rect x="710" y="75" width="150" height="54" class="p"/><text x="785" y="99" text-anchor="middle" class="head">Telemetry</text><text x="785" y="119" text-anchor="middle" class="small">Subscription</text>
+    <rect x="885" y="75" width="150" height="54" class="p"/><text x="960" y="99" text-anchor="middle" class="head">AttributesService</text><text x="960" y="119" text-anchor="middle" class="small">Base / Cached</text>
+    <rect x="1060" y="75" width="150" height="54" class="p"/><text x="1135" y="99" text-anchor="middle" class="head">SQL Queue / DB</text><text x="1135" y="119" text-anchor="middle" class="small">attribute_kv</text>
+    <rect x="1235" y="75" width="135" height="54" class="p"/><text x="1302" y="107" text-anchor="middle" class="head">Cache</text>
+    <rect x="1395" y="75" width="155" height="54" class="p"/><text x="1472" y="99" text-anchor="middle" class="head">Subscription</text><text x="1472" y="119" text-anchor="middle" class="small">Local / Remote</text>
+    <rect x="1575" y="75" width="180" height="54" class="p"/><text x="1665" y="99" text-anchor="middle" class="head">WS / Core / Actor</text><text x="1665" y="119" text-anchor="middle" class="small">realtime side effects</text>
+    <path d="M102 129 V1205 M270 129 V1205 M440 129 V1205 M610 129 V1205 M785 129 V1205 M960 129 V1205 M1135 129 V1205 M1302 129 V1205 M1472 129 V1205 M1665 129 V1205" class="life"/>
+  </g>
+
+  <rect x="25" y="155" width="1740" height="31" fill="#263746"/><text x="895" y="177" text-anchor="middle" style="font:700 15px 'Microsoft YaHei';fill:#fff">设备上报：Transport metadata notifyDevice=false</text>
+  <path d="M102 215 H270" class="call"/><text x="122" y="207" class="txt">PUBLISH attributes (QoS 1)</text>
+  <path d="M270 252 H440" class="call"/><text x="286" y="244" class="txt">POST_ATTRIBUTES_REQUEST · key=TbMsg.id</text>
+  <path d="M440 286 H270" class="ret"/><text x="290" y="278" class="txt">producer success</text>
+  <path d="M270 320 H102" class="ret"/><text x="176" y="312" class="txt">PUBACK</text>
+  <rect x="40" y="340" width="470" height="54" class="note"/><text x="55" y="363" class="txt">PUBACK 只确认 Queue producer handoff，</text><text x="55" y="384" class="txt">不等待 Rule Node、SQL、cache 或通知。</text>
+  <path d="M440 420 H610" class="call"/><text x="470" y="412" class="txt">consume TbMsg</text>
+  <rect x="535" y="438" width="325" height="76" class="group"/><text x="550" y="462" class="head">value-change filter</text><text x="550" y="484" class="small">开启：同值 + 同 DataType 全部过滤 → Success，无 DB/通知/action</text><text x="550" y="504" class="small">关闭：同值重放仍 upsert，并可重复通知/root action</text>
+  <path d="M610 542 H785" class="call"/><text x="625" y="534" class="txt">saveAndNotify(entries, false)</text>
+  <path d="M785 578 H960" class="call"/><text x="815" y="570" class="txt">save(entries)</text>
+  <path d="M960 614 H1135" class="call"/><text x="970" y="606" class="txt">每 key 独立 queue.add</text>
+  <rect x="1025" y="632" width="310" height="78" class="group"/><text x="1040" y="656" class="head">SQL batch</text><text x="1040" y="678" class="small">请求可跨 batch；batch 可混合多个请求</text><text x="1040" y="699" class="small">batch 是 transaction / failure unit</text>
+  <path d="M1135 734 H960" class="ret"/><text x="975" y="726" class="txt">DB commit → key Futures success</text>
+  <path d="M960 770 H1302" class="call"/><text x="1000" y="762" class="txt">cache enabled: transform evictOrPut(original value)</text>
+  <path d="M1302 806 H960" class="ret"/><text x="1035" y="798" class="txt">cache transform success</text>
+  <path d="M960 842 H785" class="ret"/><text x="806" y="834" class="txt">aggregate / composite Future success</text>
+
+  <rect x="700" y="862" width="1065" height="205" class="ok"/><text x="716" y="886" class="head">组合 Future 成功后并列 callback</text>
+  <path d="M785 914 H610" class="ret"/><text x="625" y="906" class="txt">业务 callback → Success / optional root action</text>
+  <path d="M785 950 H1472" class="call"/><text x="910" y="942" class="txt">订阅 callback: onAttributesUpdate(entries, false)</text>
+  <path d="M1472 980 H1665" class="call"/><text x="1510" y="972" class="small">route update</text>
+  <rect x="1180" y="992" width="570" height="66" class="note"/>
+  <text x="1195" y="1014" class="small">本地：保留 notifyDevice=false，仅更新 WebSocket。</text>
+  <text x="1195" y="1034" class="small">远程：TbAttributeUpdateProto 丢失该字段，consumer 默认 true。</text>
+  <text x="1195" y="1054" class="small">Shared 下行仍只进入在线且已订阅 attributes 的 session。</text>
+
+  <rect x="700" y="1085" width="1065" height="94" class="fail"/><text x="716" y="1109" class="head">任一 SQL batch 或 cache transform 失败</text><text x="716" y="1133" class="txt">上层 Future 失败；其他 batch / DB 可能已提交，但整个请求不发属性通知。</text><text x="716" y="1157" class="txt">REST/Rule Node 失败，WS、Device Actor、REST/Node root action 被抑制。</text>
+
+  <rect x="25" y="1200" width="1740" height="31" fill="#263746"/><text x="895" y="1222" text-anchor="middle" style="font:700 15px 'Microsoft YaHei';fill:#fff">平台 REST：scope 枚举 + AccessValidator → 同一 DB/cache 组合 Future</text>
+  <g>
+    <rect x="45" y="1250" width="135" height="50" class="p"/><text x="112" y="1280" text-anchor="middle" class="head">REST Client</text>
+    <rect x="220" y="1250" width="180" height="50" class="p"/><text x="310" y="1272" text-anchor="middle" class="head">TelemetryController</text><text x="310" y="1291" text-anchor="middle" class="small">AccessValidator</text>
+    <rect x="500" y="1250" width="180" height="50" class="p"/><text x="590" y="1272" text-anchor="middle" class="head">TelemetrySubscription</text><text x="590" y="1291" text-anchor="middle" class="small">saveAndNotify</text>
+    <rect x="780" y="1250" width="180" height="50" class="p"/><text x="870" y="1272" text-anchor="middle" class="head">AttributesService</text><text x="870" y="1291" text-anchor="middle" class="small">Base / Cached</text>
+    <rect x="1060" y="1250" width="180" height="50" class="p"/><text x="1150" y="1272" text-anchor="middle" class="head">SQL + Cache</text><text x="1150" y="1291" text-anchor="middle" class="small">composite Future</text>
+    <rect x="1380" y="1250" width="200" height="50" class="p"/><text x="1480" y="1272" text-anchor="middle" class="head">EntityAction / Audit</text><text x="1480" y="1291" text-anchor="middle" class="small">transaction-external</text>
+    <path d="M112 1300 V1605 M310 1300 V1605 M590 1300 V1605 M870 1300 V1605 M1150 1300 V1605 M1480 1300 V1605" class="life"/>
+  </g>
+  <path d="M112 1330 H310" class="call"/><text x="132" y="1322" class="small">POST attributes</text>
+  <path d="M310 1365 H590" class="call"/><text x="330" y="1357" class="small">validated entity + scope + entries</text>
+  <path d="M590 1400 H870" class="call"/><text x="650" y="1392" class="small">save(entries)</text>
+  <path d="M870 1435 H1150" class="call"/><text x="930" y="1427" class="small">SQL batch then optional cache transform</text>
+  <path d="M1150 1470 H590" class="ret"/><text x="730" y="1462" class="small">composite Future success / failure</text>
+  <path d="M590 1505 H310" class="ret"/><text x="380" y="1497" class="small">business callback</text>
+  <path d="M310 1540 H1480" class="call"/><text x="610" y="1532" class="small">success only: EntityAction ATTRIBUTES_UPDATED; success/failure audit only when configured</text>
+  <path d="M310 1575 H112" class="ret"/><text x="145" y="1567" class="small">HTTP 200 or error</text>
+  <rect x="420" y="1590" width="1120" height="34" class="note"/><text x="980" y="1613" text-anchor="middle" class="small">cache 失败时 DB 可能已提交；REST 仍失败，且不产生 EntityAction、WebSocket 或 Device Actor 通知。</text>
+</svg>

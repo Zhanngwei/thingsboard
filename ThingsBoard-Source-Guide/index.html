@@ -14,7 +14,7 @@
   <main class="layout home-layout">
     <article class="content">
       <section class="hero">
-        <p class="status">SOURCE-VERIFIED GUIDE · CHAPTERS 01-06 COMPLETE</p>
+        <p class="status">SOURCE-VERIFIED GUIDE · CHAPTERS 01-10 COMPLETE</p>
         <h1>ThingsBoard release-3.6 源码解析指南</h1>
         <p>从协议入口一路追到 Queue、Actor、Rule Engine、DAO 和数据库。每个流程独立成章，并明确线程边界、确认语义、数据变化和失败路径。</p>
         <div class="meta"><span>版本 3.6.4</span><span>提交 0cb411fc90</span><span>Markdown + HTML</span><span>Mermaid + PlantUML + SVG</span></div>
@@ -63,6 +63,30 @@
         <p><span class="status">已完成</span> · <a href="chapters/07-alarm-clear/README.md">Markdown</a> · <a href="chapters/07-alarm-clear/sequence.puml">PlantUML</a> · <a href="chapters/07-alarm-clear/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/07-alarm-clear.svg">架构图 SVG</a></p>
       </div>
 
+      <div class="chapter-card" id="chapter-08">
+        <h3><a href="chapters/08-attributes-save/index.html">08 Attributes 保存流程</a></h3>
+        <p>REST 与设备属性入口、Client/Shared/Server Scope、SQL batch upsert、属性缓存、WebSocket 和 Device Actor 下行边界。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/08-attributes-save/README.md">Markdown</a> · <a href="chapters/08-attributes-save/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/08-attributes-save.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-09">
+        <h3><a href="chapters/09-telemetry-save/index.html">09 Telemetry 保存流程</a></h3>
+        <p>多协议入口、Save Timeseries Node、history/latest 双写、Timescale chunk、SQL 后台保留、Cassandra 原生 TTL 和实时订阅。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/09-telemetry-save/README.md">Markdown</a> · <a href="chapters/09-telemetry-save/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/09-telemetry-save.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-10">
+        <h3><a href="chapters/10-rpc/index.html">10 RPC 流程</a></h3>
+        <p>Server-side/client-side RPC、规则链、Core 分区、Device Actor、MQTT delivery、持久化状态机与 Edge。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/10-rpc/README.md">Markdown</a> · <a href="chapters/10-rpc/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/10-rpc.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-11">
+        <h3><a href="chapters/11-ota/index.html">11 OTA 流程</a></h3>
+        <p>包 metadata/OID binary、Device/Profile 两级分配、状态 Queue、Shared Attributes、Actor 通知、多协议下载、缓存与 Edge。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/11-ota/README.md">Markdown</a> · <a href="chapters/11-ota/sequence.puml">PlantUML</a> · <a href="chapters/11-ota/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/11-ota.svg">架构图 SVG</a></p>
+      </div>
+
       <div class="notice"><strong>源码结论：</strong>3.6.4 中普通 MQTT 遥测不会先进入 Device Actor。Transport 直接投递 Rule Engine Queue，消费者再进入 App/Tenant/RuleChain/RuleNode Actor。MQTT PUBACK 表示队列 producer 写入成功，不表示数据库落库完成。</div>
       <div class="notice"><strong>Device 创建结论：</strong><code>device</code> 与 <code>device_credentials</code> 在一个 PostgreSQL 事务中提交；Cluster、Rule Engine、State 和 Audit 是提交后的异步传播。DEVICE CREATED 生命周期不会预建 Device Actor。</div>
       <div class="notice"><strong>Device 删除结论：</strong>Alarm 与 Device 聚合删除共享外层 PostgreSQL 事务，但运行时 Queue 在 COMMIT 前发送。删除不清理 Attribute、TimescaleDB/Cassandra telemetry 或设备 RPC；DEVICE DELETED 可能临时创建 Device Actor 再停止。</div>
@@ -70,13 +94,13 @@
       <div class="notice"><strong>Rule Chain 结论：</strong>本地单目标沿用原 callback，跨分区或多目标在 producer handoff 后切成独立 Queue records。Main Queue 默认跳过 failure/timeout 并提交；metadata 的 PostgreSQL 图事务与 lifecycle/Actor reload 不原子。</div>
       <div class="notice"><strong>Alarm 创建结论：</strong><code>createAlarm</code> 是按 originator + type 的 active upsert；已有行加锁，但首次并发创建没有唯一约束。<code>alarm</code>、<code>entity_alarm</code>、WebSocket、通知、Rule Engine action 与 audit 不共享事务。</div>
       <div class="notice"><strong>Alarm 清除结论：</strong><code>clear_alarm</code> 通过行锁保证首次更新和重复 no-op，但数据库、WS、通知、comment、Rule Engine、audit 与 Edge 不原子。REST、显式 Node、Device Profile 和 Edge 上行产生的消息及回调并不相同。</div>
+      <div class="notice"><strong>Attributes 结论：</strong><code>attribute_kv</code> 只保存最新状态；多 key 请求无统一事务。启用缓存后，DB 已提交仍可能因 cache transform 失败而抑制通知；跨节点 update proto 还会丢失 <code>notifyDevice=false</code>。</div>
+      <div class="notice"><strong>Telemetry 结论：</strong>history 与 latest 可独立选择后端并独立提交。SQL/Timescale 请求 TTL 不驱动删除，后台按 system/tenant/customer TTL 清 history 且不清 latest；3.6 也未自动配置 continuous aggregate、compression 或 retention policy。</div>
+      <div class="notice"><strong>RPC 结论：</strong>REST 先经规则链再到 Device Actor；只有到达 Actor 时未过期的 persistent RPC 才保存 QUEUED 并回调 rpcId。DB 状态、状态 Queue message、MQTT delivery、设备业务 response 和 Node continuation 是不同阶段。</div>
+      <div class="notice"><strong>OTA 结论：</strong>Device override 优先于 Profile；Queue 与 QUEUED Telemetry 独立。consumer 只调度 INITIATED Future 即返回，commit 可能早于 Shared Attributes callback，异步失败不受 consumer catch 覆盖。binary 下载绕过 Device Actor，经 Transport API 与共享 cache；PostgreSQL OID 在业务路径仍完整 materialize，分离部署应使用 Redis。</div>
 
       <h2>全书规划</h2>
       <div class="catalog">
-        <section class="chapter-card" id="chapter-08"><h3>08 Attributes 保存流程</h3><p class="pending">待分析</p><p>Scope、最新值、订阅通知和设备下行。</p></section>
-        <section class="chapter-card" id="chapter-09"><h3>09 Telemetry 保存流程</h3><p class="pending">待分析</p><p>多入口汇合、history/latest 双写和实时通知。</p></section>
-        <section class="chapter-card" id="chapter-10"><h3>10 RPC 流程</h3><p class="pending">待分析</p><p>双向 RPC、会话、超时、持久化和状态。</p></section>
-        <section class="chapter-card" id="chapter-11"><h3>11 OTA 流程</h3><p class="pending">待分析</p><p>包元数据、分块下载、状态遥测与队列。</p></section>
         <section class="chapter-card" id="chapter-12"><h3>12 Dashboard 流程</h3><p class="pending">待分析</p><p>授权、Widget 数据查询和 WebSocket 订阅。</p></section>
         <section class="chapter-card" id="chapter-13"><h3>13 Login 流程</h3><p class="pending">待分析</p><p>认证、用户状态、密码策略、审计与 token。</p></section>
         <section class="chapter-card" id="chapter-14"><h3>14 JWT 认证流程</h3><p class="pending">待分析</p><p>Filter、token 解析、权限上下文和刷新。</p></section>

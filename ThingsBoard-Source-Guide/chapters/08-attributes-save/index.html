@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>08 Attributes 保存流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航">
+      <a href="README.md">Markdown</a>
+      <a href="../../index.html">全书目录</a>
+      <a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a>
+    </nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>08 Attributes 保存流程</strong>
+      <a href="#一-流程目标">一、流程目标</a>
+      <a href="#二-入口">二、入口</a>
+      <a href="#三-完整调用链">三、完整调用链</a>
+      <a href="#四-消息流">四、消息流</a>
+      <a href="#五-时序图">五、时序图</a>
+      <a href="#六-数据变化">六、数据变化</a>
+      <a href="#七-源码分析">七、源码分析</a>
+      <a href="#八-actor-分析">八、Actor 分析</a>
+      <a href="#九-kafka-分析">九、Kafka 分析</a>
+      <a href="#十-数据库分析">十、数据库分析</a>
+      <a href="#十一-异常处理">十一、异常处理</a>
+      <a href="#十二-源码阅读路线">十二、源码阅读路线</a>
+      <a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script id="markdown-source" type="text/plain"># 08 Attributes 保存流程
+
+> 源码基线：ThingsBoard `3.6.4`，行为提交 `0cb411fc90`；源码链接按当前 `release-3.6` 工作树行号校准。本章只讨论属性写入、通知与作用域，不展开属性查询和删除。
+
+[上一篇：07 Alarm 清除流程](../07-alarm-clear/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/08-attributes-save.svg) | [下一篇：09 Telemetry 保存流程](../09-telemetry-save/index.html)
+
+---
+
+## 一、流程目标
+
+Attributes 保存流程维护实体当前状态，而不是时序历史。相同 `(entity_type, entity_id, scope, key)` 在 `attribute_kv` 中始终对应一行；再次保存执行覆盖更新，因此设备配置、服务端状态和设备自报属性可以用低成本主键查询。
+
+### 1.1 三种作用域是权限和传播边界
+
+| Scope | 典型写入者 | 设备能否直接上报 | 是否可下发设备 | 典型用途 |
+|---|---|---:|---:|---|
+| `CLIENT_SCOPE` | 设备经 Transport + Save Attributes Node | 是 | 否 | 固件版本、自检状态、设备能力 |
+| `SHARED_SCOPE` | Tenant/Customer REST、Rule Node、Edge | Transport proto 可显式标记 | 是，但仅通知已订阅在线 session | 平台下发阈值、采样周期、开关 |
+| `SERVER_SCOPE` | 平台 REST、内部服务、Rule Node | 否 | 否 | 服务端计算状态、inactive timeout 等内部配置 |
+
+REST [`TelemetryController.saveAttributes(...)`](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L843) 只允许 `SERVER_SCOPE` 和 `SHARED_SCOPE`。设备普通 attributes topic 不携带 scope 时，Save Attributes Node 使用节点配置，默认场景通常保存为 `CLIENT_SCOPE`；Transport 自身不直接写 `attribute_kv`。
+
+```mermaid
+flowchart LR
+  DEV[Device attributes] --> TR[Transport]
+  TR --> REQ[POST_ATTRIBUTES_REQUEST]
+  REQ --> NODE[Save Attributes Node]
+  REST[Platform REST] --> SUB[TelemetrySubscriptionService]
+  NODE --> SUB
+  EDGE[Edge attributes update] --> SUB
+  SUB --> AS[AttributesService]
+  AS --> DAO[JpaAttributeDao batch queue]
+  DAO --> PG[(attribute_kv)]
+  PG --> COMBINED[DB Future then optional cache transform]
+  COMBINED -. success only .-> WS[WebSocket subscriptions]
+  COMBINED -. optional shared notify .-> ACTOR[Device Actor]
+  COMBINED -. optional action msg .-> RULE[ATTRIBUTES_UPDATED]
+```
+
+### 1.2 本章核心结论
+
+1. `attribute_kv` 是 latest-state 表，没有历史版本；主键包含 entity type、UUID、scope 和 key，但不包含 tenant id。
+2. MQTT `PUBACK` 只表示 `POST_ATTRIBUTES_REQUEST` 已交给 Rule Engine Queue producer，不表示 Save Attributes Node 已执行，更不表示 PostgreSQL 已提交。
+3. 一次多 key 保存会按 key 独立入 SQL queue；请求可跨 batch，batch 也可混入多个请求。事务和失败单元是 batch，不是 API 请求。
+4. PostgreSQL upsert 不比较 `last_update_ts`，同一 key 的最终值取决于实际执行顺序；乱序并发写不能仅靠时间戳字段消解。
+5. 启用属性缓存后，上层等待的是“DB Future -> cache transform”的组合 Future；缓存失败时数据库可能已提交，但 REST/Rule Node 仍失败，WS、Device Actor 和 root action 都不会触发。
+6. `notifyDevice` 只在 SubscriptionManager 本地调用时完整保留；跨节点 `TbAttributeUpdateProto` 不携带该字段，远端 consumer 调用默认 `true` 的重载，因此 `notifyDevice=false` 不能作为跨节点可靠抑制条件。
+7. `SQL_REMOVE_NULL_CHARS` 默认开启，但只在 JDBC 绑定 `str_v/json_v` 时删除 NUL；缓存和通知继续使用原始值，三者可能不一致。
+
+---
+
+## 二、入口
+
+### 2.1 平台 REST
+
+三个公开入口最终进入同一个私有方法：
+
+| API | 方法 | 说明 |
+|---|---|---|
+| `POST /api/plugins/telemetry/{deviceId}/{scope}` | [`TelemetryController.saveDeviceAttributes(String,String,JsonNode)`](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L476) | 兼容设备专用路径 |
+| `POST /api/plugins/telemetry/{entityType}/{entityId}/{scope}` | [`saveEntityAttributesV1(String,String,String,JsonNode)`](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L509) | V1 实体路径 |
+| `POST /api/plugins/telemetry/{entityType}/{entityId}/attributes/{scope}` | [`saveEntityAttributesV2(String,String,String,JsonNode)`](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L543) | V2 路径 |
+
+统一入口把 scope 强制限制为 `SERVER_SCOPE/SHARED_SCOPE`，再验证 JSON object、非空属性列表和非空白 key，并通过 `Operation.WRITE_ATTRIBUTES` 调用 `AccessValidator` 校验实体权限。成功和失败 callback 都会调用 action/audit 入口，但只有成功才生成 `ATTRIBUTES_UPDATED` EntityAction；audit 是否异步写入取决于总开关和 entity/action 级 mask，并非无条件落库。
+
+### 2.2 MQTT、CoAP 与其他设备 Transport
+
+MQTT [`MqttTransportHandler.processDevicePublish(...)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L584) 将 attributes topic 转为 `PostAttributeMsg`，再调用 [`DefaultTransportService.process(SessionInfoProto,PostAttributeMsg,TbMsgMetaData,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L884)。CoAP 在 [`CoapTransportResource.handlePostAttributesRequest(...)`](../../../common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java#L373) 做同样的协议适配。
+
+Transport 增加 `deviceName/deviceType`，总是设置 `notifyDevice=false`；仅当 proto 的 `shared=true` 时才显式写入 metadata `scope=SHARED_SCOPE`。随后产生 `TbMsgType.POST_ATTRIBUTES_REQUEST` 并投递 Rule Engine Queue。
+
+### 2.3 Save Attributes Rule Node
+
+[`TbMsgAttributesNode.onMsg(TbContext,TbMsg)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgAttributesNode.java#L116) 是设备属性真正进入持久化服务的常规入口。它只接受 `POST_ATTRIBUTES_REQUEST`，把 JSON 转成 `AttributeKvEntry`，scope 优先取消息 metadata，否则使用节点配置。
+
+节点可启用：
+
+- `updateAttributesOnlyOnValueChange`：先读取当前值，按值和 `DataType` 过滤未变化 key。审查项中所称 `sendAttributesUpdatedOnValueChange` 在 3.6 源码中的实际配置名是这个字段。
+- `sendAttributesUpdatedNotification`：AttributesService 组合 Future 成功后额外创建 root `ATTRIBUTES_UPDATED` 消息。
+- `notifyDevice`：控制 Shared Scope 是否进入设备下行通知；Transport 默认写入 `false`，避免设备上报后反向回送自身。
+
+scope 的下拉选项主要由节点 UI/配置约束；运行时 [`getScope(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgAttributesNode.java#L226) 直接接受 metadata 或配置字符串，后续 DAO 也只校验非空。因此 Rule Node 不是 scope 枚举防火墙。
+
+### 2.4 内部服务、Entity View 与 Edge
+
+应用内部可直接调用 [`DefaultTelemetrySubscriptionService.saveAndNotify(...)`](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L391)。Entity View 同步、inactive timeout 和其他服务也复用该边界。
+
+Edge 上行的 `attributesUpdatedMsg` 在 [`BaseTelemetryProcessor.processAttributesUpdate(...)`](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/processor/telemetry/BaseTelemetryProcessor.java#L318) 直接保存，成功后另行推送 `ATTRIBUTES_UPDATED` 到规则引擎；Edge 的 `postAttributesMsg` 则重新形成 `POST_ATTRIBUTES_REQUEST`，走默认规则链。
+
+---
+
+## 三、完整调用链
+
+### 3.1 REST 保存 Shared/Server Attributes
+
+| 步骤 | 类与方法 | 源码 | 输入 -> 输出 | 职责与设计原因 |
+|---|---|---|---|---|
+| 1 | `org.thingsboard.server.controller.TelemetryController.saveEntityAttributesV2(...)` | [L543](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L543) | HTTP body -> DeferredResult | REST 参数边界 |
+| 2 | `TelemetryController.saveAttributes(TenantId,EntityId,String,JsonNode)` | [L843](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L843) | JSON -> `List<AttributeKvEntry>` | scope/key 校验和权限编排 |
+| 3 | `org.thingsboard.server.service.security.AccessValidator.validateEntityAndCallback(...)` | [L858](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L858) | current user + entity -> tenant/entity | 租户和客户可见性 |
+| 4 | `org.thingsboard.server.service.telemetry.DefaultTelemetrySubscriptionService.saveAndNotify(...)` | [L391](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L391) | scope + entries -> callback | 统一持久化与订阅通知边界 |
+| 5 | `DefaultTelemetrySubscriptionService.saveAndNotifyInternal(...)` | [L422](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L422) | entries -> save Future | 分别注册业务 callback 与 WS callback |
+| 6 | `BaseAttributesService.save(...)` / `CachedAttributesService.save(...)` | [Base L193](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/BaseAttributesService.java#L193) / [Cached L370](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/CachedAttributesService.java#L370) | list -> list of key Futures | 逐 key 调 DAO；启用缓存时再组合 cache transform |
+| 7 | `org.thingsboard.server.dao.sql.attributes.JpaAttributeDao.save(...)` | [L271](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java#L271) | entry -> `AttributeKvEntity` | 转 typed columns，加入 SQL blocking queue |
+| 8 | `org.thingsboard.server.dao.sql.attributes.AttributeKvInsertRepository.saveOrUpdate(...)` | [L90](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L90) | SQL batch -> commit | 先 UPDATE，未命中再 INSERT ON CONFLICT |
+| 9 | PostgreSQL `attribute_kv` | [DDL L105](../../../dao/src/main/resources/sql/schema-entities.sql#L105) | composite key -> latest row | 保存当前属性状态 |
+| 10 | `DefaultTelemetrySubscriptionService.onAttributesUpdate(...)` | [L721](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L721) | successful composite Future -> subscription update | 本地保留 notifyDevice；远程 update proto 丢失该字段 |
+| 11 | `org.thingsboard.server.service.subscription.DefaultSubscriptionManagerService.onAttributesUpdate(...)` | [L327](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L327) | update -> WS / Device Actor | 更新订阅，Shared Scope 可通知设备 |
+| 12 | `TelemetryController.logAttributesUpdated(...)` | [L1177](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L1177) | successful save -> EntityAction | 保存成功后异步产生 action/audit |
+| 13 | `org.thingsboard.server.service.action.EntityActionService.pushEntityActionToRuleEngine(...)` | [L90](../../../application/src/main/java/org/thingsboard/server/service/action/EntityActionService.java#L90) | `ATTRIBUTES_UPDATED` -> `TbMsg` | 将 REST 更新作为新的 root rule message |
+
+`saveAndNotifyInternal(...)` 的业务 callback 与 WS callback 都注册在 `AttributesService` 返回的 Future 上。未启用缓存时它是聚合 DB Future；启用缓存时它还要等待每个 DB Future 后面的 cache transform。只有这个组合 Future 成功后两条 callback 才会运行，二者先后没有承诺；HTTP 200 仍不等待 WS/Device Actor、root action 消费或按配置异步写入的 audit。
+
+### 3.2 MQTT 设备属性
+
+```mermaid
+sequenceDiagram
+  participant D as MQTT Device
+  participant M as MqttTransportHandler
+  participant T as DefaultTransportService
+  participant Q as Rule Engine Queue
+  participant N as TbMsgAttributesNode
+  participant S as TelemetrySubscriptionService
+  participant P as PostgreSQL
+  participant C as Attribute Cache
+  D->>M: PUBLISH v1/devices/me/attributes
+  M->>T: process(PostAttributeMsg)
+  T->>Q: POST_ATTRIBUTES_REQUEST
+  Q-->>T: producer callback success
+  T-->>M: Transport callback
+  M-->>D: PUBACK for QoS 1
+  Q->>N: RuleNodeActor.onMsg
+  N->>S: saveAndNotify(scope, entries)
+  S->>P: async batch upsert attribute_kv
+  P-->>S: DB Future success
+  opt cache.attributes.enabled
+    S->>C: cache transform: evictOrPut(original value)
+    C-->>S: composite Future success
+  end
+  S-->>N: FutureCallback.onSuccess only after composite Future
+  N-->>Q: Success or enqueue ATTRIBUTES_UPDATED
+```
+
+`PUBACK` 位于 Queue producer handoff 之后、数据库写入之前。若 Save Attributes Node 不在规则链中，或消息被过滤，设备仍可能收到 PUBACK，但 `attribute_kv` 不会变化。
+
+### 3.3 Save Attributes Node 的 callback 分支
+
+普通配置使用 [`TelemetryNodeCallback`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TelemetryNodeCallback.java#L38)，保存成功直接 `tellSuccess`。启用更新通知且 scope 不是 `CLIENT_SCOPE` 时使用 [`AttributesUpdateNodeCallback.onSuccess(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/AttributesUpdateNodeCallback.java#L67)：
+
+```mermaid
+flowchart TD
+  SAVE[attribute save Future] --> OK{success}
+  OK -- no --> FAIL[tellFailure original msg]
+  OK -- yes --> FLAG{sendAttributesUpdatedNotification and non-client scope}
+  FLAG -- no --> SUCCESS[tellSuccess original msg]
+  FLAG -- yes --> ENQ[enqueue root ATTRIBUTES_UPDATED]
+  ENQ --> POK{Queue producer success}
+  POK -- yes --> SUCCESS
+  POK -- no --> FAIL
+```
+
+因此该模式下原消息的 Success 还要求新 root 消息 producer 成功，但不等待新消息被消费。数据库已提交后 producer 失败会让原消息走 Failure，重放可能再次覆盖同一属性。
+
+重放还取决于 `updateAttributesOnlyOnValueChange`：开启时，值与 `DataType` 都未变化的 key 会在保存前被过滤；若全部未变化，节点直接 Success，不写 DB、不发订阅通知，也不创建 root action。关闭时，同值重放仍会 upsert，并再次触发订阅副作用；若同时开启 `sendAttributesUpdatedNotification` 且不是 Client Scope，还会再次创建 root action。该过滤是“读后比较”，不是原子 CAS，并发重放仍可能同时通过。
+
+[`JsonConverter.convertToAttributes(...)`](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/JsonConverter.java#L739) 每次解析都会生成新的 `lastUpdateTs`，它不是稳定的业务幂等键。需要去重时应透传上游 operation id 或单调 revision，并以该标识建立业务幂等。
+
+### 3.4 Shared Scope 设备通知
+
+本地分支中，`DefaultSubscriptionManagerService` 只有在 `entityType=DEVICE`、`scope=SHARED_SCOPE`、`notifyDevice=true` 时创建 [`DeviceAttributesEventNotificationMsg.onUpdate(...)`](../../../common/message/src/main/java/org/thingsboard/server/common/msg/rule/engine/DeviceAttributesEventNotificationMsg.java#L75)。但跨节点更新由 [`TbSubscriptionUtils.toAttributesUpdateProto(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbSubscriptionUtils.java#L285) 构造，[`TbAttributeUpdateProto`](../../../common/proto/src/main/proto/queue.proto#L791) 只有 entity、tenant、scope 和 data，没有 `notifyDevice`。远端 [`DefaultTbCoreConsumerService`](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L798) 调用不带布尔参数的重载，该重载默认 `true`。所以 `notifyDevice=false` 只在 [`AbstractSubscriptionService`](../../../application/src/main/java/org/thingsboard/server/service/telemetry/AbstractSubscriptionService.java#L136) 判定 TB_CORE partition 为本地时可靠；远程分支可能重新启用 Shared 下行。
+
+进入 Device Actor 后，[`DeviceActorMessageProcessor.processAttributesUpdate(...)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L785) 仍只向 `attributeSubscriptions` 中的在线 session 发送 `AttributeUpdateNotificationMsg`，所以默认 `true` 也不等于保证送达。
+
+---
+
+## 四、消息流
+
+[点击打开独立架构 SVG](../../assets/architecture/08-attributes-save.svg)
+
+![Attributes 保存架构图](../../assets/architecture/08-attributes-save.svg)
+
+```mermaid
+flowchart TB
+  subgraph Entry[入口层]
+    REST[Telemetry REST]
+    MQTT[MQTT CoAP HTTP LwM2M]
+    EDGE[Edge gRPC]
+    INTERNAL[Internal services]
+  end
+  subgraph QueueRule[消息与规则层]
+    RQ[(Rule Engine Queue)]
+    ACTORS[App Tenant RuleChain RuleNode Actors]
+    SAVE[Save Attributes Node]
+    ACTION[ATTRIBUTES_UPDATED root msg]
+  end
+  subgraph Persist[持久化层]
+    TS[DefaultTelemetrySubscriptionService]
+    AS[Base or Cached AttributesService]
+    BQ[TbSqlBlockingQueueWrapper]
+    TX[AttributeKvInsertRepository transaction]
+    DB[(PostgreSQL attribute_kv)]
+    CACHE[(Caffeine or Redis attribute cache)]
+    CF[AttributesService composite Future]
+  end
+  subgraph Notify[通知层]
+    SM[SubscriptionManagerService]
+    WS[WebSocket]
+    CQ[(Core Queue)]
+    DA[Device Actor]
+    SESSION[Subscribed device session]
+    AUDIT[(audit_log)]
+  end
+  MQTT --> RQ --> ACTORS --> SAVE
+  REST --> TS
+  EDGE --> TS
+  INTERNAL --> TS
+  SAVE --> TS --> AS --> BQ --> TX --> DB
+  DB -->|DB Future success| CACHE
+  DB -->|cache disabled| CF
+  CACHE -->|cache transform success| CF
+  CF -. success only .-> SM
+  SM --> WS
+  SM -. local Shared and notifyDevice .-> DA --> SESSION
+  SM -. remote TbAttributeUpdateProto no notifyDevice .-> CQ --> DA
+  CF -. node callback success and optional .-> ACTION --> RQ
+  CF -. REST callback success .-> ACTION
+  REST -. success or failure; audit config allows .-> AUDIT
+```
+
+---
+
+## 五、时序图
+
+本章按要求只保留渲染后的矢量图，不在章节目录生成 `sequence.puml`。
+
+[新窗口打开完整时序图 SVG](sequence.svg)
+
+![Attributes 保存完整时序图](sequence.svg)
+
+时序图同时标出 REST 直写与 MQTT 经 Rule Engine 两条路径，并区分 Queue producer、DB Future、cache transform、组合 Future、本地/远程 SubscriptionManager 和 Device Actor 下行的完成语义。
+
+---
+
+## 六、数据变化
+
+| 对象/系统 | 变化 | 是否与 `attribute_kv` 同事务 |
+|---|---|---:|
+| `attribute_kv` | 按复合主键 INSERT 或 UPDATE；一种 typed value 非空，其余列清空 | 是，限单个 SQL batch |
+| Attribute Cache | Caffeine 执行 evict；Redis 使用原始 `AttributeKvEntry` 做 `evictOrPut` | 否；在 DAO Future 成功后执行，属于上层组合 Future |
+| WebSocket subscription | 组合 Future 成功后，将原始 attributes update 推送到本地或远端订阅服务 | 否 |
+| Device Actor | 本地分支遵守 `notifyDevice`；远程 update proto 丢失该字段并默认 `true` | 否 |
+| Transport session | 仅已订阅 attributes update 的 session 收到下行 | 否 |
+| Rule Engine Queue | REST 或节点配置可产生 root `ATTRIBUTES_UPDATED` | 否 |
+| `audit_log` | REST 成功/失败都可按 audit 总开关和 entity/action mask 异步记录 `ATTRIBUTES_UPDATED` | 否；配置可完全不落库 |
+| Device inactivity state | `SERVER_SCOPE` 的特定 inactivity timeout 属性可更新状态服务 | 否 |
+| Edge | Edge 上行可在本地保存并产生规则消息；普通中央属性更新不等于自动复制到所有 Edge | 否 |
+
+### 6.1 缓存不是数据库事务的一部分
+
+启用 `cache.attributes.enabled=true` 时，[`CachedAttributesService.save(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/CachedAttributesService.java#L353) 对每个 DAO Future 添加 `cacheExecutor` transform，并在 [`evict(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/CachedAttributesService.java#L392) 中用原始 `AttributeKvEntry` 调 `cache.evictOrPut(...)`；最后 `Futures.allAsList` 才形成上层 Future。Caffeine 用 direct executor，Redis 用独立 cache executor。
+
+因此 DB commit 只是组合 Future 的中间状态。Redis cache 操作抛错时，REST 返回失败或 Rule Node 走 Failure，但数据库行可能已经提交；由于业务 callback 和 WS callback 都只处理组合 Future success，WebSocket、Device Actor、REST EntityAction、节点可选 root `ATTRIBUTES_UPDATED` 都会被抑制。后续恢复不能假设“调用失败即未落库”，必须先读 DB 对账。
+
+### 6.2 多 key 请求的原子性
+
+`BaseAttributesService.save(List)` 为每个 entry 调用一次 `attributesDao.save(...)`，最后用 `Futures.allAsList` 聚合。[`JpaAttributeDao`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java#L271) 对每个 key 单独 `queue.add`，只用 entity UUID 选择 worker；worker 的 [`poll + drainTo`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L82) 按到达时机组 batch，完全不知道请求边界。因此一个请求可跨多个 batch，一个 batch 也可混合多个请求。
+
+[`AttributeKvInsertRepository.saveOrUpdate(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L90) 为整个 batch 开事务，异常时该 batch 的所有 Future 一起失败；已经提交的其他 batch 不回滚。若同一请求部分 key 已在其他 batch 提交、另一个 batch 失败，聚合 Future 仍失败，`onAttributesUpdate` 不会执行，所以“部分落库”不等于“通知已提交部分 key”。
+
+---
+
+## 七、源码分析
+
+### 7.1 关键类型与边界
+
+| 层 | 类型 | 作用 |
+|---|---|---|
+| Protocol | `org.thingsboard.server.gen.transport.TransportProtos.PostAttributeMsg` | Transport 内部 protobuf，承载 typed key/value |
+| Transport | `org.thingsboard.server.common.transport.service.DefaultTransportService` | 限流、activity、metadata 和 Rule Engine Queue 投递 |
+| Rule Node | `org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode` | 解析、scope、变更过滤、保存和 callback 关系 |
+| Callback | `TelemetryNodeCallback` / `AttributesUpdateNodeCallback` | 将异步持久化结果映射为 Success/Failure 或 root action |
+| Application | `org.thingsboard.server.service.telemetry.DefaultTelemetrySubscriptionService` | 组合 DAO Future 与订阅通知 |
+| DAO API | `org.thingsboard.server.dao.attributes.AttributesService` | 隐藏 SQL/Cassandra 之外的属性实现细节 |
+| DAO Service | `BaseAttributesService` / `CachedAttributesService` | 校验、逐 key 保存和可选 Cache-Aside |
+| SQL DAO | `org.thingsboard.server.dao.sql.attributes.JpaAttributeDao` | 实体转换和异步 SQL queue |
+| JDBC | `org.thingsboard.server.dao.sql.attributes.AttributeKvInsertRepository` | batch UPDATE + INSERT/UPSERT transaction |
+| Entity | `AttributeKvEntity` / `AttributeKvCompositeKey` | JPA 字段和四段复合主键映射 |
+
+### 7.2 Typed-union 值模型
+
+`AttributeKvEntity` 同时声明 `str_v/bool_v/dbl_v/long_v/json_v`。写入时只设置当前 `DataType` 对应列，SQL 更新会把其他列设为 NULL；读取 [`AttributeKvEntity.toData()`](../../../dao/src/main/java/org/thingsboard/server/dao/model/sql/AttributeKvEntity.java#L104) 按非空列重建 `KvEntry`。
+
+这种设计避免把所有值强制转字符串，并允许 SQL 类型比较；代价是应用必须维持“恰好一个 value 列非空”的不变量，DDL 本身没有 CHECK 约束强制它。
+
+### 7.3 校验边界
+
+[`AttributeUtils.validate(AttributeKvEntry,boolean)`](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/AttributeUtils.java#L67) 检查 data type、非空 key、正 `last_update_ts`，并复用 `KvUtils` 的值/XSS 校验；其 [`validate(EntityId,String)`](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/AttributeUtils.java#L44) 对 scope 只做非空字符串校验。REST 在 Controller 中强制枚举，Save Attributes Node 则主要依赖 UI/配置约束，运行时直接接受 metadata/config 字符串。Rule Node 和 DAO 都不是 scope 枚举防火墙，内部调用方必须自行保证语义。
+
+### 7.4 SQL upsert
+
+[`AttributeKvInsertRepository`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L57) 先批量执行：
+
+```sql
+UPDATE attribute_kv
+SET str_v=?, long_v=?, dbl_v=?, bool_v=?, json_v=?, last_update_ts=?
+WHERE entity_type=? AND entity_id=? AND attribute_type=? AND attribute_key=?;
+```
+
+`updateCount=0` 的实体再执行 `INSERT ... ON CONFLICT (...) DO UPDATE`。SQL 没有 `WHERE attribute_kv.last_update_ts <= excluded.last_update_ts`，所以旧时间戳晚执行时仍能覆盖新状态。
+
+### 7.5 JDBC NUL 清理与值分叉
+
+配置 [`sql.remove_null_chars`](../../../application/src/main/resources/thingsboard.yml#L361) 对应环境变量 `SQL_REMOVE_NULL_CHARS`，默认 `true`。[`AttributeKvInsertRepository`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L81) 只在 JDBC `PreparedStatement` 绑定 `str_v/json_v` 时调用 `replaceNullChars`，数值/布尔列不受影响。
+
+清理不会回写 `AttributeKvEntity` 或原始 `AttributeKvEntry`。因此 Redis `evictOrPut`、WebSocket、跨节点 proto、Device Actor 和 root action 仍携带原值，而 PostgreSQL 保存的是去掉 `\u0000` 后的字符串/JSON；实时消费者与后续 DB 读取可能看到不同内容。需要强一致时应在进入 ThingsBoard 前规范化，而不是依赖 JDBC 层隐式改值。
+
+---
+
+## 八、Actor 分析
+
+属性写数据库本身不经过 Device Actor。普通设备属性沿 Rule Engine 的 `AppActor -> TenantActor -> RuleChainActor -> RuleNodeActor` 执行 Save Attributes Node；应用 REST 则直接调用 Subscription/DAO。
+
+Device Actor 只参与 Shared Scope 下行：
+
+```mermaid
+flowchart LR
+  DB[DB committed] --> CACHE{cache transform success}
+  CACHE -- no --> STOP[combined Future failure; no notify]
+  CACHE -- yes --> SUB[Subscription routing]
+  SUB -- local: keep notifyDevice --> SM[SubscriptionManager]
+  SUB -- remote: proto drops flag --> REMOTE[(TB_CORE subscription hop)]
+  REMOTE --> SM
+  SM --> CORE[(Device event Core Queue)]
+  CORE --> APP[AppActor]
+  APP --> TENANT[TenantActor]
+  TENANT --> DEVICE[DeviceActor]
+  DEVICE --> HAS{attributeSubscriptions non-empty}
+  HAS -- no --> DROP[log and stop]
+  HAS -- yes --> SCOPE{SHARED_SCOPE}
+  SCOPE -- no --> DROP
+  SCOPE -- yes --> TRANSPORT[ToTransportMsg]
+  TRANSPORT --> SESSION[online subscribed session]
+```
+
+Actor 的价值是按 DeviceId 串行维护 session/subscription 状态并处理节点间路由；它不提供数据库事务。Shared 属性先提交、再等待可选 cache transform，之后才可能入 Core Queue。服务崩溃或缓存失败窗口都可能留下“数据库已更新但设备未收到通知”。此外远程 update proto 不保留 `notifyDevice=false`。设备重连后应主动读取 shared attributes，而不是把实时通知当作可靠状态日志。
+
+---
+
+## 九、Kafka 分析
+
+这里的 Queue provider 可配置为 Kafka、in-memory 等；源码抽象是 ThingsBoard Queue，不应把每条链路写死为 Kafka。
+
+Kafka provider 最终由 [`TbKafkaProducerTemplate.send(...)`](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaProducerTemplate.java#L154) 把 `TbQueueMsg.key` 写成 record key，并把 Kafka record 的显式 partition 留空。ThingsBoard 先按 entity 解析“逻辑 partition”，把编号拼入 `TopicPartitionInfo.fullTopicName`；Kafka 再在该 destination topic 内按 record key 选择物理 partition。两层不能混为一个字段。
+
+| Producer | 消息 | Kafka record key | ThingsBoard partition resolution | Destination / Consumer | callback 的真实语义 |
+|---|---|---|---|---|---|
+| `DefaultTransportService` | `POST_ATTRIBUTES_REQUEST` | `TbMsg.id` | `TB_RULE_ENGINE + queue/profile + originator DeviceId` | Rule Engine destination topic -> consumer | producer 接受后可触发 MQTT PUBACK |
+| `AttributesUpdateNodeCallback` | root `ATTRIBUTES_UPDATED` | 新 `TbMsg.id` | `TB_RULE_ENGINE + queue + originator` | Rule Engine destination topic -> consumer | producer 成功后原消息走 Success |
+| `EntityActionService` | REST `ATTRIBUTES_UPDATED` | 新 `TbMsg.id` | [`TB_RULE_ENGINE + entity`](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L292) | Rule Engine destination topic -> consumer | callback 为 null，不等待消费 |
+| `DefaultTelemetrySubscriptionService` | cross-node `TbAttributeUpdateProto` | entity UUID | [`TB_CORE + entity`](../../../application/src/main/java/org/thingsboard/server/service/telemetry/AbstractSubscriptionService.java#L136) | entity 的 TB_CORE destination topic -> Core consumer -> SubscriptionManager | 这是跨节点 subscription 的第一跳；不等待最终 WS，且 proto 丢失 `notifyDevice` |
+| `DefaultSubscriptionManagerService` | `DeviceAttributesEventNotificationMsg` | Device UUID | `TB_CORE + DeviceId` | Device 的 TB_CORE destination topic -> Core consumer -> Device Actor | `pushMsgToCore(..., null)` 不等待设备送达 |
+
+[`HashPartitionService.resolve(...)`](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L376) 用 entity UUID hash 选择 ThingsBoard 逻辑 partition；Rule Engine 两条路径在 [`DefaultTbClusterService`](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L304) 中明确以 `TbMsg.id` 创建 queue record。跨节点 subscription 第一跳则先按 entity 解析 TB_CORE partition，再以 entity UUID 作为 record key。
+
+### 9.1 重放与幂等
+
+复合主键 upsert 使同 value 重放在最终行状态上近似幂等，但副作用并不 exactly-once：root `ATTRIBUTES_UPDATED`、WebSocket、audit 和设备下行都可能重复或缺失。Save Attributes Node 开启 `updateAttributesOnlyOnValueChange` 时，同值重放通常在读后过滤阶段结束；关闭时会再次 upsert 和通知，开启 `sendAttributesUpdatedNotification` 时还会重发 root action。
+
+不要把节点每次解析新生成的 `lastUpdateTs` 当成稳定幂等键，也不要依赖 Queue message UUID。可靠去重应由上游提供 operation id 或单调 revision，并把它作为属性/消息业务协议的一部分；数据库状态和事务外副作用仍需分别对账。
+
+---
+
+## 十、数据库分析
+
+### 10.1 表结构与关系
+
+```mermaid
+erDiagram
+  ENTITY_CONCEPT {
+    uuid id "conceptual only"
+    varchar entity_type "not a real table"
+    uuid tenant_id "not in attribute_kv"
+  }
+  ATTRIBUTE_KV {
+    varchar entity_type PK
+    uuid entity_id PK
+    varchar attribute_type PK
+    varchar attribute_key PK
+    boolean bool_v
+    varchar str_v
+    bigint long_v
+    double dbl_v
+    json json_v
+    bigint last_update_ts
+  }
+  AUDIT_LOG {
+    uuid id PK
+    uuid tenant_id
+    uuid entity_id
+    varchar action_type
+  }
+  ENTITY_CONCEPT ||..o{ ATTRIBUTE_KV : conceptual_reference_no_FK
+  ENTITY_CONCEPT ||..o{ AUDIT_LOG : conceptual_audit_subject
+```
+
+图中的 `ENTITY_CONCEPT` 只是 conceptual supertype，用来把 Device、Asset 等不同实体画成一个阅读入口；它不是 ThingsBoard 的真实通用实体表，虚线也不表示真实 FK。
+
+DDL [`schema-entities.sql`](../../../dao/src/main/resources/sql/schema-entities.sql#L105) 没有从 `attribute_kv.entity_id` 到各实体表的外键，也没有 `tenant_id`。[`JpaAttributeDao.save(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java#L271) 虽接收 `TenantId`，构造主键和入队时完全不使用它。正常 REST 的租户/客户隔离依赖 `AccessValidator(Operation.WRITE_ATTRIBUTES)`；DAO/DB 本身既不保存 tenant id，也没有 FK 或“实体属于该租户”的约束保证，绕过授权边界的内部调用不能依赖数据库兜底。
+
+### 10.2 与 MySQL 工程经验的对应
+
+可以把复合主键 upsert 理解为 InnoDB `INSERT ... ON DUPLICATE KEY UPDATE` 的用途，但 PostgreSQL 的 `ON CONFLICT` 依赖明确 conflict target。这里先 UPDATE 再 UPSERT，是为了批处理大量“多数已存在”的 latest-state 行。
+
+PostgreSQL UPDATE 会产生新 tuple version；高频反复更新少量属性可能产生 dead tuples，需要 autovacuum。与 `ts_kv` 追加写相比，`attribute_kv` 更接近热点 OLTP 表，应观察 `n_dead_tup`、autovacuum 延迟和索引膨胀。
+
+### 10.3 为什么不写 TimescaleDB/Cassandra
+
+属性查询核心是“实体 + scope + key 的当前值”，不是按时间范围扫描。使用普通 PostgreSQL 主键表可获得事务 upsert、类型列和低延迟 point lookup。若业务需要属性历史，应显式把变化转成 telemetry 或独立事件，不要期望 `attribute_kv` 保留旧值。
+
+---
+
+## 十一、异常处理
+
+| 失败点 | 调用方看到什么 | 已可能完成的副作用 | 恢复语义 |
+|---|---|---|---|
+| REST scope/JSON/key 非法 | HTTP 400 | 无 | 修正请求 |
+| `WRITE_ATTRIBUTES` 权限失败 | 401/403/404 语义 | 无 | 修正租户/权限 |
+| API limits 拒绝 Transport | Transport callback 失败 | activity 取决于检查位置 | 按限流策略重试 |
+| Rule Engine Queue producer 失败 | MQTT 不确认或连接侧失败处理 | 未执行 Save Node | Queue/设备重试 |
+| Save Node 缺失或消息被过滤 | 原规则链按其配置结束 | MQTT 已可能 PUBACK | 配置问题，数据库不会写 |
+| 某个 attribute SQL batch 失败 | 聚合 Future 失败 | 其他 batch 中的 key 可能已提交；整个请求不发属性通知 | 无请求级回滚；按 DB 对账后重试 |
+| Redis cache `evictOrPut` 失败 | REST/Rule Node 看到组合 Future 失败 | PostgreSQL 已提交；WS、Device Actor、REST/Node root action 被抑制 | 重试/清缓存并对账，不能回滚 DB |
+| WS callback 失败 | REST/Rule Node 通常不感知 | DB 已提交 | 客户端重查 latest state |
+| root `ATTRIBUTES_UPDATED` producer 失败 | Node 原消息 Failure；REST 只记录 warning | DB 已提交 | 重放可能再次 upsert |
+| Core Queue/Device Actor 失败 | 保存 callback 通常已成功 | DB/WS 可能完成 | 设备重连主动拉 Shared Scope |
+| `notifyDevice=false` 跨 TB_CORE 节点 | 保存可成功 | update proto 丢失标志，远端按默认 `true` 处理 Shared 下行 | 不把该标志当跨节点安全边界；修协议或在消费端补字段 |
+| 字符串/JSON 含 NUL 且默认清理开启 | 调用可成功 | DB 值去掉 NUL，缓存/通知仍是原值 | 入口统一规范化并按 DB 对账 |
+| 设备没有属性订阅 | 无下行 | DB 已提交 | 订阅后主动读取，不补发历史通知 |
+| 乱序并发更新 | 请求都可能成功 | 较旧 `last_update_ts` 可能覆盖新值 | 上游串行化或增加 CAS/时间条件 |
+| 服务在 DB commit 后崩溃 | 客户端可能超时 | 行已更新，通知/action 可能缺失 | 幂等重试 + 状态对账 |
+
+### 11.1 生产监控建议
+
+1. 同时监控 SQL attribute queue size/delay、batch failures、Redis cache failures、Rule Engine lag 和 Core Queue lag。
+2. 对高频属性更新检查 `pg_stat_user_tables.attribute_kv` 的 update/dead tuple/autovacuum 指标。
+3. 设备配置下发以数据库为 source of truth，实时 notification 只作为加速通道。
+4. 对要求严格顺序的属性按 DeviceId + key 在入口串行化，或改造 SQL 为带 revision 条件的 compare-and-set；幂等键使用上游 operation/revision，不使用节点生成的时间戳。
+
+---
+
+## 十二、源码阅读路线
+
+1. [`TelemetryController.saveAttributes(...)`](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L843)：先看平台 REST 的 scope 和权限边界。
+2. [`MqttTransportHandler.processDevicePublish(...)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L584)：确认设备 topic 如何变成 proto。
+3. [`DefaultTransportService.process(...PostAttributeMsg...)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L884)：理解 metadata、notifyDevice 与 Queue callback。
+4. [`TbMsgAttributesNode.onMsg(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgAttributesNode.java#L116)：阅读 scope、变更过滤和 callback 分支。
+5. [`AttributesUpdateNodeCallback.onSuccess(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/AttributesUpdateNodeCallback.java#L67)：区分 AttributesService 组合 Future success 与 action producer success。
+6. [`DefaultTelemetrySubscriptionService.saveAndNotifyInternal(...)`](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L422)：观察并列 callback。
+7. [`BaseAttributesService.save(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/BaseAttributesService.java#L193)：确认多 key 非统一事务。
+8. [`CachedAttributesService.save(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/CachedAttributesService.java#L370)：理解缓存 Future 如何包裹 DB Future。
+9. [`JpaAttributeDao.save(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java#L271)：查看实体转换和 queue。
+10. [`AttributeKvInsertRepository.saveOrUpdate(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L90)：精读 batch transaction 和 upsert。
+11. [`TbAttributeUpdateProto`](../../../common/proto/src/main/proto/queue.proto#L791) 与 [`DefaultTbCoreConsumerService`](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L798)：确认跨节点更新缺少 `notifyDevice` 且远端走默认重载。
+12. [`DefaultSubscriptionManagerService.onAttributesUpdate(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L327)：追踪 WS 与 Shared 下行分叉。
+13. [`TbKafkaProducerTemplate.send(...)`](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaProducerTemplate.java#L154)：区分 record key、ThingsBoard 逻辑 partition 与 destination topic。
+14. [`DeviceActorMessageProcessor.processAttributesUpdate(...)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L785)：确认只有订阅 session 收到。
+
+下一步阅读 [09 Telemetry 保存流程](../09-telemetry-save/index.html)，对比 latest-state 属性表与 telemetry 的 history/latest 双写。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard 的 Attribute 为什么不是时序数据？
+
+它按 `(entity_type, entity_id, scope, key)` 唯一，只保存当前值和最后更新时间；更新覆盖同一行，不保留旧版本。需要历史时应转成 telemetry 或事件。
+
+### 2. MQTT PUBACK 是否表示 `attribute_kv` 已写成功？
+
+不是。PUBACK 对应 Rule Engine Queue producer callback；Save Attributes Node 和 SQL batch 在后续异步消费中执行。
+
+### 3. REST 为什么不能写 `CLIENT_SCOPE`？
+
+Client Scope 表示设备自报状态。平台 REST 只开放 Server/Shared Scope，避免服务端伪装设备来源；内部/Rule Node 仍需自行遵守语义。
+
+### 4. `notifyDevice=true` 是否保证设备收到 Shared Attributes？
+
+不保证。本地 SubscriptionManager 中它只允许事件进入 Device Actor，设备还必须在线、已建立 attributes subscription，且 Queue/Transport 下行成功。跨节点更新 proto 甚至不携带该标志，远端 consumer 走默认 `true`；相应地，`notifyDevice=false` 也不能可靠抑制远端下行。
+
+### 5. 一次保存十个属性是否一个事务？
+
+没有请求级保证。服务逐 key 独立入队，十个 key 可跨 batch，batch 也可混入其他请求；事务/失败单元是 batch。若部分 batch 已提交而另一 batch 失败，聚合 Future 失败，整个请求不会执行属性通知，所以部分落库不等于部分通知。
+
+### 6. 为什么 `attribute_kv` 没有 `tenant_id`？
+
+它是多实体共享表。正常 REST 由 `AccessValidator` 做租户/客户可见性校验，但 DAO 忽略传入 `TenantId`，表中也没有 tenant id、实体 FK 或归属约束；数据库不能替代上层授权。
+
+### 7. `last_update_ts` 会阻止旧值覆盖新值吗？
+
+不会。3.6 的 Attribute upsert 没有按时间戳比较；它只是记录更新时间。并发执行顺序决定最终值。
+
+### 8. CachedAttributesService 的写一致性是什么？
+
+先等待 DB Future，再执行 `evictOrPut`，上层拿到的是组合 Future。Redis 路径缓存失败可让 REST/Rule Node 失败，却不能回滚已提交数据库，并会抑制 WS、Device Actor 和后续 root action；恢复时先以 PostgreSQL 对账。
+
+### 9. 为什么 Redis 写路径用 `evictOrPut` 而 Caffeine 只 evict？
+
+远程缓存的并发 miss 查询可能在写入后把旧值回填，put 新值可覆盖该窗口；本地 Caffeine transactional cache 用 evict 取消并发加载即可。
+
+### 10. Save Attributes Node 开启 updated notification 后何时 Success？
+
+未启用属性缓存时先要聚合 DB Future 成功；启用时还要 cache transform 成功。之后 root `ATTRIBUTES_UPDATED` producer 也必须成功，但不等待该 root 消息消费。cache 或 producer 失败时数据库仍可能已提交。
+
+### 11. Client Scope 更新会生成额外 `ATTRIBUTES_UPDATED` 吗？
+
+该节点显式排除 Client Scope 的额外 notification，普通 callback 只推进原消息 Success，避免设备自报形成不必要的更新 action 回路。
+
+### 12. Shared Scope 为什么需要 Device Actor？
+
+Actor 按设备维护在线 session 和订阅集合，并把通知路由到正确 Transport 节点。DAO 不知道连接在哪个服务实例上。
+
+### 13. PostgreSQL 高频属性更新的主要风险是什么？
+
+热点行竞争、heap tuple 更新产生 dead tuples、WAL 增长、autovacuum 滞后，以及 SQL queue 延迟。它与追加型 telemetry 的瓶颈不同。
+
+### 14. 如何设计可靠的设备配置下发？
+
+把 Shared Scope 数据库状态作为真相，notification 只作提示；设备连接/重连后读取当前 Shared Attributes，并用版本号或配置 revision 做幂等确认。
+
+### 15. Attribute 保存是 exactly-once 吗？
+
+不是。数据库 upsert 对最终行有一定幂等性，但 Queue、WebSocket、按配置写入的 audit 和设备通知均在事务外，可能重复或缺失。开启 value-change 过滤可减少同值重放副作用，关闭时同值也会重写和重发；稳定去重应依赖上游 operation id/revision，而不是节点新生成的 `lastUpdateTs`。
+
+---
+
+[上一篇：07 Alarm 清除流程](../07-alarm-clear/index.html) | [返回目录](../../SUMMARY.md) | [下一篇：09 Telemetry 保存流程](../09-telemetry-save/index.html)
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

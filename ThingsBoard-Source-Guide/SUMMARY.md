@@ -13,10 +13,10 @@
 - <a id="chapter-05"></a>**05 Rule Chain 执行流程**（已完成）：[Markdown](chapters/05-rule-chain-execution/README.md) · [HTML](chapters/05-rule-chain-execution/index.html) · [PlantUML](chapters/05-rule-chain-execution/sequence.puml) · [时序图 SVG](chapters/05-rule-chain-execution/sequence.svg) · [架构图 SVG](assets/architecture/05-rule-chain-execution.svg)
 - <a id="chapter-06"></a>**06 Alarm 创建流程**（已完成）：[Markdown](chapters/06-alarm-create/README.md) · [HTML](chapters/06-alarm-create/index.html) · [PlantUML](chapters/06-alarm-create/sequence.puml) · [时序图 SVG](chapters/06-alarm-create/sequence.svg) · [架构图 SVG](assets/architecture/06-alarm-create.svg)
 - <a id="chapter-07"></a>**07 Alarm 清除流程**（已完成）：[Markdown](chapters/07-alarm-clear/README.md) · [HTML](chapters/07-alarm-clear/index.html) · [PlantUML](chapters/07-alarm-clear/sequence.puml) · [时序图 SVG](chapters/07-alarm-clear/sequence.svg) · [架构图 SVG](assets/architecture/07-alarm-clear.svg)
-- <a id="chapter-08"></a>**08 Attributes 保存流程**（待分析）：client/shared/server scope、最新值、通知和设备下行。
-- <a id="chapter-09"></a>**09 Telemetry 保存流程**（待分析）：所有入口统一后的 `TsKvEntry`、latest/history 双写与订阅通知。
-- <a id="chapter-10"></a>**10 RPC 流程**（待分析）：server-side/client-side RPC、会话路由、超时、持久化与状态回报。
-- <a id="chapter-11"></a>**11 OTA 流程**（待分析）：固件元数据、包分块、状态遥测、队列和设备协议。
+- <a id="chapter-08"></a>**08 Attributes 保存流程**（已完成）：[Markdown](chapters/08-attributes-save/README.md) · [HTML](chapters/08-attributes-save/index.html) · [时序图 SVG](chapters/08-attributes-save/sequence.svg) · [架构图 SVG](assets/architecture/08-attributes-save.svg)
+- <a id="chapter-09"></a>**09 Telemetry 保存流程**（已完成）：[Markdown](chapters/09-telemetry-save/README.md) · [HTML](chapters/09-telemetry-save/index.html) · [时序图 SVG](chapters/09-telemetry-save/sequence.svg) · [架构图 SVG](assets/architecture/09-telemetry-save.svg)
+- <a id="chapter-10"></a>**10 RPC 流程**（已完成）：[Markdown](chapters/10-rpc/README.md) · [HTML](chapters/10-rpc/index.html) · [时序图 SVG](chapters/10-rpc/sequence.svg) · [架构图 SVG](assets/architecture/10-rpc.svg)
+- <a id="chapter-11"></a>**11 OTA 流程**（已完成）：[Markdown](chapters/11-ota/README.md) · [HTML](chapters/11-ota/index.html) · [PlantUML](chapters/11-ota/sequence.puml) · [时序图 SVG](chapters/11-ota/sequence.svg) · [架构图 SVG](assets/architecture/11-ota.svg)
 - <a id="chapter-12"></a>**12 Dashboard 流程**（待分析）：Dashboard CRUD、授权、Widget 数据订阅和 WebSocket 查询。
 - <a id="chapter-13"></a>**13 Login 流程**（待分析）：认证入口、用户状态、密码策略、审计与 token 签发。
 - <a id="chapter-14"></a>**14 JWT 认证流程**（待分析）：Security Filter、token 解析、权限上下文、刷新和失效。

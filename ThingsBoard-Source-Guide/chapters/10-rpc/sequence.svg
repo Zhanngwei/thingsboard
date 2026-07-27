@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="2520" viewBox="0 0 1840 2520" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 RPC 完整时序</title>
+  <desc id="desc">区分轻量 RPC 的 REST callback 与 Rule Node continuation、持久化 RPC 的 QUEUED 和到达前过期分支、按提交策略区分的重试、MQTT delivery、恢复和删除语义。</desc>
+  <defs>
+    <marker id="arrowRequest" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#111827"/>
+    </marker>
+    <marker id="arrowResponse" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#005A85"/>
+    </marker>
+    <marker id="arrowStatus" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#8A3B12"/>
+    </marker>
+    <marker id="arrowOk" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#116329"/>
+    </marker>
+    <style>
+      text { font-family: Inter, "Microsoft YaHei", Arial, sans-serif; fill: #111827; }
+      .title { font-size: 28px; font-weight: 700; }
+      .subtitle { font-size: 15px; fill: #374151; }
+      .section-title { font-size: 19px; font-weight: 700; fill: #FFFFFF; }
+      .lane-title { font-size: 14px; font-weight: 700; }
+      .label { font-size: 13px; }
+      .small { font-size: 12px; }
+      .note-title { font-size: 14px; font-weight: 700; }
+      .footer { font-size: 12px; fill: #FFFFFF; }
+      .lifeline { stroke: #64748B; stroke-width: 1.5; stroke-dasharray: 6 6; }
+      .request { stroke: #111827; stroke-width: 2; fill: none; marker-end: url(#arrowRequest); }
+      .response { stroke: #005A85; stroke-width: 2.5; fill: none; marker-end: url(#arrowResponse); }
+      .status { stroke: #8A3B12; stroke-width: 2; stroke-dasharray: 7 5; fill: none; marker-end: url(#arrowStatus); }
+      .ok { stroke: #116329; stroke-width: 2; fill: none; marker-end: url(#arrowOk); }
+      .panel { fill: #FFFFFF; stroke: #334155; stroke-width: 1.5; rx: 4; }
+      .blue-panel { fill: #EAF4FA; stroke: #005A85; stroke-width: 1.5; rx: 4; }
+      .amber-panel { fill: #FFF4D6; stroke: #7A5A00; stroke-width: 1.5; rx: 4; }
+      .red-panel { fill: #FDECEC; stroke: #9B1C1C; stroke-width: 1.5; rx: 4; }
+      .green-panel { fill: #E9F7EF; stroke: #116329; stroke-width: 1.5; rx: 4; }
+    </style>
+  </defs>
+
+  <rect width="1840" height="2520" fill="#FFFFFF"/>
+  <text class="title" x="40" y="44">10 RPC 完整时序</text>
+  <text class="subtitle" x="40" y="72">黑线：request　蓝线：callback/response　棕色虚线：持久化状态事件　绿色：delivery 确认</text>
+
+  <!-- Participant headers -->
+  <g>
+    <rect class="panel" x="25" y="92" width="150" height="48"/>
+    <text class="lane-title" x="100" y="121" text-anchor="middle">REST Controller</text>
+    <rect class="panel" x="230" y="92" width="150" height="48"/>
+    <text class="lane-title" x="305" y="112" text-anchor="middle">Core RPC</text>
+    <text class="small" x="305" y="130" text-anchor="middle">HTTP callback map</text>
+    <rect class="panel" x="435" y="92" width="170" height="48"/>
+    <text class="lane-title" x="520" y="112" text-anchor="middle">Rule Queue /</text>
+    <text class="lane-title" x="520" y="130" text-anchor="middle">Request Node</text>
+    <rect class="panel" x="650" y="92" width="160" height="48"/>
+    <text class="lane-title" x="730" y="112" text-anchor="middle">Rule Engine</text>
+    <text class="small" x="730" y="130" text-anchor="middle">RPC Service</text>
+    <rect class="panel" x="875" y="92" width="170" height="48"/>
+    <text class="lane-title" x="960" y="112" text-anchor="middle">Device Actor</text>
+    <text class="small" x="960" y="130" text-anchor="middle">per-device owner</text>
+    <rect class="panel" x="1090" y="92" width="180" height="48"/>
+    <text class="lane-title" x="1180" y="112" text-anchor="middle">TbRpcService</text>
+    <text class="small" x="1180" y="130" text-anchor="middle">+ PostgreSQL rpc</text>
+    <rect class="panel" x="1335" y="92" width="170" height="48"/>
+    <text class="lane-title" x="1420" y="112" text-anchor="middle">MQTT Handler</text>
+    <text class="small" x="1420" y="130" text-anchor="middle">Transport session</text>
+    <rect class="panel" x="1625" y="92" width="150" height="48"/>
+    <text class="lane-title" x="1700" y="121" text-anchor="middle">MQTT Device</text>
+  </g>
+
+  <g>
+    <line class="lifeline" x1="100" y1="140" x2="100" y2="1800"/>
+    <line class="lifeline" x1="305" y1="140" x2="305" y2="1800"/>
+    <line class="lifeline" x1="520" y1="140" x2="520" y2="1800"/>
+    <line class="lifeline" x1="730" y1="140" x2="730" y2="1800"/>
+    <line class="lifeline" x1="960" y1="140" x2="960" y2="1800"/>
+    <line class="lifeline" x1="1180" y1="140" x2="1180" y2="1800"/>
+    <line class="lifeline" x1="1420" y1="140" x2="1420" y2="1800"/>
+    <line class="lifeline" x1="1700" y1="140" x2="1700" y2="1800"/>
+  </g>
+
+  <!-- Lightweight -->
+  <rect x="20" y="160" width="1800" height="805" fill="none" stroke="#005A85" stroke-width="2"/>
+  <rect x="20" y="160" width="1800" height="38" fill="#0B3A53"/>
+  <text class="section-title" x="40" y="186">A. Lightweight two-way：REST callback 与 Node continuation 是同一 callback 的两个有序动作</text>
+
+  <line class="request" x1="100" y1="225" x2="305" y2="225"/>
+  <text class="label" x="202" y="217" text-anchor="middle">POST /api/rpc/twoway/{deviceId}</text>
+  <line class="request" x1="305" y1="270" x2="520" y2="270"/>
+  <text class="label" x="412" y="262" text-anchor="middle">RPC_CALL_FROM_SERVER_TO_DEVICE</text>
+  <rect class="blue-panel" x="210" y="287" width="190" height="56"/>
+  <text class="note-title" x="305" y="309" text-anchor="middle">Core 注册 HTTP consumer</text>
+  <text class="small" x="305" y="329" text-anchor="middle">UUID + 总 expiration timeout</text>
+  <line class="request" x1="520" y1="365" x2="730" y2="365"/>
+  <text class="label" x="625" y="357" text-anchor="middle">sendRpcRequestToDevice</text>
+  <rect class="amber-panel" x="425" y="385" width="190" height="62"/>
+  <text class="note-title" x="520" y="408" text-anchor="middle">立即 ctx.ack(original)</text>
+  <text class="small" x="520" y="428" text-anchor="middle">原 Queue record 可先提交</text>
+  <line class="request" x1="730" y1="470" x2="960" y2="470"/>
+  <text class="label" x="845" y="462" text-anchor="middle">Core partition → doProcess branch L100</text>
+  <rect class="blue-panel" x="865" y="490" width="190" height="72"/>
+  <text class="note-title" x="960" y="512" text-anchor="middle">rpcSeq → int requestId</text>
+  <text class="small" x="960" y="532" text-anchor="middle">pending map 属于 Actor 实例</text>
+  <text class="small" x="960" y="550" text-anchor="middle">该设备所有当前 session 共享</text>
+  <line class="request" x1="960" y1="585" x2="1420" y2="585"/>
+  <text class="label" x="1190" y="577" text-anchor="middle">ToDeviceRpcRequestMsg</text>
+  <line class="request" x1="1420" y1="625" x2="1700" y2="625"/>
+  <text class="label" x="1560" y="617" text-anchor="middle">PUBLISH .../request/{int requestId}</text>
+  <rect class="amber-panel" x="1340" y="642" width="440" height="70"/>
+  <text class="note-title" x="1560" y="666" text-anchor="middle">标准 JSON payload：method + params；内部 UUID 不下发</text>
+  <text class="small" x="1560" y="688" text-anchor="middle">稳定幂等键必须由调用方/规则链显式放进 params</text>
+
+  <line class="ok" x1="1420" y1="740" x2="960" y2="740"/>
+  <text class="label" x="1190" y="732" text-anchor="middle">QoS0 / PUBACK → DELIVERED</text>
+  <line class="status" x1="1420" y1="780" x2="960" y2="780"/>
+  <text class="label" x="1190" y="772" text-anchor="middle">ACK timeout → TIMEOUT</text>
+  <rect class="red-panel" x="1330" y="800" width="460" height="48"/>
+  <text class="note-title" x="1560" y="829" text-anchor="middle">轻量 QoS1 channel write 后不报 SENT</text>
+
+  <line class="response" x1="1700" y1="875" x2="1420" y2="875"/>
+  <text class="label" x="1560" y="867" text-anchor="middle">PUBLISH .../response/{int requestId}</text>
+  <line class="response" x1="1420" y1="910" x2="960" y2="910"/>
+  <text class="label" x="1190" y="902" text-anchor="middle">ToDeviceRpcResponseMsg → pending lookup</text>
+  <line class="response" x1="960" y1="945" x2="730" y2="945"/>
+  <text class="label" x="845" y="937" text-anchor="middle">FromDeviceRpcResponse(UUID)</text>
+
+  <rect class="panel" x="20" y="985" width="1800" height="285" stroke="#005A85" stroke-width="2"/>
+  <rect x="20" y="985" width="1800" height="38" fill="#0B3A53"/>
+  <text class="section-title" x="40" y="1011">A1. callback 内调用顺序固定；跨服务实际完成顺序不固定</text>
+  <line class="response" x1="730" y1="1058" x2="305" y2="1058"/>
+  <text class="label" x="517" y="1050" text-anchor="middle">1. REST 调用先 sendRpcResponseToTbCore(...)</text>
+  <line class="response" x1="730" y1="1103" x2="520" y2="1103"/>
+  <text class="label" x="625" y="1095" text-anchor="middle">2. 随后调用 consumer.accept(...)</text>
+  <line class="response" x1="305" y1="1150" x2="100" y2="1150"/>
+  <text class="label" x="202" y="1142" text-anchor="middle">本地或异步完成 HTTP response</text>
+  <path class="response" d="M520 1190 h80 v38 h-80"/>
+  <text class="label" x="615" y="1206">enqueue 新 Success/Failure continuation</text>
+  <rect class="green-panel" x="820" y="1050" width="920" height="132"/>
+  <text class="note-title" x="850" y="1077">REST 完成不依赖 enqueueForTellNext</text>
+  <text class="label" x="850" y="1104">两者由同一 callback 依次调用；跨服务时 HTTP 完成可与 continuation enqueue/消费竞速。</text>
+  <text class="label" x="850" y="1131">无订阅时轻量请求在总 expiration 后返回 NO_ACTIVE_CONNECTION / HTTP 504；不会产生持久化行。</text>
+  <text class="label" x="850" y="1158">设备业务 response、MQTT delivery 和 Rule Node continuation 是三个不同阶段。</text>
+
+  <!-- Persistent -->
+  <rect x="20" y="1295" width="1800" height="490" fill="none" stroke="#8A3B12" stroke-width="2"/>
+  <rect x="20" y="1295" width="1800" height="38" fill="#6B2C0C"/>
+  <text class="section-title" x="40" y="1321">B. Persistent：只有到达 Actor 时未过期才 QUEUED 并返回 rpcId</text>
+
+  <line class="request" x1="100" y1="1365" x2="960" y2="1365"/>
+  <text class="label" x="530" y="1357" text-anchor="middle">persistent request 经相同 REST → Rule Engine → Core 路径到 Actor</text>
+
+  <rect class="red-panel" x="45" y="1390" width="840" height="175"/>
+  <text class="note-title" x="70" y="1418">分支 1：到达 Actor 时 timeout &lt;= 0</text>
+  <text class="label" x="70" y="1450">1. Actor 调用 createRpc(request, EXPIRED)，TbRpcService 保存行并发送 RPC_EXPIRED。</text>
+  <text class="label" x="70" y="1483">2. Actor 直接 return：不注册 pending、不发送 rpcId callback。</text>
+  <text class="label" x="70" y="1516">3. Core 已注册的 HTTP consumer 最终 timeout → HTTP 504。</text>
+  <text class="small" x="70" y="1546">EXPIRED 行存在不等于原 REST 已拿到可查询 rpcId。</text>
+
+  <rect class="green-panel" x="905" y="1390" width="885" height="345"/>
+  <text class="note-title" x="930" y="1418">分支 2：到达 Actor 时仍有效</text>
+  <text class="label" x="930" y="1450">1. L258 createRpc(request, QUEUED)；DB save 后 TbRpcService 发送 RPC_QUEUED。</text>
+  <text class="label" x="930" y="1483">2. Actor 合成首次 callback {rpcId: UUID}。</text>
+  <text class="label" x="930" y="1516">3. 同一 callback：先调用 sendRpcResponseToTbCore，再调用 consumer.accept；</text>
+  <text class="label" x="948" y="1544">HTTP 200 + rpcId 与 Request Node continuation 的实际完成顺序不保证。</text>
+  <line class="status" x1="1680" y1="1590" x2="1210" y2="1590"/>
+  <text class="label" x="1445" y="1582" text-anchor="middle">之后设备 delivery / business response</text>
+  <text class="label" x="930" y="1628">4. Actor 通过 TbRpcService 保存 SENT/DELIVERED/SUCCESSFUL/FAILED 等状态并发 RPC_...。</text>
+  <text class="label" x="930" y="1661">5. 原 RPC callback 已在首次 rpcId 时移除；后续 response lookup stale，</text>
+  <text class="label" x="948" y="1689">不会再次继续原 Request Node。</text>
+
+  <!-- Strategy panels -->
+  <rect x="20" y="1810" width="1800" height="410" fill="none" stroke="#334155" stroke-width="2"/>
+  <rect x="20" y="1810" width="1800" height="38" fill="#263746"/>
+  <text class="section-title" x="40" y="1836">C. 状态、重试、恢复与删除按真实边界解释</text>
+
+  <rect class="amber-panel" x="45" y="1870" width="550" height="150"/>
+  <text class="note-title" x="70" y="1898">默认 BURST</text>
+  <text class="label" x="70" y="1926">ACK TIMEOUT：retry++，persistent 保存 TIMEOUT。</text>
+  <text class="label" x="70" y="1953">sendNextPendingRequest 因 rpcSequential=false 不立即重发。</text>
+  <text class="label" x="70" y="1980">two-way 最终受总 expiration 约束 → EXPIRED。</text>
+
+  <rect class="blue-panel" x="620" y="1870" width="570" height="150"/>
+  <text class="note-title" x="645" y="1898">两种 SEQUENTIAL</text>
+  <text class="label" x="645" y="1926">ACK TIMEOUT 且 retry 未耗尽：立即重新选择 pending 发包。</text>
+  <text class="label" x="645" y="1953">retry 耗尽才保存 FAILED；不是所有 TIMEOUT 都转 SENT。</text>
+  <text class="label" x="645" y="1980">response_timeout_ms 只用于 SEQUENTIAL_ON_RESPONSE。</text>
+
+  <rect class="red-panel" x="1215" y="1870" width="575" height="150"/>
+  <text class="note-title" x="1240" y="1898">业务 response 与 delivery 独立</text>
+  <text class="label" x="1240" y="1926">业务 success/error 可在 QUEUED/SENT/DELIVERED/TIMEOUT 时到达。</text>
+  <text class="label" x="1240" y="1953">因此不能无条件画 DELIVERED → FAILED。</text>
+  <text class="label" x="1240" y="1980">轻量 QoS1 只有 DELIVERED 或 TIMEOUT，没有 SENT。</text>
+
+  <rect class="blue-panel" x="45" y="2045" width="550" height="135"/>
+  <text class="note-title" x="70" y="2073">Actor init</text>
+  <text class="label" x="70" y="2101">只恢复 QUEUED；SENT/DELIVERED 不重建 pending。</text>
+  <text class="label" x="70" y="2128">迟到 response stale；行保留到 TTL 或 REST delete。</text>
+  <rect class="amber-panel" x="620" y="2045" width="570" height="135"/>
+  <text class="note-title" x="645" y="2073">DELETE 是 operation/event</text>
+  <text class="label" x="645" y="2101">包括 TIMEOUT 在内的行都可删除；DB 不保存 DELETED。</text>
+  <text class="label" x="645" y="2128">删除后仅内存对象置 DELETED，并发送 RPC_DELETED。</text>
+  <rect class="green-panel" x="1215" y="2045" width="575" height="135"/>
+  <text class="note-title" x="1240" y="2073">状态事件 producer</text>
+  <text class="label" x="1240" y="2101">TbRpcService：RPC_QUEUED / RPC_SENT / RPC_DELIVERED / ...</text>
+  <text class="label" x="1240" y="2128">DB 不是 producer；不存在泛型 RPC_STATUS 类型。</text>
+
+  <!-- Topics and client side -->
+  <rect x="20" y="2245" width="1800" height="235" fill="none" stroke="#005A85" stroke-width="2"/>
+  <rect x="20" y="2245" width="1800" height="38" fill="#0B3A53"/>
+  <text class="section-title" x="40" y="2271">D. MQTT topic 与 client-side RPC</text>
+  <rect class="panel" x="45" y="2300" width="840" height="142"/>
+  <text class="note-title" x="70" y="2327">Server-side request subscription → 对应 response publish</text>
+  <text class="label" x="70" y="2354">V1: v1/devices/me/rpc/request/+ → v1/devices/me/rpc/response/{id}</text>
+  <text class="label" x="70" y="2380">V2: v2/r/req/+　JSON: v2/r/req/j/+　Proto: v2/r/req/p/+</text>
+  <text class="label" x="70" y="2406">response 分别为 v2/r/res/{id}、v2/r/res/j/{id}、v2/r/res/p/{id}</text>
+  <rect class="panel" x="915" y="2300" width="875" height="142"/>
+  <text class="note-title" x="940" y="2327">Client-side</text>
+  <text class="label" x="940" y="2354">processDevicePublish → DefaultTransportService.process(SessionInfoProto,</text>
+  <text class="label" x="940" y="2380">ToServerRpcRequestMsg, TransportServiceCallback) → TO_SERVER_RPC_REQUEST</text>
+  <text class="label" x="940" y="2406">toServerRpcPendingMap 用 sessionId-requestId 等待 Reply Node 或 timeout。</text>
+
+  <rect x="20" y="2492" width="1800" height="18" fill="#263746"/>
+  <text class="footer" x="920" y="2506" text-anchor="middle">持久化 DB 状态、RPC_&lt;STATUS&gt; Queue message、MQTT delivery、设备业务 response、Rule Node continuation 均为不同阶段</text>
+</svg>
