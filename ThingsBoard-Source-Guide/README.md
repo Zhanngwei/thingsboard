@@ -2,7 +2,7 @@
 
 > 源码基线：ThingsBoard `3.6.4`，工作区提交 `0cb411fc90`。本文档只记录能够从当前工作区源码、配置和建表脚本中核实的行为。
 
-[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md)
+[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md) | [第 20 章：Cassandra 写入流程](chapters/20-cassandra-write/README.md) | [第 21 章：TimescaleDB 写入流程](chapters/21-timescale-write/README.md) | [第 22 章：PostgreSQL 写入流程](chapters/22-postgresql-write/README.md) | [第 23 章：HTTP 设备 API 流程](chapters/23-http-device-api/README.md)
 
 ## 阅读定位
 
@@ -51,6 +51,10 @@
 | 17 | Kafka 消费流程 | 已完成 | [Markdown](chapters/17-kafka-consumer/README.md) / [HTML](chapters/17-kafka-consumer/index.html) / [PlantUML](chapters/17-kafka-consumer/sequence.puml) / [时序图 SVG](chapters/17-kafka-consumer/sequence.svg) / [架构图 SVG](assets/architecture/17-kafka-consumer.svg) |
 | 18 | Queue 管理 | 已完成 | [Markdown](chapters/18-queue-management/README.md) / [HTML](chapters/18-queue-management/index.html) / [PlantUML](chapters/18-queue-management/sequence.puml) / [时序图 SVG](chapters/18-queue-management/sequence.svg) / [架构图 SVG](assets/architecture/18-queue-management.svg) |
 | 19 | Cluster 通信 | 已完成 | [Markdown](chapters/19-cluster-communication/README.md) / [HTML](chapters/19-cluster-communication/index.html) / [PlantUML](chapters/19-cluster-communication/sequence.puml) / [时序图 SVG](chapters/19-cluster-communication/sequence.svg) / [架构图 SVG](assets/architecture/19-cluster-communication.svg) |
+| 20 | Cassandra 写入流程 | 已完成 | [Markdown](chapters/20-cassandra-write/README.md) / [HTML](chapters/20-cassandra-write/index.html) / [PlantUML](chapters/20-cassandra-write/sequence.puml) / [时序图 SVG](chapters/20-cassandra-write/sequence.svg) / [架构图 SVG](assets/architecture/20-cassandra-write.svg) |
+| 21 | TimescaleDB 写入流程 | 已完成 | [Markdown](chapters/21-timescale-write/README.md) / [HTML](chapters/21-timescale-write/index.html) / [PlantUML](chapters/21-timescale-write/sequence.puml) / [时序图 SVG](chapters/21-timescale-write/sequence.svg) / [架构图 SVG](assets/architecture/21-timescale-write.svg) |
+| 22 | PostgreSQL 写入流程 | 已完成 | [Markdown](chapters/22-postgresql-write/README.md) / [HTML](chapters/22-postgresql-write/index.html) / [PlantUML](chapters/22-postgresql-write/sequence.puml) / [时序图 SVG](chapters/22-postgresql-write/sequence.svg) / [架构图 SVG](assets/architecture/22-postgresql-write.svg) |
+| 23 | HTTP 设备 API 流程 | 已完成 | [Markdown](chapters/23-http-device-api/README.md) / [HTML](chapters/23-http-device-api/index.html) / [PlantUML](chapters/23-http-device-api/sequence.puml) / [时序图 SVG](chapters/23-http-device-api/sequence.svg) / [架构图 SVG](assets/architecture/23-http-device-api.svg) |
 
 完整规划见 [SUMMARY.md](SUMMARY.md)。待分析章节只链接到目录锚点，避免产生指向不存在文件的失效链接。
 
@@ -167,6 +171,30 @@ Queue 是 PostgreSQL 配置、物理 topic、`HashPartitionService` 路由、con
 多节点发现由 ZooKeeper ephemeral-sequential `ServiceInfo` 节点完成；Kafka只承载跨节点数据与notification record。`HashPartitionService`按serviceId排序后取模分配owner：Core使用`partition % count`，Rule Engine使用`(hash(tenantId)+partition) % count`并可先过滤dedicated tenant-profile服务。源码中的`ConsistentHashCircle`在当前路径未被引用，因此扩缩容可能迁移大量partition，ServiceInfo中的CPU/memory也不参与负载权重。
 
 跨节点Actor调用实际是`ClusterService -> Queue producer -> broker -> owner consumer -> local Actor`，producer callback不等待远端应用。ZooKeeper remove立即发布shutdown事件、延迟重算owner，同serviceId及时返回可取消重算。PartitionChange由本地Spring事件分别驱动consumer订阅和高优先级Actor清理；Device/RuleChain Actor、mailbox、Session和旧异步副作用都不迁移，新owner从数据库/缓存和后续消息重建。
+
+## 第 20 章关键结论
+
+Cassandra telemetry 的 registry、history 和 latest 是三个独立 Future，不存在跨表 batch 或回滚。History 主键为 `((entity_type, entity_id, key, partition), ts)`，默认按 UTC 月分桶并使用原生 `USING TTL`；registry 只使用系统 TTL，latest 不设置 TTL。默认读写一致性级别均为 `ONE`。
+
+`ts_kv_latest_cf` 使用无时间条件的普通 INSERT，较旧数据后到时可以覆盖较新的 latest。`set_null_values_enabled=true` 会清空旧类型列以避免类型切换残值。缓冲执行器虽有有界请求队列，但并发计数检查不是严格信号量；部分 history 查询和删除失败路径只记录日志，外层 Future 可能一直等待到上层超时。
+
+## 第 21 章关键结论
+
+ThingsBoard 3.6 只把 `ts_kv` 建成按bigint毫秒 `ts` 的一维hypertable，默认chunk interval为7天；dictionary和latest仍是普通PostgreSQL表。History按entity UUID hash进入默认3条无界SQL队列，以10000行/100ms合批并在独立事务中JDBC UPSERT；latest使用另一组事务和payload时间戳保护，二者的`allAsList`不是共同事务。
+
+当前schema没有Continuous Aggregate、compression policy、Timescale retention policy或`drop_chunks`。请求TTL不写入history行，只参与用量计算；Core定时任务调用PL/pgSQL按system/tenant/customer策略逐行DELETE history且不清latest，因此生产调优必须同时观察活动chunk索引、WAL/checkpoint、SQL queue、TTL DELETE和autovacuum。
+
+## 第 22 章关键结论
+
+ThingsBoard的PostgreSQL写入不是单一JPA路径：实体CRUD主要走Spring Data/Hibernate，高频Attribute/Telemetry/Latest走按entity hash的无界SQL队列和JDBC batch，Alarm与TTL使用native query和PL/pgSQL。`saveAndFlush`只提前执行SQL而非提交；实际原子边界取决于从Spring代理进入的具体`@Transactional` Service方法，异步batch切换线程后必然使用独立事务。
+
+普通SQL telemetry使用按`ts`的RANGE partition和`ts_kv_indefinite` DEFAULT表；分区DDL以`NOT_SUPPORTED`脱离父事务。每实例Hikari默认16连接，而Web、JPA executor及多组SQL writer共同竞争该池。Attribute的`last_update_ts`没有更新条件保护；UPDATE/DELETE产生的dead tuple、WAL/checkpoint、autovacuum和TTL维护必须与Java queue积压一起排查。
+
+## 第 23 章关键结论
+
+HTTP Device API使用URL path中的Device access token，不走用户JWT；每次请求通过Transport API request/reply交给Core验证credentials、device与profile，再创建随机SessionInfo。Telemetry和Client Attributes直接进入Rule Engine Queue，HTTP 200只等待producer callback，不等待consumer、Rule Node或数据库提交。
+
+GET Attributes、RPC/Attribute长轮询会在持有请求的Transport实例创建一次性SYNC session，经Core Queue和Device Actor路由，response或timeout后注销。默认业务timeout 60秒、Tomcat async上限300秒；客户端断开或HTTP timeout不会取消已发送的Queue/Actor/DB工作。生产必须对URL token做日志脱敏，并按认证、producer、consumer、Rule Chain和DAO逐层排查“200但无数据”。
 
 ## 图表约定
 

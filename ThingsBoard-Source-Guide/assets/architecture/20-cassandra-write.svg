@@ -53,7 +53,8 @@
   <text x="675" y="791" text-anchor="middle" class="small">no TTL · no payload-ts guard</text>
   <text x="675" y="819" text-anchor="middle" class="small">high key count widens one partition</text>
   <rect x="515" y="900" width="320" height="75" rx="5" class="red"/>
-  <text x="675" y="939" text-anchor="middle" class="label">Registry / history / latest may diverge</text>
+  <text x="675" y="929" text-anchor="middle" class="label">Registry / history / latest</text>
+  <text x="675" y="954" text-anchor="middle" class="label">may diverge</text>
 
   <rect x="915" y="85" width="400" height="940" rx="6" class="band"/>
   <text x="1115" y="125" text-anchor="middle" class="section">Async IO Control</text>
@@ -75,7 +76,8 @@
   <text x="1115" y="791" text-anchor="middle" class="small">default read/write CL = ONE</text>
   <text x="1115" y="819" text-anchor="middle" class="small">success at configured consistency</text>
   <rect x="955" y="900" width="320" height="75" rx="5" class="red"/>
-  <text x="1115" y="939" text-anchor="middle" class="label">Buffer full / timeout / overload fail Future</text>
+  <text x="1115" y="929" text-anchor="middle" class="label">Buffer full / timeout / overload</text>
+  <text x="1115" y="954" text-anchor="middle" class="label">fail Future</text>
 
   <rect x="1355" y="85" width="390" height="940" rx="6" class="band"/>
   <text x="1550" y="125" text-anchor="middle" class="section">Lifecycle and Risks</text>
@@ -97,7 +99,8 @@
   <text x="1550" y="791" text-anchor="middle" class="small">older event submitted later may win</text>
   <text x="1550" y="819" text-anchor="middle" class="small">delete rewrite also races new writes</text>
   <rect x="1390" y="900" width="320" height="75" rx="5" class="red"/>
-  <text x="1550" y="939" text-anchor="middle" class="label">No Cassandra/Kafka exactly-once boundary</text>
+  <text x="1550" y="929" text-anchor="middle" class="label">No Cassandra/Kafka</text>
+  <text x="1550" y="954" text-anchor="middle" class="label">exactly-once boundary</text>
 
   <path d="M235 310 L235 370" class="line"/>
   <path d="M395 440 L475 440 L475 252 L515 252" class="line"/>

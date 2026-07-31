@@ -25,7 +25,7 @@
 
 > 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章只分析 `database.ts.type=cassandra` / `database.ts_latest.type=cassandra` 的 telemetry history/latest 实现，不把 Cassandra 当作 ThingsBoard 全部实体数据库。
 
-[上一篇：19 Cluster 通信](../19-cluster-communication/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/20-cassandra-write.svg) | [下一篇：21 TimescaleDB 写入流程（待分析）](../../SUMMARY.md#chapter-21)
+[上一篇：19 Cluster 通信](../19-cluster-communication/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/20-cassandra-write.svg) | [下一篇：21 TimescaleDB 写入流程](../21-timescale-write/index.html)
 
 ---
 
@@ -298,7 +298,7 @@ sequenceDiagram
     alt all futures succeed
       S-->>N: success then notify
     else one future fails
-      S-->>N: failure; successful mutations remain
+      S-->>N: failure, successful mutations remain
     end
 ```
 
@@ -644,7 +644,7 @@ system TTL大于0时取system与custom的较小值；custom为0则使用system�
 
 ---
 
-[上一篇：19 Cluster 通信](../19-cluster-communication/index.html) | [返回全书目录](../../SUMMARY.md) | [下一篇：21 TimescaleDB 写入流程（待分析）](../../SUMMARY.md#chapter-21)
+[上一篇：19 Cluster 通信](../19-cluster-communication/index.html) | [返回全书目录](../../SUMMARY.md) | [下一篇：21 TimescaleDB 写入流程](../21-timescale-write/index.html)
 
 </script>
   <script src="../../assets/guide.js"></script>

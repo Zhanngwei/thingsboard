@@ -135,6 +135,30 @@
         <p><span class="status">已完成</span> · <a href="chapters/19-cluster-communication/README.md">Markdown</a> · <a href="chapters/19-cluster-communication/sequence.puml">PlantUML</a> · <a href="chapters/19-cluster-communication/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/19-cluster-communication.svg">架构图 SVG</a></p>
       </div>
 
+      <div class="chapter-card" id="chapter-20">
+        <h3><a href="chapters/20-cassandra-write/index.html">20 Cassandra 写入流程</a></h3>
+        <p>partition registry、UTC 时间分桶、history 原生 TTL、latest 覆盖语义、异步 Driver、缓冲执行器与一致性边界。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/20-cassandra-write/README.md">Markdown</a> · <a href="chapters/20-cassandra-write/sequence.puml">PlantUML</a> · <a href="chapters/20-cassandra-write/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/20-cassandra-write.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-21">
+        <h3><a href="chapters/21-timescale-write/index.html">21 TimescaleDB 写入流程</a></h3>
+        <p>Hypertable安装、dictionary映射、history/latest独立批处理、chunk路由、time_bucket查询、TTL DELETE与未启用的Timescale能力。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/21-timescale-write/README.md">Markdown</a> · <a href="chapters/21-timescale-write/sequence.puml">PlantUML</a> · <a href="chapters/21-timescale-write/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/21-timescale-write.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-22">
+        <h3><a href="chapters/22-postgresql-write/index.html">22 PostgreSQL 写入流程</a></h3>
+        <p>JPA实体事务、JDBC高频批处理、SQL telemetry RANGE分区、Alarm数据库函数、Hikari连接池与MVCC/VACUUM影响。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/22-postgresql-write/README.md">Markdown</a> · <a href="chapters/22-postgresql-write/sequence.puml">PlantUML</a> · <a href="chapters/22-postgresql-write/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/22-postgresql-write.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-23">
+        <h3><a href="chapters/23-http-device-api/index.html">23 HTTP 设备 API 流程</a></h3>
+        <p>URL access token、Transport API认证、Telemetry/Attributes producer确认、临时SYNC session、Device Actor与双向RPC。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/23-http-device-api/README.md">Markdown</a> · <a href="chapters/23-http-device-api/sequence.puml">PlantUML</a> · <a href="chapters/23-http-device-api/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/23-http-device-api.svg">架构图 SVG</a></p>
+      </div>
+
       <div class="notice"><strong>源码结论：</strong>3.6.4 中普通 MQTT 遥测不会先进入 Device Actor。Transport 直接投递 Rule Engine Queue，消费者再进入 App/Tenant/RuleChain/RuleNode Actor。MQTT PUBACK 表示队列 producer 写入成功，不表示数据库落库完成。</div>
       <div class="notice"><strong>Device 创建结论：</strong><code>device</code> 与 <code>device_credentials</code> 在一个 PostgreSQL 事务中提交；Cluster、Rule Engine、State 和 Audit 是提交后的异步传播。DEVICE CREATED 生命周期不会预建 Device Actor。</div>
       <div class="notice"><strong>Device 删除结论：</strong>Alarm 与 Device 聚合删除共享外层 PostgreSQL 事务，但运行时 Queue 在 COMMIT 前发送。删除不清理 Attribute、TimescaleDB/Cassandra telemetry 或设备 RPC；DEVICE DELETED 可能临时创建 Device Actor 再停止。</div>
@@ -154,12 +178,14 @@
       <div class="notice"><strong>Kafka Consumer 结论：</strong>poll先推进本地position，Rule Engine再等待整个pack并选择内存重投或commitSync；retry不seek Kafka，也不回滚已经完成的副作用。Main Queue默认跳过failure/timeout。长await可能触发rebalance并与旧异步工作重叠；decode异常没有seek或公共DLQ，后续commit可能越过坏record。</div>
       <div class="notice"><strong>Queue 管理结论：</strong>Queue是PostgreSQL配置、多个物理topic、PartitionService和consumer manager的组合。保存、topic创建、null-callback通知与运行时应用不原子；删除也先删行再异步drain/topic delete。逻辑partition进入topic后缀，缩容不回收旧topic；consumerPerPartition切换会重建task。queue表无tenant+name/topic唯一约束。</div>
       <div class="notice"><strong>Cluster 通信结论：</strong>ZooKeeper用ephemeral ServiceInfo发现节点，PartitionService按serviceId排序后取模分配owner，并不使用现存但无调用者的ConsistentHashCircle。跨节点Actor消息走broker再进入远端本地Actor；producer callback不等远端应用。拓扑变化分别更新consumer和Actor，mailbox、Session与旧异步工作不迁移。</div>
+      <div class="notice"><strong>Cassandra 写入结论：</strong>registry、history、latest 是三个独立 Future，没有跨表事务。history 按 entity/type/key/time partition 分桶并使用原生 TTL，latest 不过期且普通 INSERT 没有时间戳保护，旧点后到可以覆盖新值。默认读写一致性级别为 ONE。</div>
+      <div class="notice"><strong>TimescaleDB 写入结论：</strong>只有 <code>ts_kv</code> 是按 bigint ts 的一维hypertable；history与普通PostgreSQL latest分别合批和提交。3.6未创建Continuous Aggregate、压缩或Timescale retention policy，请求TTL也不写入行；后台procedure按租户策略DELETE history并留下latest。</div>
+      <div class="notice"><strong>PostgreSQL 写入结论：</strong>实体CRUD、JDBC batch和PL/pgSQL是三条不同路径；事务要从真实Service代理入口判断，异步queue已经切换事务。SQL telemetry动态创建RANGE分区并保留DEFAULT；每实例Hikari默认16连接由Web、JPA和多组writer共享，积压、WAL、锁、dead tuple和autovacuum必须联合排查。</div>
+      <div class="notice"><strong>HTTP 设备 API 结论：</strong>URL access token每次经Transport API交给Core验证，不走用户JWT。Telemetry/Attribute POST的200只等Rule Engine Queue producer；GET Attributes和HTTP RPC使用临时SYNC session、Core Queue和Device Actor。timeout或断连不取消下游工作，URL token必须在网关和日志中脱敏。</div>
 
       <h2>全书规划</h2>
       <div class="catalog">
-        <section class="chapter-card" id="chapter-20"><h3>20 Cassandra 写入流程</h3><p class="pending">待分析</p><p>分区键、TTL、异步 driver 和 latest/history。</p></section>
-        <section class="chapter-card" id="chapter-21"><h3>21 TimescaleDB 写入流程</h3><p class="pending">待分析</p><p>Hypertable、chunk、批量写和聚合查询。</p></section>
-        <section class="chapter-card" id="chapter-22"><h3>22 PostgreSQL 写入流程</h3><p class="pending">待分析</p><p>事务、JDBC/JPA、分区、批处理和连接池。</p></section>
+        <section class="chapter-card" id="chapter-24"><h3>24 CoAP 消息流程</h3><p class="pending">待分析</p><p>资源匹配、DTLS、会话上下文、适配与响应。</p></section>
       </div>
       <p>其余协议、查询、缓存、WebSocket、Edge、通知和运行时章节见 <a href="SUMMARY.md">完整目录</a>。</p>
     </article>

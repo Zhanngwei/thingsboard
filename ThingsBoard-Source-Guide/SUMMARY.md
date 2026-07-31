@@ -28,13 +28,13 @@
 - <a id="chapter-17"></a>**17 Kafka 消费流程**（已完成）：[Markdown](chapters/17-kafka-consumer/README.md) · [HTML](chapters/17-kafka-consumer/index.html) · [PlantUML](chapters/17-kafka-consumer/sequence.puml) · [时序图 SVG](chapters/17-kafka-consumer/sequence.svg) · [架构图 SVG](assets/architecture/17-kafka-consumer.svg)
 - <a id="chapter-18"></a>**18 Queue 管理**（已完成）：[Markdown](chapters/18-queue-management/README.md) · [HTML](chapters/18-queue-management/index.html) · [PlantUML](chapters/18-queue-management/sequence.puml) · [时序图 SVG](chapters/18-queue-management/sequence.svg) · [架构图 SVG](assets/architecture/18-queue-management.svg)
 - <a id="chapter-19"></a>**19 Cluster 通信**（已完成）：[Markdown](chapters/19-cluster-communication/README.md) · [HTML](chapters/19-cluster-communication/index.html) · [PlantUML](chapters/19-cluster-communication/sequence.puml) · [时序图 SVG](chapters/19-cluster-communication/sequence.svg) · [架构图 SVG](assets/architecture/19-cluster-communication.svg)
-- <a id="chapter-20"></a>**20 Cassandra 写入流程**（待分析）：分区键、TTL、异步 driver、latest/history 和 partition registry。
-- <a id="chapter-21"></a>**21 TimescaleDB 写入流程**（待分析）：Hypertable、chunk、批量队列、聚合查询和 TTL。
-- <a id="chapter-22"></a>**22 PostgreSQL 写入流程**（待分析）：JPA/自定义 JDBC、事务边界、分区表、批处理和连接池。
+- <a id="chapter-20"></a>**20 Cassandra 写入流程**（已完成）：[Markdown](chapters/20-cassandra-write/README.md) · [HTML](chapters/20-cassandra-write/index.html) · [PlantUML](chapters/20-cassandra-write/sequence.puml) · [时序图 SVG](chapters/20-cassandra-write/sequence.svg) · [架构图 SVG](assets/architecture/20-cassandra-write.svg)
+- <a id="chapter-21"></a>**21 TimescaleDB 写入流程**（已完成）：[Markdown](chapters/21-timescale-write/README.md) · [HTML](chapters/21-timescale-write/index.html) · [PlantUML](chapters/21-timescale-write/sequence.puml) · [时序图 SVG](chapters/21-timescale-write/sequence.svg) · [架构图 SVG](assets/architecture/21-timescale-write.svg)
+- <a id="chapter-22"></a>**22 PostgreSQL 写入流程**（已完成）：[Markdown](chapters/22-postgresql-write/README.md) · [HTML](chapters/22-postgresql-write/index.html) · [PlantUML](chapters/22-postgresql-write/sequence.puml) · [时序图 SVG](chapters/22-postgresql-write/sequence.svg) · [架构图 SVG](assets/architecture/22-postgresql-write.svg)
 
 ## 第三篇：协议与会话
 
-- <a id="chapter-23"></a>**23 HTTP 设备 API 流程**（待分析）：token 认证、telemetry/attributes/RPC 与 TransportService。
+- <a id="chapter-23"></a>**23 HTTP 设备 API 流程**（已完成）：[Markdown](chapters/23-http-device-api/README.md) · [HTML](chapters/23-http-device-api/index.html) · [PlantUML](chapters/23-http-device-api/sequence.puml) · [时序图 SVG](chapters/23-http-device-api/sequence.svg) · [架构图 SVG](assets/architecture/23-http-device-api.svg)
 - <a id="chapter-24"></a>**24 CoAP 消息流程**（待分析）：资源匹配、DTLS、会话上下文、适配与响应。
 - <a id="chapter-25"></a>**25 LwM2M 注册与观测流程**（待分析）：Bootstrap、Registration、Observe、对象模型和遥测转换。
 - <a id="chapter-26"></a>**26 MQTT Gateway 流程**（待分析）：虚拟设备连接、遥测/属性代理、RPC 路由和会话维护。
