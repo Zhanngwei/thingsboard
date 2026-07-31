@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1780" height="1240" viewBox="0 0 1780 1240" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 PostgreSQL write architecture</title>
+  <desc id="desc">High contrast architecture of JPA entity writes, JDBC batches, PostgreSQL partitions, stored functions, connection pool and transaction boundaries.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <style>.title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8;stroke-linejoin:round}.band{fill:#f8fafc;stroke:#64748b;stroke-width:2}.blue{fill:#eef8fb;stroke:#176b87;stroke-width:2}.amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}.green{fill:#ecfdf5;stroke:#047857;stroke-width:2}.red{fill:#fff1f2;stroke:#be123c;stroke-width:2}.gray{fill:#f3f4f6;stroke:#4b5563;stroke-width:2}.line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1780" height="1240" fill="#fff"/>
+  <text x="890" y="52" text-anchor="middle" class="title">ThingsBoard 3.6 PostgreSQL：JPA、JDBC Batch、分区与事务边界</text>
+
+  <rect x="35" y="85" width="400" height="1030" rx="6" class="band"/>
+  <text x="235" y="125" text-anchor="middle" class="section">Business Entry and Service</text>
+  <rect x="75" y="165" width="320" height="140" rx="5" class="blue"/>
+  <text x="235" y="205" text-anchor="middle" class="label">Synchronous Entity API</text>
+  <text x="235" y="236" text-anchor="middle" class="small">Device · Asset · Customer · Dashboard</text>
+  <text x="235" y="264" text-anchor="middle" class="small">public Service method through Spring proxy</text>
+  <text x="235" y="292" text-anchor="middle" class="small">validation and cross-DAO orchestration</text>
+  <rect x="75" y="365" width="320" height="160" rx="5" class="green"/>
+  <text x="235" y="405" text-anchor="middle" class="label">Asynchronous KV API</text>
+  <text x="235" y="436" text-anchor="middle" class="small">Attribute · History · Latest · Event</text>
+  <text x="235" y="464" text-anchor="middle" class="small">ListenableFuture per entry</text>
+  <text x="235" y="492" text-anchor="middle" class="small">Rule Node callback after Future result</text>
+  <rect x="75" y="585" width="320" height="160" rx="5" class="amber"/>
+  <text x="235" y="625" text-anchor="middle" class="label">Native State Operations</text>
+  <text x="235" y="656" text-anchor="middle" class="small">Alarm create · ACK · clear · assign</text>
+  <text x="235" y="684" text-anchor="middle" class="small">TTL cleanup and partition drop</text>
+  <text x="235" y="712" text-anchor="middle" class="small">native query / PL/pgSQL</text>
+  <rect x="75" y="805" width="320" height="190" rx="5" class="red"/>
+  <text x="235" y="845" text-anchor="middle" class="label">External Commit Boundaries</text>
+  <text x="235" y="876" text-anchor="middle" class="small">Kafka offset · Actor mailbox</text>
+  <text x="235" y="904" text-anchor="middle" class="small">cache · WebSocket · audit · cluster event</text>
+  <text x="235" y="932" text-anchor="middle" class="small">not covered by PostgreSQL transaction</text>
+  <text x="235" y="960" text-anchor="middle" class="small">selected cache events run after commit</text>
+
+  <rect x="475" y="85" width="400" height="1030" rx="6" class="band"/>
+  <text x="675" y="125" text-anchor="middle" class="section">Java Persistence Paths</text>
+  <rect x="515" y="165" width="320" height="180" rx="5" class="blue"/>
+  <text x="675" y="205" text-anchor="middle" class="label">JPA and Hibernate</text>
+  <text x="675" y="236" text-anchor="middle" class="small">JpaAbstractDao + Spring Data repository</text>
+  <text x="675" y="264" text-anchor="middle" class="small">time UUID generated in application</text>
+  <text x="675" y="292" text-anchor="middle" class="small">saveAndFlush is not COMMIT</text>
+  <text x="675" y="320" text-anchor="middle" class="small">ddl-auto none · open-in-view false</text>
+  <rect x="515" y="405" width="320" height="210" rx="5" class="green"/>
+  <text x="675" y="445" text-anchor="middle" class="label">SQL Blocking Queues</text>
+  <text x="675" y="476" text-anchor="middle" class="small">entity UUID hash to single-thread writers</text>
+  <text x="675" y="504" text-anchor="middle" class="small">poll · drain · optional composite-key sort</text>
+  <text x="675" y="532" text-anchor="middle" class="small">JdbcTemplate batch UPDATE / UPSERT</text>
+  <text x="675" y="560" text-anchor="middle" class="small">one transaction per repository batch</text>
+  <text x="675" y="588" text-anchor="middle" class="small">unbounded LinkedBlockingQueue</text>
+  <rect x="515" y="675" width="320" height="180" rx="5" class="amber"/>
+  <text x="675" y="715" text-anchor="middle" class="label">Partition DDL Path</text>
+  <text x="675" y="746" text-anchor="middle" class="small">UTC range calculated before enqueue</text>
+  <text x="675" y="774" text-anchor="middle" class="small">Propagation.NOT_SUPPORTED</text>
+  <text x="675" y="802" text-anchor="middle" class="small">JVM cache + DB race handling</text>
+  <text x="675" y="830" text-anchor="middle" class="small">DEFAULT partition remains fallback</text>
+  <rect x="515" y="915" width="320" height="80" rx="5" class="red"/>
+  <text x="675" y="949" text-anchor="middle" class="label">One bad row can fail a batch</text>
+  <text x="675" y="978" text-anchor="middle" class="small">all batch Futures receive the exception</text>
+
+  <rect x="915" y="85" width="400" height="1030" rx="6" class="band"/>
+  <text x="1115" y="125" text-anchor="middle" class="section">Connection and Transaction</text>
+  <rect x="955" y="165" width="320" height="180" rx="5" class="gray"/>
+  <text x="1115" y="205" text-anchor="middle" class="label">Spring Transaction Proxy</text>
+  <text x="1115" y="236" text-anchor="middle" class="small">public proxy call starts or joins TX</text>
+  <text x="1115" y="264" text-anchor="middle" class="small">self/private call does not add a TX</text>
+  <text x="1115" y="292" text-anchor="middle" class="small">default isolation not overridden</text>
+  <text x="1115" y="320" text-anchor="middle" class="small">after-commit cache listener</text>
+  <rect x="955" y="405" width="320" height="210" rx="5" class="blue"/>
+  <text x="1115" y="445" text-anchor="middle" class="label">HikariCP per Service</text>
+  <text x="1115" y="476" text-anchor="middle" class="small">default maximumPoolSize 16</text>
+  <text x="1115" y="504" text-anchor="middle" class="small">JPA async executor also sizes to 16</text>
+  <text x="1115" y="532" text-anchor="middle" class="small">web + JPA + all SQL writers compete</text>
+  <text x="1115" y="560" text-anchor="middle" class="small">cluster total is sum of every pool</text>
+  <text x="1115" y="588" text-anchor="middle" class="small">pool wait can dominate request latency</text>
+  <rect x="955" y="675" width="320" height="180" rx="5" class="green"/>
+  <text x="1115" y="715" text-anchor="middle" class="label">PostgreSQL Transaction</text>
+  <text x="1115" y="746" text-anchor="middle" class="small">constraints · row locks · ON CONFLICT</text>
+  <text x="1115" y="774" text-anchor="middle" class="small">flush SQL then COMMIT</text>
+  <text x="1115" y="802" text-anchor="middle" class="small">WAL durability follows DB settings</text>
+  <text x="1115" y="830" text-anchor="middle" class="small">no XA with Kafka or cache</text>
+  <rect x="955" y="915" width="320" height="80" rx="5" class="red"/>
+  <text x="1115" y="949" text-anchor="middle" class="label">Pool saturation</text>
+  <text x="1115" y="978" text-anchor="middle" class="small">borrower waits or times out</text>
+
+  <rect x="1355" y="85" width="390" height="1030" rx="6" class="band"/>
+  <text x="1550" y="125" text-anchor="middle" class="section">PostgreSQL Physical Effects</text>
+  <rect x="1390" y="165" width="320" height="180" rx="5" class="blue"/>
+  <text x="1550" y="205" text-anchor="middle" class="label">Entity Tables</text>
+  <text x="1550" y="236" text-anchor="middle" class="small">device · credentials · profile · relation</text>
+  <text x="1550" y="264" text-anchor="middle" class="small">UUID PK · UNIQUE · FK constraints</text>
+  <text x="1550" y="292" text-anchor="middle" class="small">Hibernate INSERT / UPDATE</text>
+  <text x="1550" y="320" text-anchor="middle" class="small">schema comes from install scripts</text>
+  <rect x="1390" y="405" width="320" height="210" rx="5" class="green"/>
+  <text x="1550" y="445" text-anchor="middle" class="label">High-Rate KV Tables</text>
+  <text x="1550" y="476" text-anchor="middle" class="small">attribute_kv · ts_kv · ts_kv_latest</text>
+  <text x="1550" y="504" text-anchor="middle" class="small">typed nullable value columns</text>
+  <text x="1550" y="532" text-anchor="middle" class="small">composite primary keys</text>
+  <text x="1550" y="560" text-anchor="middle" class="small">UPDATE creates MVCC tuple versions</text>
+  <text x="1550" y="588" text-anchor="middle" class="small">autovacuum reclaims dead tuples</text>
+  <rect x="1390" y="675" width="320" height="180" rx="5" class="amber"/>
+  <text x="1550" y="715" text-anchor="middle" class="label">Range Partitions and Functions</text>
+  <text x="1550" y="746" text-anchor="middle" class="small">ts_kv child ranges + DEFAULT</text>
+  <text x="1550" y="774" text-anchor="middle" class="small">Alarm state uses SELECT FOR UPDATE</text>
+  <text x="1550" y="802" text-anchor="middle" class="small">TTL drops partitions and deletes rows</text>
+  <text x="1550" y="830" text-anchor="middle" class="small">row DELETE still needs vacuum</text>
+  <rect x="1390" y="915" width="320" height="80" rx="5" class="red"/>
+  <text x="1550" y="949" text-anchor="middle" class="label">WAL · checkpoint · disk IO</text>
+  <text x="1550" y="978" text-anchor="middle" class="small">shared bottleneck for all write paths</text>
+
+  <path d="M395 235 H505" class="line"/>
+  <text x="450" y="219" text-anchor="middle" class="edge">entity</text>
+  <path d="M395 445 H505" class="line"/>
+  <text x="450" y="429" text-anchor="middle" class="edge">KV Future</text>
+  <path d="M395 665 H505" class="line"/>
+  <text x="450" y="649" text-anchor="middle" class="edge">native</text>
+  <path d="M835 255 H945" class="line"/>
+  <text x="890" y="239" text-anchor="middle" class="edge">TX</text>
+  <path d="M835 510 H945" class="line"/>
+  <text x="890" y="494" text-anchor="middle" class="edge">borrow</text>
+  <path d="M835 765 H945" class="line"/>
+  <text x="890" y="749" text-anchor="middle" class="edge">DDL</text>
+  <path d="M1275 255 H1380" class="line"/>
+  <text x="1328" y="239" text-anchor="middle" class="edge">SQL</text>
+  <path d="M1275 510 H1380" class="line"/>
+  <text x="1328" y="494" text-anchor="middle" class="edge">batch</text>
+  <path d="M1275 765 H1380" class="line"/>
+  <text x="1328" y="749" text-anchor="middle" class="edge">DDL/function</text>
+
+  <rect x="75" y="1050" width="1635" height="140" rx="5" class="gray"/>
+  <text x="892" y="1088" text-anchor="middle" class="label">Production diagnosis order</text>
+  <text x="892" y="1118" text-anchor="middle" class="small">1 Queue/Actor stage  ·  2 SQL queue depth  ·  3 Hikari active and pending  ·  4 pg_stat_activity and locks</text>
+  <text x="892" y="1148" text-anchor="middle" class="small">5 WAL/checkpoint and disk latency  ·  6 dead tuples/autovacuum  ·  7 partition and TTL maintenance</text>
+  <text x="892" y="1176" text-anchor="middle" class="small">Database COMMIT, Kafka offset, cache propagation and WebSocket delivery are independent boundaries.</text>
+</svg>

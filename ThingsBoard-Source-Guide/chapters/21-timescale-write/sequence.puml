@@ -1,0 +1,171 @@
+@startuml
+title ThingsBoard 3.6 TimescaleDB telemetry: install, history/latest batches, chunk routing and TTL
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 210
+
+participant "Installer" as Installer
+participant "Schema Service" as Schema
+database "PostgreSQL" as PG
+participant "Timescale Extension" as Timescale
+participant "Rule Engine Queue" as Queue
+participant "Save Timeseries Node" as Node
+participant "Telemetry Service" as Telemetry
+participant "BaseTimeseriesService" as Base
+participant "Dictionary DAO" as Dictionary
+participant "Timescale History DAO" as History
+participant "History SQL Queue" as HistoryQueue
+participant "History JDBC Repository" as HistoryRepo
+participant "SQL Latest DAO" as Latest
+participant "Latest SQL Queue" as LatestQueue
+participant "Latest JDBC Repository" as LatestRepo
+participant "Subscription Notify" as Notify
+participant "TTL Scheduler" as TTL
+
+== Install profile ==
+Installer -> Schema : createDatabaseSchema()
+Schema -> PG : CREATE EXTENSION timescaledb
+Schema -> PG : CREATE ts_kv, dictionary, latest and cleanup procedure
+Schema -> Timescale : create_hypertable(ts_kv, ts, chunk interval)
+Timescale -> PG : register bigint time dimension and chunk metadata
+PG --> Schema : success
+note over Schema,Timescale
+  Only ts_kv becomes a hypertable.
+  Dictionary and latest remain ordinary PostgreSQL tables.
+end note
+
+== Telemetry entry ==
+Queue -> Node : POST_TELEMETRY_REQUEST TbMsg
+Node -> Node : parse entries, ttl and saveLatest
+Node -> Telemetry : saveAndNotify(tenant, entity, entries, ttl, callback)
+Telemetry -> Base : save(...) or saveWithoutLatest(...)
+
+loop each TsKvEntry
+  Base -> History : savePartition(entity, ts, key)
+  History --> Base : immediateFuture(0)
+  Base -> History : save(tenant, entity, entry, ttl)
+
+  == Key dictionary ==
+  History -> Dictionary : getOrSaveKeyId(string key)
+  alt local ConcurrentMap hit
+    Dictionary --> History : key_id
+  else cache miss
+    Dictionary -> PG : SELECT ts_kv_dictionary
+    alt missing
+      Dictionary -> Dictionary : acquire JVM creation lock
+      Dictionary -> PG : INSERT key, generated key_id
+      alt another service won unique race
+        PG --> Dictionary : constraint violation
+        Dictionary -> PG : SELECT existing key_id
+      end
+    end
+    Dictionary --> History : key_id and cache
+  end
+
+  == History enqueue ==
+  History -> History : build TimescaleTsKvEntity
+  History -> HistoryQueue : add(entity), hash by entity UUID
+  opt saveLatest
+    Base -> Latest : saveLatest(entity, entry)
+    Latest -> LatestQueue : add(TsKvLatestEntity)
+  end
+end
+
+== Independent history batch transaction ==
+HistoryQueue -> HistoryQueue : poll first, drain to batch size
+HistoryQueue -> HistoryQueue : optionally sort entity_id, key, ts
+HistoryQueue -> HistoryRepo : saveOrUpdate(batch)
+HistoryRepo -> PG : JDBC batch INSERT ON CONFLICT
+PG -> Timescale : route each logical ts_kv row by bigint ts
+Timescale -> PG : write target internal chunk and indexes
+alt history transaction commits
+  PG --> HistoryRepo : update counts
+  HistoryRepo --> HistoryQueue : return
+  HistoryQueue --> Base : all batch Futures success
+else SQL, lock, connection or chunk failure
+  PG --> HistoryRepo : exception and rollback batch
+  HistoryRepo --> HistoryQueue : throw
+  HistoryQueue --> Base : all batch Futures failed
+end
+
+== Independent latest batch transaction ==
+LatestQueue -> LatestQueue : poll and drain
+LatestQueue -> LatestQueue : merge entity_id + key, retain max payload ts
+LatestQueue -> LatestRepo : saveOrUpdate(trueLatest)
+LatestRepo -> PG : UPDATE WHERE existing.ts <= incoming.ts
+LatestRepo -> PG : INSERT ON CONFLICT for rows not updated
+alt latest transaction commits
+  PG --> LatestRepo : success
+  LatestRepo --> LatestQueue : return
+  LatestQueue --> Base : latest Futures success
+else latest transaction fails
+  PG --> LatestRepo : rollback and exception
+  LatestQueue --> Base : latest Futures failed
+end
+
+== Combined application result ==
+Base -> Base : Futures.allAsList(history and latest)
+alt every registered Future succeeds
+  Base --> Telemetry : success
+  Telemetry -> Notify : publish telemetry update
+  Telemetry --> Node : callback success
+  Node --> Queue : Success relation
+else any Future fails
+  Base --> Telemetry : failed combination
+  Telemetry --> Node : callback failure
+  Node --> Queue : Failure relation
+end
+note over HistoryQueue,LatestQueue
+  History and latest use different queues, connections and transactions.
+  allAsList is not a database transaction and does not roll back partial commits.
+end note
+
+== Native query path ==
+Node -> History : findAllAsync(entity, key, range, aggregation)
+alt raw values
+  History -> PG : SELECT ts range ORDER BY ts LIMIT
+else fixed millisecond aggregation
+  History -> PG : SELECT time_bucket(...) GROUP BY bucket
+else calendar aggregation
+  loop each calendar period
+    History -> PG : one time_bucket query for period
+  end
+end
+Timescale -> PG : planner excludes chunks outside ts range
+PG --> History : rows or aggregate buckets
+
+== ThingsBoard TTL path ==
+TTL -> TTL : scheduled only on system tenant partition owner
+TTL -> Base : cleanup(systemTtl)
+Base -> History : cleanup(systemTtl)
+History -> PG : CALL cleanup_timeseries_by_ttl
+PG -> PG : read tenant/customer TTL attributes
+PG -> PG : DELETE old device/asset/customer rows from ts_kv
+PG --> History : deleted row count and warnings
+note over TTL,PG
+  No add_retention_policy or drop_chunks in release-3.6 schema.
+  Row DELETE creates dead tuples and latest rows are not removed.
+end note
+
+== Backlog risk ==
+Queue -> Node : sustained telemetry faster than database
+Node -> HistoryQueue : queue.add continues
+note over HistoryQueue
+  LinkedBlockingQueue is unbounded.
+  There is no DAO enqueue backpressure; monitor queueSize and heap.
+end note
+@enduml

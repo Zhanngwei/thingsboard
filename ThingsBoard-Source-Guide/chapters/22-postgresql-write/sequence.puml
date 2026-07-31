@@ -1,0 +1,190 @@
+@startuml
+title ThingsBoard 3.6 PostgreSQL writes: JPA entities, JDBC batches, partitions and PL/pgSQL
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 220
+
+participant "REST / Actor / Scheduler" as Entry
+participant "Domain Service" as Service
+participant "Spring TX Proxy" as Tx
+participant "JpaAbstractDao" as JpaDao
+participant "JpaRepository / Hibernate" as Hibernate
+participant "Async SQL DAO" as AsyncDao
+participant "SQL Blocking Queue" as SqlQueue
+participant "JdbcTemplate Repository" as Jdbc
+participant "Partition Repository" as Partition
+participant "Alarm Repository" as AlarmRepo
+participant "HikariCP" as Pool
+database "PostgreSQL" as PG
+participant "WAL / Storage" as WAL
+participant "After-Commit Listener" as AfterCommit
+participant "Kafka Consumer" as Kafka
+
+== Path A: Device entity and credentials ==
+Entry -> Service : DeviceController.saveDevice(device)
+Service -> Tx : enter public @Transactional method
+Tx -> Pool : borrow JDBC connection
+Pool --> Tx : connection bound to thread
+Service -> Service : validate tenant, profile and device data
+Service -> JpaDao : saveAndFlush(tenant, device)
+JpaDao -> JpaDao : construct DeviceEntity
+alt new entity
+  JpaDao -> JpaDao : Uuids.timeBased()\ncreated_time from UUID
+end
+JpaDao -> Hibernate : JpaRepository.save(entity)
+Hibernate -> PG : INSERT or UPDATE device
+JpaDao -> Hibernate : flush()
+Hibernate -> PG : execute SQL and constraints now
+Service -> JpaDao : create device credentials
+JpaDao -> Hibernate : save credentials entity
+Hibernate -> PG : INSERT device_credentials
+Service -> AfterCommit : publish cache evict event inside TX
+Service --> Tx : return
+Tx -> PG : COMMIT
+PG -> WAL : WAL flush per PostgreSQL settings
+WAL --> PG : commit durability acknowledgement
+PG --> Tx : commit success
+Tx -> Pool : return connection
+Tx -> AfterCommit : TransactionalEventListener
+AfterCommit -> AfterCommit : evict device and credentials cache
+Tx --> Entry : saved Device
+note over JpaDao,Tx
+  flush is not commit. A later credentials failure still rolls back the outer transaction.
+end note
+
+== Path B: Attribute JDBC batch ==
+Entry -> Service : save attributes list
+loop each AttributeKvEntry
+  Service -> AsyncDao : save(tenant, entity, scope, entry)
+  AsyncDao -> SqlQueue : add(AttributeKvEntity)
+end
+note over SqlQueue
+  Entity UUID hash selects one local writer.
+  The LinkedBlockingQueue has no configured capacity.
+end note
+SqlQueue -> SqlQueue : poll first and drain to batch size
+SqlQueue -> SqlQueue : optionally sort full composite key
+SqlQueue -> Jdbc : saveOrUpdate(batch)
+Jdbc -> Tx : TransactionTemplate opens batch transaction
+Tx -> Pool : borrow connection
+Jdbc -> PG : batch UPDATE existing attributes
+PG --> Jdbc : JDBC update counts
+Jdbc -> Jdbc : collect rows with update count zero
+Jdbc -> PG : batch INSERT ON CONFLICT
+alt batch transaction commits
+  Jdbc --> SqlQueue : return
+  SqlQueue --> AsyncDao : all batch Futures success
+  AsyncDao --> Service : allAsList success
+else any SQL error
+  PG --> Tx : exception
+  Tx -> PG : ROLLBACK whole batch
+  Jdbc --> SqlQueue : throw
+  SqlQueue --> AsyncDao : all batch Futures failed
+end
+note over Jdbc,PG
+  attribute last_update_ts is stored but is not used as an update predicate.
+  An older write submitted later can overwrite a newer value.
+end note
+
+== Path C: SQL telemetry partition and batch ==
+Entry -> AsyncDao : save TsKvEntry with database.ts.type=sql
+AsyncDao -> AsyncDao : compute UTC period start/end
+alt partition cache miss
+  AsyncDao -> Partition : save(SqlPartition)
+  Partition -> Tx : NOT_SUPPORTED suspends parent transaction
+  Partition -> Pool : borrow independent connection
+  Partition -> PG : CREATE TABLE ... PARTITION OF ts_kv
+  alt created
+    PG --> Partition : success
+  else already exists, overlap or default contains rows
+    PG --> Partition : DDL error
+    Partition --> AsyncDao : catch known race / warn
+  end
+end
+AsyncDao -> SqlQueue : add(TsKvEntity)
+SqlQueue -> Jdbc : saveOrUpdate(history batch)
+Jdbc -> Tx : begin repository transaction
+Jdbc -> PG : INSERT parent ts_kv ON CONFLICT
+PG -> PG : route row to range child\nor ts_kv_indefinite DEFAULT
+alt commit
+  PG --> Jdbc : success
+  Jdbc --> SqlQueue : return
+  SqlQueue --> AsyncDao : history Future success
+else failure
+  PG --> Jdbc : exception and rollback
+  SqlQueue --> AsyncDao : Future failure
+end
+
+== Path D: Alarm PL/pgSQL state transition ==
+Entry -> Service : create / ack / clear Alarm
+Service -> AlarmRepo : native repository method
+AlarmRepo -> Tx : join or open transaction
+Tx -> Pool : borrow connection
+AlarmRepo -> PG : SELECT create_or_update_active_alarm(...)
+PG -> PG : find active alarm
+alt existing row
+  PG -> PG : SELECT ... FOR UPDATE
+  PG -> PG : validate state and UPDATE tuple
+else no existing row
+  PG -> PG : INSERT new alarm
+end
+PG --> AlarmRepo : JSON result
+AlarmRepo --> Service : AlarmApiCallResult
+Service --> Tx : return
+Tx -> PG : COMMIT
+note over AlarmRepo,PG
+  FOR UPDATE serializes an existing row.
+  First concurrent creation has no row to lock and the active index is not unique.
+end note
+
+== Kafka and database are separate commits ==
+Kafka -> Entry : submit polled Rule Engine message
+Entry -> Service : execute rule nodes
+Service -> PG : one or more independent DB transactions
+PG --> Service : committed
+Service --> Kafka : callback success
+Kafka -> Kafka : commitSync offset according processing strategy
+note over Kafka,PG
+  There is no XA or outbox transaction.
+  A crash after DB commit and before offset commit causes replay.
+end note
+
+== Connection pressure ==
+Entry -> Pool : synchronous JPA request
+AsyncDao -> Pool : JpaExecutor task
+SqlQueue -> Pool : attribute/history/latest/event workers
+alt idle connection available
+  Pool --> Entry : connection
+else all 16 default connections busy
+  Pool -> Pool : borrower waits until timeout or return
+end
+note over Pool,PG
+  maximumPoolSize is per service instance.
+  Cluster capacity is the sum of all service pools and other clients.
+end note
+
+== SQL telemetry TTL ==
+Entry -> Partition : scheduled cleanup on owner
+Partition -> PG : CALL drop_partitions_by_system_ttl
+PG -> PG : DROP fully expired range children
+Partition -> PG : CALL cleanup_timeseries_by_ttl
+PG -> PG : DELETE rows for tenant/customer TTL
+note over Partition,PG
+  Row UPDATE/DELETE creates dead tuples.
+  VACUUM progress, long snapshots and WAL/checkpoint pressure affect write latency.
+end note
+@enduml

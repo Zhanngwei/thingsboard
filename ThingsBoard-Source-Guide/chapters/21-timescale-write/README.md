@@ -1,0 +1,691 @@
+# 21 TimescaleDB 写入流程
+
+> 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章分析 `database.ts.type=timescale` 的 telemetry history，以及 `database.ts_latest.type=timescale` 时复用的 SQL latest 实现；结论以当前建表脚本和 Java 调用链为准。
+
+[上一篇：20 Cassandra 写入流程](../20-cassandra-write/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/21-timescale-write.svg) | [下一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md)
+
+---
+
+## 一、流程目标
+
+TimescaleDB 在 ThingsBoard 3.6 中不是独立数据库协议层，而是安装在 PostgreSQL 上的 extension。ThingsBoard 仍通过 Spring、JPA 和 JDBC 访问 PostgreSQL，只把 history 表 `ts_kv` 转换为按 `ts` 自动分块的 hypertable。
+
+一次保存 telemetry 最多涉及三类 PostgreSQL对象：
+
+1. `ts_kv_dictionary`：把字符串 key 映射为整数 `key_id`，减少每个历史点的索引和行宽。
+2. `ts_kv`：Timescale hypertable，保存所有历史点。
+3. `ts_kv_latest`：普通 PostgreSQL 表，保存每个 entity/key 的最新镜像。
+
+`BaseTimeseriesService` 仍为每个点登记 partition、history 和可选 latest Future；但 Timescale 的 `savePartition(...)` 是立即完成的空操作，因为 chunk 由 extension 在 INSERT 时路由。
+
+```mermaid
+flowchart LR
+    ENTRY[TsKvEntry] --> BASE[BaseTimeseriesService]
+    BASE --> PART[savePartition]
+    PART --> NOOP[immediateFuture 0]
+    BASE --> HIST[TimescaleTimeseriesDao.save]
+    BASE --> LATEST[SqlTimeseriesLatestDao.saveLatest]
+    HIST --> DICT[(ts_kv_dictionary)]
+    HIST --> HQ[History SQL Queue]
+    LATEST --> LQ[Latest SQL Queue]
+    HQ --> HT[(ts_kv hypertable)]
+    LQ --> LT[(ts_kv_latest ordinary table)]
+```
+
+这里的“使用 TimescaleDB”不等于 ThingsBoard 已启用 Timescale 的全部能力。release-3.6 安装脚本没有创建 Continuous Aggregate、compression policy 或 `add_retention_policy`；聚合查询直接扫描原始 chunk，TTL 也由 ThingsBoard 存储过程逐行 `DELETE`。
+
+### 1.1 Java/MySQL 开发者应先建立的模型
+
+| 熟悉的 MySQL 思维 | ThingsBoard Timescale 实现 |
+|---|---|
+| 应用选择分表名 | 应用始终 INSERT `ts_kv`，extension 路由到内部 chunk |
+| InnoDB partition 由 DDL 管理 | `create_hypertable` 创建时间维度，chunk按需生成 |
+| history/latest 可放一个事务 | 两条异步批处理队列，独立数据库事务 |
+| 字符串 key直接进联合索引 | `ts_kv_dictionary` 全局映射为int |
+| TTL按行记录到期时间 | 请求TTL只用于用量计算，后台按租户策略DELETE |
+| 预聚合表由业务创建 | 3.6 没有 Continuous Aggregate DDL |
+
+---
+
+## 二、入口
+
+Timescale history 没有专用 REST 或 MQTT 入口。它位于通用 telemetry 保存服务之后，入口是否最终使用 Timescale 由 `database.ts.type` 条件装配决定。
+
+| 入口 | 入口类/方法 | 到达写入层的消息 | 什么时候调用 |
+|---|---|---|---|
+| MQTT telemetry | `org.thingsboard.server.transport.mqtt.MqttTransportHandler.channelRead(...)` | `PostTelemetryMsg` / `TbMsg` | 设备发布 `v1/devices/me/telemetry` |
+| HTTP telemetry | `org.thingsboard.server.transport.http.DeviceApiController.postTelemetry(...)` | telemetry JSON | 设备调用 HTTP API |
+| CoAP/LwM2M | 对应 Transport Handler/Adaptor | 统一 telemetry KV | 协议适配完成后 |
+| Rule Engine | `org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode.onMsg(...)` | `POST_TELEMETRY_REQUEST` | Save Timeseries Node收到消息 |
+| REST server-side | `org.thingsboard.server.controller.TelemetryController.saveEntityTelemetryWithTTL(...)` | `List<TsKvEntry>` | 用户向实体写遥测 |
+| Scheduler/内部服务 | `TimeseriesService.save(...)` | `TsKvEntry` | 平台指标、状态或业务组件写入 |
+
+```mermaid
+flowchart TB
+    MQTT[MQTT] --> TRANSPORT[TransportService]
+    HTTP[HTTP Device API] --> TRANSPORT
+    COAP[CoAP / LwM2M] --> TRANSPORT
+    TRANSPORT --> REQ[Rule Engine Queue]
+    REST[TelemetryController] --> TSVC[TimeseriesService]
+    REQ --> NODE[TbMsgTimeseriesNode]
+    NODE --> NOTIFY[TelemetrySubscriptionService]
+    NOTIFY --> TSVC
+    TSVC --> SELECT{database.ts.type}
+    SELECT -->|timescale| TDAO[TimescaleTimeseriesDao]
+    SELECT -->|sql| SQLDAO[JpaSqlTimeseriesDao]
+    SELECT -->|cassandra| CDAO[CassandraBaseTimeseriesDao]
+```
+
+条件注解 [TimescaleDBTsDao](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/util/TimescaleDBTsDao.java#L24) 只在 `database.ts.type=timescale` 时装配 history DAO。latest 后端可以独立选择；`database.ts_latest.type=timescale` 实际装配 [TimescaleTsLatestDaoConfig](../../../dao/src/main/java/org/thingsboard/server/dao/TimescaleTsLatestDaoConfig.java#L33)，底层仍使用普通 `ts_kv_latest` 和 SQL JDBC repository。
+
+---
+
+## 三、完整调用链
+
+### 3.1 安装与 hypertable 创建
+
+| 步骤 | 类/方法 | 输入 | 输出/副作用 | 设计原因 |
+|---|---|---|---|---|
+| 1 | `TimescaleTsDatabaseSchemaService.createDatabaseSchema()` | install profile、chunk interval | 执行schema脚本 | 先建立extension和普通表 |
+| 2 | `SqlAbstractDatabaseSchemaService.createDatabaseSchema()` | `schema-timescale.sql` | `CREATE EXTENSION`、三张表和TTL过程 | 保持SQL安装框架统一 |
+| 3 | `executeQuery(create_hypertable...)` | `ts_kv`、`ts`、interval | 把`ts_kv`转换为hypertable | chunk生命周期交给Timescale |
+
+源码：[TimescaleTsDatabaseSchemaService.java:60](../../../application/src/main/java/org/thingsboard/server/service/install/TimescaleTsDatabaseSchemaService.java#L60)、[schema-timescale.sql:17](../../../dao/src/main/resources/sql/schema-timescale.sql#L17)。
+
+`chunk_time_interval` 默认 `604800000` ms，即7天。`ts` 是 `bigint`，因此 interval 也按毫秒整数传入。主键 `(entity_id,key,ts)` 包含时间维度，满足 Timescale 对 hypertable UNIQUE/PRIMARY KEY 必须包含全部 partition column 的要求。
+
+```mermaid
+sequenceDiagram
+    participant Install as Install Service
+    participant Schema as TimescaleTsDatabaseSchemaService
+    participant PG as PostgreSQL
+    participant Ext as Timescale Extension
+    Install->>Schema: createDatabaseSchema()
+    Schema->>PG: CREATE EXTENSION timescaledb
+    Schema->>PG: CREATE TABLE ts_kv/dictionary/latest
+    Schema->>Ext: create_hypertable(ts_kv, ts, interval)
+    Ext->>PG: 创建hypertable元数据
+    PG-->>Schema: success
+```
+
+### 3.2 单点 history 写入
+
+1. [BaseTimeseriesService.doSave(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L317) 遍历所有 `TsKvEntry`。
+2. [doSaveAndRegisterFuturesFor(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L386) 登记 `savePartition` 和 `save` Future。
+3. [TimescaleTimeseriesDao.savePartition(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L189) 返回 `immediateFuture(0)`。
+4. [TimescaleTimeseriesDao.save(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L162) 解析 key id，构造 `TimescaleTsKvEntity`，加入SQL队列。
+5. [TbSqlBlockingQueueWrapper.add(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueueWrapper.java#L89) 按 entity UUID hash选择一个writer queue。
+6. [TbSqlBlockingQueue.init(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L82) poll首项并drain最多一个batch，可选按完整主键排序。
+7. [TimescaleInsertTsRepository.saveOrUpdate(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/timescale/TimescaleInsertTsRepository.java#L55) 在Spring事务内执行 `JdbcTemplate.batchUpdate`。
+8. PostgreSQL解析逻辑表 INSERT，Timescale根据 `ts` 把每行路由到目标chunk。
+9. repository返回后，队列把本批所有 `SettableFuture` 标为成功。
+
+```mermaid
+flowchart LR
+    A[TimescaleTimeseriesDao.save] --> B[getOrSaveKeyId]
+    B --> C[TimescaleTsKvEntity]
+    C --> D[hash entityId]
+    D --> Q0[queue 0]
+    D --> Q1[queue 1]
+    D --> Q2[queue 2]
+    Q0 --> BATCH[JDBC batch]
+    Q1 --> BATCH
+    Q2 --> BATCH
+    BATCH --> SQL[INSERT ON CONFLICT]
+    SQL --> ROUTE[Timescale chunk router]
+    ROUTE --> CHUNK[(target chunk)]
+```
+
+### 3.3 dictionary 路径
+
+[BaseAbstractSqlTimeseriesDao.getOrSaveKeyId(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/BaseAbstractSqlTimeseriesDao.java#L69) 先查每个JVM内的 `ConcurrentMap`，miss后查 `ts_kv_dictionary`。仍不存在时用一个JVM全局 `ReentrantLock` 串行创建；多节点间没有共享锁，因此依赖数据库 `key` 主键捕获唯一冲突后重查。
+
+dictionary不是 hypertable。它的 `serial key_id` 会被 history/latest共同引用，但schema没有外键，减少高频写的FK检查成本。
+
+### 3.4 history UPSERT
+
+核心SQL：
+
+```sql
+INSERT INTO ts_kv
+  (entity_id, key, ts, bool_v, str_v, long_v, dbl_v, json_v)
+VALUES (?, ?, ?, ?, ?, ?, ?, cast(? AS json))
+ON CONFLICT (entity_id, key, ts)
+DO UPDATE SET
+  bool_v = ?, str_v = ?, long_v = ?, dbl_v = ?, json_v = cast(? AS json);
+```
+
+同一entity/key/ts重试不会新增第二个逻辑点，而是更新原行。它只提供主键级幂等，不使“history + latest + Rule Engine其他副作用”成为 exactly-once。
+
+### 3.5 latest 写入
+
+[SqlTimeseriesLatestDao.init()](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/SqlTimeseriesLatestDao.java#L159) 创建另一组SQL队列。一个batch内先按 `entity_id + key` 去重并保留payload ts最大项，然后 [SqlLatestInsertTsRepository.saveOrUpdate(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/latest/sql/SqlLatestInsertTsRepository.java#L81) 在独立事务内先UPDATE已存在行，再对未更新行执行UPSERT。
+
+默认 `sql.ts_latest.update_by_latest_ts=true`，UPDATE和ON CONFLICT都带 `existing.ts <= incoming.ts` 条件，因此旧点后到不会回退SQL latest。这个保护与第20章 Cassandra latest不同。
+
+```mermaid
+flowchart TB
+    POINTS[latest queue batch] --> MERGE[按 entityId + key 合并]
+    MERGE --> MAX[保留最大 payload ts]
+    MAX --> UPDATE[UPDATE WHERE existing.ts <= incoming.ts]
+    UPDATE --> FOUND{更新成功?}
+    FOUND -->|是| DONE[完成]
+    FOUND -->|否| UPSERT[INSERT ON CONFLICT ... WHERE existing.ts <= incoming.ts]
+    UPSERT --> DONE
+```
+
+### 3.6 Future与事务边界
+
+`BaseTimeseriesService` 使用 `Futures.allAsList` 等待history/latest Future都完成。history batch和latest batch由不同线程、不同repository事务执行；任一失败只使组合Future失败，不回滚另一条队列已经提交的事务。
+
+---
+
+## 四、消息流
+
+下面的消息流从Rule Engine Save Timeseries Node开始，突出“消息确认”和“数据库事务”不是同一件事。
+
+```mermaid
+flowchart TB
+    KAFKA[Rule Engine Queue record] --> NODE[TbMsgTimeseriesNode]
+    NODE --> PARSE[解析TsKvEntry和TTL]
+    PARSE --> SUB[TelemetrySubscriptionService.saveAndNotify]
+    SUB --> BASE[BaseTimeseriesService]
+    BASE --> HQUEUE[Timescale history queue]
+    BASE --> LQUEUE[SQL latest queue]
+    HQUEUE --> HTX[history JDBC transaction]
+    LQUEUE --> LTX[latest JDBC transaction]
+    HTX --> CHUNKS[(ts_kv chunks)]
+    LTX --> LATEST[(ts_kv_latest)]
+    HTX --> JOIN{all futures}
+    LTX --> JOIN
+    JOIN -->|全部成功| WS[WebSocket/entity view notify]
+    JOIN -->|失败| FAILURE[Rule Node Failure]
+    WS --> SUCCESS[Rule Node Success]
+```
+
+需要区分四个时刻：
+
+1. MQTT PUBACK：Transport成功把消息交给Queue producer。
+2. Kafka consumer callback：Rule Engine处理完成或策略超时/跳过。
+3. SQL queue Future：对应batch事务已返回。
+4. PostgreSQL WAL持久性：受 `synchronous_commit`、WAL和复制配置控制，不由ThingsBoard Future单独定义。
+
+### 4.1 chunk 路由
+
+```mermaid
+flowchart LR
+    I1[ts=Jan 03] --> HT[INSERT ts_kv]
+    I2[ts=Jan 08] --> HT
+    I3[ts=Jan 15] --> HT
+    HT --> ROUTER{hypertable time router}
+    ROUTER --> C1[(chunk Jan01-Jan08)]
+    ROUTER --> C2[(chunk Jan08-Jan15)]
+    ROUTER --> C3[(chunk Jan15-Jan22)]
+    Q[WHERE ts between Jan08 and Jan15] --> PRUNE{chunk pruning}
+    PRUNE --> C2
+```
+
+hypertable只有 `ts` 一个dimension，没有按tenant/entity的space partition。所有设备当前时间窗口的数据会进入同一个活动时间chunk；entity/key/ts索引负责chunk内定位。这简化查询与运维，但超大写入量下必须关注当前chunk索引、WAL和单PostgreSQL实例写入上限。
+
+---
+
+## 五、时序图
+
+完整PlantUML时序图：
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="TimescaleDB telemetry完整写入时序图"></a>
+
+图中包括安装、dictionary竞争、history/latest独立batch、chunk路由、通知和TTL清理。可直接查看 [PlantUML源文件](sequence.puml)。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Queued: tsQueue.add
+    Queued --> Batched: poll + drainTo
+    Batched --> Sorted: batch_sort=true
+    Batched --> JdbcTx: batch_sort=false
+    Sorted --> JdbcTx
+    JdbcTx --> Routed: INSERT logical hypertable
+    Routed --> Committed: transaction commit
+    JdbcTx --> Failed: SQLException/runtime exception
+    Committed --> FutureSuccess
+    Failed --> FutureFailure
+    FutureSuccess --> [*]
+    FutureFailure --> [*]
+```
+
+注意 `TbSqlBlockingQueue` 使用无容量参数的 `LinkedBlockingQueue`。`add` 不提供背压，数据库持续慢于入口时queue可无限增长；日志中的 `queueSize` 是关键容量信号。
+
+---
+
+## 六、数据变化
+
+| 对象/系统 | 写入变化 | 事务/一致性 |
+|---|---|---|
+| `ts_kv_dictionary` | 新key首次出现时插入一行 | 独立JPA调用；DB UNIQUE解决跨节点竞争 |
+| `ts_kv` hypertable | 每个entity/key/ts插入或UPSERT | 每个history batch一个Spring事务 |
+| Timescale chunk | extension创建或选择目标chunk | 与对应INSERT事务一致 |
+| `ts_kv_latest` | 每entity/key更新一行 | 独立latest batch事务 |
+| JVM dictionary map | 缓存key到key_id | 每进程本地，无跨节点失效需求，因为映射不可变 |
+| SQL history queue | 暂存待写实体和Future | 无界内存队列 |
+| SQL latest queue | 暂存并batch内去重 | 与history独立 |
+| WebSocket订阅 | DB组合Future成功后发布 | 不在数据库事务内 |
+| Kafka offset | 由Queue策略在Rule Node callback后处理 | 与PostgreSQL无共同事务 |
+
+```mermaid
+flowchart TB
+    subgraph JVM
+      MAP[Dictionary ConcurrentMap]
+      HQ[History Queue]
+      LQ[Latest Queue]
+    end
+    subgraph PostgreSQL
+      DICT[(ts_kv_dictionary)]
+      META[(Timescale metadata)]
+      COLD[(old chunks)]
+      HOT[(active chunk)]
+      LAT[(ts_kv_latest)]
+    end
+    MAP <--> DICT
+    HQ --> HOT
+    HQ -. old event .-> COLD
+    META --> HOT
+    META --> COLD
+    LQ --> LAT
+```
+
+### 6.1 TTL真正改变什么
+
+单次save的 `ttl` 经 `computeTtl` 计算后只用于返回 `dataPointDays` 用量值；`TimescaleInsertTsRepository` 的列和SQL都没有TTL。实际清理由 [TimeseriesCleanUpService.cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/TimeseriesCleanUpService.java#L74) 定时触发 `cleanup_timeseries_by_ttl`。
+
+procedure读取system TTL，并允许tenant/customer实体的SERVER_SCOPE `TTL` attribute覆盖，然后按device、asset、customer反查entity_id并删除 `ts < cutoff` 的history。它不删除 `ts_kv_latest`。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类型与职责
+
+| 类型 | 包路径 | 职责 |
+|---|---|---|
+| `TimescaleTsDatabaseSchemaService` | `org.thingsboard.server.service.install` | 安装schema并调用`create_hypertable` |
+| `TimescaleDaoConfig` | `org.thingsboard.server.dao` | 条件装配Timescale history repository/entity |
+| `TimescaleTimeseriesDao` | `org.thingsboard.server.dao.sqlts.timescale` | history实体转换、排队、查询、聚合、删除 |
+| `BaseAbstractSqlTimeseriesDao` | `org.thingsboard.server.dao.sqlts` | dictionary key映射 |
+| `TbSqlBlockingQueueWrapper` | `org.thingsboard.server.dao.sql` | entity hash到多条writer queue |
+| `TbSqlBlockingQueue` | `org.thingsboard.server.dao.sql` | poll/drain/sort/save并完成Future |
+| `TimescaleInsertTsRepository` | `org.thingsboard.server.dao.sqlts.insert.timescale` | JDBC batch UPSERT history |
+| `SqlTimeseriesLatestDao` | `org.thingsboard.server.dao.sqlts` | SQL latest队列和batch内去重 |
+| `SqlLatestInsertTsRepository` | `org.thingsboard.server.dao.sqlts.insert.latest.sql` | 时间戳保护的latest UPDATE/UPSERT |
+| `TsKvTimescaleRepository` | `org.thingsboard.server.dao.sqlts.timescale` | raw history范围查询和删除 |
+| `AggregationRepository` | `org.thingsboard.server.dao.sqlts.timescale` | 原生`time_bucket`聚合 |
+| `TimeseriesCleanUpService` | `org.thingsboard.server.service.ttl` | 单owner定时触发SQL TTL清理 |
+
+### 7.2 SQL队列的线程与排序
+
+[TimescaleTimeseriesDao.init()](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L107) 用entity UUID hash把同一实体稳定分配到同一条本地队列。默认 `sql.timescale.batch_threads=3`、history batch `10000`、最大延迟 `100ms`。
+
+每条queue只有一个worker线程，queue之间可并行。`sql.batch_sort=true` 时按 `entity_id,key,ts` 排序，这与完整主键一致，主要用于多节点并发UPSERT时降低锁顺序不一致导致的死锁概率。它不保证不同服务节点之间的总顺序。
+
+```mermaid
+flowchart LR
+    E1[entity A points] --> H[hash]
+    E2[entity B points] --> H
+    E3[entity C points] --> H
+    H --> W0[writer 0 single thread]
+    H --> W1[writer 1 single thread]
+    H --> W2[writer 2 single thread]
+    W0 --> S0[sort PK]
+    W1 --> S1[sort PK]
+    W2 --> S2[sort PK]
+    S0 --> DB[(PostgreSQL)]
+    S1 --> DB
+    S2 --> DB
+```
+
+### 7.3 Query与chunk pruning
+
+raw查询 [TsKvTimescaleRepository.findAllWithLimit(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TsKvTimescaleRepository.java#L53) 包含 `entity_id`、`key` 和半开区间 `ts >= start AND ts < end`。显式time range允许Timescale排除无关chunk。
+
+固定毫秒interval聚合使用 [AggregationRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/AggregationRepository.java#L55) 的 `time_bucket(timeBucket, ts, startTs)`。日历interval仍在 [TimescaleTimeseriesDao.findAllAsync(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L225) 中由Java逐period循环发查询，源码还有“按Timescale原生能力改进”的TODO。
+
+### 7.4 没有被创建的Timescale对象
+
+对 `schema-timescale.sql` 的源码检查结果：
+
+- 没有 `CREATE MATERIALIZED VIEW ... WITH (timescaledb.continuous)`。
+- 没有 `add_continuous_aggregate_policy`。
+- 没有 `ALTER TABLE ... SET (timescaledb.compress)`。
+- 没有 `add_compression_policy`。
+- 没有 `add_retention_policy` 或 `drop_chunks`。
+
+因此不能把Timescale官网功能默认套到ThingsBoard 3.6部署上；要使用这些能力必须自行设计、验证升级脚本和查询兼容性。
+
+---
+
+## 八、Actor 分析
+
+Timescale DAO不是Actor。SQL queue worker也不是ThingsBoard Actor mailbox，而是每条queue自己的 `newSingleThreadExecutor`。
+
+```mermaid
+flowchart LR
+    RE[RuleNodeActor mailbox] --> NODE[TbMsgTimeseriesNode.onMsg]
+    NODE --> FUTURE[async save Future]
+    FUTURE --> HQ[SQL queue worker]
+    HQ --> PG[(PostgreSQL/Timescale)]
+    PG --> CALLBACK[Future listener]
+    CALLBACK --> NODECB[Rule Node callback]
+    NODECB --> RE
+```
+
+Actor提供Rule Node对象级串行和消息路由；SQL queue负责跨消息合批。Node发起save后不应在Actor线程同步等待JDBC。数据库Future完成后回调恢复规则链。
+
+Actor串行不等于数据库串行：
+
+- 同一entity通常hash到同一本地writer queue。
+- 不同Core/Rule Engine服务有各自DAO队列。
+- REST直接写入不必经过RuleNodeActor。
+- history和latest本来就是不同queue。
+
+因此最终并发正确性依赖PostgreSQL主键、`ON CONFLICT`、latest timestamp条件和事务，而不是Actor。
+
+---
+
+## 九、Kafka 分析
+
+Kafka不参与Timescale内部chunk路由，也不包围JDBC事务。它只承载上游Rule Engine消息与跨服务传播。
+
+```mermaid
+sequenceDiagram
+    participant D as Device
+    participant T as MQTT Transport
+    participant K as Kafka/Broker
+    participant R as Rule Engine Consumer
+    participant N as Save Timeseries Node
+    participant P as PostgreSQL Timescale
+    D->>T: telemetry PUBLISH
+    T->>K: send Queue record
+    K-->>T: producer ack
+    T-->>D: MQTT PUBACK
+    R->>K: poll pack
+    R->>N: process TbMsg
+    N->>P: async history/latest batches
+    P-->>N: Futures complete
+    N-->>R: success/failure callback
+    R->>K: commitSync according strategy
+```
+
+### 9.1 交付语义
+
+- producer ack不表示Timescale写入。
+- Queue retry会重新执行整个Rule Chain，不只重试失败SQL batch。
+- history同主键UPSERT较接近幂等；其他Rule Node外部副作用未必幂等。
+- Main Queue默认可在failure/timeout后跳过并commit，具体见第17章。
+- SQL事务与Kafka offset没有XA、outbox或Kafka transaction联动。
+
+数据库提交成功但consumer提交offset前宕机，会重放并再次UPSERT；history通常收敛到同一主键，latest按payload ts保护，但通知和其他节点可能重复。
+
+---
+
+## 十、数据库分析
+
+### 10.1 物理结构
+
+```mermaid
+erDiagram
+    TS_KV_DICTIONARY {
+      varchar key PK
+      serial key_id UK
+    }
+    TS_KV_HYPERTABLE {
+      uuid entity_id PK
+      int key PK
+      bigint ts PK
+      boolean bool_v
+      varchar str_v
+      bigint long_v
+      double dbl_v
+      json json_v
+    }
+    TS_KV_LATEST {
+      uuid entity_id PK
+      int key PK
+      bigint ts
+      boolean bool_v
+      varchar str_v
+      bigint long_v
+      double dbl_v
+      json json_v
+    }
+    TS_KV_DICTIONARY ||--o{ TS_KV_HYPERTABLE : logical_key_id
+    TS_KV_DICTIONARY ||--o{ TS_KV_LATEST : logical_key_id
+```
+
+schema没有声明外键，上图是逻辑关系。`ts_kv` 的主键顺序以entity/key开头，适配ThingsBoard“单实体、单key、时间范围”读取。Timescale内部每个chunk拥有对应索引。
+
+### 10.2 Chunk生命周期
+
+```mermaid
+stateDiagram-v2
+    [*] --> Absent
+    Absent --> Created: first INSERT in interval
+    Created --> Active: current time window
+    Active --> Closed: time advances
+    Closed --> ReadOnlyByConvention: mostly historical reads
+    ReadOnlyByConvention --> RowDelete: ThingsBoard TTL DELETE
+    RowDelete --> Vacuum: dead tuples
+    Vacuum --> ReusableSpace
+    ReusableSpace --> [*]
+```
+
+这里没有自动压缩或整chunk删除。大量DELETE会产生PostgreSQL dead tuples，需要autovacuum回收；若TTL cutoff与chunk边界对齐，自定义 `drop_chunks` 会更高效，但当前ThingsBoard过程还要表达不同tenant/customer TTL，不能直接无条件替换。
+
+### 10.3 Continuous Aggregate状态
+
+当前没有Continuous Aggregate。Dashboard的7天平均温度仍调用原始history上的 `time_bucket` 聚合。自行增加CAGG时必须处理：
+
+1. ThingsBoard支持动态key与任意interval，固定CAGG粒度不一定覆盖全部查询。
+2. late/out-of-order telemetry需要refresh window。
+3. tenant/customer TTL必须同步影响materialized数据。
+4. 升级和schema校验不能把自定义对象误删或失配。
+
+### 10.4 生产调优关注点
+
+| 层 | 重点指标/参数 | 风险 |
+|---|---|---|
+| ThingsBoard queue | `ts.timescale.queue.*`、queueSize、saved/failed | 无界queue导致堆增长 |
+| batch | size、delay、writer threads | batch过大增加事务/WAL尖峰，线程过多增加锁竞争 |
+| HikariCP | pool size、active/pending | 每个服务实例多组SQL worker共享连接池 |
+| PostgreSQL | WAL、checkpoint、autovacuum、IO latency | 活动chunk和索引形成集中写热点 |
+| Timescale | chunk interval、chunk数、chunk索引大小 | 过短产生过多chunk，过长使活动索引过大 |
+| TTL | cleanup耗时、deleted rows、dead tuples | DELETE膨胀、长事务和vacuum滞后 |
+
+独立架构图：
+
+[点击新窗口打开原始 SVG](../../assets/architecture/21-timescale-write.svg)
+
+<a class="static-svg-thumbnail" href="../../assets/architecture/21-timescale-write.svg" target="_blank" rel="noopener noreferrer"><img src="../../assets/architecture/21-timescale-write.svg" alt="ThingsBoard TimescaleDB写入架构图"></a>
+
+---
+
+## 十一、异常处理
+
+```mermaid
+flowchart TB
+    SAVE[save point] --> QUEUE{进入无界queue}
+    QUEUE --> BATCH[形成batch]
+    BATCH --> TX{JDBC事务}
+    TX -->|成功| FS[本批history Future成功]
+    TX -->|异常| RB[事务回滚]
+    RB --> FF[本批所有Future同一异常]
+    FS --> JOIN{history + latest}
+    FF --> JOIN
+    JOIN -->|全部成功| NOTIFY[通知并Rule Node Success]
+    JOIN -->|任一失败| FAIL[Rule Node Failure]
+    FAIL --> STRATEGY{Queue processing strategy}
+    STRATEGY --> RETRY[内存重投整个消息]
+    STRATEGY --> COMMIT[跳过并commit]
+```
+
+### 11.1 失败矩阵
+
+| 失败点 | 当前行为 | 已提交状态 | 运维含义 |
+|---|---|---|---|
+| dictionary INSERT唯一冲突 | 捕获后重查 | 另一节点映射可复用 | 正常竞争，不应视为数据错误 |
+| history batch异常 | repository事务回滚，batch内Future失败 | 该history batch不提交 | 同batch最多10000点一起失败 |
+| latest batch异常 | latest事务回滚 | history可能已提交 | latest/history暂时分叉 |
+| history成功、latest失败 | 组合Future失败 | history保留 | retry通常修复latest但会重复规则链 |
+| latest成功、history失败 | 组合Future失败 | latest保留 | latest查询能看到history曲线缺点 |
+| queue持续积压 | `LinkedBlockingQueue`继续增长 | 尚未写DB | 可能最终OOM，没有入口背压 |
+| shutdownNow | worker被中断 | queue中Future可能未完成 | 优雅停机期间要先停止入口并等待排空 |
+| TTL procedure SQL异常 | catch并记录日志 | 本轮删除中已提交/回滚取决于调用事务 | 下一调度周期再尝试，无专用重试队列 |
+| chunk创建/DDL锁等待 | INSERT batch阻塞或超时 | Future延迟 | 检查Timescale catalog、锁和连接超时 |
+
+### 11.2 部分成功不是理论问题
+
+history和latest独立排队意味着它们可能进入不同大小的batch、使用不同连接并在不同时间提交。`allAsList` 是应用层等待栅栏，不是两阶段提交。通知只在组合成功后发生，所以数据库已有部分数据而订阅者没有收到对应实时通知是允许出现的状态。
+
+### 11.3 TTL与删除实体
+
+TTL procedure通过 `device`、`asset`、`customer` 表反查entity_id。实体基础行已经删除后，孤立的 `ts_kv` history可能无法再被这一清理路径选中；这也是删除流程不能简单理解为级联清库的原因。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    A[1 schema-timescale.sql] --> B[2 SchemaService]
+    B --> C[3 BaseTimeseriesService]
+    C --> D[4 TimescaleTimeseriesDao]
+    D --> E[5 Dictionary]
+    D --> F[6 SQL Queue]
+    F --> G[7 Insert Repository]
+    G --> H[8 Latest DAO]
+    H --> I[9 AggregationRepository]
+    I --> J[10 TTL Service/Procedure]
+```
+
+建议按以下顺序阅读：
+
+1. [schema-timescale.sql](../../../dao/src/main/resources/sql/schema-timescale.sql#L17)：确认三张表、主键和TTL procedure。
+2. [TimescaleTsDatabaseSchemaService](../../../application/src/main/java/org/thingsboard/server/service/install/TimescaleTsDatabaseSchemaService.java#L37)：确认唯一hypertable创建语句。
+3. [BaseTimeseriesService](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L317)：理解history/latest Future组合。
+4. [TimescaleTimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L107)：看queue初始化、save no-op partition和query分支。
+5. [BaseAbstractSqlTimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/BaseAbstractSqlTimeseriesDao.java#L55)：看dictionary缓存与竞争。
+6. [TbSqlBlockingQueueWrapper](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueueWrapper.java#L74) 和 [TbSqlBlockingQueue](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L82)：画出hash、poll、drain、sort、Future。
+7. [TimescaleInsertTsRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/timescale/TimescaleInsertTsRepository.java#L45)：核对UPSERT列与事务。
+8. [SqlTimeseriesLatestDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/SqlTimeseriesLatestDao.java#L159) 与 [SqlLatestInsertTsRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/latest/sql/SqlLatestInsertTsRepository.java#L55)：验证latest时间戳保护。
+9. [AggregationRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/AggregationRepository.java#L55)：理解`time_bucket` SQL。
+10. [TimeseriesCleanUpService](../../../application/src/main/java/org/thingsboard/server/service/ttl/TimeseriesCleanUpService.java#L74) 回到schema procedure：确认TTL不是Timescale policy。
+
+推荐断点：`TbMsgTimeseriesNode.onMsg` -> `BaseTimeseriesService.doSave` -> `TimescaleTimeseriesDao.save` -> `TbSqlBlockingQueueWrapper.add` -> `TbSqlBlockingQueue.saveFunction` -> `TimescaleInsertTsRepository.saveOrUpdate`。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard 3.6把哪些表建成Timescale hypertable？
+
+只有history `ts_kv`。`ts_kv_dictionary` 和 `ts_kv_latest` 都是普通PostgreSQL表。
+
+### 2. hypertable按什么维度分块？
+
+只按bigint毫秒时间戳 `ts` 一维分块，没有tenant或entity space partition。
+
+### 3. 默认chunk interval是多少？
+
+`604800000` ms，即7天；安装时传给`create_hypertable`。
+
+### 4. 应用是否需要计算chunk名？
+
+不需要。应用始终INSERT逻辑表`ts_kv`，Timescale extension按ts路由。
+
+### 5. savePartition在Timescale实现中做什么？
+
+直接返回`immediateFuture(0)`；它只是适配通用TimeseriesDao接口。
+
+### 6. 为什么需要ts_kv_dictionary？
+
+把重复字符串key压缩为整数key_id，降低history行宽与联合索引体积，并让history/latest共享映射。
+
+### 7. dictionary如何处理多节点并发创建同一key？
+
+JVM锁只管本进程；跨节点依赖数据库主键/唯一约束，捕获冲突后重新读取。
+
+### 8. history写入如何合批？
+
+按entity UUID hash进入多条单线程SQL queue，poll首项后drain到batch size，可选按完整主键排序，再执行JDBC batch。
+
+### 9. 默认history batch参数是什么？
+
+batch size 10000、max delay 100ms、Timescale writer threads 3。
+
+### 10. SQL queue有容量上限吗？
+
+没有；使用无界`LinkedBlockingQueue`，数据库落后时存在堆内存风险。
+
+### 11. 一个history batch是否在一个事务中？
+
+是，`TimescaleInsertTsRepository` 带Spring `@Transactional`，整个`batchUpdate`共享该repository调用事务。
+
+### 12. history重试会产生重复行吗？
+
+同一`entity_id,key,ts`使用ON CONFLICT UPDATE，不新增重复主键，但其他副作用仍可能重复。
+
+### 13. history和latest是否同一事务？
+
+不是。它们进入两组独立queue和两个repository事务，`allAsList`只等待结果。
+
+### 14. SQL latest如何避免旧点覆盖新点？
+
+默认启用`update_by_latest_ts`，UPDATE和UPSERT冲突分支都要求现有ts小于等于incoming ts。
+
+### 15. batch内出现同一entity/key多个latest点怎么办？
+
+`SqlTimeseriesLatestDao` 先合并，只保留payload ts最大的实体。
+
+### 16. 单次保存传入的TTL是否写入Timescale行？
+
+不写。它只参与dataPointDays计算；SQL行没有TTL列。
+
+### 17. ThingsBoard如何清理Timescale history？
+
+Core owner定时调用PL/pgSQL `cleanup_timeseries_by_ttl`，按system/tenant/customer TTL执行DELETE。
+
+### 18. TTL清理是否使用drop_chunks？
+
+不使用。3.6 schema没有Timescale retention policy或`drop_chunks`。
+
+### 19. TTL是否清理ts_kv_latest？
+
+不清理，latest可能在全部history删除后继续存在。
+
+### 20. 3.6是否自动创建Continuous Aggregate？
+
+没有。聚合直接对原始`ts_kv`执行`time_bucket`。
+
+### 21. 3.6是否自动启用Timescale compression？
+
+没有，schema中无compression设置和policy。
+
+### 22. 查询如何触发chunk pruning？
+
+raw和聚合SQL都带明确的ts半开区间，Timescale planner据此排除不相交chunk。
+
+### 23. 日历interval是否完全使用Timescale原生聚合？
+
+不是。固定毫秒interval使用`time_bucket`；日历interval在Java循环period并执行多次聚合查询。
+
+### 24. 为什么批次要按entity/key/ts排序？
+
+让并发batch以一致主键顺序获取冲突行锁，降低集群多writer死锁概率；它不提供全局事件顺序。
+
+### 25. 排查Timescale慢写先看什么？
+
+先区分Kafka lag、Actor等待和SQL queue积压，再看Hikari pending、batch失败、活动chunk索引、WAL/checkpoint、磁盘延迟、autovacuum和TTL DELETE。
+
+---
+
+[上一篇：20 Cassandra 写入流程](../20-cassandra-write/README.md) | [返回全书目录](../../SUMMARY.md) | [下一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md)

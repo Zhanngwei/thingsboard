@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1780" height="1200" viewBox="0 0 1780 1200" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 HTTP Device API architecture</title>
+  <desc id="desc">High contrast architecture of access-token authentication, telemetry queueing, temporary HTTP sessions, Actor routing and persistence boundaries.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <style>.title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8}.band{fill:#f8fafc;stroke:#64748b;stroke-width:2}.blue{fill:#eef8fb;stroke:#176b87;stroke-width:2}.green{fill:#ecfdf5;stroke:#047857;stroke-width:2}.amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}.red{fill:#fff1f2;stroke:#be123c;stroke-width:2}.gray{fill:#f3f4f6;stroke:#4b5563;stroke-width:2}.line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1780" height="1200" fill="#fff"/>
+  <text x="890" y="52" text-anchor="middle" class="title">ThingsBoard 3.6 HTTP Device API：认证、Queue、临时 Session 与持久化边界</text>
+
+  <rect x="35" y="85" width="400" height="970" rx="6" class="band"/>
+  <text x="235" y="125" text-anchor="middle" class="section">HTTP Boundary</text>
+  <rect x="75" y="165" width="320" height="155" rx="5" class="blue"/>
+  <text x="235" y="205" text-anchor="middle" class="label">DeviceApiController</text>
+  <text x="235" y="236" text-anchor="middle" class="small">/api/v1/{deviceToken}/...</text>
+  <text x="235" y="264" text-anchor="middle" class="small">JSON to Transport Protobuf</text>
+  <text x="235" y="292" text-anchor="middle" class="small">DeferredResult response</text>
+  <rect x="75" y="380" width="320" height="175" rx="5" class="red"/>
+  <text x="235" y="420" text-anchor="middle" class="label">Credential Exposure Risk</text>
+  <text x="235" y="451" text-anchor="middle" class="small">device access token is in URL path</text>
+  <text x="235" y="479" text-anchor="middle" class="small">redact proxy · access · APM logs</text>
+  <text x="235" y="507" text-anchor="middle" class="small">not a user JWT filter flow</text>
+  <rect x="75" y="615" width="320" height="175" rx="5" class="amber"/>
+  <text x="235" y="655" text-anchor="middle" class="label">Temporary HTTP Session</text>
+  <text x="235" y="686" text-anchor="middle" class="small">GET attributes · RPC long poll</text>
+  <text x="235" y="714" text-anchor="middle" class="small">random session UUID + listener</text>
+  <text x="235" y="742" text-anchor="middle" class="small">response or timeout deregisters</text>
+  <rect x="75" y="850" width="320" height="135" rx="5" class="gray"/>
+  <text x="235" y="890" text-anchor="middle" class="label">Timeouts</text>
+  <text x="235" y="921" text-anchor="middle" class="small">request 60 s · async max 300 s</text>
+  <text x="235" y="949" text-anchor="middle" class="small">client disconnect does not cancel work</text>
+
+  <rect x="475" y="85" width="400" height="970" rx="6" class="band"/>
+  <text x="675" y="125" text-anchor="middle" class="section">Transport Service</text>
+  <rect x="515" y="165" width="320" height="175" rx="5" class="blue"/>
+  <text x="675" y="205" text-anchor="middle" class="label">Token Request / Reply</text>
+  <text x="675" y="236" text-anchor="middle" class="small">ValidateDeviceTokenRequestMsg</text>
+  <text x="675" y="264" text-anchor="middle" class="small">correlation UUID to Core</text>
+  <text x="675" y="292" text-anchor="middle" class="small">credentials + device + profile response</text>
+  <rect x="515" y="400" width="320" height="195" rx="5" class="green"/>
+  <text x="675" y="440" text-anchor="middle" class="label">Telemetry / Attributes</text>
+  <text x="675" y="471" text-anchor="middle" class="small">rate limit · activity · metadata</text>
+  <text x="675" y="499" text-anchor="middle" class="small">Profile Queue and Rule Chain</text>
+  <text x="675" y="527" text-anchor="middle" class="small">one record per timestamp group</text>
+  <text x="675" y="555" text-anchor="middle" class="small">HTTP 200 on producer callback</text>
+  <rect x="515" y="655" width="320" height="195" rx="5" class="amber"/>
+  <text x="675" y="695" text-anchor="middle" class="label">Session and RPC State</text>
+  <text x="675" y="726" text-anchor="middle" class="small">sessions ConcurrentMap</text>
+  <text x="675" y="754" text-anchor="middle" class="small">scheduled timeout Future</text>
+  <text x="675" y="782" text-anchor="middle" class="small">client RPC pending map</text>
+  <text x="675" y="810" text-anchor="middle" class="small">20-way callback executor</text>
+  <rect x="515" y="910" width="320" height="75" rx="5" class="red"/>
+  <text x="675" y="942" text-anchor="middle" class="label">No HTTP idempotency key</text>
+  <text x="675" y="970" text-anchor="middle" class="small">timeout and retry can duplicate messages</text>
+
+  <rect x="915" y="85" width="400" height="970" rx="6" class="band"/>
+  <text x="1115" y="125" text-anchor="middle" class="section">Core and Rule Engine</text>
+  <rect x="955" y="165" width="320" height="175" rx="5" class="blue"/>
+  <text x="1115" y="205" text-anchor="middle" class="label">Core Credential Validation</text>
+  <text x="1115" y="236" text-anchor="middle" class="small">credentials cache then PostgreSQL</text>
+  <text x="1115" y="264" text-anchor="middle" class="small">ACCESS_TOKEN type match</text>
+  <text x="1115" y="292" text-anchor="middle" class="small">invalid response becomes HTTP 401</text>
+  <rect x="955" y="400" width="320" height="195" rx="5" class="green"/>
+  <text x="1115" y="440" text-anchor="middle" class="label">Rule Engine Queue</text>
+  <text x="1115" y="471" text-anchor="middle" class="small">POST_TELEMETRY_REQUEST</text>
+  <text x="1115" y="499" text-anchor="middle" class="small">POST_ATTRIBUTES_REQUEST</text>
+  <text x="1115" y="527" text-anchor="middle" class="small">TO_SERVER_RPC_REQUEST</text>
+  <text x="1115" y="555" text-anchor="middle" class="small">consumer and Actor execution later</text>
+  <rect x="955" y="655" width="320" height="195" rx="5" class="amber"/>
+  <text x="1115" y="695" text-anchor="middle" class="label">Core Queue and Device Actor</text>
+  <text x="1115" y="726" text-anchor="middle" class="small">GET attributes · subscriptions</text>
+  <text x="1115" y="754" text-anchor="middle" class="small">server RPC response · claim</text>
+  <text x="1115" y="782" text-anchor="middle" class="small">object-level serialized state</text>
+  <text x="1115" y="810" text-anchor="middle" class="small">notification to owning Transport service</text>
+  <rect x="955" y="910" width="320" height="75" rx="5" class="gray"/>
+  <text x="1115" y="942" text-anchor="middle" class="label">Per-service notification topic</text>
+  <text x="1115" y="970" text-anchor="middle" class="small">listener callback submitted before commit</text>
+
+  <rect x="1355" y="85" width="390" height="970" rx="6" class="band"/>
+  <text x="1550" y="125" text-anchor="middle" class="section">Data and Confirmation</text>
+  <rect x="1390" y="165" width="320" height="175" rx="5" class="blue"/>
+  <text x="1550" y="205" text-anchor="middle" class="label">Authentication Data</text>
+  <text x="1550" y="236" text-anchor="middle" class="small">device_credentials · device</text>
+  <text x="1550" y="264" text-anchor="middle" class="small">device_profile snapshot</text>
+  <text x="1550" y="292" text-anchor="middle" class="small">Transport does not query DB directly</text>
+  <rect x="1390" y="400" width="320" height="195" rx="5" class="green"/>
+  <text x="1550" y="440" text-anchor="middle" class="label">Downstream Persistence</text>
+  <text x="1550" y="471" text-anchor="middle" class="small">attribute_kv CLIENT_SCOPE</text>
+  <text x="1550" y="499" text-anchor="middle" class="small">ts_kv / ts_kv_latest / Cassandra</text>
+  <text x="1550" y="527" text-anchor="middle" class="small">Rule Chain decides actual writes</text>
+  <text x="1550" y="555" text-anchor="middle" class="small">not part of HTTP producer callback</text>
+  <rect x="1390" y="655" width="320" height="195" rx="5" class="amber"/>
+  <text x="1550" y="695" text-anchor="middle" class="label">Response Meanings</text>
+  <text x="1550" y="726" text-anchor="middle" class="small">POST 200 = Queue producer ack</text>
+  <text x="1550" y="754" text-anchor="middle" class="small">GET result = Actor query response</text>
+  <text x="1550" y="782" text-anchor="middle" class="small">RPC DELIVERED = written to HTTP response</text>
+  <text x="1550" y="810" text-anchor="middle" class="small">none means business execution complete</text>
+  <rect x="1390" y="910" width="320" height="75" rx="5" class="red"/>
+  <text x="1550" y="942" text-anchor="middle" class="label">Partial success is expected</text>
+  <text x="1550" y="970" text-anchor="middle" class="small">HTTP timeout cannot roll back downstream</text>
+
+  <path d="M395 240 H505" class="line"/><text x="450" y="224" text-anchor="middle" class="edge">auth</text>
+  <path d="M835 240 H945" class="line"/><text x="890" y="224" text-anchor="middle" class="edge">Core</text>
+  <path d="M1275 240 H1380" class="line"/><text x="1328" y="224" text-anchor="middle" class="edge">lookup</text>
+  <path d="M395 475 H505" class="line"/><text x="450" y="459" text-anchor="middle" class="edge">uplink</text>
+  <path d="M835 495 H945" class="line"/><text x="890" y="479" text-anchor="middle" class="edge">producer</text>
+  <path d="M1275 495 H1380" class="line"/><text x="1328" y="479" text-anchor="middle" class="edge">later DB</text>
+  <path d="M395 700 H505" class="line"/><text x="450" y="684" text-anchor="middle" class="edge">long poll</text>
+  <path d="M835 750 H945" class="line"/><text x="890" y="734" text-anchor="middle" class="edge">Core msg</text>
+  <path d="M1275 750 H1380" class="line"/><text x="1328" y="734" text-anchor="middle" class="edge">response</text>
+
+  <rect x="75" y="1080" width="1635" height="80" rx="5" class="gray"/>
+  <text x="892" y="1114" text-anchor="middle" class="label">End-to-end boundary</text>
+  <text x="892" y="1144" text-anchor="middle" class="small">Token validation, Queue producer ack, Rule Engine processing, database commit and HTTP delivery are distinct asynchronous stages.</text>
+</svg>

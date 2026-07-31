@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1260" viewBox="0 0 1840 1260" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 CoAP 消息架构</title>
+  <desc id="desc">高对比展示 Californium UDP/DTLS 接入、身份解析、Observe 与 Session 状态、Queue Actor 和数据库边界。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:700 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8}
+      .band{fill:#f8fafc;stroke:#475569;stroke-width:2}
+      .blue{fill:#eaf7fb;stroke:#0e7490;stroke-width:2.5}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:2.5}
+      .amber{fill:#fff7e6;stroke:#9a5b13;stroke-width:2.5}
+      .red{fill:#fff1f2;stroke:#be123c;stroke-width:2.5}
+      .gray{fill:#f3f4f6;stroke:#4b5563;stroke-width:2.5}
+      .line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#475569;stroke-width:2.2;stroke-dasharray:8 7;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1840" height="1260" fill="#ffffff"/>
+  <text x="920" y="52" text-anchor="middle" class="title">ThingsBoard 3.6 CoAP：网络接入、身份、Observe 与持久化边界</text>
+
+  <rect x="30" y="85" width="410" height="1030" rx="6" class="band"/>
+  <text x="235" y="125" text-anchor="middle" class="section">Device 与 Californium</text>
+  <rect x="70" y="160" width="330" height="145" rx="5" class="blue"/>
+  <text x="235" y="200" text-anchor="middle" class="label">CoAP Device</text>
+  <text x="235" y="232" text-anchor="middle" class="small">CON / NON · Observe · Blockwise</text>
+  <text x="235" y="260" text-anchor="middle" class="small">JSON 或 Profile Protobuf payload</text>
+  <rect x="70" y="350" width="330" height="185" rx="5" class="green"/>
+  <text x="235" y="390" text-anchor="middle" class="label">CoapServer Endpoints</text>
+  <text x="235" y="422" text-anchor="middle" class="small">UDP 5683</text>
+  <text x="235" y="450" text-anchor="middle" class="small">可选 DTLS 1.2 5684</text>
+  <text x="235" y="478" text-anchor="middle" class="small">message 1024 B · max retransmit 4</text>
+  <text x="235" y="506" text-anchor="middle" class="small">blockwise body 上限 256 MiB</text>
+  <rect x="70" y="580" width="330" height="180" rx="5" class="amber"/>
+  <text x="235" y="620" text-anchor="middle" class="label">/api/v1 Resource</text>
+  <text x="235" y="652" text-anchor="middle" class="small">动态 child 返回同一 Resource</text>
+  <text x="235" y="680" text-anchor="middle" class="small">token · feature · requestId 按位置解析</text>
+  <text x="235" y="708" text-anchor="middle" class="small">piggyback 500 ms，之后 separate response</text>
+  <rect x="70" y="805" width="330" height="225" rx="5" class="red"/>
+  <text x="235" y="845" text-anchor="middle" class="label">协议与安全风险</text>
+  <text x="235" y="877" text-anchor="middle" class="small">Plain CoAP token 和 payload 明文</text>
+  <text x="235" y="905" text-anchor="middle" class="small">token 在 URI path，日志必须脱敏</text>
+  <text x="235" y="933" text-anchor="middle" class="small">UDP response 丢失可触发客户端重试</text>
+  <text x="235" y="961" text-anchor="middle" class="small">CREATED 不等于数据库提交</text>
+  <text x="235" y="989" text-anchor="middle" class="small">大 blockwise payload 会占堆与状态</text>
+
+  <rect x="475" y="85" width="420" height="1030" rx="6" class="band"/>
+  <text x="685" y="125" text-anchor="middle" class="section">Transport 身份与状态</text>
+  <rect x="515" y="160" width="340" height="185" rx="5" class="blue"/>
+  <text x="685" y="200" text-anchor="middle" class="label">Plain Token Validation</text>
+  <text x="685" y="232" text-anchor="middle" class="small">URI access token</text>
+  <text x="685" y="260" text-anchor="middle" class="small">Transport API request/reply 到 Core</text>
+  <text x="685" y="288" text-anchor="middle" class="small">credentials + device + profile 快照</text>
+  <text x="685" y="316" text-anchor="middle" class="small">无 device/profile 返回 4.01</text>
+  <rect x="515" y="390" width="340" height="205" rx="5" class="green"/>
+  <text x="685" y="430" text-anchor="middle" class="label">X.509 DTLS Identity</text>
+  <text x="685" y="462" text-anchor="middle" class="small">证书 SHA3 hash -> Core credentials</text>
+  <text x="685" y="490" text-anchor="middle" class="small">握手最多同步等待 10 s</text>
+  <text x="685" y="518" text-anchor="middle" class="small">peer address -> identity/profile 内存缓存</text>
+  <text x="685" y="546" text-anchor="middle" class="small">默认 inactivity 24 h，30 min 扫描</text>
+  <rect x="515" y="640" width="340" height="220" rx="5" class="amber"/>
+  <text x="685" y="680" text-anchor="middle" class="label">DefaultCoapClientContext</text>
+  <text x="685" y="712" text-anchor="middle" class="small">clients[DeviceId] + per-state lock</text>
+  <text x="685" y="740" text-anchor="middle" class="small">clientsByToken[peer:port:CoAP-token]</text>
+  <text x="685" y="768" text-anchor="middle" class="small">Attrs Observe + RPC Observe</text>
+  <text x="685" y="796" text-anchor="middle" class="small">rpcAwaitingAck[CoAP MID]</text>
+  <text x="685" y="824" text-anchor="middle" class="small">PSM/eDRX window 与 missed updates</text>
+  <rect x="515" y="905" width="340" height="125" rx="5" class="gray"/>
+  <text x="685" y="945" text-anchor="middle" class="label">Session Types</text>
+  <text x="685" y="977" text-anchor="middle" class="small">SYNC：GET / client RPC，10 s</text>
+  <text x="685" y="1005" text-anchor="middle" class="small">ASYNC：Observe，直到两类订阅均取消</text>
+
+  <rect x="930" y="85" width="420" height="1030" rx="6" class="band"/>
+  <text x="1140" y="125" text-anchor="middle" class="section">Queue 与 Actor</text>
+  <rect x="970" y="160" width="340" height="175" rx="5" class="blue"/>
+  <text x="1140" y="200" text-anchor="middle" class="label">Transport API Queue</text>
+  <text x="1140" y="232" text-anchor="middle" class="small">Token / X.509 credential validation</text>
+  <text x="1140" y="260" text-anchor="middle" class="small">Provision request/reply</text>
+  <text x="1140" y="288" text-anchor="middle" class="small">correlation id 返回目标 service</text>
+  <rect x="970" y="380" width="340" height="200" rx="5" class="green"/>
+  <text x="1140" y="420" text-anchor="middle" class="label">Rule Engine Queue</text>
+  <text x="1140" y="452" text-anchor="middle" class="small">POST_TELEMETRY_REQUEST</text>
+  <text x="1140" y="480" text-anchor="middle" class="small">POST_ATTRIBUTES_REQUEST</text>
+  <text x="1140" y="508" text-anchor="middle" class="small">TO_SERVER_RPC_REQUEST</text>
+  <text x="1140" y="536" text-anchor="middle" class="small">producer callback 即可返回 CREATED</text>
+  <rect x="970" y="625" width="340" height="220" rx="5" class="amber"/>
+  <text x="1140" y="665" text-anchor="middle" class="label">Core Queue 与 Device Actor</text>
+  <text x="1140" y="697" text-anchor="middle" class="small">GET Attributes · Claim</text>
+  <text x="1140" y="725" text-anchor="middle" class="small">Session OPEN/CLOSE</text>
+  <text x="1140" y="753" text-anchor="middle" class="small">Attribute/RPC subscriptions</text>
+  <text x="1140" y="781" text-anchor="middle" class="small">RPC SENT/DELIVERED/TIMEOUT</text>
+  <text x="1140" y="809" text-anchor="middle" class="small">pending persistent RPC</text>
+  <rect x="970" y="890" width="340" height="140" rx="5" class="gray"/>
+  <text x="1140" y="930" text-anchor="middle" class="label">Transport Notification</text>
+  <text x="1140" y="962" text-anchor="middle" class="small">按 serviceId/sessionId 定向</text>
+  <text x="1140" y="990" text-anchor="middle" class="small">回调本地 CoapSessionListener</text>
+
+  <rect x="1385" y="85" width="425" height="1030" rx="6" class="band"/>
+  <text x="1597" y="125" text-anchor="middle" class="section">业务与持久化</text>
+  <rect x="1425" y="160" width="345" height="175" rx="5" class="blue"/>
+  <text x="1597" y="200" text-anchor="middle" class="label">Credential Control Plane</text>
+  <text x="1597" y="232" text-anchor="middle" class="small">credentials cache</text>
+  <text x="1597" y="260" text-anchor="middle" class="small">device_credentials · device</text>
+  <text x="1597" y="288" text-anchor="middle" class="small">device_profile payload/power config</text>
+  <rect x="1425" y="380" width="345" height="200" rx="5" class="green"/>
+  <text x="1597" y="420" text-anchor="middle" class="label">Telemetry / Attributes</text>
+  <text x="1597" y="452" text-anchor="middle" class="small">Rule Node Actor -> Save Node</text>
+  <text x="1597" y="480" text-anchor="middle" class="small">ts_kv / Timescale / Cassandra</text>
+  <text x="1597" y="508" text-anchor="middle" class="small">ts_kv_latest</text>
+  <text x="1597" y="536" text-anchor="middle" class="small">attribute_kv CLIENT / SHARED scope</text>
+  <rect x="1425" y="625" width="345" height="220" rx="5" class="amber"/>
+  <text x="1597" y="665" text-anchor="middle" class="label">Observe Downlink</text>
+  <text x="1597" y="697" text-anchor="middle" class="small">Shared Attributes 更新通知</text>
+  <text x="1597" y="725" text-anchor="middle" class="small">server-side RPC / persistent RPC</text>
+  <text x="1597" y="753" text-anchor="middle" class="small">CON ACK 驱动 RPC status</text>
+  <text x="1597" y="781" text-anchor="middle" class="small">设备睡眠时合并 Attributes</text>
+  <text x="1597" y="809" text-anchor="middle" class="small">唤醒后请求 Actor 重发 pending RPC</text>
+  <rect x="1425" y="890" width="345" height="140" rx="5" class="red"/>
+  <text x="1597" y="930" text-anchor="middle" class="label">不持久化的状态</text>
+  <text x="1597" y="962" text-anchor="middle" class="small">Observe Exchange / peer-token map</text>
+  <text x="1597" y="990" text-anchor="middle" class="small">DTLS identity cache / sleeping flag</text>
+
+  <path d="M400 230 H515" class="line"/><text x="457" y="216" text-anchor="middle" class="edge">request</text>
+  <path d="M855 245 H970" class="line"/><text x="912" y="231" text-anchor="middle" class="edge">auth</text>
+  <path d="M855 745 H970" class="line"/><text x="912" y="731" text-anchor="middle" class="edge">session</text>
+  <path d="M1310 480 H1425" class="line"/><text x="1367" y="466" text-anchor="middle" class="edge">consume</text>
+  <path d="M1425 735 H1310" class="line"/><text x="1367" y="721" text-anchor="middle" class="edge">notify</text>
+  <path d="M970 960 H855" class="line"/><text x="912" y="946" text-anchor="middle" class="edge">downlink</text>
+  <path d="M515 970 H400" class="line"/><text x="457" y="956" text-anchor="middle" class="edge">Observe</text>
+  <path d="M855 520 C910 560 915 560 970 520" class="dash"/><text x="912" y="574" text-anchor="middle" class="edge">uplink Queue</text>
+
+  <rect x="75" y="1150" width="1690" height="72" rx="5" class="gray"/>
+  <text x="920" y="1180" text-anchor="middle" class="label">关键确认边界</text>
+  <text x="920" y="1208" text-anchor="middle" class="small">CoAP 2.01 CREATED = Queue producer callback；Rule Engine、DAO batch、数据库事务在后续独立完成，失败不会撤回已经发出的 response。</text>
+</svg>

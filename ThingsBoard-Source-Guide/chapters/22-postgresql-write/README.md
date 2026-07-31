@@ -1,0 +1,710 @@
+# 22 PostgreSQL 写入流程
+
+> 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章从源码阅读角度解释ThingsBoard如何通过Spring事务、Spring Data JPA、JdbcTemplate、PL/pgSQL和HikariCP写PostgreSQL；不把它扩展成通用PostgreSQL DBA教材。
+
+[上一篇：21 TimescaleDB 写入流程](../21-timescale-write/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/22-postgresql-write.svg) | [下一篇：23 HTTP 设备 API 流程](../23-http-device-api/README.md)
+
+---
+
+## 一、流程目标
+
+PostgreSQL是ThingsBoard 3.6控制面和关系数据的主存储。Device、Asset、Customer、Alarm、Rule Chain、Dashboard、Attribute、RPC、Event、Audit以及SQL模式telemetry都依赖它，但并不使用同一种写入方式。
+
+源码中可以归纳出三条主要写路径：
+
+1. **实体CRUD**：`Service -> JpaXxxDao -> Spring Data JpaRepository -> Hibernate -> PostgreSQL`。
+2. **高频KV批处理**：`DAO -> TbSqlBlockingQueue -> JdbcTemplate.batchUpdate -> PostgreSQL`。
+3. **原子状态机/复杂查询**：Spring Data native query或JdbcTemplate调用PL/pgSQL function/procedure。
+
+```mermaid
+flowchart TB
+    ENTRY[REST / Rule Engine / Transport / Scheduler] --> SERVICE[Domain Service]
+    SERVICE --> KIND{写入类型}
+    KIND -->|Device Asset Dashboard| JPA[JpaAbstractDao + JpaRepository]
+    KIND -->|Attribute Telemetry Latest| BATCH[TbSqlBlockingQueue + JdbcTemplate]
+    KIND -->|Alarm state TTL| PROC[Native SQL / PL/pgSQL]
+    JPA --> HIKARI[HikariCP]
+    BATCH --> HIKARI
+    PROC --> HIKARI
+    HIKARI --> PG[(PostgreSQL)]
+```
+
+不能把“调用了`save`”统一理解为同一个事务：
+
+- `@Transactional` 的Service入口可以把多个DAO调用合并到一个事务。
+- DAO上的`@Transactional`在没有外层事务时创建自己的事务。
+- SQL batch worker在另一个线程中启动新的repository事务。
+- Kafka、Actor、缓存、WebSocket和普通Spring事件通常不与数据库共享事务。
+
+### 1.1 与MySQL/Spring Boot经验的映射
+
+| MySQL工程经验 | ThingsBoard PostgreSQL实现 |
+|---|---|
+| MyBatis mapper单条SQL | Spring Data repository、JPQL和native query并存 |
+| 自增主键 | 应用生成time-based UUID，并派生`created_time` |
+| InnoDB事务边界看`@Transactional` | 同样看Spring代理，但异步queue已切换线程/事务 |
+| 分表中间件选物理表 | PostgreSQL declarative partition由parent自动路由 |
+| `INSERT ... ON DUPLICATE KEY UPDATE` | `INSERT ... ON CONFLICT ... DO UPDATE` |
+| purge回收旧版本 | PostgreSQL autovacuum回收UPDATE/DELETE产生的dead tuple |
+| Buffer Pool连接数独立调优 | 每个ThingsBoard实例Hikari pool会共同放大DB连接和并发 |
+
+---
+
+## 二、入口
+
+所有业务入口最终都可能写PostgreSQL，但写入的确认语义不同。
+
+| 入口 | 示例源码入口 | 典型写入 | 调用时机 |
+|---|---|---|---|
+| REST Entity API | `DeviceController.saveDevice(...)` | `device`、`device_credentials` | 控制台创建/更新设备 |
+| REST telemetry/attribute | `TelemetryController` | `attribute_kv`、`ts_kv`、`ts_kv_latest` | 用户服务端写KV |
+| Transport | MQTT/HTTP/CoAP Handler | 经Queue和Rule Engine后写telemetry、alarm | 设备上报 |
+| Rule Engine Actor | `TbMsgTimeseriesNode`、Alarm Nodes | batch KV或Alarm function | Rule Node执行 |
+| Kafka Consumer | Core/Rule Engine consumer | 触发Actor/Service异步写 | poll pack后 |
+| Scheduler | TTL clean-up services | procedure、DELETE、DROP partition | 定时保留策略 |
+| Install/Upgrade | schema services | DDL、function、index | 安装或版本升级 |
+
+```mermaid
+flowchart LR
+    REST[REST Controller] --> SYNC[同步Service事务]
+    MQTT[MQTT/HTTP Device] --> BROKER[Queue Broker]
+    BROKER --> ACTOR[Rule Engine Actor]
+    ACTOR --> ASYNC[异步DAO Future]
+    SCHED[Scheduler] --> PROC[Stored Procedure]
+    INSTALL[Install profile] --> DDL[Schema DDL]
+    SYNC --> PG[(PostgreSQL)]
+    ASYNC --> PG
+    PROC --> PG
+    DDL --> PG
+```
+
+设备创建入口见 [DeviceController.java:218](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L218)。实体Service多为同步调用；Attribute/Telemetry保存返回Guava `ListenableFuture`，由上层回调决定规则链何时继续。
+
+---
+
+## 三、完整调用链
+
+### 3.1 Device实体写入链
+
+| 步骤 | 类/方法 | 输入 | 输出/副作用 | 设计原因 |
+|---|---|---|---|---|
+| 1 | `DeviceController.saveDevice(...)` | JSON Device、可选accessToken | 调用DeviceService | HTTP鉴权与审计边界 |
+| 2 | `DeviceServiceImpl.saveDevice(...)` | domain Device | 开启Spring事务 | device与默认credentials可原子提交 |
+| 3 | `saveDeviceWithoutCredentials(...)` | 校验后的Device | 绑定Profile、同步DeviceData | 业务约束在Service层 |
+| 4 | `JpaDeviceDao.saveAndFlush(...)` | Device | 转换并flush Hibernate SQL | 尽早暴露唯一/FK错误 |
+| 5 | `JpaAbstractDao.save(...)` | domain对象 | 生成UUID/createdTime并repository.save | 统一实体持久化模板 |
+| 6 | `DeviceRepository.save(...)` | `DeviceEntity` | Hibernate INSERT/UPDATE | Spring Data实现 |
+| 7 | `DeviceCredentialsService.create...` | credentials | 写`device_credentials` | 外层事务存在时加入同一事务 |
+| 8 | transaction commit | JDBC connection | PostgreSQL COMMIT/WAL | 数据库原子边界 |
+| 9 | `@TransactionalEventListener` | cache evict event | 提交后清本地/共享缓存 | 避免rollback后错误失效 |
+
+源码：[DeviceServiceImpl.java:231](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L231)、[DeviceServiceImpl.java:314](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L314)、[JpaDeviceDao.java:126](../../../dao/src/main/java/org/thingsboard/server/dao/sql/device/JpaDeviceDao.java#L126)、[JpaAbstractDao.java:76](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L76)。
+
+```mermaid
+sequenceDiagram
+    participant C as DeviceController
+    participant S as DeviceServiceImpl
+    participant D as JpaDeviceDao
+    participant R as DeviceRepository
+    participant CR as CredentialsService
+    participant PG as PostgreSQL
+    participant Cache as Transactional Cache Listener
+    C->>S: saveDevice(device)
+    S->>S: validate and resolve profile
+    S->>D: saveAndFlush(tenant, device)
+    D->>D: generate time UUID and createdTime if new
+    D->>R: save(DeviceEntity), flush()
+    R->>PG: INSERT/UPDATE device
+    S->>CR: create credentials when new
+    CR->>PG: INSERT device_credentials
+    S->>S: publish cache evict event
+    PG-->>S: COMMIT
+    S-->>Cache: AFTER_COMMIT listener
+    S-->>C: saved Device
+```
+
+`flush()`只保证SQL已发送并完成约束检查，不等于事务已经提交。若后续credentials写失败，外层事务仍可回滚device。
+
+### 3.2 JPA抽象层
+
+[JpaAbstractDao](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L49) 通过反射调用`Entity(domain)`构造器。新对象使用DataStax `Uuids.timeBased()` 生成UUID v1，并从UUID提取毫秒`createdTime`；主键不是PostgreSQL sequence。
+
+```mermaid
+flowchart LR
+    DOMAIN[Device domain] --> CTOR["DeviceEntity(Device)"]
+    CTOR --> NEW{uuid null?}
+    NEW -->|是| UUID[time-based UUID + created_time]
+    NEW -->|否| EXIST[保留ID]
+    UUID --> SAVE[JpaRepository.save]
+    EXIST --> SAVE
+    SAVE --> MODE{Hibernate判断}
+    MODE --> INSERT[INSERT]
+    MODE --> UPDATE[merge / UPDATE]
+```
+
+`spring.jpa.hibernate.ddl-auto=none`，Hibernate不负责生产建表；安装/升级SQL脚本才是schema真相。`open-in-view=false`，Controller序列化阶段不能依赖懒加载补查数据库。
+
+### 3.3 Attribute批量写入
+
+1. [BaseAttributesService.save(...)](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/BaseAttributesService.java#L193) 为每个key调用DAO并聚合Future。
+2. [JpaAttributeDao.save(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java#L270) 构造typed-column entity。
+3. [JpaAttributeDao.init()](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java#L130) 创建默认3条writer queue，按entity UUID hash分配。
+4. [AttributeKvInsertRepository.saveOrUpdate(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L81) 用`TransactionTemplate`先批量UPDATE，再把未命中行批量UPSERT。
+5. repository事务完成后，该batch所有Future成功。
+
+```mermaid
+flowchart TB
+    ATTRS[List AttributeKvEntry] --> FUT[one Future per key]
+    FUT --> HASH[hash entity_id]
+    HASH --> Q0[attribute queue 0]
+    HASH --> Q1[attribute queue 1]
+    HASH --> Q2[attribute queue 2]
+    Q0 --> TX[TransactionTemplate]
+    Q1 --> TX
+    Q2 --> TX
+    TX --> UPD[batch UPDATE existing]
+    UPD --> INS[batch INSERT ON CONFLICT missing]
+    INS --> TABLE[(attribute_kv)]
+```
+
+`attribute_kv.last_update_ts`只是存储列，UPDATE/ON CONFLICT没有`existing.last_update_ts <= incoming`条件。旧属性后到可以覆盖新值并把timestamp回退；这与SQL latest telemetry的时间戳保护不同。
+
+### 3.4 普通PostgreSQL telemetry分区写入
+
+`database.ts.type=sql` 时使用 [JpaSqlTimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/sql/JpaSqlTimeseriesDao.java#L61)：
+
+1. 根据UTC时间和`DAYS/MONTHS/YEARS/INDEFINITE`计算range。
+2. 当前JVM map未见分区时，同步执行`CREATE TABLE ... PARTITION OF ts_kv FOR VALUES FROM...TO...`。
+3. DDL repository使用`Propagation.NOT_SUPPORTED`，挂起外层事务，避免分区创建错误把业务事务标记rollback-only。
+4. telemetry实体进入SQL batch queue。
+5. INSERT parent `ts_kv`，PostgreSQL路由到range child；创建失败时DEFAULT `ts_kv_indefinite`承接。
+
+```mermaid
+flowchart TB
+    POINT[TsKvEntry.ts] --> UTC[UTC truncate to month/day/year]
+    UTC --> CACHE{partition map hit?}
+    CACHE -->|否| DDL[NOT_SUPPORTED CREATE PARTITION]
+    DDL --> RACE{created?}
+    RACE -->|是| CHILD[(ts_kv_YYYY_MM)]
+    RACE -->|并发/被default约束阻止| DEF[(ts_kv_indefinite DEFAULT)]
+    CACHE -->|是| BATCH[SQL telemetry batch]
+    CHILD --> BATCH
+    DEF --> BATCH
+    BATCH --> PARENT[INSERT ts_kv parent]
+    PARENT --> ROUTE{PostgreSQL partition router}
+    ROUTE --> CHILD
+    ROUTE --> DEF
+```
+
+### 3.5 Alarm原子状态函数
+
+Alarm并非简单repository.save。`AlarmRepository.createOrUpdateActiveAlarm(...)` 调用 [create_or_update_active_alarm](../../../dao/src/main/resources/sql/schema-views-and-functions.sql#L75)，已有active alarm使用`SELECT ... FOR UPDATE`串行更新。ACK/CLEAR/ASSIGN函数也锁定alarm行。
+
+已有行的并发状态迁移由数据库函数封装，减少Java“先查再改”的竞态。但首次创建没有可锁行，3.6 active索引也不是UNIQUE，不能推导为严格全局去重。
+
+### 3.6 Hikari连接借用
+
+JPA、JdbcTemplate、stored procedure最终共享Spring Boot配置的Hikari DataSource。默认每个服务实例`maximumPoolSize=16`；[JpaExecutorService](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaExecutorService.java#L29) 的异步线程数也直接取这个值。
+
+---
+
+## 四、消息流
+
+```mermaid
+flowchart TB
+    subgraph RequestThreads[请求/Actor回调线程]
+      CTRL[Controller]
+      SERV[Domain Service]
+      DAO[DAO enqueue or repository call]
+    end
+    subgraph Workers[DAO工作线程]
+      JPAEXEC[JpaExecutorService]
+      SQLQ[SQL queue workers]
+    end
+    subgraph SpringDB[Spring数据库层]
+      TX[Transaction Interceptor]
+      EM[EntityManager/Hibernate]
+      JDBC[JdbcTemplate]
+      POOL[HikariCP]
+    end
+    CTRL --> SERV
+    SERV --> DAO
+    DAO --> TX
+    DAO --> JPAEXEC
+    DAO --> SQLQ
+    TX --> EM
+    JPAEXEC --> EM
+    SQLQ --> JDBC
+    EM --> POOL
+    JDBC --> POOL
+    POOL --> PG[(PostgreSQL)]
+```
+
+同步实体保存占用调用线程直到事务返回；异步DAO只把等待移到`JpaExecutorService`或SQL queue，并没有让数据库写“免费”。所有路径仍竞争同一个连接池、PostgreSQL WAL、锁和IO。
+
+### 4.1 一次写入的状态边界
+
+```mermaid
+stateDiagram-v2
+    [*] --> Validated
+    Validated --> TransactionActive: Spring proxy
+    TransactionActive --> SQLFlushed: saveAndFlush / batchUpdate
+    SQLFlushed --> Committed: COMMIT success
+    SQLFlushed --> RolledBack: exception
+    Committed --> CacheEvicted: transactional listener
+    Committed --> QueueNotified: application propagation
+    RolledBack --> ErrorMapped
+    CacheEvicted --> [*]
+    QueueNotified --> [*]
+    ErrorMapped --> [*]
+```
+
+---
+
+## 五、时序图
+
+完整PlantUML同时展示Device/JPA、Attribute batch、SQL telemetry partition和Alarm function：
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="ThingsBoard PostgreSQL多写入路径时序图"></a>
+
+可直接查看 [PlantUML源文件](sequence.puml)。
+
+```mermaid
+sequenceDiagram
+    participant App as Service/DAO
+    participant Tx as Spring Transaction
+    participant Pool as HikariCP
+    participant PG as PostgreSQL
+    participant WAL as WAL/Storage
+    App->>Tx: enter @Transactional method
+    Tx->>Pool: borrow connection
+    Pool-->>Tx: JDBC connection
+    App->>PG: INSERT/UPDATE/ON CONFLICT
+    PG->>PG: constraints, indexes, row locks, MVCC tuple
+    App->>Tx: method returns
+    Tx->>PG: COMMIT
+    PG->>WAL: flush according durability settings
+    WAL-->>PG: durable/ack boundary
+    PG-->>Tx: commit success
+    Tx->>Pool: return connection
+    Tx-->>App: after-commit callbacks
+```
+
+ThingsBoard源码没有覆盖数据库`synchronous_commit`等参数。应用看到COMMIT成功的持久性由PostgreSQL配置决定，不能从Java Future本身推导副本级耐久性。
+
+---
+
+## 六、数据变化
+
+| 对象 | 主写路径 | 主键/冲突控制 | 事务边界 |
+|---|---|---|---|
+| `device` | JPA/Hibernate | UUID PK；`tenant_id,name` UNIQUE | Device Service事务 |
+| `device_credentials` | JPA service | credentials_id、device_id UNIQUE | 标准创建时加入Device事务 |
+| `attribute_kv` | JDBC batch | entity_type/id/scope/key PK | 每个attribute batch事务 |
+| `ts_kv` SQL | JDBC batch | entity_id/key/ts PK | 每个history batch事务 |
+| `ts_kv_latest` | JDBC batch | entity_id/key PK + 可选ts条件 | 独立latest batch事务 |
+| `alarm` | native function | UUID PK，已有行`FOR UPDATE` | function所在调用事务 |
+| `event/audit/alarm_comment` | JPA/JDBC + range partition | 主键包含分区列或独立索引 | 对应DAO/batch事务 |
+| cache | TransactionalCache/EventListener | cache key | 通常COMMIT后 |
+| Kafka/Actor | broker record/mailbox | message id/offset | 不在PostgreSQL事务 |
+
+```mermaid
+erDiagram
+    DEVICE_PROFILE ||--o{ DEVICE : profile
+    DEVICE ||--|| DEVICE_CREDENTIALS : authenticates
+    DEVICE ||--o{ ATTRIBUTE_KV : logical_entity_id
+    DEVICE ||--o{ TS_KV : logical_entity_id
+    DEVICE ||--o{ TS_KV_LATEST : logical_entity_id
+    DEVICE ||--o{ ALARM : originator
+    DEVICE {
+      uuid id PK
+      uuid tenant_id
+      uuid device_profile_id FK
+      varchar name
+      bigint created_time
+    }
+    ATTRIBUTE_KV {
+      varchar entity_type PK
+      uuid entity_id PK
+      varchar attribute_type PK
+      varchar attribute_key PK
+      bigint last_update_ts
+    }
+    TS_KV {
+      uuid entity_id PK
+      int key PK
+      bigint ts PK
+    }
+```
+
+多数KV关系没有数据库FK，上图中的entity关联是逻辑关系。这样避免高频telemetry/attribute写做FK检查，但实体删除也不会自动级联清理这些表。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类
+
+| 类型 | 包路径 | 核心职责 |
+|---|---|---|
+| `JpaAbstractDao` | `org.thingsboard.server.dao.sql` | domain/entity转换、UUID生成、通用CRUD |
+| `JpaDeviceDao` | `org.thingsboard.server.dao.sql.device` | Device repository适配与flush |
+| `DeviceServiceImpl` | `org.thingsboard.server.dao.device` | 校验、Profile、credentials与事务编排 |
+| `JpaExecutorService` | `org.thingsboard.server.dao.sql` | 异步JPA任务线程池 |
+| `TbSqlBlockingQueueWrapper` | `org.thingsboard.server.dao.sql` | 多writer hash分流 |
+| `TbSqlBlockingQueue` | `org.thingsboard.server.dao.sql` | 无界排队、合批、排序、Future完成 |
+| `AttributeKvInsertRepository` | `org.thingsboard.server.dao.sql.attributes` | Attribute UPDATE + UPSERT事务 |
+| `JpaSqlTimeseriesDao` | `org.thingsboard.server.dao.sqlts.sql` | PostgreSQL telemetry分区与history实体 |
+| `SqlPartitioningRepository` | `org.thingsboard.server.dao.sqlts.insert.sql` | 非事务DDL、detach/drop partition |
+| `SqlInsertTsRepository` | `org.thingsboard.server.dao.sqlts.insert.sql` | telemetry JDBC batch UPSERT |
+| `AlarmRepository` | `org.thingsboard.server.dao.sql.alarm` | native function映射 |
+
+### 7.2 Spring事务代理边界
+
+`@Transactional`只在通过Spring代理调用public方法时生效。ThingsBoard的Service入口常在具体实现类上标注事务；内部private调用不会新开事务，但会沿用入口已创建的事务。
+
+`DeviceServiceImpl.saveDevice(Device)`有事务，`saveDevice(Device, boolean)`没有同样注解。后者若没有外层事务，`JpaDeviceDao.saveAndFlush`只在DAO方法自己的事务中提交，后续动作不自动与它合并。阅读调用链时必须从实际入口向下检查，而不是看到任意一个`@Transactional`就假设全流程原子。
+
+```mermaid
+flowchart TB
+    CALL[调用者] --> PROXY{是否经过Spring代理?}
+    PROXY -->|否 self/private| CURRENT[沿用当前事务或无事务]
+    PROXY -->|是| ANN{public方法有@Transactional?}
+    ANN -->|是| OPEN[创建/加入事务]
+    ANN -->|否| NONE[无Service事务]
+    OPEN --> DAO[DAO @Transactional joins]
+    NONE --> DAO2[DAO自己创建短事务]
+```
+
+### 7.3 PostgreSQL MVCC写放大
+
+PostgreSQL UPDATE不是InnoDB“原地页记录+undo旧版本”的同一实现。普通UPDATE产生新tuple version，旧tuple在不再被任何snapshot需要后由VACUUM回收。ThingsBoard的Attribute、latest和Alarm都是高频UPDATE目标：
+
+- HOT条件满足时可避免更新所有索引，但主键/索引列变化通常不能HOT。
+- 长事务、空闲事务或复制slot会拖住`OldestXmin`，阻止dead tuple回收。
+- TTL大DELETE也会制造dead tuples，除非直接DROP整个partition。
+
+这一点解释了为什么数据库容量、autovacuum和表膨胀会直接影响Java层写入延迟。
+
+### 7.4 配置边界
+
+[thingsboard.yml:712](../../../application/src/main/resources/thingsboard.yml#L712) 明确：
+
+- JPA query timeout默认30000ms。
+- `open-in-view=false`。
+- Hibernate `ddl-auto=none`。
+- PostgreSQL driver和JDBC URL。
+- Hikari max pool默认16，leak detection默认关闭。
+
+应用没有在当前配置中显式覆盖transaction isolation；实际采用DataSource/数据库默认，标准PostgreSQL默认通常是READ COMMITTED，但生产应查询实际参数而不是依赖文档假设。
+
+---
+
+## 八、Actor 分析
+
+Actor负责业务对象串行处理，不持有JDBC connection。Rule Node发起异步DAO调用后，SQL queue worker或JPA executor才借连接。
+
+```mermaid
+flowchart LR
+    MAIL[RuleNodeActor mailbox] --> NODE[Node.onMsg]
+    NODE --> FUTURE[DAO ListenableFuture]
+    FUTURE --> SQLQ[SQL queue worker]
+    SQLQ --> POOL[Hikari borrow]
+    POOL --> PG[(PostgreSQL)]
+    PG --> COMPLETE[Future complete]
+    COMPLETE --> CALLBACK[Node callback]
+    CALLBACK --> MAIL
+```
+
+Actor串行不能替代数据库并发控制：
+
+- 多个服务节点可同时处理同一数据库行。
+- REST写不一定经过Actor。
+- SQL queue只在单JVM内按entity hash。
+- Alarm行锁、UNIQUE、ON CONFLICT和WHERE timestamp条件才是跨节点约束。
+
+不要在Actor线程同步`Future.get()`等待数据库；现有Node模式通过callback恢复消息流。
+
+---
+
+## 九、Kafka 分析
+
+```mermaid
+sequenceDiagram
+    participant P as Queue Producer
+    participant B as Kafka/Broker
+    participant C as Consumer
+    participant A as Actor/Service
+    participant DB as PostgreSQL
+    P->>B: send record
+    B-->>P: broker ack
+    C->>B: poll pack
+    C->>A: submit message
+    A->>DB: transaction or SQL batch Future
+    DB-->>A: commit/failure
+    A-->>C: callback
+    C->>B: retry in memory or commitSync
+```
+
+PostgreSQL事务与Kafka offset没有共同提交协议：
+
+- DB commit成功、offset提交前宕机：消息重放，依赖UPSERT/业务幂等。
+- DB失败、策略选择skip：offset仍可能提交，形成数据缺口。
+- consumer timeout不会取消已开始的JDBC事务。
+- Queue retry会重复整个消息路径，不只重试最后一条SQL。
+
+Device JPA创建通常由REST直接调用，不经过Kafka；创建成功后的生命周期、Cluster、Rule Engine、Transport通知才进入提交后的异步传播。
+
+---
+
+## 十、数据库分析
+
+### 10.1 Schema由安装脚本控制
+
+```mermaid
+flowchart LR
+    INSTALL[install/upgrade profile] --> ENTITY[schema-entities.sql]
+    INSTALL --> INDEX[schema-entities-idx.sql]
+    INSTALL --> FUNC[schema-views-and-functions.sql]
+    INSTALL --> TS[schema-ts-psql.sql]
+    ENTITY --> PG[(PostgreSQL)]
+    INDEX --> PG
+    FUNC --> PG
+    TS --> PG
+    HIB[Hibernate ddl-auto none] -. does not create .-> PG
+```
+
+读表结构必须先看脚本，再看Entity映射。仅看`@Entity`会漏掉partial index、function、procedure、range partition、unique constraint和安装后创建的DEFAULT partition。
+
+### 10.2 SQL telemetry分区生命周期
+
+```mermaid
+stateDiagram-v2
+    [*] --> DefaultOnly: install creates ts_kv_indefinite
+    DefaultOnly --> RangeCreated: first point in period
+    RangeCreated --> Active
+    Active --> Historical: period closes
+    Historical --> DropEligible: system TTL crosses whole partition
+    DropEligible --> Dropped: DROP old partition
+    Historical --> RowCleanup: tenant/customer TTL differs
+    RowCleanup --> Vacuum
+    Vacuum --> Historical
+```
+
+`JpaSqlTimeseriesDao.cleanup`先在system TTL大于0时调用`drop_partitions_by_system_ttl`删除完整旧partition，再调用通用`cleanup_timeseries_by_ttl`处理tenant/customer差异。DEFAULT partition不会被整表drop，需要行清理。
+
+### 10.3 连接池容量
+
+```mermaid
+flowchart TB
+    WEB[HTTP threads] --> POOL[Hikari max 16 per service]
+    JPA[JPA async executor max 16] --> POOL
+    ATTR[3 attribute writers] --> POOL
+    TS[3 telemetry writers] --> POOL
+    LATEST[3 latest writers] --> POOL
+    EVENT[event/audit/edge workers] --> POOL
+    POOL --> PG[(PostgreSQL max_connections)]
+```
+
+这些线程不会永久各占一条连接，但峰值会一起争抢16个slot。部署`N`个Core/Rule Engine实例时理论pool上限近似`N * 16`，还要加安装服务、监控、psql和其他应用。盲目增大pool可能把等待从应用搬到PostgreSQL并增加上下文切换。
+
+### 10.4 关键索引和约束
+
+- `device(tenant_id,name)` UNIQUE保证租户内设备名唯一。
+- `device(tenant_id,external_id)` UNIQUE；PostgreSQL允许多个NULL。
+- `device_credentials(credentials_id)`和`(device_id)` UNIQUE。
+- `attribute_kv`复合PK正好匹配scope key UPSERT。
+- `ts_kv`复合PK包含partition key `ts`。
+- active alarm partial index不是UNIQUE，首次并发创建仍有窗口。
+
+独立架构图：
+
+[点击新窗口打开原始 SVG](../../assets/architecture/22-postgresql-write.svg)
+
+<a class="static-svg-thumbnail" href="../../assets/architecture/22-postgresql-write.svg" target="_blank" rel="noopener noreferrer"><img src="../../assets/architecture/22-postgresql-write.svg" alt="ThingsBoard PostgreSQL写入架构图"></a>
+
+---
+
+## 十一、异常处理
+
+```mermaid
+flowchart TB
+    WRITE[业务写入] --> MODE{JPA / batch / function}
+    MODE --> JPA[JPA flush]
+    MODE --> BATCH[JDBC batch]
+    MODE --> FUNC[PL/pgSQL]
+    JPA --> ERR{异常?}
+    BATCH --> ERR
+    FUNC --> ERR
+    ERR -->|否| COMMIT[commit]
+    ERR -->|唯一/FK| MAP[映射DataValidation/Conflict]
+    ERR -->|deadlock/serialization| ROLLBACK[rollback transaction]
+    ERR -->|connection/timeout| ROLLBACK
+    ROLLBACK --> FUT[throw or failed Future]
+    FUT --> UP{上层策略}
+    UP --> HTTP[HTTP error]
+    UP --> REL[Rule Node Failure]
+    UP --> RETRY[Queue retry/skip]
+```
+
+### 11.1 失败矩阵
+
+| 失败点 | 当前行为 | 事务结果 | 风险 |
+|---|---|---|---|
+| Device唯一约束 | flush时抛异常，Service映射消息 | 外层事务回滚 | flush早于commit，不能把flush当成功 |
+| credentials失败 | 异常向上传播 | 标准`saveDevice`外层事务回滚device | 非事务入口要单独核对 |
+| Attribute batch一行失败 | `TransactionTemplate`抛异常 | 整个batch回滚，所有Future失败 | 一个坏值影响同batch其他实体 |
+| telemetry batch失败 | repository事务回滚 | 整batch失败 | Kafka retry会重复其他成功副作用 |
+| 分区DDL竞争 | 匹配已存在/overlap后缓存 | DDL在业务事务外 | 数据写可落DEFAULT partition |
+| DEFAULT已有目标range数据 | range partition创建可能被拒绝 | 继续使用DEFAULT | pruning和后续迁移受影响 |
+| Alarm deadlock/lock timeout | function调用异常 | 调用事务回滚 | 上层无数据库级自动重试 |
+| Hikari耗尽 | borrower等待/超时 | SQL未开始或事务失败 | 先看pool pending，不要只加连接 |
+| SQL queue积压 | 无界`LinkedBlockingQueue`增长 | 尚未入库 | 堆内存和长尾延迟 |
+| 服务关闭 | `shutdownNow`中断worker | queue内Future可能未完成 | 需要入口drain和停机顺序 |
+
+### 11.2 PostgreSQL错误与Spring异常
+
+JDBC SQLState会被Spring翻译为`DataAccessException`层级；业务Service常通过`checkConstraintViolation`把已知constraint name转成可读错误。新增或改名约束时如果不更新映射，用户只会看到通用数据库异常。
+
+### 11.3 Deadlock不是“加排序就消失”
+
+batch按完整PK排序能降低相同表的锁顺序差异，但跨表事务、数据库function、不同服务版本和其他查询仍可能形成锁环。生产应收集PostgreSQL deadlock log和完整SQL，再决定重试或调整顺序。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    A[1 thingsboard.yml datasource] --> B[2 schema SQL]
+    B --> C[3 JpaAbstractDao]
+    C --> D[4 DeviceService + JpaDeviceDao]
+    D --> E[5 Attribute SQL queue]
+    E --> F[6 SQL telemetry partition]
+    F --> G[7 Alarm functions]
+    G --> H[8 Hikari and metrics]
+```
+
+推荐顺序：
+
+1. [thingsboard.yml datasource](../../../application/src/main/resources/thingsboard.yml#L712)：确认JPA/Hikari默认值。
+2. [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L328)、[schema-entities-idx.sql](../../../dao/src/main/resources/sql/schema-entities-idx.sql#L46)：看Device表和约束。
+3. [JpaAbstractDao](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L76)：看UUID、Entity转换与事务。
+4. [DeviceServiceImpl](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L231) -> [JpaDeviceDao](../../../dao/src/main/java/org/thingsboard/server/dao/sql/device/JpaDeviceDao.java#L126)：跟踪外层事务和flush。
+5. [AbstractCachedEntityService](../../../dao/src/main/java/org/thingsboard/server/dao/entity/AbstractCachedEntityService.java#L47)：确认事务内发布和无事务立即失效差异。
+6. [JpaAttributeDao](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/JpaAttributeDao.java#L130) -> [AttributeKvInsertRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L81)：看批处理事务。
+7. [SqlTsDatabaseSchemaService](../../../application/src/main/java/org/thingsboard/server/service/install/SqlTsDatabaseSchemaService.java#L57) -> [JpaSqlTimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/sql/JpaSqlTimeseriesDao.java#L113) -> [SqlPartitioningRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/sql/SqlPartitioningRepository.java#L74)。
+8. [AlarmRepository native function](../../../dao/src/main/java/org/thingsboard/server/dao/sql/alarm/AlarmRepository.java#L463) -> [schema-views-and-functions.sql](../../../dao/src/main/resources/sql/schema-views-and-functions.sql#L75)。
+9. 回到第17、21章，把Kafka callback、SQL batch Future、COMMIT和通知放到同一时序线。
+
+推荐断点：`DeviceController.saveDevice` -> `DeviceServiceImpl.saveDeviceWithoutCredentials` -> `JpaDeviceDao.saveAndFlush` -> `JpaAbstractDao.save`；批处理路径则断在`JpaAttributeDao.addToQueue` -> `TbSqlBlockingQueue` -> `AttributeKvInsertRepository.saveOrUpdate`。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard写PostgreSQL只有JPA一种方式吗？
+
+不是。实体CRUD主要用JPA，高频KV用JdbcTemplate batch，Alarm/TTL等使用native SQL和PL/pgSQL。
+
+### 2. Hibernate是否自动维护生产schema？
+
+不维护，`ddl-auto=none`；安装和升级SQL脚本是schema真相。
+
+### 3. 新实体UUID在哪里生成？
+
+`JpaAbstractDao.save`在应用内生成time-based UUID，并从UUID计算`created_time`。
+
+### 4. saveAndFlush是否等于commit？
+
+不等于。flush只把SQL发送到DB并触发约束检查，外层事务之后仍可能回滚。
+
+### 5. Device和默认credentials是否同一事务？
+
+标准`@Transactional saveDevice(Device)`入口下是；必须从具体入口确认，未标注事务的重载不能自动作同样假设。
+
+### 6. Spring self-invocation会开启新事务吗？
+
+不会。内部private/this调用不经过代理，只沿用已有事务或无事务。
+
+### 7. cache为什么使用TransactionalEventListener？
+
+让事务提交后再失效，避免数据库rollback但缓存已经被清理或发布错误状态。
+
+### 8. Attribute为什么不用JpaRepository逐行save？
+
+写频率高，需要跨请求合批、减少round trip并统一UPSERT。
+
+### 9. Attribute batch默认参数是什么？
+
+默认3条writer、batch 1000、最大延迟50ms，并按复合主键排序。
+
+### 10. SQL queue是否提供背压？
+
+不提供；底层是无界`LinkedBlockingQueue`。
+
+### 11. Attribute的last_update_ts能阻止旧值覆盖吗？
+
+不能，当前UPDATE/UPSERT没有比较existing timestamp。
+
+### 12. PostgreSQL telemetry如何分区？
+
+`ts_kv`按`ts`做RANGE partition，默认按UTC月份动态创建，也支持days/years/indefinite。
+
+### 13. 为什么有ts_kv_indefinite？
+
+它是DEFAULT partition，在目标range child不存在或创建失败时承接写入。
+
+### 14. 分区DDL为什么用NOT_SUPPORTED？
+
+让DDL脱离父事务，避免创建错误把业务事务标成rollback-only。
+
+### 15. DDL在事务外有什么代价？
+
+分区可能已创建但业务写失败；DDL与数据写不是原子操作。
+
+### 16. SQL telemetry重复点如何处理？
+
+按`entity_id,key,ts`执行`ON CONFLICT DO UPDATE`。
+
+### 17. system TTL如何清理SQL telemetry？
+
+先drop完整过期range partition，再运行procedure按tenant/customer TTL删除行。
+
+### 18. 为什么还需要行DELETE？
+
+不同tenant/customer可有不同TTL，无法总是按全局chunk/partition边界整体drop。
+
+### 19. Alarm为什么使用PL/pgSQL function？
+
+把读取、`FOR UPDATE`、状态判断和更新封装在数据库事务内，减少跨网络竞态。
+
+### 20. Alarm首次并发创建是否严格去重？
+
+不严格。没有现有行可锁，active索引也不是UNIQUE。
+
+### 21. 默认Hikari pool多大？
+
+每个服务实例16条连接。
+
+### 22. JpaExecutorService线程数是多少？
+
+直接使用Hikari maximumPoolSize，因此默认也是16。
+
+### 23. 为什么不能把pool从16直接调到100？
+
+所有服务实例的pool会累加，可能超过PostgreSQL容量并增加后端进程、内存和上下文切换，吞吐未必提高。
+
+### 24. PostgreSQL UPDATE为什么需要关注VACUUM？
+
+MVCC UPDATE/DELETE留下dead tuple；长事务和vacuum滞后会造成表/索引膨胀并拖慢写入。
+
+### 25. 排查PostgreSQL慢写的第一条链路是什么？
+
+先定位请求、Actor或Kafka阶段，再看SQL queue depth、Hikari active/pending、pg_stat_activity/locks、WAL/checkpoint、磁盘延迟、dead tuples和autovacuum。
+
+---
+
+[上一篇：21 TimescaleDB 写入流程](../21-timescale-write/README.md) | [返回全书目录](../../SUMMARY.md) | [下一篇：23 HTTP 设备 API 流程](../23-http-device-api/README.md)

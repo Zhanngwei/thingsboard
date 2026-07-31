@@ -1,0 +1,614 @@
+# 23 HTTP 设备 API 流程
+
+> 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章分析设备固件使用的 `/api/v1/{deviceToken}/...` Transport API，不分析平台用户使用JWT访问的 `/api/plugins/telemetry`。
+
+[上一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/23-http-device-api.svg) | [下一篇：24 CoAP 消息流程（待分析）](../../SUMMARY.md#chapter-24)
+
+---
+
+## 一、流程目标
+
+HTTP Device API让不适合维持MQTT连接的设备通过短请求完成遥测、Client Attributes、RPC、Claim、Provision和OTA下载。它复用统一`TransportService`，因此HTTP只负责路由、JSON/Protobuf转换和`DeferredResult`响应，不直接调用Telemetry DAO。
+
+核心入口是 [DeviceApiController](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L86)：
+
+```mermaid
+flowchart TB
+    DEVICE[HTTP Device] --> API["/api/v1/{deviceToken}/..."]
+    API --> AUTH[ValidateDeviceTokenRequestMsg]
+    AUTH --> CORE[Core Transport API Service]
+    CORE --> CREDS[(device_credentials/cache)]
+    CREDS --> SESSION[SessionInfoProto]
+    SESSION --> OP{operation}
+    OP -->|telemetry / post attributes| RE[Rule Engine Queue]
+    OP -->|get attributes / subscribe / RPC| ACTOR[Core Queue -> Device Actor]
+    OP -->|OTA| CACHE[OTA data cache]
+    OP -->|provision| PROV[Provision service]
+```
+
+HTTP API与平台REST的关键差异：
+
+- 身份是Device access token，不是User JWT。
+- token位于URL path，网关/access log必须脱敏。
+- 每个请求通常重新验证token并创建新的随机sessionId。
+- Telemetry/Attribute POST的200只确认消息交给Queue producer。
+- RPC/Attribute长轮询会建立临时SYNC session，占用server async request和内存状态。
+
+---
+
+## 二、入口
+
+### 2.1 路由清单
+
+| HTTP路由 | Controller方法 | Transport消息 | 主要去向 |
+|---|---|---|---|
+| `GET /{token}/attributes` | `getDeviceAttributes(...)` | `GetAttributeRequestMsg` | Device Actor -> Attribute Service |
+| `POST /{token}/attributes` | `postDeviceAttributes(...)` | `PostAttributeMsg` | Rule Engine Queue |
+| `POST /{token}/telemetry` | `postTelemetry(...)` | `PostTelemetryMsg` | Rule Engine Queue |
+| `POST /{token}/claim` | `claimDevice(...)` | `ClaimDeviceMsg` | Device Actor |
+| `GET /{token}/rpc` | `subscribeToCommands(...)` | `SubscribeToRPCMsg` | SYNC session + Device Actor |
+| `POST /{token}/rpc/{requestId}` | `replyToCommand(...)` | `ToDeviceRpcResponseMsg` | Device Actor |
+| `POST /{token}/rpc` | `postRpcRequest(...)` | `ToServerRpcRequestMsg` | Rule Engine Queue + pending map |
+| `GET /{token}/attributes/updates` | `subscribeToAttributes(...)` | `SubscribeToAttributeUpdatesMsg` | SYNC session + Device Actor |
+| `GET /{token}/firmware` | `getFirmware(...)` | `GetOtaPackageRequestMsg` | Core metadata + OTA cache |
+| `GET /{token}/software` | `getSoftware(...)` | 同上 | Core metadata + OTA cache |
+| `POST /provision` | `provisionDevice(...)` | `ProvisionDeviceRequestMsg` | Transport API request/reply |
+
+```mermaid
+flowchart LR
+    T[deviceToken routes] --> A[attributes GET/POST]
+    T --> M[telemetry POST]
+    T --> R[RPC GET/POST]
+    T --> C[claim]
+    T --> O[firmware/software]
+    P["/api/v1/provision"] --> V[provision request]
+    A --> AUTH[common token validation]
+    M --> AUTH
+    R --> AUTH
+    C --> AUTH
+    O --> AUTH
+```
+
+Controller只在`service.type=tb-transport`，或monolith且Transport API与HTTP均启用时装配。独立HTTP Transport默认端口8081；monolith HTTP默认端口8080。
+
+### 2.2 Telemetry JSON格式
+
+`JsonConverter.convertToTelemetryProto(...)`接受：
+
+1. 无timestamp对象，使用服务器当前时间。
+2. `{"ts":..., "values":{...}}`。
+3. 带timestamp对象数组。
+
+每个timestamp组在`DefaultTransportService`中变成独立`TbMsg`，一个HTTP请求可能向Rule Engine Queue发送多条record。
+
+---
+
+## 三、完整调用链
+
+### 3.1 Token验证
+
+| 步骤 | 类/方法 | 输入 | 输出 | 为什么 |
+|---|---|---|---|---|
+| 1 | `DeviceApiController.postTelemetry(...)` | path token、JSON | `DeferredResult` | Servlet线程尽快释放 |
+| 2 | `DefaultTransportService.process(DEFAULT, ValidateDeviceTokenRequestMsg, callback)` | raw token | Transport API request | HTTP与其他协议统一认证 |
+| 3 | `TbQueueRequestTemplate.send(...)` | correlation UUID + protobuf | Future response | 支持Transport/Core微服务拆分 |
+| 4 | `DefaultTransportApiService.handle(...)` | `TransportApiRequestMsg` | handlerExecutor任务 | Core集中访问credentials |
+| 5 | `validateCredentials(token, ACCESS_TOKEN)` | token | device/profile/credentials proto | 查cache/`device_credentials` |
+| 6 | Transport callback | response | `ValidateDeviceCredentialsResponse` | Transport本地缓存Profile |
+| 7 | `SessionInfoCreator.create(...)` | device/profile + random UUID | `SessionInfoProto` | 后续统一路由与限流 |
+
+源码：[DeviceApiController.java:245](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L245)、[DefaultTransportService.java:545](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L545)、[DefaultTransportApiService.java:239](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L239)。
+
+```mermaid
+sequenceDiagram
+    participant D as HTTP Device
+    participant H as DeviceApiController
+    participant T as DefaultTransportService
+    participant Q as Transport API Request Template
+    participant C as Core TransportApiService
+    participant DB as Credentials Cache/PostgreSQL
+    D->>H: POST /api/v1/token/telemetry
+    H->>T: ValidateDeviceTokenRequestMsg
+    T->>Q: request with correlation UUID
+    Q->>C: TransportApiRequestMsg
+    C->>DB: find credentials by credentials_id
+    DB-->>C: credentials + device/profile
+    C-->>Q: ValidateCredResponse
+    Q-->>T: correlated Future
+    T-->>H: SessionInfoProto
+```
+
+invalid token返回HTTP 401；Transport API调用异常返回500。这里不是Spring Security JWT认证链。
+
+### 3.2 Telemetry POST
+
+1. Controller把JSON转为`PostTelemetryMsg`。
+2. [DefaultTransportService.process(PostTelemetryMsg)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L825)统计datapoint并执行tenant/device rate limit。
+3. 更新设备activity。
+4. 每个`TsKvListProto`组装metadata：deviceName、deviceType、`ts`。
+5. Device Profile缓存提供default Rule Chain与Queue name。
+6. 创建`TbMsgType.POST_TELEMETRY_REQUEST`。
+7. `ruleEngineMsgProducer.send(...)`。
+8. producer callback成功后`HttpOkCallback`把`DeferredResult`设为200。
+
+```mermaid
+flowchart TB
+    JSON[Telemetry JSON] --> PROTO[PostTelemetryMsg]
+    PROTO --> LIMIT{rate and entity limits}
+    LIMIT -->|reject| ERROR[callback error]
+    LIMIT -->|pass| GROUP[each timestamp group]
+    GROUP --> META[deviceName deviceType ts]
+    META --> TBMSG[POST_TELEMETRY_REQUEST TbMsg]
+    TBMSG --> PRODUCER[Rule Engine Queue producer]
+    PRODUCER -->|broker ack| OK[HTTP 200]
+    PRODUCER -->|send error| E500[HTTP 500]
+    PRODUCER -. later .-> RULE[Rule Chain and database]
+```
+
+**HTTP 200不表示Timescale/Cassandra/PostgreSQL落库。** 它对应Queue producer callback；Rule Engine consumer、Save Timeseries Node和数据库均发生在之后。
+
+### 3.3 Client Attributes POST
+
+`JsonConverter.convertToAttributesProto`生成`PostAttributeMsg`。Transport加入`deviceName`、`deviceType`和`notifyDevice=false` metadata，以`POST_ATTRIBUTES_REQUEST`投递Rule Engine。默认Rule Chain中的Save Attributes Node最终写`attribute_kv CLIENT_SCOPE`。
+
+它同样在producer callback时返回200，不等待Attribute SQL batch。
+
+### 3.4 GET Attributes
+
+GET不是Rule Engine消息。Controller验证token后：
+
+1. `registerSyncSession(...)`在Transport本地`sessions` map登记临时session并设置timeout。
+2. `GetAttributeRequestMsg`经Core Queue发送给Device Actor。
+3. Device Actor/Subscription Manager查询Client/Shared Attributes。
+4. response经目标Transport notification topic返回。
+5. `HttpSessionListener.onGetAttributesResponse`写HTTP JSON。
+6. `DefaultTransportService`看到SYNC session后注销并取消timeout task。
+
+```mermaid
+sequenceDiagram
+    participant H as HTTP Controller
+    participant T as TransportService
+    participant Core as Core Queue Consumer
+    participant A as Device Actor
+    participant DB as Attribute Service
+    participant N as Transport Notification
+    H->>T: registerSyncSession + GetAttributeRequest
+    T->>Core: ToCoreMsg
+    Core->>A: TransportToDeviceActorMsg
+    A->>DB: read client/shared keys
+    DB-->>A: values
+    A->>N: ToSessionMsg
+    N->>T: service-specific notification
+    T->>H: listener.onGetAttributesResponse
+    T->>T: deregister SYNC session
+```
+
+### 3.5 Server-side RPC长轮询
+
+`GET /rpc`是deprecated long polling：
+
+- 每次请求注册一个SYNC session。
+- 发送`SubscribeToRPCMsg`给Device Actor。
+- Server RPC到达时`HttpSessionListener.onToDeviceRpcRequest`返回JSON，并额外报告`RpcStatus.DELIVERED`。
+- timeout回调返回408并注销session。
+
+HTTP没有持续连接，所以每取一条RPC通常需要下一次GET重新订阅。
+
+### 3.6 Client-side RPC
+
+`POST /rpc`把method/params转换为`TO_SERVER_RPC_REQUEST`，写入Rule Engine Queue，并把`sessionId-requestId`记录到`toServerRpcPendingMap`。规则链返回`ToServerRpcResponseMsg`后写HTTP response；`clientSideRpcTimeout`触发时返回包含`error=timeout`的JSON。
+
+---
+
+## 四、消息流
+
+```mermaid
+flowchart TB
+    HTTP[Tomcat NIO request] --> DR[DeferredResult]
+    DR --> AUTHQ[Transport API request/reply]
+    AUTHQ --> COREAUTH[Core credential validation]
+    COREAUTH --> SESSION[SessionInfoProto]
+    SESSION --> UPLINK{uplink type}
+    UPLINK -->|telemetry/attributes/client RPC| LIMIT[rate limit + activity]
+    LIMIT --> REQ[Rule Engine Queue]
+    UPLINK -->|get/subscription/server RPC response| CORE[Core Queue]
+    CORE --> ACTOR[Device Actor]
+    REQ --> CALLBACK[producer callback]
+    CALLBACK --> DR
+    ACTOR --> TN[Transport notification topic]
+    TN --> LISTENER[HttpSessionListener]
+    LISTENER --> DR
+```
+
+### 4.1 确认层级
+
+| HTTP操作 | 200/响应表示什么 | 不表示什么 |
+|---|---|---|
+| Telemetry POST | 所有timestamp组Queue producer成功 | Rule Chain/DB完成 |
+| Attributes POST | Queue producer成功 | `attribute_kv`提交 |
+| GET Attributes | Actor返回查询结果 | 后续订阅持续存在 |
+| GET RPC | 一条RPC到达并标DELIVERED | 设备业务执行成功 |
+| RPC response POST | response消息交给Core路径 | Server调用方已消费 |
+| Client RPC POST | Rule Chain响应或timeout | 规则链所有外部副作用回滚 |
+| OTA GET | metadata匹配且cache返回bytes | 固件已安装 |
+
+---
+
+## 五、时序图
+
+完整PlantUML覆盖token验证、Telemetry、Attributes GET与双向RPC：
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="ThingsBoard HTTP设备API完整时序图"></a>
+
+可直接查看 [PlantUML源文件](sequence.puml)。
+
+```mermaid
+stateDiagram-v2
+    [*] --> HTTPAccepted
+    HTTPAccepted --> TokenValidating
+    TokenValidating --> Unauthorized: no deviceInfo
+    TokenValidating --> SessionReady: valid token
+    SessionReady --> QueuePending: telemetry or attributes
+    SessionReady --> SyncSession: get or long poll
+    QueuePending --> Http200: producer callback
+    QueuePending --> Http500: producer failure
+    SyncSession --> Response: notification arrives
+    SyncSession --> Http408: timeout
+    Response --> Deregistered
+    Http200 --> [*]
+    Http500 --> [*]
+    Http408 --> [*]
+    Unauthorized --> [*]
+    Deregistered --> [*]
+```
+
+---
+
+## 六、数据变化
+
+| 状态 | 位置 | 创建/更新 | 生命周期 |
+|---|---|---|---|
+| token request correlation | Transport API template | 每HTTP请求一个UUID | response/timeout后清理 |
+| `SessionInfoProto` | callback对象 | 每次认证创建随机sessionId | 当前HTTP操作 |
+| SYNC session | Transport `sessions` map | GET attributes、long poll、client RPC | response或timeout注销 |
+| scheduled timeout | Scheduler | 每个SYNC session | response时cancel或到期执行 |
+| client RPC pending | `toServerRpcPendingMap` | key=sessionId-requestId | response或RPC timeout移除 |
+| Rule Engine record | broker topic | telemetry/attribute/client RPC | 按Queue策略消费/commit |
+| Core Queue record | broker topic | get/subscription/RPC response/claim | owner Device Actor处理 |
+| activity/rate counters | Transport内存/usage统计 | 每次通过limit的操作 | 周期统计/失效 |
+| PostgreSQL/Cassandra | 下游Rule Node/DAO | telemetry、attribute、alarm等 | 不在HTTP producer事务 |
+
+```mermaid
+flowchart LR
+    REQ[HTTP request] --> CORR[request correlation]
+    REQ --> SID[random session UUID]
+    SID --> SYNC{needs response session?}
+    SYNC -->|yes| MAP[(sessions map)]
+    MAP --> TIMER[scheduled timeout]
+    SYNC -->|client RPC| PENDING[(RPC pending map)]
+    CORR --> AUTHRESP[auth response]
+    TIMER --> CLEAN[deregister]
+    PENDING --> CLEAN
+```
+
+HTTP Transport本身不建立长期Device Actor。每次GET long poll只是Transport侧临时session；Device Actor由Core owner按消息惰性创建/复用。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类型
+
+| 类型 | 包路径 | 职责 |
+|---|---|---|
+| `DeviceApiController` | `org.thingsboard.server.transport.http` | HTTP路由、JSON转换、DeferredResult |
+| `HttpTransportContext` | 同包 | timeout、Transport依赖、Tomcat async配置 |
+| `DefaultTransportService` | `org.thingsboard.server.common.transport.service` | 认证request/reply、限流、session、Core/RE Queue |
+| `DefaultTransportApiService` | `org.thingsboard.server.service.transport` | Core侧credentials/profile验证与Provision |
+| `SessionInfoCreator` | Transport common | 认证结果转SessionInfoProto |
+| `SessionMetaData` | Transport service | session type、listener、subscription flag、timeout Future |
+| `HttpSessionListener` | `DeviceApiController`内部类 | notification转HTTP response |
+| `MsgPackCallback` | Transport service | 多timestamp telemetry producer callback聚合 |
+| `TransportTbQueueCallback` | Transport service | broker callback适配Transport callback |
+
+### 7.2 DeferredResult与线程
+
+Controller创建无显式timeout的`DeferredResult`，实际异步上限由Tomcat connector `asyncTimeout=max_request_timeout`控制；业务SYNC session使用`request_timeout`或用户给出的long poll timeout。
+
+`HttpTransportContext`默认：
+
+- request timeout 60000ms。
+- max request timeout 300000ms。
+- Tomcat NIO async connector，不为每个long poll独占一个Servlet线程。
+
+callback可能运行在Transport 20并行度work-stealing pool或notification consumer提交的任务中，`DeferredResult.setResult`负责重新调度HTTP响应。
+
+### 7.3 token path的安全影响
+
+token出现在URL，不是Authorization header。反向代理、APM、access log、WAF和trace如果记录完整path，就会泄露可直接认证设备的credentials。生产应在最外层按`/api/v1/{token}/...`模式脱敏，并避免把完整URI写入告警。
+
+token验证调用Core侧 [DeviceCredentialsService.findDeviceCredentialsByCredentialsId](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L296)，通常可命中credentials cache；cache miss才访问PostgreSQL。
+
+### 7.4 多timestamp pack
+
+`MsgPackCallback`的计数是`TsKvListProto`组数，不是KV key数。任意Queue producer失败会触发HTTP错误；已成功发送的其他组不会撤销。HTTP重试会重新发送所有组，因此下游依赖`entity,key,ts` UPSERT等幂等能力。
+
+---
+
+## 八、Actor 分析
+
+```mermaid
+flowchart TB
+    TELE[Telemetry POST] --> RE[Rule Engine Queue]
+    RE --> RACT[Rule Chain/Node Actors]
+    GET[GET attributes] --> CQ[Core Queue]
+    SUB[RPC/Attribute subscribe] --> CQ
+    RESP[RPC response] --> CQ
+    CQ --> APP[App Actor]
+    APP --> TENANT[Tenant Actor]
+    TENANT --> DEVICE[Device Actor]
+    DEVICE --> NOTIFY[Transport notification]
+```
+
+HTTP telemetry和client attributes不先进入Device Actor；它们直接成为Rule Engine消息。以下操作需要Device Actor：
+
+- GET attributes。
+- subscribe RPC/attributes。
+- server RPC response。
+- claim、session类消息。
+
+Device Actor保存订阅和RPC路由状态，保证设备对象级串行。Transport侧`HttpSessionListener`只负责把到达当前service/session的消息转换为HTTP response。
+
+HTTP long poll为什么仍需要Actor：RPC可能由任意Core/API节点发起，Device Actor是设备状态与会话的唯一串行协调点，ClusterService再把消息路由到持有SYNC session的HTTP Transport实例。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 四类topic
+
+```mermaid
+flowchart LR
+    HTTP[HTTP Transport] --> TA[Transport API request topic]
+    TA --> COREAUTH[Core auth handler]
+    COREAUTH --> TAR[correlated response]
+    HTTP --> RE[Rule Engine data topic]
+    HTTP --> CORE[Core data topic]
+    CORE --> ACTOR[Device Actor]
+    ACTOR --> TN[per-service Transport notification topic]
+    TN --> HTTP
+```
+
+- Transport API request/reply：token验证、Provision、OTA metadata。
+- Rule Engine Queue：telemetry、attributes、client RPC。
+- Core Queue：subscription、GET attributes、claim、RPC response。
+- Transport notification：Actor到具体Transport service的下行。
+
+monolith可以使用in-memory Queue provider，但代码仍经过相同template/producer抽象；微服务部署才跨broker。
+
+### 9.2 HTTP与broker确认
+
+`ruleEngineMsgProducer.send` callback在broker确认后完成HTTP POST。它不等待consumer。若HTTP客户端超时并重试，而第一次producer其实已成功，消息会重复；没有HTTP idempotency key或跨请求去重。
+
+SYNC session notification consumer在每个poll batch处理后commit。listener callback异步提交给`transportCallbackExecutor`后，consumer即可commit；进程在callback执行前宕机可能丢失该HTTP响应，而上游Actor不会因为HTTP未回包自动重放。
+
+---
+
+## 十、数据库分析
+
+```mermaid
+flowchart TB
+    TOKEN[deviceToken] --> CACHE{credentials cache}
+    CACHE -->|miss| DC[(device_credentials)]
+    DC --> DEV[(device)]
+    DEV --> PROFILE[(device_profile)]
+    AUTH[SessionInfo] --> RE[Rule Engine]
+    RE --> ATTR[(attribute_kv)]
+    RE --> HIST[(ts_kv / Cassandra)]
+    RE --> LATEST[(ts_kv_latest)]
+    AUTH --> ACTOR[Device Actor]
+    ACTOR --> READ[attribute/RPC read paths]
+```
+
+HTTP Controller不直接使用Repository。数据库作用分为：
+
+1. **认证控制面**：Core读取credentials、device、profile，返回Transport所需快照。
+2. **Telemetry数据面**：Rule Engine节点决定是否写history/latest、后端类型和TTL。
+3. **Attribute数据面**：Save Attributes Node写Client Scope；GET经Actor读取Client/Shared。
+4. **RPC**：persistent server-side RPC可能写`rpc`；普通HTTP long poll状态主要在内存/Queue。
+5. **OTA**：PostgreSQL保存metadata/OID，HTTP下载路径从共享或本地OTA cache读bytes。
+
+### 10.1 为什么不让HTTP直接写DB
+
+- 所有Transport协议共享Rule Chain入口。
+- Device Profile决定default Rule Chain/Queue。
+- Rule Engine可以过滤、转换、告警、转发和选择是否保存。
+- Queue隔离入口峰值与数据库延迟。
+- 代价是HTTP 200与最终持久化解耦，端到端不提供同步事务语义。
+
+独立架构图：
+
+[点击新窗口打开原始 SVG](../../assets/architecture/23-http-device-api.svg)
+
+<a class="static-svg-thumbnail" href="../../assets/architecture/23-http-device-api.svg" target="_blank" rel="noopener noreferrer"><img src="../../assets/architecture/23-http-device-api.svg" alt="ThingsBoard HTTP设备API架构图"></a>
+
+---
+
+## 十一、异常处理
+
+```mermaid
+flowchart TB
+    R[HTTP request] --> JSON{JSON parse}
+    JSON -->|bad| BAD[Spring 400 path]
+    JSON -->|ok| AUTH{token auth}
+    AUTH -->|no device| U[401]
+    AUTH -->|queue/error| E500[500]
+    AUTH -->|valid| LIMIT{limits}
+    LIMIT -->|reject| LERR[callback error]
+    LIMIT -->|pass| SEND{Queue send / session}
+    SEND -->|producer failure| E500
+    SEND -->|producer ack| OK[200 for POST]
+    SEND -->|notification| RESP[200 response payload]
+    SEND -->|timeout| T408[408 or RPC timeout JSON]
+```
+
+### 11.1 失败矩阵
+
+| 失败点 | HTTP表现 | 已发生副作用 |
+|---|---|---|
+| malformed JSON | 通常400或Controller异常映射 | 尚未认证/发送 |
+| invalid token | 401 | Core完成一次credentials查询 |
+| Transport API timeout/error | 500或容器timeout | request可能仍在Core处理 |
+| rate limit | callback error，通常500路径 | activity/usage依分支而定，未发业务Queue |
+| 多timestamp第N条producer失败 | 500 | 前N-1条可能已在broker |
+| HTTP客户端先超时 | 客户端重试 | 原producer/Actor/DB仍可能完成 |
+| long poll timeout | 408 | session注销、订阅Actor消息可能已发送 |
+| notification已commit但callback前宕机 | HTTP断开 | Actor认为消息已投递到Transport |
+| device删除 | long poll返回403 | session随后清理 |
+| client RPC timeout | JSON error=timeout | Rule Chain外部副作用可能稍后完成 |
+
+### 11.2 取消不会向下游传播
+
+客户端断开或Tomcat async timeout不会自动取消已经写入Queue的record、Actor消息或数据库Future。排障时应使用message/session/correlation id跨层关联，而不是只看HTTP access status。
+
+### 11.3 重试策略
+
+设备可以重试Telemetry POST，但相同payload最好携带原timestamp；否则无timestamp格式每次使用新的server time，会变成新历史点。Attribute是latest状态，重复写通常收敛；Rule Chain中的HTTP/Kafka等外部节点仍可能重复。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    A[1 DeviceApiController routes] --> B[2 HttpTransportContext]
+    B --> C[3 DefaultTransportService auth]
+    C --> D[4 Core TransportApiService]
+    D --> E[5 telemetry/attribute process]
+    E --> F[6 Core and RE send]
+    F --> G[7 SYNC session notification]
+    G --> H[8 downstream Rule Nodes]
+```
+
+推荐顺序：
+
+1. [DeviceApiController路由](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L158)：先列出每个HTTP方法与Proto。
+2. [HttpTransportContext](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/HttpTransportContext.java#L44)：确认两个timeout。
+3. [DefaultTransportService.doProcess](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L637)：跟Transport API Future。
+4. [DefaultTransportApiService.handle](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L239)：看Core验证credentials。
+5. [Telemetry与Attribute process](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L825)：对比RE Queue和Device Actor路径。
+6. [sendToRuleEngine](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1636)：确认callback层级。
+7. [registerSyncSession](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1223)和notification dispatch：确认response/timeout注销。
+8. 回读第9、10、17章，分别连接Telemetry、RPC和Kafka确认语义。
+
+推荐断点：`DeviceApiController.postTelemetry` -> `DefaultTransportService.process(ValidateDeviceToken...)` -> `DefaultTransportApiService.validateCredentials` -> `DefaultTransportService.process(PostTelemetryMsg)` -> `sendToRuleEngine` -> `HttpOkCallback.onSuccess`。
+
+---
+
+## 十三、常见面试题
+
+### 1. HTTP Device API使用JWT吗？
+
+不使用用户JWT；它使用URL path中的Device access token。
+
+### 2. token在哪里验证？
+
+HTTP Transport通过Transport API request/reply把token交给Core的`DefaultTransportApiService`验证。
+
+### 3. 为什么不在HTTP Transport直接查device_credentials？
+
+支持Transport微服务不直接访问主数据库，并集中复用Core缓存、credentials和Profile逻辑。
+
+### 4. invalid token返回什么？
+
+认证response没有deviceInfo时返回HTTP 401。
+
+### 5. token放URL有什么风险？
+
+反向代理、access log、APM和trace可能记录完整path并泄露credentials。
+
+### 6. Telemetry POST 200表示数据库成功吗？
+
+不表示，只表示对应Rule Engine Queue producer callback成功。
+
+### 7. 一个HTTP telemetry数组会产生几条Queue消息？
+
+每个独立timestamp组一条`TbMsg`；组内可有多个key。
+
+### 8. 多组中一条producer失败会回滚前面的消息吗？
+
+不会，HTTP返回错误但已成功发送的record保留。
+
+### 9. Client Attributes POST走Device Actor吗？
+
+不先走Device Actor；它直接成为`POST_ATTRIBUTES_REQUEST` Rule Engine消息。
+
+### 10. GET Attributes为什么走Device Actor？
+
+需要统一处理Client/Shared范围、实体状态和跨节点session response。
+
+### 11. HTTP long poll session存在哪里？
+
+持有请求的Transport实例`sessions` ConcurrentMap中。
+
+### 12. SYNC session何时注销？
+
+目标notification处理后或scheduled timeout触发后注销并取消/完成timer。
+
+### 13. 默认HTTP request timeout是多少？
+
+业务默认60000ms，Tomcat async max默认300000ms。
+
+### 14. GET /rpc为什么被deprecated？
+
+每条下行消息都需要HTTP长轮询，网络和server async state成本高于MQTT/CoAP持续会话。
+
+### 15. Server RPC在HTTP中何时标DELIVERED？
+
+`HttpSessionListener`把请求写入HTTP response时向TransportService报告DELIVERED。
+
+### 16. DELIVERED表示设备业务执行成功吗？
+
+不表示，只表示请求已交给设备HTTP响应；业务结果要等`POST /rpc/{requestId}`。
+
+### 17. Client-side RPC pending key是什么？
+
+`sessionId-requestId`，HTTP路径requestId固定从0开始但sessionId每次随机。
+
+### 18. Client RPC超时会取消Rule Engine处理吗？
+
+不会，只移除pending并返回timeout response。
+
+### 19. HTTP请求断开会取消Queue消息吗？
+
+不会，producer、consumer、Actor和数据库仍可能继续。
+
+### 20. 无timestamp telemetry重试是否幂等？
+
+通常不幂等，每次转换会使用新的server timestamp并形成新历史点。
+
+### 21. 有原timestamp的相同telemetry重试呢？
+
+SQL/Timescale同`entity,key,ts`会UPSERT，Cassandra同主键也覆盖，但Rule Chain其他副作用仍可能重复。
+
+### 22. HTTP Transport会长期占用Servlet线程吗？
+
+使用DeferredResult和Tomcat NIO async，不持续占用请求线程，但会占session map、timer和连接资源。
+
+### 23. monolith是否完全绕过Queue抽象？
+
+不绕过代码抽象；可由in-memory provider实现，但仍通过Transport API/Core/RE模板。
+
+### 24. OTA下载经过Device Actor吗？
+
+不经过；认证后请求Core metadata，再从OTA package data cache取完整或range bytes。
+
+### 25. 排查HTTP telemetry“200但无数据”先看什么？
+
+按token auth、Transport producer、Rule Engine consumer/Rule Chain、Save Timeseries Node、SQL/Cassandra queue和数据库逐层检查，不能停在HTTP access log。
+
+---
+
+[上一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md) | [返回全书目录](../../SUMMARY.md) | [下一篇：24 CoAP 消息流程（待分析）](../../SUMMARY.md#chapter-24)

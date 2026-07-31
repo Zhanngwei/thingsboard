@@ -1,0 +1,158 @@
+@startuml
+title ThingsBoard 3.6 HTTP Device API: token auth, telemetry, attributes and RPC
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 210
+
+participant "HTTP Device" as Device
+participant "Tomcat NIO" as Tomcat
+participant "DeviceApiController" as Http
+participant "DefaultTransportService" as Transport
+participant "Transport API Template" as ApiTemplate
+participant "Core TransportApiService" as CoreAuth
+database "Credentials Cache / PostgreSQL" as Credentials
+participant "Rule Engine Producer" as ReProducer
+participant "Rule Engine Consumer" as ReConsumer
+participant "Rule Node Actors" as RuleActors
+database "Telemetry / Attribute DB" as DB
+participant "Core Queue / Device Actor" as DeviceActor
+participant "Transport Notification" as Notify
+participant "HTTP Session Listener" as Listener
+
+== Common token validation ==
+Device -> Tomcat : /api/v1/{deviceToken}/operation
+Tomcat -> Http : controller method and DeferredResult
+Http -> Transport : process(DEFAULT, ValidateDeviceTokenRequestMsg)
+Transport -> ApiTemplate : send request with correlation UUID
+ApiTemplate -> CoreAuth : TransportApiRequestMsg
+CoreAuth -> Credentials : find credentials by credentials_id
+alt ACCESS_TOKEN credentials and device exist
+  Credentials --> CoreAuth : credentials + device + profile
+  CoreAuth --> ApiTemplate : ValidateCredResponse with deviceInfo
+  ApiTemplate --> Transport : correlated Future
+  Transport -> Transport : cache profile and create SessionInfo
+  Transport --> Http : auth callback success
+else invalid token
+  Credentials --> CoreAuth : null or wrong credentials type
+  CoreAuth --> Transport : empty credential response
+  Transport --> Http : no deviceInfo
+  Http --> Tomcat : HTTP 401
+  Tomcat --> Device : Unauthorized
+end
+note over Device,Http
+  The device token is part of the URL path, not a user JWT.
+  Proxy, access and tracing logs must redact it.
+end note
+
+== Telemetry POST ==
+Device -> Http : POST /token/telemetry JSON
+Http -> Http : JsonConverter to PostTelemetryMsg
+Http -> Transport : process(sessionInfo, telemetry, HttpOkCallback)
+Transport -> Transport : count data points, check limits, record activity
+loop each timestamp group
+  Transport -> Transport : build metadata and POST_TELEMETRY_REQUEST TbMsg
+  Transport -> ReProducer : send to profile queue and Rule Chain
+end
+alt every producer callback succeeds
+  ReProducer --> Transport : MsgPackCallback success
+  Transport --> Http : HttpOkCallback.onSuccess
+  Http --> Device : HTTP 200
+else any producer callback fails
+  ReProducer --> Transport : callback failure
+  Transport --> Http : onError
+  Http --> Device : HTTP 500
+end
+ReProducer -> ReConsumer : broker record becomes available
+ReConsumer -> RuleActors : App/Tenant/RuleChain/Node Actors
+RuleActors -> DB : Save Timeseries and other nodes
+note over Http,DB
+  HTTP 200 is producer acknowledgement.
+  It does not wait for Rule Engine consumption or database commit.
+end note
+
+== Client Attributes POST ==
+Device -> Http : POST /token/attributes JSON
+Http -> Transport : PostAttributeMsg
+Transport -> Transport : metadata notifyDevice=false
+Transport -> ReProducer : POST_ATTRIBUTES_REQUEST
+ReProducer --> Http : producer callback
+Http --> Device : HTTP 200 or 500
+ReConsumer -> RuleActors : execute default Rule Chain
+RuleActors -> DB : save CLIENT_SCOPE attribute
+
+== GET Attributes with temporary SYNC session ==
+Device -> Http : GET /token/attributes?clientKeys&sharedKeys
+Http -> Transport : registerSyncSession(random sessionId, timeout)
+Transport -> Transport : sessions.put and schedule timeout
+Http -> Transport : process(GetAttributeRequestMsg)
+Transport -> DeviceActor : Core Queue to partition owner
+DeviceActor -> DB : read Client / Shared attributes
+DB --> DeviceActor : values
+DeviceActor -> Notify : ToSessionMsg to HTTP serviceId
+Notify -> Transport : notification record
+Transport -> Listener : onGetAttributesResponse
+Listener -> Http : DeferredResult JSON 200
+Transport -> Transport : deregister SYNC session and cancel timer
+Http --> Device : attributes JSON
+
+== Deprecated server RPC long poll ==
+Device -> Http : GET /token/rpc?timeout
+Http -> Transport : registerSyncSession and SubscribeToRPCMsg
+Transport -> DeviceActor : subscribe this session to RPC
+alt server RPC arrives
+  DeviceActor -> Notify : ToDeviceRpcRequestMsg
+  Notify -> Listener : onToDeviceRpcRequest
+  Listener -> Http : HTTP JSON response
+  Listener -> Transport : report RpcStatus.DELIVERED
+  Transport -> DeviceActor : status via Core Queue
+  Transport -> Transport : deregister one-shot SYNC session
+  Http --> Device : requestId, method, params
+else long poll timeout
+  Transport -> Listener : SessionCloseNotification
+  Listener -> Http : HTTP 408
+  Transport -> Transport : deregister session
+  Http --> Device : Request Timeout
+end
+
+== Device replies to server RPC ==
+Device -> Http : POST /token/rpc/{requestId}
+Http -> Transport : ToDeviceRpcResponseMsg
+Transport -> DeviceActor : Core Queue response
+Transport --> Http : producer callback
+Http --> Device : HTTP 200
+
+== Client-side RPC ==
+Device -> Http : POST /token/rpc {method, params}
+Http -> Transport : registerSyncSession
+Transport -> ReProducer : TO_SERVER_RPC_REQUEST
+Transport -> Transport : pending[sessionId-requestId] and timeout task
+ReConsumer -> RuleActors : process client RPC
+alt Rule Chain responds before timeout
+  RuleActors -> Notify : ToServerRpcResponse to service/session
+  Notify -> Listener : response
+  Listener -> Http : DeferredResult JSON
+  Transport -> Transport : remove pending and deregister
+  Http --> Device : RPC result
+else RPC timeout
+  Transport -> Transport : remove pending
+  Transport -> Listener : response error=timeout
+  Listener -> Http : JSON timeout result
+  Http --> Device : timeout response
+end
+note over Transport,RuleActors
+  HTTP timeout does not cancel a queued record or continuing Rule Node.
+end note
+@enduml

@@ -1,0 +1,169 @@
+@startuml
+title ThingsBoard 3.6 CoAP: server, identity, uplink, Observe and RPC
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 220
+
+participant "CoAP Device" as Device
+participant "Californium UDP/DTLS" as Cf
+participant "CoapTransportResource" as Resource
+participant "DTLS Certificate Verifier" as Verifier
+collections "DTLS / Client State Maps" as State
+participant "DefaultTransportService" as Transport
+participant "Transport API Template" as Api
+participant "Core Credential Handler" as CoreAuth
+database "Credentials Cache / PostgreSQL" as Credentials
+participant "Rule Engine Queue" as ReQueue
+participant "Rule Engine Actors" as ReActors
+database "Telemetry / Attribute DB" as DB
+participant "Core Queue / Device Actor" as DeviceActor
+participant "Transport Notification" as Notify
+participant "CoapSessionListener" as Listener
+
+== Server lifecycle ==
+Resource -> Cf : Spring init obtains shared CoapServer
+Resource -> Cf : add /api/v1 resource
+note over Cf,Resource
+  UDP 5683 is always configured when CoAP is enabled.
+  DTLS 5684 is optional. Resource children are dynamic path segments.
+end note
+
+== Optional X.509 DTLS handshake ==
+Device -> Cf : DTLS ClientHello and certificate
+Cf -> Verifier : verifyCertificate(remotePeer, chain)
+Verifier -> Verifier : validity check, canonical string, SHA3 hash
+Verifier -> Transport : ValidateDeviceX509CertRequestMsg
+Transport -> Api : correlated Transport API request
+Api -> CoreAuth : credential validation
+CoreAuth -> Credentials : find X.509 device credentials
+Credentials --> CoreAuth : device, profile, certificate string
+CoreAuth --> Verifier : ValidateDeviceCredentialsResponse
+Verifier -> Verifier : compare full certificate strings
+Verifier -> State : put(peer address, identity snapshot)
+Verifier --> Cf : CertificateVerificationResult
+
+== Plain token or DTLS identity resolution ==
+Device -> Cf : GET or POST /api/v1/{token}/{feature}
+Cf -> Resource : CoapExchange
+Resource -> Resource : schedule empty ACK after piggyback timeout
+alt request has DTLS session id and peer state
+  Resource -> State : lookup peer and update lastActivityTime
+  State --> Resource : credentials and DeviceProfile
+else no reusable DTLS identity
+  Resource -> Resource : decode access token from URI path
+  Resource -> Transport : ValidateDeviceTokenRequestMsg
+  Transport -> Api : correlated request
+  Api -> CoreAuth : validate token
+  CoreAuth -> Credentials : cache then device_credentials
+  Credentials --> CoreAuth : device, profile, credentials
+  CoreAuth --> Resource : validation response
+end
+alt identity invalid
+  Resource --> Device : 4.01 Unauthorized
+else identity valid
+  Resource -> State : getOrCreateClient(DeviceId), init adaptor
+end
+
+== Telemetry or Client Attributes POST ==
+Device -> Resource : POST telemetry or attributes payload
+Resource -> State : create random SYNC SessionInfo
+Resource -> Resource : JSON or profile Protobuf conversion
+Resource -> Transport : PostTelemetryMsg / PostAttributeMsg
+Transport -> Transport : limits, activity, metadata and routing
+Transport -> ReQueue : produce Rule Engine record
+alt producer callback succeeds
+  ReQueue --> Resource : callback success
+  Resource --> Device : 2.01 Created
+else producer callback fails
+  ReQueue --> Resource : callback error
+  Resource --> Device : 5.00 Internal Server Error
+end
+ReQueue -> ReActors : consumer poll later
+ReActors -> DB : Save Timeseries / Attributes node
+note over Resource,DB
+  Created acknowledges Queue production, not Rule Engine execution or DB commit.
+end note
+
+== One-shot GET Attributes ==
+Device -> Resource : GET attributes?clientKeys&sharedKeys
+Resource -> State : new random SYNC session
+Resource -> Transport : registerSyncSession(listener, 10 seconds)
+Resource -> Transport : GetAttributeRequestMsg
+Transport -> DeviceActor : Core Queue record
+DeviceActor -> DB : read Client / Shared attributes
+DB --> DeviceActor : values
+DeviceActor -> Notify : response to serviceId/sessionId
+Notify -> Transport : transport notification
+Transport -> Resource : GetAttributesSyncSessionCallback
+Resource --> Device : 2.05 Content JSON / Protobuf
+Transport -> Transport : deregister one-shot session
+
+== Long-lived Attributes Observe ==
+Device -> Resource : GET Observe=0 attributes
+Resource -> State : register attrs token = peer:port:CoAP-token
+State -> Transport : registerAsyncSession(listener)
+State -> Transport : SessionEvent OPEN
+State -> Transport : SubscribeToAttributeUpdatesMsg
+State -> Transport : GetAttributeRequestMsg onlyShared=true
+Transport -> DeviceActor : subscriptions and current-state query
+DeviceActor -> Notify : current Shared Attributes
+Notify -> Listener : onGetAttributesResponse
+Listener --> Device : Observe response with local counter
+loop each Shared Attribute update
+  DeviceActor -> Notify : AttributeUpdateNotificationMsg
+  Notify -> Listener : onAttributeUpdate
+  alt device inside PSM/eDRX downlink window
+    Listener --> Device : CON/NON Observe notification
+  else device sleeping
+    Listener -> State : merge missed updates in memory
+  end
+end
+
+== Server-side RPC Observe ==
+Device -> Resource : GET Observe=0 rpc
+Resource -> State : register RPC observation and async session
+State -> Transport : SubscribeToRPCMsg
+Transport -> DeviceActor : subscribe session
+DeviceActor -> Notify : ToDeviceRpcRequestMsg
+Notify -> Listener : onToDeviceRpcRequest
+alt NON notification
+  Listener --> Device : NON Observe RPC
+  Listener -> DeviceActor : RpcStatus DELIVERED after send
+else CON notification
+  Listener --> Device : CON Observe RPC
+  Listener -> DeviceActor : RpcStatus SENT when persisted
+  alt ACK arrives
+    Device --> Listener : ACK for CoAP MID
+    Listener -> DeviceActor : RpcStatus DELIVERED
+  else timeout
+    Listener -> DeviceActor : RpcStatus TIMEOUT
+  end
+end
+Device -> Resource : POST /rpc/{businessRequestId} response
+Resource -> DeviceActor : ToDeviceRpcResponseMsg
+Resource --> Device : 2.01 Created on Queue callback
+
+== Unsubscribe and cleanup ==
+Device -> Resource : GET Observe=1 attributes or rpc
+Resource -> State : remove peer/token index
+State -> Transport : unsubscribe message
+alt no other observation remains
+  State -> Transport : SessionEvent CLOSED
+  State -> Transport : deregister async session
+  State -> State : clear session, credentials and adaptor
+end
+Resource --> Device : 2.02 Deleted
+@enduml
