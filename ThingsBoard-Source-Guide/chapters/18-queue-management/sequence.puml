@@ -1,0 +1,153 @@
+@startuml
+title ThingsBoard 3.6 Queue management: DB, topic, notification and consumer lifecycle
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam groupFontColor #111827
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 220
+
+actor "SYS_ADMIN / Profile" as User
+participant "QueueController" as Controller
+participant "DefaultTbQueueService" as AppService
+participant "Queue DAO Service" as Dao
+database "PostgreSQL queue" as Pg
+participant "TbQueueAdmin" as Admin
+queue "Broker Topics" as Broker
+participant "ClusterService" as Cluster
+queue "Service Notification Topics" as Notifications
+participant "RE ConsumerService" as ConsumerService
+participant "PartitionService" as Partition
+participant "ConsumerManager" as Manager
+participant "Queue Consumer Tasks" as Consumer
+participant "Actor / Rule Nodes" as Actor
+
+== REST create or update ==
+User -> Controller : POST /api/queues?serviceType=TB_RULE_ENGINE
+Controller -> Controller : require SYS_ADMIN\noverride tenantId\ncheckEntity
+Controller -> AppService : saveQueue(Queue)
+activate AppService
+alt update
+  AppService -> Dao : findQueueById(tenantId, id)
+  Dao -> Pg : SELECT queue
+  Pg --> Dao : old row
+  Dao --> AppService : old Queue
+else create
+  AppService -> AppService : oldQueue = null
+end
+AppService -> Dao : saveQueue(queue)
+activate Dao
+Dao -> Dao : QueueValidator\nname/topic lookup\npositive values and strategies
+Dao -> Pg : INSERT or UPDATE
+Pg --> Dao : COMMIT row
+Dao --> AppService : saved Queue
+deactivate Dao
+
+loop partition = oldPartitions .. newPartitions-1
+  AppService -> Admin : createTopicIfNotExists(fullTopic, customProperties)
+  Admin -> Broker : admin create / ensure
+  Broker --> Admin : result
+  Admin --> AppService : return or throw
+end
+
+AppService -> Cluster : onQueuesUpdate([savedQueue])
+activate Cluster
+Cluster -> Cluster : build compact QueueUpdateMsg\nid/name/topic/partitions only
+loop each distinct RE / Core / Transport service
+  Cluster -> Notifications : producer.send(service topic, msg, callback=null)
+end
+Cluster --> AppService : send calls returned
+deactivate Cluster
+AppService --> Controller : saved Queue
+deactivate AppService
+Controller --> User : HTTP 200
+note over Pg,Notifications
+  PostgreSQL commit, broker topic creation and notification delivery
+  have no shared transaction or outbox.
+end note
+
+== Runtime update on a Rule Engine service ==
+Notifications -> ConsumerService : poll QueueUpdateMsg
+ConsumerService -> Partition : isManagedByCurrentService(tenantId)
+alt current service manages tenant
+  ConsumerService -> Dao : findQueueById(tenantId, queueId)
+  Dao -> Pg : SELECT full Queue
+  Pg --> Dao : row including strategies
+  Dao --> ConsumerService : Queue
+  alt manager already exists
+    ConsumerService -> Manager : update(queue)
+  else manager missing
+    ConsumerService -> Manager : create manager(queue)
+  end
+end
+ConsumerService -> Partition : updateQueues(compact messages)
+ConsumerService -> Partition : recalculatePartitions(serviceInfo, peers)
+Partition --> ConsumerService : publish PartitionChangeEvent
+ConsumerService -> Manager : update(owned TopicPartitionInfo set)
+
+== ConsumerManager task folding ==
+Manager -> Manager : enqueue CONFIG_UPDATE / PARTITION_CHANGE
+Manager -> Manager : mgmtExecutor + tryLock\nkeep latest config and partition set
+alt consumerPerPartition changed
+  Manager -> Consumer : stop all consumers
+  Manager -> Consumer : await each Future up to 30 seconds
+  Manager -> Manager : replace wrapper
+  Manager -> Consumer : create and subscribe new tasks
+else only poll/timeout/strategies changed
+  Manager -> Manager : replace Queue reference\nno consumer restart
+end
+
+== Next data pack observes runtime configuration ==
+Consumer -> Broker : poll(queue.pollInterval)
+Broker --> Consumer : records
+Consumer -> Manager : processMsgs(records, current Queue)
+Manager -> Manager : new SubmitStrategy\nnew ProcessingStrategy
+Manager -> Actor : tell QueueToRuleEngineMsg(s)
+Actor --> Manager : callbacks or timeout
+alt processing decision commits
+  Manager -> Consumer : commit()
+  Consumer -> Broker : commit group positions
+else processing decision retries
+  Manager -> Manager : in-memory selected reprocess map
+  Manager -> Actor : submit again; no Kafka re-poll
+end
+
+== Queue delete ==
+User -> Controller : DELETE /api/queues/{id}
+Controller -> AppService : deleteQueue(tenantId, id)
+AppService -> Dao : find then delete Queue row
+Dao -> Pg : DELETE
+Pg --> Dao : COMMIT
+AppService -> Cluster : onQueuesDelete(queue)
+Cluster -> Notifications : per-service QueueDeleteMsg, callback=null
+AppService --> Controller : return without waiting for remote drain
+Controller --> User : HTTP success
+
+Notifications -> ConsumerService : QueueDeleteMsg
+ConsumerService -> Manager : delete(drainQueue=true)
+Manager -> Consumer : await current loop
+Manager -> Consumer : async drain remaining records
+loop each subscribed physical topic
+  Manager -> Admin : deleteTopic(topic)
+  Admin -> Broker : delete
+  Manager -> Consumer : unsubscribe()
+end
+ConsumerService -> Partition : removeQueues + recalculate
+
+note over Pg,Broker
+  A lost delete notification can leave consumers/topics after the row is gone.
+  Partition shrink also leaves high-numbered physical topics behind.
+end note
+@enduml

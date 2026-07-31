@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1120" viewBox="0 0 1700 1120" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Actor model architecture</title>
+  <desc id="desc">High contrast architecture of producers, local actor runtime, business actor hierarchy, queues and persistence.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <marker id="blueArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#176b87"/></marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:7;stroke-linejoin:round}
+      .box{fill:#fff;stroke:#334155;stroke-width:2}
+      .blue{fill:#eef6f8;stroke:#176b87;stroke-width:2}
+      .amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:2}
+      .red{fill:#fff1f2;stroke:#be123c;stroke-width:2}
+      .band{fill:#f8fafc;stroke:#64748b;stroke-width:2}
+      .line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#176b87;stroke-width:2.5;stroke-dasharray:9 7;marker-end:url(#blueArrow)}
+    </style>
+  </defs>
+
+  <rect width="1700" height="1120" fill="#fff"/>
+  <text x="850" y="50" text-anchor="middle" class="title">ThingsBoard 3.6 Actor：本地运行时、Mailbox 与业务对象树</text>
+
+  <rect x="35" y="82" width="300" height="925" rx="6" class="band"/>
+  <text x="185" y="120" text-anchor="middle" class="section">Message Producers</text>
+  <rect x="65" y="160" width="240" height="105" rx="5" class="blue"/>
+  <text x="185" y="197" text-anchor="middle" class="label">Queue Consumers</text>
+  <text x="185" y="228" text-anchor="middle" class="small">Core / Rule Engine records</text>
+  <rect x="65" y="335" width="240" height="105" rx="5" class="box"/>
+  <text x="185" y="372" text-anchor="middle" class="label">Transport / RPC</text>
+  <text x="185" y="403" text-anchor="middle" class="small">session and control messages</text>
+  <rect x="65" y="510" width="240" height="105" rx="5" class="amber"/>
+  <text x="185" y="547" text-anchor="middle" class="label">Lifecycle / Cluster</text>
+  <text x="185" y="578" text-anchor="middle" class="small">high-priority updates</text>
+  <rect x="65" y="685" width="240" height="105" rx="5" class="green"/>
+  <text x="185" y="722" text-anchor="middle" class="label">Actor Scheduler</text>
+  <text x="185" y="753" text-anchor="middle" class="small">timeout and periodic tick</text>
+  <rect x="65" y="860" width="240" height="105" rx="5" class="red"/>
+  <text x="185" y="897" text-anchor="middle" class="label">Spring Lifecycle</text>
+  <text x="185" y="928" text-anchor="middle" class="small">start, ready, shutdown</text>
+
+  <rect x="370" y="82" width="465" height="925" rx="6" class="band"/>
+  <text x="602" y="120" text-anchor="middle" class="section">Common Actor Runtime (one JVM)</text>
+  <rect x="405" y="155" width="395" height="120" rx="5" class="green"/>
+  <text x="602" y="194" text-anchor="middle" class="label">DefaultTbActorSystem</text>
+  <text x="602" y="224" text-anchor="middle" class="small">actors map · creation locks · parent/child map</text>
+  <text x="602" y="250" text-anchor="middle" class="small">no persistence · no remote Actor registry</text>
+
+  <rect x="405" y="330" width="180" height="135" rx="5" class="blue"/>
+  <text x="495" y="369" text-anchor="middle" class="label">TbActorRef</text>
+  <text x="495" y="400" text-anchor="middle" class="small">tell</text>
+  <text x="495" y="426" text-anchor="middle" class="small">tell high priority</text>
+  <rect x="620" y="330" width="180" height="135" rx="5" class="blue"/>
+  <text x="710" y="369" text-anchor="middle" class="label">TbActorCtx</text>
+  <text x="710" y="400" text-anchor="middle" class="small">child / broadcast</text>
+  <text x="710" y="426" text-anchor="middle" class="small">stop / scheduler</text>
+
+  <rect x="405" y="525" width="395" height="175" rx="5" class="amber"/>
+  <text x="602" y="565" text-anchor="middle" class="label">TbActorMailbox</text>
+  <text x="602" y="597" text-anchor="middle" class="small">unbounded highPriorityMsgs + normalPriorityMsgs</text>
+  <text x="602" y="625" text-anchor="middle" class="small">ready + busy CAS + destroyInProgress</text>
+  <text x="602" y="653" text-anchor="middle" class="small">poll high first · max throughput per batch</text>
+  <text x="602" y="681" text-anchor="middle" class="small">implements both Ref and Ctx</text>
+
+  <rect x="405" y="760" width="395" height="175" rx="5" class="box"/>
+  <text x="602" y="800" text-anchor="middle" class="label">Named Dispatchers</text>
+  <text x="602" y="832" text-anchor="middle" class="small">app 1 · tenant 2 · device 4 · rule 8</text>
+  <text x="602" y="860" text-anchor="middle" class="small">single-thread or work-stealing ExecutorService</text>
+  <text x="602" y="888" text-anchor="middle" class="small">Actor is serial, but not bound to one thread</text>
+
+  <rect x="870" y="82" width="470" height="925" rx="6" class="band"/>
+  <text x="1105" y="120" text-anchor="middle" class="section">Business Actor Hierarchy</text>
+  <rect x="975" y="155" width="260" height="100" rx="5" class="green"/>
+  <text x="1105" y="193" text-anchor="middle" class="label">AppActor</text>
+  <text x="1105" y="224" text-anchor="middle" class="small">root routing + tenant lifecycle</text>
+  <rect x="975" y="320" width="260" height="105" rx="5" class="blue"/>
+  <text x="1105" y="358" text-anchor="middle" class="label">TenantActor</text>
+  <text x="1105" y="389" text-anchor="middle" class="small">partition-aware local owner state</text>
+
+  <rect x="900" y="510" width="200" height="120" rx="5" class="amber"/>
+  <text x="1000" y="549" text-anchor="middle" class="label">DeviceActor</text>
+  <text x="1000" y="580" text-anchor="middle" class="small">session + RPC</text>
+  <text x="1000" y="606" text-anchor="middle" class="small">created on demand</text>
+  <rect x="1140" y="510" width="170" height="120" rx="5" class="green"/>
+  <text x="1225" y="549" text-anchor="middle" class="label">RuleChainActor</text>
+  <text x="1225" y="580" text-anchor="middle" class="small">graph routes</text>
+  <text x="1225" y="606" text-anchor="middle" class="small">root / target chain</text>
+  <rect x="1140" y="700" width="170" height="120" rx="5" class="blue"/>
+  <text x="1225" y="739" text-anchor="middle" class="label">RuleNodeActor</text>
+  <text x="1225" y="770" text-anchor="middle" class="small">TbNode instance</text>
+  <text x="1225" y="796" text-anchor="middle" class="small">async tell-next</text>
+  <rect x="900" y="875" width="410" height="80" rx="5" class="red"/>
+  <text x="1105" y="908" text-anchor="middle" class="label">Local state is rebuilt, never migrated</text>
+  <text x="1105" y="936" text-anchor="middle" class="small">partition loss stops local actors and pending mailboxes</text>
+
+  <rect x="1375" y="82" width="290" height="925" rx="6" class="band"/>
+  <text x="1520" y="120" text-anchor="middle" class="section">External Boundaries</text>
+  <rect x="1405" y="160" width="230" height="110" rx="5" class="blue"/>
+  <text x="1520" y="198" text-anchor="middle" class="label">Kafka Topics</text>
+  <text x="1520" y="228" text-anchor="middle" class="small">durable before Actor ingress</text>
+  <rect x="1405" y="350" width="230" height="110" rx="5" class="green"/>
+  <text x="1520" y="388" text-anchor="middle" class="label">PostgreSQL Config</text>
+  <text x="1520" y="418" text-anchor="middle" class="small">reloaded by service calls</text>
+  <rect x="1405" y="540" width="230" height="110" rx="5" class="amber"/>
+  <text x="1520" y="578" text-anchor="middle" class="label">Telemetry Stores</text>
+  <text x="1520" y="608" text-anchor="middle" class="small">PostgreSQL / TS / Cassandra</text>
+  <rect x="1405" y="730" width="230" height="110" rx="5" class="box"/>
+  <text x="1520" y="768" text-anchor="middle" class="label">Transport Sessions</text>
+  <text x="1520" y="798" text-anchor="middle" class="small">Netty channels outside Actor</text>
+  <rect x="1405" y="900" width="230" height="65" rx="5" class="red"/>
+  <text x="1520" y="940" text-anchor="middle" class="label">No shared transaction</text>
+
+  <path d="M305 212 L405 212" class="line"/>
+  <path d="M305 387 L355 387 L355 375 L405 375" class="line"/>
+  <path d="M305 562 L350 562 L350 405 L405 405" class="line"/>
+  <path d="M305 737 L370 737 L370 650 L405 650" class="line"/>
+  <path d="M305 912 L370 912 L370 850 L405 850" class="line"/>
+
+  <path d="M602 275 L602 330" class="line"/>
+  <path d="M495 465 L495 525" class="line"/>
+  <path d="M710 465 L710 525" class="line"/>
+  <path d="M602 700 L602 760" class="line"/>
+
+  <path d="M800 612 L850 612 L850 205 L975 205" class="line"/>
+  <path d="M1105 255 L1105 320" class="line"/>
+  <path d="M1060 425 L1000 510" class="line"/>
+  <path d="M1150 425 L1225 510" class="line"/>
+  <path d="M1225 630 L1225 700" class="line"/>
+  <path d="M1225 820 L1225 875" class="dash"/>
+
+  <path d="M1405 215 L1340 215 L1340 185 L1235 185" class="dash"/>
+  <path d="M1405 405 L1340 405 L1340 372 L1235 372" class="dash"/>
+  <path d="M1310 595 L1405 595" class="dash"/>
+  <path d="M1100 570 L1120 475 L1360 475 L1360 785 L1405 785" class="dash"/>
+
+  <text x="325" y="200" class="edge">queue record</text>
+  <text x="320" y="550" class="edge">control</text>
+  <text x="820" y="598" class="edge">one local mailbox turn</text>
+  <text x="1315" y="202" class="edge">not a mailbox</text>
+  <text x="1318" y="392" class="edge">read/reload</text>
+  <text x="1315" y="582" class="edge">service write</text>
+  <text x="1200" y="463" class="edge">session command</text>
+
+  <text x="850" y="1060" text-anchor="middle" class="small">The Actor runtime serializes mutable state per local entity. Kafka durability, database transactions, cluster ownership and transport delivery remain separate layers.</text>
+  <text x="850" y="1085" text-anchor="middle" class="small">Mailbox enqueue is not completion; queues are unbounded; ordinary processing exceptions resume without automatically replaying the polled message.</text>
+</svg>

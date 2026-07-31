@@ -2,7 +2,7 @@
 
 > 源码基线：ThingsBoard `3.6.4`，工作区提交 `0cb411fc90`。本文档只记录能够从当前工作区源码、配置和建表脚本中核实的行为。
 
-[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md)
+[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md)
 
 ## 阅读定位
 
@@ -43,6 +43,14 @@
 | 09 | Telemetry 保存流程 | 已完成 | [Markdown](chapters/09-telemetry-save/README.md) / [HTML](chapters/09-telemetry-save/index.html) / [时序图 SVG](chapters/09-telemetry-save/sequence.svg) / [架构图 SVG](assets/architecture/09-telemetry-save.svg) |
 | 10 | RPC 流程 | 已完成 | [Markdown](chapters/10-rpc/README.md) / [HTML](chapters/10-rpc/index.html) / [时序图 SVG](chapters/10-rpc/sequence.svg) / [架构图 SVG](assets/architecture/10-rpc.svg) |
 | 11 | OTA 流程 | 已完成 | [Markdown](chapters/11-ota/README.md) / [HTML](chapters/11-ota/index.html) / [PlantUML](chapters/11-ota/sequence.puml) / [时序图 SVG](chapters/11-ota/sequence.svg) / [架构图 SVG](assets/architecture/11-ota.svg) |
+| 12 | Dashboard 流程 | 已完成 | [Markdown](chapters/12-dashboard/README.md) / [HTML](chapters/12-dashboard/index.html) / [PlantUML](chapters/12-dashboard/sequence.puml) / [时序图 SVG](chapters/12-dashboard/sequence.svg) / [架构图 SVG](assets/architecture/12-dashboard.svg) |
+| 13 | Login 流程 | 已完成 | [Markdown](chapters/13-login/README.md) / [HTML](chapters/13-login/index.html) / [PlantUML](chapters/13-login/sequence.puml) / [时序图 SVG](chapters/13-login/sequence.svg) / [架构图 SVG](assets/architecture/13-login.svg) |
+| 14 | JWT 认证流程 | 已完成 | [Markdown](chapters/14-jwt-authentication/README.md) / [HTML](chapters/14-jwt-authentication/index.html) / [PlantUML](chapters/14-jwt-authentication/sequence.puml) / [时序图 SVG](chapters/14-jwt-authentication/sequence.svg) / [架构图 SVG](assets/architecture/14-jwt-authentication.svg) |
+| 15 | Actor 模型 | 已完成 | [Markdown](chapters/15-actor-model/README.md) / [HTML](chapters/15-actor-model/index.html) / [PlantUML](chapters/15-actor-model/sequence.puml) / [时序图 SVG](chapters/15-actor-model/sequence.svg) / [架构图 SVG](assets/architecture/15-actor-model.svg) |
+| 16 | Kafka 发送流程 | 已完成 | [Markdown](chapters/16-kafka-producer/README.md) / [HTML](chapters/16-kafka-producer/index.html) / [PlantUML](chapters/16-kafka-producer/sequence.puml) / [时序图 SVG](chapters/16-kafka-producer/sequence.svg) / [架构图 SVG](assets/architecture/16-kafka-producer.svg) |
+| 17 | Kafka 消费流程 | 已完成 | [Markdown](chapters/17-kafka-consumer/README.md) / [HTML](chapters/17-kafka-consumer/index.html) / [PlantUML](chapters/17-kafka-consumer/sequence.puml) / [时序图 SVG](chapters/17-kafka-consumer/sequence.svg) / [架构图 SVG](assets/architecture/17-kafka-consumer.svg) |
+| 18 | Queue 管理 | 已完成 | [Markdown](chapters/18-queue-management/README.md) / [HTML](chapters/18-queue-management/index.html) / [PlantUML](chapters/18-queue-management/sequence.puml) / [时序图 SVG](chapters/18-queue-management/sequence.svg) / [架构图 SVG](assets/architecture/18-queue-management.svg) |
+| 19 | Cluster 通信 | 已完成 | [Markdown](chapters/19-cluster-communication/README.md) / [HTML](chapters/19-cluster-communication/index.html) / [PlantUML](chapters/19-cluster-communication/sequence.puml) / [时序图 SVG](chapters/19-cluster-communication/sequence.svg) / [架构图 SVG](assets/architecture/19-cluster-communication.svg) |
 
 完整规划见 [SUMMARY.md](SUMMARY.md)。待分析章节只链接到目录锚点，避免产生指向不存在文件的失效链接。
 
@@ -111,6 +119,54 @@ Device Actor 按设备维护 session、subscription、int requestId、pending ma
 OTA 分配同时维护 Device/Profile 指针、Shared Attributes、target/state Telemetry 和 binary cache 四类状态。Device 字段覆盖 Profile；Profile 更新只扫描 override 为空的设备。`send(...)` 以 `callback=null` 投递 OTA Queue，并独立写 `QUEUED` Telemetry；consumer 重查 current target 后只调度 `INITIATED` Future 即返回，Queue commit 可能早于 callback 中的 Shared Attributes，异步失败也不受 consumer catch 覆盖。
 
 MQTT/HTTP/CoAP binary 下载不经过 Device Actor，而是通过 Transport API request/reply 解析 effective package，再从 Caffeine/Redis data cache读取完整包或 range。Actor 只向已订阅 Shared Attributes 的在线 session 推送目标 metadata。PostgreSQL `ota_package.data` 是 OID，但 upload、checksum、首次回源和 Caffeine 都 materialize 完整 `byte[]`；微服务分离部署需要共享 Redis。release-3.6 的 URL checksum attribute、software MQTT error topic 和 LwM2M software temp URL 分支还存在需要专项回归的源码边界。
+
+## 第 12 章关键结论
+
+Dashboard 是控制面配置与运行时数据面的组合：PostgreSQL `dashboard.configuration` 保存 Widget/alias/filter/timewindow 定义，实际属性、latest、history 和 Alarm 由 Widget 打开后通过 EntityData/WebSocket 查询。普通 Entity Widget使用同一 `cmdId` 的两阶段命令，先解析实体和 latest，再补发 history/realtime 命令；跨 Core 节点由 entity partition owner 的 SubscriptionManager 和目标 service notification topic 路由实时点。
+
+Customer assignment 同时写 `relation` 和 `dashboard.assigned_customers`，但 assign 与批量 Customer 编排没有覆盖两次写入的外层事务；列表依赖 relation、直接读取权限依赖 JSON 摘要，失败或并发整行更新会造成漂移。Dashboard 本身也没有 `@Version`。服务端没有 Dashboard Actor，WebSocket context 使用并发 Map/锁维护，并通过 update rate limit 和有界出站队列限制慢消费者。
+
+## 第 13 章关键结论
+
+普通 `POST /api/auth/login` 由 Spring Security 的 `RestLoginProcessingFilter` 消费，不进入 `AuthController`。Provider 读取全局唯一的 `tb_user.email`、`user_credentials`、系统密码策略与可选 2FA 配置；成功登录同步重置失败次数和写 `lastLoginTs`，异步写 `audit_log`，随后签发不落数据库的 HS512 access/refresh JWT。2FA 第一阶段只返回 `PRE_VERIFICATION_TOKEN`，验证码通过后才创建最终 token pair 和成功审计。
+
+失败次数与 last-login 都保存在 `tb_user.additional_info`，采用无版本列的整 JSON 读改写，并发请求可能丢计数。密码修改/重置又通过两个独立 DAO 事务删除旧 `user_credentials` 再插新行。logout/改密依赖 `userSessionsInvalidation` cache 提前淘汰旧 JWT：Caffeine 只在当前 Core JVM 生效，多节点部署要使用 Redis 才能共享失效时间。
+
+## 第 14 章关键结论
+
+受保护 REST 由 JWT Filter解析 `X-Authorization/Authorization`，access Provider验证签名、exp和 user/session失效时间后，直接从 claims恢复 `SecurityUser`，不重读用户表。方法角色由 `@PreAuthorize` 判断，具体实体归属再由 `BaseController` 与 authority-specific `PermissionChecker` 判断。Refresh Provider则重读 `tb_user/user_credentials`，但不检查密码年龄；旧 refresh token也不会因换得新 token而被标记已使用。
+
+WebSocket跳过普通 REST JWT Filter，只在 query token或首个 `AuthCmd` 认证一次，之后连接不会因 token到期/logout自动关闭。JWT signing key更新通过异步 lifecycle通知各节点reload，没有双 key过渡。`userSessionsInvalidation` TTL又取启动时 YAML refresh lifetime，而实际 JWT lifetime可由数据库修改；多节点需共享 Redis并确保 marker TTL覆盖最长 refresh token寿命。
+
+## 第 15 章关键结论
+
+ThingsBoard 3.6 使用 `common/actor` 中的自研 JVM 内 Actor，而不是 Akka。`DefaultTbActorSystem` 维护本地 Actor registry和parent-child关系；每个 `TbActorMailbox` 通过 high/normal 两条无界队列、`ready` 与 `busy` CAS保证同一业务对象串行执行，多个 Actor共享 App/Tenant/Device/Rule Dispatcher。`tell()` 只完成本地入队，不代表下游处理、Kafka commit或数据库提交。
+
+初始化失败会按策略重试并在 ready前积压消息；普通 process异常默认 resume但不会自动重放已poll消息。高优先级不能抢占当前消息，却可能长期饿死normal队列。分区迁移只停止旧owner本地 Actor，新owner从数据库和后续消息重建，Mailbox和session状态不迁移；全局 `system.stop()` 也不会逐个调用全部 Actor的 `destroy()`。
+
+## 第 16 章关键结论
+
+ThingsBoard 的逻辑 partition 不是 Kafka 原生 partition：entity UUID hash出的编号被追加到物理 topic 名，`ProducerRecord.partition` 实际传 `null`。消息value是Protobuf bytes，key是UUID字符串。第一次发送会同步通过 AdminClient确保topic存在；随后KafkaProducer异步合批和发送，callback运行在Kafka I/O线程。
+
+Producer success只表示broker按 `acks` 确认，不代表consumer、Actor、Rule Node或数据库完成。默认虽为 `acks=all`，但replication factor与min ISR均为1。同步异常会callback failure后再rethrow，异步失败在callback为null时只写warning；公共模板没有Kafka事务，Provider普通shutdown路径也未显示调用共享producer的 `stop()`。
+
+## 第 17 章关键结论
+
+`KafkaConsumer.poll()` 在返回 records 时已经推进本地 position；Rule Engine consumer 等待整个 pack 的 callback/timeout，再由 Processing Strategy 决定内存重投或 `commitSync()`。这里的 retry 不会 `seek` 或重新 poll Kafka，也不会回滚此前已经完成的数据库、HTTP 或 Kafka 副作用。默认 Main Queue 使用 `BURST + SKIP_ALL_FAILURES`，失败和超时最终仍会提交；High Priority Queue 的 `retries=0` 在实现中表示不设上限。
+
+提交按 consumer 当前 assignment positions 进行，不是按成功 UUID 单条确认。长时间 await/retry 可超过 `max.poll.interval.ms` 并触发 rebalance，使旧异步工作与新 owner 重放并行；timeout cleanup 也不会取消 Actor、DB Future 或外部调用。decode `IOException` 被包装为运行时异常，但外层没有 `seek` 或公共 DLQ，后续成功 commit 可能越过坏 record，因此端到端既不是 exactly-once，也不能简单归类为纯 at-least-once。
+
+## 第 18 章关键结论
+
+Queue 是 PostgreSQL 配置、物理 topic、`HashPartitionService` 路由、consumer manager 和每 pack 策略的组合，不等于单个 Kafka topic。ThingsBoard 逻辑 partition 被编码进 `topic[.isolated.tenantId].partitionNo`；`consumerPerPartition` 决定一个 consumer 订阅多 topic，还是每逻辑分区建立独立 task。poll/timeout/submit/processing strategy 在后续 pack 热读取，切换 `consumerPerPartition` 则会停止并重建消费者。
+
+普通 REST 保存按“Queue 行提交 -> 补建新增 topic -> null-callback 集群通知”执行；isolated Profile 批量更新的 topic/DB 顺序又不同。删除按“行删除 -> 通知 -> 远端异步 drain/delete topic”执行，均无共同事务或 outbox。分区缩容不会删除高编号 topic，通知丢失可留下 stale consumer/topic；`queue` schema 对 tenant+name/topic 也没有 UNIQUE constraint，应用层先查后插不能封闭并发创建竞态。
+
+## 第 19 章关键结论
+
+多节点发现由 ZooKeeper ephemeral-sequential `ServiceInfo` 节点完成；Kafka只承载跨节点数据与notification record。`HashPartitionService`按serviceId排序后取模分配owner：Core使用`partition % count`，Rule Engine使用`(hash(tenantId)+partition) % count`并可先过滤dedicated tenant-profile服务。源码中的`ConsistentHashCircle`在当前路径未被引用，因此扩缩容可能迁移大量partition，ServiceInfo中的CPU/memory也不参与负载权重。
+
+跨节点Actor调用实际是`ClusterService -> Queue producer -> broker -> owner consumer -> local Actor`，producer callback不等待远端应用。ZooKeeper remove立即发布shutdown事件、延迟重算owner，同serviceId及时返回可取消重算。PartitionChange由本地Spring事件分别驱动consumer订阅和高优先级Actor清理；Device/RuleChain Actor、mailbox、Session和旧异步副作用都不迁移，新owner从数据库/缓存和后续消息重建。
 
 ## 图表约定
 

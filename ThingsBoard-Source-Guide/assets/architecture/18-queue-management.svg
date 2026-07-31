@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1760" height="1120" viewBox="0 0 1760 1120" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Queue management architecture</title>
+  <desc id="desc">High contrast diagram of Queue control plane, physical topics, partition routing, runtime consumers, strategies and failure boundaries.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <marker id="blueArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#176b87"/></marker>
+    <style>.title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8;stroke-linejoin:round}.band{fill:#f8fafc;stroke:#64748b;stroke-width:2}.blue{fill:#eef6f8;stroke:#176b87;stroke-width:2}.amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}.green{fill:#ecfdf5;stroke:#047857;stroke-width:2}.red{fill:#fff1f2;stroke:#be123c;stroke-width:2}.line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}.dash{fill:none;stroke:#176b87;stroke-width:2.5;stroke-dasharray:9 7;marker-end:url(#blueArrow)}</style>
+  </defs>
+  <rect width="1760" height="1120" fill="#fff"/>
+  <text x="880" y="52" text-anchor="middle" class="title">ThingsBoard 3.6 Queue：配置、Topic、路由与 Consumer 生命周期</text>
+
+  <rect x="35" y="85" width="390" height="920" rx="6" class="band"/>
+  <text x="230" y="125" text-anchor="middle" class="section">Control Plane</text>
+  <rect x="70" y="165" width="320" height="125" rx="5" class="blue"/>
+  <text x="230" y="204" text-anchor="middle" class="label">REST / Tenant Profile</text>
+  <text x="230" y="235" text-anchor="middle" class="small">SYS_ADMIN or isolated profile diff</text>
+  <text x="230" y="263" text-anchor="middle" class="small">name / topic immutable on update</text>
+  <rect x="70" y="350" width="320" height="165" rx="5" class="green"/>
+  <text x="230" y="389" text-anchor="middle" class="label">PostgreSQL queue</text>
+  <text x="230" y="420" text-anchor="middle" class="small">topic · partitions · poll · timeout</text>
+  <text x="230" y="448" text-anchor="middle" class="small">submit + processing strategies</text>
+  <text x="230" y="476" text-anchor="middle" class="small">no DB unique(name/topic) constraint</text>
+  <rect x="70" y="585" width="320" height="145" rx="5" class="amber"/>
+  <text x="230" y="624" text-anchor="middle" class="label">TbQueueAdmin</text>
+  <text x="230" y="655" text-anchor="middle" class="small">create only new partition topics</text>
+  <text x="230" y="683" text-anchor="middle" class="small">shrink does not delete old topics</text>
+  <rect x="70" y="800" width="320" height="155" rx="5" class="red"/>
+  <text x="230" y="839" text-anchor="middle" class="label">Non-atomic boundaries</text>
+  <text x="230" y="870" text-anchor="middle" class="small">DB · broker admin · notifications</text>
+  <text x="230" y="898" text-anchor="middle" class="small">null callback · no outbox</text>
+  <text x="230" y="926" text-anchor="middle" class="small">HTTP success is not cluster convergence</text>
+
+  <rect x="465" y="85" width="390" height="920" rx="6" class="band"/>
+  <text x="660" y="125" text-anchor="middle" class="section">Broker and Notifications</text>
+  <rect x="500" y="165" width="320" height="155" rx="5" class="amber"/>
+  <text x="660" y="204" text-anchor="middle" class="label">Physical Queue Topics</text>
+  <text x="660" y="235" text-anchor="middle" class="small">topic.partitionNo</text>
+  <text x="660" y="263" text-anchor="middle" class="small">topic.isolated.tenantId.partitionNo</text>
+  <text x="660" y="291" text-anchor="middle" class="small">not Kafka native partitions</text>
+  <rect x="500" y="390" width="320" height="155" rx="5" class="blue"/>
+  <text x="660" y="429" text-anchor="middle" class="label">Service Notification Topics</text>
+  <text x="660" y="460" text-anchor="middle" class="small">QueueUpdateMsg / QueueDeleteMsg</text>
+  <text x="660" y="488" text-anchor="middle" class="small">per RE / Core / Transport service</text>
+  <text x="660" y="516" text-anchor="middle" class="small">compact message; full config in DB</text>
+  <rect x="500" y="615" width="320" height="155" rx="5" class="red"/>
+  <text x="660" y="654" text-anchor="middle" class="label">Delete / Drain</text>
+  <text x="660" y="685" text-anchor="middle" class="small">DB row removed before remote drain</text>
+  <text x="660" y="713" text-anchor="middle" class="small">topic deletion is asynchronous</text>
+  <text x="660" y="741" text-anchor="middle" class="small">admin failures are logged only</text>
+
+  <rect x="895" y="85" width="390" height="920" rx="6" class="band"/>
+  <text x="1090" y="125" text-anchor="middle" class="section">Routing and Lifecycle</text>
+  <rect x="930" y="165" width="320" height="155" rx="5" class="blue"/>
+  <text x="1090" y="204" text-anchor="middle" class="label">HashPartitionService</text>
+  <text x="1090" y="235" text-anchor="middle" class="small">QueueKey → topic + logical size</text>
+  <text x="1090" y="263" text-anchor="middle" class="small">tenant owner + partition assignment</text>
+  <text x="1090" y="291" text-anchor="middle" class="small">fallback to system Main queue</text>
+  <rect x="930" y="390" width="320" height="155" rx="5" class="green"/>
+  <text x="1090" y="429" text-anchor="middle" class="label">RE ConsumerService</text>
+  <text x="1090" y="460" text-anchor="middle" class="small">startup reads all Queue rows</text>
+  <text x="1090" y="488" text-anchor="middle" class="small">QueueKey → ConsumerManager</text>
+  <text x="1090" y="516" text-anchor="middle" class="small">notification + partition events</text>
+  <rect x="930" y="615" width="320" height="165" rx="5" class="amber"/>
+  <text x="1090" y="654" text-anchor="middle" class="label">ConsumerManager</text>
+  <text x="1090" y="685" text-anchor="middle" class="small">fold CONFIG / PARTITION tasks</text>
+  <text x="1090" y="713" text-anchor="middle" class="small">single or consumer-per-partition</text>
+  <text x="1090" y="741" text-anchor="middle" class="small">rebuild only structural changes</text>
+
+  <rect x="1325" y="85" width="400" height="920" rx="6" class="band"/>
+  <text x="1525" y="125" text-anchor="middle" class="section">Pack Runtime</text>
+  <rect x="1365" y="165" width="320" height="155" rx="5" class="blue"/>
+  <text x="1525" y="204" text-anchor="middle" class="label">Submit Strategy</text>
+  <text x="1525" y="235" text-anchor="middle" class="small">BURST · BATCH · SEQUENTIAL</text>
+  <text x="1525" y="263" text-anchor="middle" class="small">by originator / tenant</text>
+  <text x="1525" y="291" text-anchor="middle" class="small">controls Actor submission order</text>
+  <rect x="1365" y="390" width="320" height="155" rx="5" class="green"/>
+  <text x="1525" y="429" text-anchor="middle" class="label">Processing Strategy</text>
+  <text x="1525" y="460" text-anchor="middle" class="small">SKIP / RETRY result maps</text>
+  <text x="1525" y="488" text-anchor="middle" class="small">whole-pack offset decision</text>
+  <text x="1525" y="516" text-anchor="middle" class="small">retry is in-memory, no rollback</text>
+  <rect x="1365" y="615" width="320" height="165" rx="5" class="amber"/>
+  <text x="1525" y="654" text-anchor="middle" class="label">Queue Consumer Tasks</text>
+  <text x="1525" y="685" text-anchor="middle" class="small">poll using current Queue values</text>
+  <text x="1525" y="713" text-anchor="middle" class="small">new strategies for each pack</text>
+  <text x="1525" y="741" text-anchor="middle" class="small">tell Actor then await callbacks</text>
+  <rect x="1365" y="850" width="320" height="105" rx="5" class="red"/>
+  <text x="1525" y="889" text-anchor="middle" class="label">Idempotency required</text>
+  <text x="1525" y="920" text-anchor="middle" class="small">config retry cannot undo side effects</text>
+
+  <path d="M230 290 L230 350" class="line"/>
+  <path d="M230 515 L230 585" class="line"/>
+  <path d="M390 430 L500 430" class="dash"/>
+  <path d="M390 650 L500 245" class="line"/>
+  <path d="M820 467 L930 467" class="dash"/>
+  <path d="M820 245 L890 245 L890 242 L930 242" class="line"/>
+  <path d="M1090 320 L1090 390" class="line"/>
+  <path d="M1090 545 L1090 615" class="line"/>
+  <path d="M1250 697 L1300 697 L1300 242 L1365 242" class="line"/>
+  <path d="M1250 720 L1315 720 L1315 467 L1365 467" class="dash"/>
+  <path d="M1525 320 L1525 390" class="line"/>
+  <path d="M1525 545 L1525 615" class="line"/>
+  <path d="M1525 780 L1525 850" class="dash"/>
+  <path d="M660 545 L660 615" class="dash"/>
+
+  <text x="414" y="415" class="edge">notify</text>
+  <text x="405" y="615" class="edge">ensure topics</text>
+  <text x="838" y="451" class="edge">apply</text>
+  <text x="1265" y="680" class="edge">submit mode</text>
+  <text x="1265" y="707" class="edge">commit mode</text>
+  <text x="880" y="1050" text-anchor="middle" class="small">Queue row is the recovery baseline, but broker topics, service notifications, partition maps and consumer tasks converge asynchronously.</text>
+  <text x="880" y="1078" text-anchor="middle" class="small">HTTP success proves neither notification delivery nor runtime convergence; partition shrink and lost delete notifications can leave broker artifacts.</text>
+</svg>

@@ -1,0 +1,147 @@
+@startuml
+title ThingsBoard 3.6 Kafka producer: routing, topic creation, broker ack and failure boundaries
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #F8FAFC
+skinparam ParticipantFontColor #111827
+skinparam LifeLineBorderColor #64748B
+skinparam NoteBackgroundColor #FFF5CC
+skinparam NoteBorderColor #8A5A00
+skinparam NoteFontColor #111827
+skinparam GroupBorderColor #176B87
+skinparam GroupBackgroundColor #EEF6F8
+skinparam GroupFontColor #111827
+
+actor "Business caller\nTransport / Actor / Service" as Caller
+participant "DefaultTbClusterService" as Cluster
+participant "HashPartitionService" as Partition
+participant "TbQueueProducerProvider" as Provider
+participant "TbKafkaProducerTemplate" as Template
+participant "TbKafkaAdmin" as Admin
+participant "KafkaProducer\n[caller thread + accumulator]" as Producer
+participant "Kafka I/O thread" as Io
+participant "Kafka Broker\nleader + ISR" as Broker
+participant "TbQueueCallback" as Callback
+participant "Target Consumer\n[later]" as Consumer
+
+== Provider startup ==
+Caller -> Provider: Spring @PostConstruct init()
+activate Provider
+Provider -> Template: factory.createRuleEngineMsgProducer()
+activate Template
+Template -> Template: settings.toProducerProps()
+Template -> Producer: new KafkaProducer<String, byte[]>()
+Template --> Provider: shared purpose-specific producer
+deactivate Template
+deactivate Provider
+note right of Provider
+  Core, Rule Engine and Transport providers create several
+  independent producer templates for fixed message channels.
+end note
+
+== Resolve and encode one Rule Engine message ==
+Caller -> Cluster: pushMsgToRuleEngine(tenantId, entityId, tbMsg, callback)
+activate Cluster
+Cluster -> Cluster: resolve profile and queueName
+Cluster -> Partition: resolve(TB_RULE_ENGINE, queueName, tenantId, entityId)
+activate Partition
+Partition -> Partition: hash(entity UUID) modulo logical partition count
+Partition -> Partition: build full topic with prefix, isolation and suffix
+Partition --> Cluster: TopicPartitionInfo
+deactivate Partition
+Cluster -> Cluster: build ToRuleEngineMsg protobuf
+Cluster -> Cluster: new TbProtoQueueMsg(tbMsg.id, proto)
+Cluster -> Provider: getRuleEngineMsgProducer()
+Provider --> Cluster: TbKafkaProducerTemplate
+Cluster -> Template: send(tpi, queueMsg, callback)
+activate Template
+
+== First send to a physical topic ==
+Template -> Template: producer TPI cache miss
+Template -> Admin: createTopicIfNotExists(fullTopic)
+activate Admin
+alt admin topic cache hit
+  Admin --> Template: return
+else topic absent
+  Admin -> Broker: AdminClient.createTopics(NewTopic)
+  Broker --> Admin: create result
+  alt TopicExistsException from concurrent creator
+    Admin --> Template: treat as existing
+  else create succeeds
+    Admin -> Admin: cache topic name
+    Admin --> Template: return
+  else ACL / broker / invalid replication error
+    Admin --> Template: throw RuntimeException
+    Template -> Callback: onFailure(error)
+    Template --> Cluster: rethrow same error
+  end
+end
+deactivate Admin
+
+Template -> Template: UUID.toString + protobuf.toByteArray
+Template -> Template: copy headers
+opt debug logging enabled
+  Template -> Template: add producerId and threadName headers
+  opt trace logging enabled
+    Template -> Template: capture up to 18 stack trace headers
+  end
+end
+Template -> Producer: send(ProducerRecord(topic, null, key, bytes, headers))
+Producer -> Producer: select Kafka partition and append accumulator
+Producer --> Template: Future returned
+Template --> Cluster: return void
+deactivate Template
+Cluster -> Cluster: increment producer counter
+Cluster --> Caller: return
+deactivate Cluster
+
+== Asynchronous broker result ==
+Producer -> Io: sender drains batch
+Io -> Broker: produce request
+alt acks policy succeeds
+  Broker --> Io: RecordMetadata
+  Io -> Callback: onSuccess(KafkaTbQueueMsgMetadata)
+  note right of Callback
+    The record is in Kafka according to acks.
+    Consumer, Actor, Rule Node and database work are still pending.
+  end note
+  Broker -> Consumer: record becomes available later
+else asynchronous send failure
+  Broker --> Io: exception
+  alt callback exists
+    Io -> Callback: onFailure(exception)
+  else callback is null
+    Io -> Io: log warning only
+  end
+end
+
+== Subsequent send ==
+Caller -> Template: send(same TPI, another message, callback)
+Template -> Template: producer TPI cache hit
+Template -> Producer: send without Admin create
+Template --> Caller: return
+
+== Per-service broadcast ==
+Caller -> Cluster: broadcastToCore(notification)
+loop each discovered Core serviceId
+  Cluster -> Cluster: TopicService.getNotificationsTopic(serviceId)
+  Cluster -> Template: send(service-specific topic, same msgId, null callback)
+end
+note right of Cluster
+  Each send is independent. Partial broadcast success is possible,
+  and async failures with null callback are log-only.
+end note
+
+== Shutdown boundary ==
+Caller -> Admin: factory @PreDestroy destroy()
+Admin -> Admin: AdminClient.close()
+note over Provider,Producer
+  TbKafkaProducerTemplate.stop() would call KafkaProducer.close(),
+  but the shared Producer Provider classes do not call stop() in this release.
+end note
+@enduml

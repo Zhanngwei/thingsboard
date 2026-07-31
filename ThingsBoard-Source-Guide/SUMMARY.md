@@ -17,17 +17,17 @@
 - <a id="chapter-09"></a>**09 Telemetry 保存流程**（已完成）：[Markdown](chapters/09-telemetry-save/README.md) · [HTML](chapters/09-telemetry-save/index.html) · [时序图 SVG](chapters/09-telemetry-save/sequence.svg) · [架构图 SVG](assets/architecture/09-telemetry-save.svg)
 - <a id="chapter-10"></a>**10 RPC 流程**（已完成）：[Markdown](chapters/10-rpc/README.md) · [HTML](chapters/10-rpc/index.html) · [时序图 SVG](chapters/10-rpc/sequence.svg) · [架构图 SVG](assets/architecture/10-rpc.svg)
 - <a id="chapter-11"></a>**11 OTA 流程**（已完成）：[Markdown](chapters/11-ota/README.md) · [HTML](chapters/11-ota/index.html) · [PlantUML](chapters/11-ota/sequence.puml) · [时序图 SVG](chapters/11-ota/sequence.svg) · [架构图 SVG](assets/architecture/11-ota.svg)
-- <a id="chapter-12"></a>**12 Dashboard 流程**（待分析）：Dashboard CRUD、授权、Widget 数据订阅和 WebSocket 查询。
-- <a id="chapter-13"></a>**13 Login 流程**（待分析）：认证入口、用户状态、密码策略、审计与 token 签发。
-- <a id="chapter-14"></a>**14 JWT 认证流程**（待分析）：Security Filter、token 解析、权限上下文、刷新和失效。
+- <a id="chapter-12"></a>**12 Dashboard 流程**（已完成）：[Markdown](chapters/12-dashboard/README.md) · [HTML](chapters/12-dashboard/index.html) · [PlantUML](chapters/12-dashboard/sequence.puml) · [时序图 SVG](chapters/12-dashboard/sequence.svg) · [架构图 SVG](assets/architecture/12-dashboard.svg)
+- <a id="chapter-13"></a>**13 Login 流程**（已完成）：[Markdown](chapters/13-login/README.md) · [HTML](chapters/13-login/index.html) · [PlantUML](chapters/13-login/sequence.puml) · [时序图 SVG](chapters/13-login/sequence.svg) · [架构图 SVG](assets/architecture/13-login.svg)
+- <a id="chapter-14"></a>**14 JWT 认证流程**（已完成）：[Markdown](chapters/14-jwt-authentication/README.md) · [HTML](chapters/14-jwt-authentication/index.html) · [PlantUML](chapters/14-jwt-authentication/sequence.puml) · [时序图 SVG](chapters/14-jwt-authentication/sequence.svg) · [架构图 SVG](assets/architecture/14-jwt-authentication.svg)
 
 ## 第二篇：Actor、队列与集群
 
-- <a id="chapter-15"></a>**15 Actor 模型**（待分析）：ActorSystem、Mailbox、Dispatcher、App/Tenant/Device/Rule Actor 层次。
-- <a id="chapter-16"></a>**16 Kafka 发送流程**（待分析）：Producer Provider、TopicPartitionInfo、序列化、回调与生产者配置。
-- <a id="chapter-17"></a>**17 Kafka 消费流程**（待分析）：订阅、poll、pack、提交、重试、rebalance 和幂等风险。
-- <a id="chapter-18"></a>**18 Queue 管理**（待分析）：Queue/Profile 配置、submit/processing strategy、隔离队列和动态更新。
-- <a id="chapter-19"></a>**19 Cluster 通信**（待分析）：服务发现、分区分配、Core/Rule Engine/Transport 通知和远程路由。
+- <a id="chapter-15"></a>**15 Actor 模型**（已完成）：[Markdown](chapters/15-actor-model/README.md) · [HTML](chapters/15-actor-model/index.html) · [PlantUML](chapters/15-actor-model/sequence.puml) · [时序图 SVG](chapters/15-actor-model/sequence.svg) · [架构图 SVG](assets/architecture/15-actor-model.svg)
+- <a id="chapter-16"></a>**16 Kafka 发送流程**（已完成）：[Markdown](chapters/16-kafka-producer/README.md) · [HTML](chapters/16-kafka-producer/index.html) · [PlantUML](chapters/16-kafka-producer/sequence.puml) · [时序图 SVG](chapters/16-kafka-producer/sequence.svg) · [架构图 SVG](assets/architecture/16-kafka-producer.svg)
+- <a id="chapter-17"></a>**17 Kafka 消费流程**（已完成）：[Markdown](chapters/17-kafka-consumer/README.md) · [HTML](chapters/17-kafka-consumer/index.html) · [PlantUML](chapters/17-kafka-consumer/sequence.puml) · [时序图 SVG](chapters/17-kafka-consumer/sequence.svg) · [架构图 SVG](assets/architecture/17-kafka-consumer.svg)
+- <a id="chapter-18"></a>**18 Queue 管理**（已完成）：[Markdown](chapters/18-queue-management/README.md) · [HTML](chapters/18-queue-management/index.html) · [PlantUML](chapters/18-queue-management/sequence.puml) · [时序图 SVG](chapters/18-queue-management/sequence.svg) · [架构图 SVG](assets/architecture/18-queue-management.svg)
+- <a id="chapter-19"></a>**19 Cluster 通信**（已完成）：[Markdown](chapters/19-cluster-communication/README.md) · [HTML](chapters/19-cluster-communication/index.html) · [PlantUML](chapters/19-cluster-communication/sequence.puml) · [时序图 SVG](chapters/19-cluster-communication/sequence.svg) · [架构图 SVG](assets/architecture/19-cluster-communication.svg)
 - <a id="chapter-20"></a>**20 Cassandra 写入流程**（待分析）：分区键、TTL、异步 driver、latest/history 和 partition registry。
 - <a id="chapter-21"></a>**21 TimescaleDB 写入流程**（待分析）：Hypertable、chunk、批量队列、聚合查询和 TTL。
 - <a id="chapter-22"></a>**22 PostgreSQL 写入流程**（待分析）：JPA/自定义 JDBC、事务边界、分区表、批处理和连接池。

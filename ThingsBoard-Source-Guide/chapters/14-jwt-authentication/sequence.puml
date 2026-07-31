@@ -1,0 +1,158 @@
+@startuml
+title ThingsBoard 3.6 JWT 认证、授权、Refresh 与 WebSocket
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontColor #111827
+skinparam sequence {
+  ArrowColor #253746
+  LifeLineBorderColor #334155
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #FFFFFF
+  ParticipantFontColor #111827
+  ActorBorderColor #334155
+  ActorBackgroundColor #FFFFFF
+  ActorFontColor #111827
+  GroupBorderColor #176B87
+  GroupBackgroundColor #EEF6F8
+  GroupFontColor #111827
+  DividerBorderColor #9A5B13
+  DividerBackgroundColor #FFF7E8
+  DividerFontColor #111827
+  NoteBorderColor #8A5A00
+  NoteBackgroundColor #FFF5CC
+  NoteFontColor #111827
+}
+
+actor Browser
+participant "GlobalHttpInterceptor" as UI
+participant "SkipPathRequestMatcher" as Matcher
+participant "JwtTokenAuthentication\nProcessingFilter" as AccessFilter
+participant "AuthenticationManager" as Manager
+participant "JwtAuthenticationProvider" as AccessProvider
+participant "JwtTokenFactory" as JWT
+collections "userSessionsInvalidation\nCaffeine or Redis" as Invalidations
+participant "SecurityContext\nMethod Security" as Context
+participant "BaseController\nAccessControlService" as Authorization
+database "PostgreSQL\nusers / credentials / entities\nadmin_settings" as DB
+participant "RefreshTokenProcessingFilter" as RefreshFilter
+participant "RefreshTokenAuthenticationProvider" as RefreshProvider
+participant "RestAwareAuthentication\nSuccessHandler" as Success
+participant "TbWebSocketHandler" as WebSocket
+participant "TbClusterService\nLifecycle Consumer" as Cluster
+
+== Protected REST access ==
+Browser -> UI: request /api/**
+UI -> UI: check jwt_token_expiration with 2-second margin
+UI -> Matcher: X-Authorization: Bearer access-token
+Matcher -> Matcher: skip list first, then /api/**
+Matcher -> AccessFilter: protected request
+AccessFilter -> AccessFilter: choose X-Authorization before Authorization
+AccessFilter -> AccessFilter: remove first 7 header characters
+AccessFilter -> Manager: authenticate JwtAuthenticationToken(raw)
+Manager -> AccessProvider: authenticate(Authentication)
+AccessProvider -> JWT: parseAccessJwtToken(raw)
+JWT -> JWT: parseClaimsJws(current signing key)
+JWT --> AccessProvider: SecurityUser from signed claims
+AccessProvider -> Invalidations: get(userId invalidation time)
+opt user marker absent or older
+  AccessProvider -> Invalidations: get(sessionId invalidation time)
+end
+
+alt malformed, bad signature, expired, or outdated
+  AccessProvider --> AccessFilter: AuthenticationException
+  AccessFilter --> UI: 401 error response
+else token accepted
+  AccessProvider --> Manager: trusted JwtAuthenticationToken(SecurityUser)
+  Manager --> AccessFilter: authenticated result
+  AccessFilter -> Context: create empty SecurityContext and set Authentication
+  Context -> Context: tenant/customer REST rate limit after auth
+  Context -> Context: evaluate @PreAuthorize authorities
+  alt method authority denied
+    Context --> UI: 403
+  else method authority allowed
+    Context -> Authorization: Controller checkEntityId(entityId, operation)
+    Authorization -> DB: load entity using token tenantId
+    DB --> Authorization: entity or null
+    Authorization -> Authorization: authority -> Resource PermissionChecker
+    alt entity or operation denied
+      Authorization --> UI: 403 or normalized not-found error
+    else allowed
+      Authorization -> DB: execute business read/write
+      DB --> Authorization: business result
+      Authorization --> UI: HTTP response
+    end
+  end
+end
+
+== Access expired: browser refresh and retry ==
+UI -> UI: one ReplaySubject coalesces same-tab refresh
+UI -> RefreshFilter: POST /api/auth/token {refreshToken}
+RefreshFilter -> Manager: RefreshAuthenticationToken(raw)
+Manager -> RefreshProvider: authenticate(Authentication)
+RefreshProvider -> JWT: parseRefreshToken(raw)
+JWT --> RefreshProvider: userId, principal, sessionId, REFRESH_TOKEN scope
+alt normal user
+  RefreshProvider -> DB: SELECT tb_user by userId
+  RefreshProvider -> DB: SELECT user_credentials by userId
+  DB --> RefreshProvider: current user, enabled credentials
+else public principal
+  RefreshProvider -> DB: SELECT customer and verify public
+  DB --> RefreshProvider: public customer
+end
+RefreshProvider -> Invalidations: check user/session invalidation
+
+alt missing/disabled/deleted/outdated/expired
+  RefreshProvider --> RefreshFilter: AuthenticationException
+  RefreshFilter --> UI: 401 and browser clears localStorage
+else refresh accepted
+  RefreshProvider --> Success: trusted RefreshAuthenticationToken
+  Success -> JWT: createTokenPair(current SecurityUser)
+  JWT --> Success: new access + new refresh + new jti, same sessionId
+  Success --> UI: 200 JwtPair
+  UI -> UI: overwrite localStorage
+  UI -> Matcher: retry original request with new access
+end
+
+note over RefreshProvider,JWT
+  Refresh does not check password age or 2FA.
+  The previous refresh token is not marked as used and remains reusable.
+end note
+
+== WebSocket independent authentication ==
+Browser -> WebSocket: open /api/ws or plugins endpoint
+alt query contains token
+  WebSocket -> AccessProvider: authenticate(query token)
+  AccessProvider --> WebSocket: SecurityUser
+else no query token
+  WebSocket --> Browser: connection pending, auth timeout applies
+  Browser -> WebSocket: first wrapper with AuthCmd(token)
+  WebSocket -> AccessProvider: authenticate(authCmd.token)
+  AccessProvider --> WebSocket: SecurityUser
+end
+WebSocket -> WebSocket: store SecurityUser in WebSocketSessionRef
+Browser -> WebSocket: later subscription commands
+WebSocket -> WebSocket: use stored securityCtx without reparsing JWT
+
+note over WebSocket
+  Token expiration, logout, or password invalidation after connection
+  does not automatically close the established WebSocket.
+end note
+
+== JWT signing settings update ==
+Browser -> DB: SYS_ADMIN save admin_settings key=jwt
+Browser -> Cluster: broadcast SYS tenant UPDATED
+Browser -> JWT: reload local volatile settings
+JWT --> Browser: admin pair signed with new key
+Cluster -> Cluster: async notification delivery to other services
+Cluster -> DB: remote node reloads admin_settings key=jwt
+
+note over Cluster,DB
+  There is no dual-key grace period or all-node barrier.
+  During propagation, old and new tokens may be accepted by different nodes.
+  Invalidation cache TTL still comes from YAML refreshTokenExpTime at startup.
+end note
+
+@enduml

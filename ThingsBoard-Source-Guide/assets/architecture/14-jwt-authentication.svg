@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1060" viewBox="0 0 1600 1060" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard release-3.6 JWT authentication architecture</title>
+  <desc id="desc">High contrast REST access, refresh, authorization, WebSocket and cluster JWT settings architecture.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <style>
+      .title{font:700 33px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:7;stroke-linejoin:round}
+      .box{fill:#fff;stroke:#334155;stroke-width:2}
+      .blue{fill:#eef6f8;stroke:#176b87;stroke-width:2}
+      .amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:2}
+      .band{fill:#f8fafc;stroke:#64748b;stroke-width:2}
+      .line{fill:none;stroke:#253746;stroke-width:2.4;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#176b87;stroke-width:2.4;stroke-dasharray:9 7;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1600" height="1060" fill="#fff"/>
+  <text x="800" y="50" text-anchor="middle" class="title">ThingsBoard 3.6 JWT：Access、Refresh、授权与集群状态</text>
+
+  <rect x="35" y="82" width="290" height="900" rx="6" class="band"/>
+  <text x="180" y="120" text-anchor="middle" class="section">Clients</text>
+  <rect x="65" y="160" width="230" height="100" rx="5" class="box"/>
+  <text x="180" y="198" text-anchor="middle" class="label">Browser / REST Client</text>
+  <text x="180" y="228" text-anchor="middle" class="small">access header</text>
+  <rect x="65" y="335" width="230" height="120" rx="5" class="amber"/>
+  <text x="180" y="372" text-anchor="middle" class="label">localStorage</text>
+  <text x="180" y="402" text-anchor="middle" class="small">access + refresh</text>
+  <text x="180" y="430" text-anchor="middle" class="small">ReplaySubject refresh lock</text>
+  <rect x="65" y="555" width="230" height="110" rx="5" class="blue"/>
+  <text x="180" y="595" text-anchor="middle" class="label">WebSocket Client</text>
+  <text x="180" y="625" text-anchor="middle" class="small">query token or AuthCmd</text>
+  <rect x="65" y="780" width="230" height="105" rx="5" class="green"/>
+  <text x="180" y="818" text-anchor="middle" class="label">SYS_ADMIN</text>
+  <text x="180" y="848" text-anchor="middle" class="small">save JWT settings</text>
+
+  <rect x="360" y="82" width="800" height="900" rx="6" class="band"/>
+  <text x="760" y="120" text-anchor="middle" class="section">ThingsBoard Core Security</text>
+  <rect x="395" y="160" width="245" height="105" rx="5" class="blue"/>
+  <text x="518" y="196" text-anchor="middle" class="label">Access JWT Filter</text>
+  <text x="518" y="225" text-anchor="middle" class="small">matcher + header extractor</text>
+  <rect x="730" y="160" width="260" height="105" rx="5" class="green"/>
+  <text x="860" y="196" text-anchor="middle" class="label">JwtAuthenticationProvider</text>
+  <text x="860" y="225" text-anchor="middle" class="small">claims + invalidation</text>
+  <rect x="730" y="335" width="260" height="120" rx="5" class="box"/>
+  <text x="860" y="372" text-anchor="middle" class="label">JwtTokenFactory</text>
+  <text x="860" y="401" text-anchor="middle" class="small">HS512 parse / sign</text>
+  <text x="860" y="429" text-anchor="middle" class="small">volatile JWT settings</text>
+  <rect x="395" y="335" width="245" height="120" rx="5" class="amber"/>
+  <text x="518" y="372" text-anchor="middle" class="label">Refresh Filter + Provider</text>
+  <text x="518" y="401" text-anchor="middle" class="small">body token + current user</text>
+  <text x="518" y="429" text-anchor="middle" class="small">new pair, same sessionId</text>
+  <rect x="395" y="555" width="245" height="110" rx="5" class="blue"/>
+  <text x="518" y="593" text-anchor="middle" class="label">TbWebSocketHandler</text>
+  <text x="518" y="623" text-anchor="middle" class="small">one-time access validation</text>
+  <rect x="730" y="555" width="260" height="110" rx="5" class="green"/>
+  <text x="860" y="593" text-anchor="middle" class="label">SecurityContext</text>
+  <text x="860" y="623" text-anchor="middle" class="small">trusted SecurityUser</text>
+  <rect x="730" y="745" width="260" height="125" rx="5" class="box"/>
+  <text x="860" y="782" text-anchor="middle" class="label">Authorization</text>
+  <text x="860" y="811" text-anchor="middle" class="small">@PreAuthorize</text>
+  <text x="860" y="839" text-anchor="middle" class="small">Resource PermissionChecker</text>
+  <rect x="395" y="745" width="245" height="125" rx="5" class="amber"/>
+  <text x="518" y="782" text-anchor="middle" class="label">JWT Settings Service</text>
+  <text x="518" y="811" text-anchor="middle" class="small">DB save + local reload</text>
+  <text x="518" y="839" text-anchor="middle" class="small">cluster lifecycle broadcast</text>
+
+  <rect x="1195" y="82" width="370" height="900" rx="6" class="band"/>
+  <text x="1380" y="120" text-anchor="middle" class="section">State / Persistence</text>
+  <rect x="1230" y="165" width="300" height="115" rx="5" class="amber"/>
+  <text x="1380" y="203" text-anchor="middle" class="label">Invalidation Cache</text>
+  <text x="1380" y="232" text-anchor="middle" class="small">userId/sessionId -> time</text>
+  <text x="1380" y="258" text-anchor="middle" class="small">Caffeine or shared Redis</text>
+  <rect x="1230" y="355" width="300" height="120" rx="5" class="box"/>
+  <text x="1380" y="393" text-anchor="middle" class="label">PostgreSQL Identity</text>
+  <text x="1380" y="422" text-anchor="middle" class="small">tb_user + user_credentials</text>
+  <text x="1380" y="448" text-anchor="middle" class="small">refresh path only</text>
+  <rect x="1230" y="555" width="300" height="110" rx="5" class="blue"/>
+  <text x="1380" y="593" text-anchor="middle" class="label">Business Entities</text>
+  <text x="1380" y="623" text-anchor="middle" class="small">entity authorization + DAO</text>
+  <rect x="1230" y="745" width="300" height="125" rx="5" class="green"/>
+  <text x="1380" y="782" text-anchor="middle" class="label">admin_settings key=jwt</text>
+  <text x="1380" y="811" text-anchor="middle" class="small">one active signing key</text>
+  <text x="1380" y="839" text-anchor="middle" class="small">cluster reload is asynchronous</text>
+
+  <path d="M295 210 L395 210" class="line"/>
+  <path d="M640 210 L730 210" class="line"/>
+  <path d="M860 265 L860 335" class="line"/>
+  <path d="M990 210 L1230 220" class="line"/>
+  <path d="M295 395 L395 395" class="line"/>
+  <path d="M640 395 L730 395" class="line"/>
+  <path d="M395 430 L345 490 L345 415 L295 415" class="dash"/>
+  <path d="M640 430 L680 500 L1140 500 L1230 415" class="line"/>
+  <path d="M295 610 L395 610" class="line"/>
+  <path d="M640 610 L730 610" class="line"/>
+  <path d="M860 665 L860 745" class="line"/>
+  <path d="M990 807 L1230 610" class="line"/>
+  <path d="M295 832 L395 807" class="line"/>
+  <path d="M640 850 L680 910 L1140 910 L1230 807" class="dash"/>
+  <path d="M1230 807 L1070 935 L640 850" class="dash"/>
+
+  <text x="320" y="195" class="edge">access header</text>
+  <text x="1015" y="195" class="edge">cache lookup</text>
+  <text x="900" y="488" class="edge">refresh DB read</text>
+  <text x="315" y="592" class="edge">WS auth</text>
+  <text x="1035" y="690" class="edge">entity check</text>
+  <text x="870" y="927" class="edge">lifecycle reload</text>
+
+  <text x="800" y="1020" text-anchor="middle" class="small">Access is DB-free but claim-based; refresh re-reads identity; WebSocket validates only when the connection is authenticated.</text>
+  <text x="800" y="1043" text-anchor="middle" class="small">Use Redis for cross-node invalidation and keep YAML invalidation TTL at least as long as the database refresh-token lifetime.</text>
+</svg>

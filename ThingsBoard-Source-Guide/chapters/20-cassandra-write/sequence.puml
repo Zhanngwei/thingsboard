@@ -1,0 +1,134 @@
+@startuml
+title ThingsBoard 3.6 Cassandra telemetry: registry, history, latest, TTL and async IO
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 220
+
+participant "Rule Engine Queue" as Queue
+participant "TbMsgTimeseriesNode" as Node
+participant "TelemetrySubscriptionService" as Telemetry
+participant "BaseTimeseriesService" as Base
+participant "Cassandra History DAO" as History
+participant "Cassandra Latest DAO" as Latest
+participant "Partition Cache" as Cache
+participant "Buffered Rate Write Executor" as Buffer
+participant "DataStax Driver" as Driver
+database "Cassandra Replicas" as Cassandra
+participant "WebSocket / Entity View" as Notify
+
+== Rule Node entry ==
+Queue -> Node : POST_TELEMETRY_REQUEST TbMsg
+Node -> Node : parse TsKvEntry list\nresolve ttl and saveLatest flag
+Node -> Telemetry : saveAndNotify(tenant, entity, entries, ttl, callback)
+Telemetry -> Base : save(...) or saveWithoutLatest(...)
+
+== Register three independent futures per datapoint ==
+loop each TsKvEntry
+  Base -> History : savePartition(entity, ts, key)
+  Base -> History : save(entity, entry, ttl)
+  opt saveLatest = true
+    Base -> Latest : saveLatest(entity, entry)
+  end
+end
+Base -> Base : Futures.allAsList(all mutations)
+
+== Partition registry path ==
+History -> History : partitionStart = truncate UTC timestamp
+alt fixed INDEFINITE partitioning
+  History --> Base : immediate null Future
+else time buckets
+  History -> Cache : has(entity,key,partition)?
+  alt cache hit
+    Cache --> History : true
+    History --> Base : immediate success
+  else cache miss or cache disabled
+    History -> Buffer : INSERT ts_kv_partitions_cf\nTTL = system TTL only
+  end
+end
+
+== History path ==
+History -> History : effective TTL\nrequest or min(system, request)
+History -> History : choose typed prepared statement
+alt set_null_values_enabled
+  History -> History : bind all typed cells\nnon-target cells = null
+else target column only
+  History -> History : old typed cells may remain
+end
+History -> Buffer : INSERT ts_kv_cf [USING TTL]
+
+== Latest path ==
+Latest -> Latest : bind entityType, entityId, key, payload ts, value
+Latest -> Buffer : unconditional INSERT ts_kv_latest_cf\nno TTL and no payload-ts guard
+
+== Buffered asynchronous IO ==
+loop each CassandraStatementTask
+  Buffer -> Buffer : tenant rate limit check
+  alt rejected or bounded queue full
+    Buffer --> Base : failed Future
+  else queued
+    Buffer -> Buffer : dispatcher checks approximate concurrency\nqueue+execution deadline
+    Buffer -> Driver : session.executeAsync(statement with CL)
+    Driver -> Cassandra : coordinator mutation
+    alt write CL reached
+      Cassandra --> Driver : AsyncResultSet
+      Driver --> Buffer : completion on callback pool
+      Buffer --> Base : success Future
+      opt registry write succeeded
+        Buffer -> Cache : put(entity,key,partition)
+      end
+    else timeout / unavailable / overload
+      Cassandra --> Driver : failure
+      Driver --> Buffer : exceptional completion
+      Buffer --> Base : failed Future
+    end
+  end
+end
+
+== Combined result and notifications ==
+alt every registered future succeeds
+  Base --> Telemetry : success
+  Telemetry -> Notify : publish latest/history update
+  Telemetry --> Node : callback success
+  Node --> Queue : Rule Node Success relation
+else any future fails
+  Base --> Telemetry : failed combination
+  Telemetry --> Node : callback failure
+  Node --> Queue : Rule Node Failure relation
+end
+note over History,Latest
+  allAsList is not a Cassandra batch or transaction.
+  Registry, history and latest mutations already applied are not rolled back.
+end note
+
+== Native history TTL versus latest lifetime ==
+Cassandra -> Cassandra : history cells expire at effective TTL
+Cassandra -> Cassandra : expired cells become tombstones\nphysical purge waits for compaction conditions
+note over Cassandra,Latest
+  Latest INSERT has no TTL. A last value can survive after all history expires.
+end note
+
+== Out-of-order latest overwrite ==
+Queue -> Node : older payload ts arrives later
+Node -> Latest : saveLatest(old payload timestamp)
+Latest -> Buffer : ordinary INSERT same entity/key
+Buffer -> Driver : executeAsync
+Driver -> Cassandra : later write timestamp wins
+note over Latest,Cassandra
+  The payload ts column is not a compare condition.
+  An older event submitted later can replace a newer latest value.
+end note
+@enduml

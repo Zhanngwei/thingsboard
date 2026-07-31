@@ -1,0 +1,166 @@
+@startuml
+title ThingsBoard 3.6 Dashboard：配置、Widget 查询与实时更新
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 5
+skinparam sequence {
+  ArrowColor #1F2937
+  ActorBorderColor #334155
+  ActorBackgroundColor #FFFFFF
+  ActorFontColor #111827
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #E8F3F8
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #334155
+  GroupBackgroundColor #F8FAFC
+  GroupHeaderFontColor #111827
+  NoteBorderColor #8A5A00
+  NoteBackgroundColor #FFF5CC
+  NoteFontColor #111827
+  DividerBackgroundColor #0B3A53
+  DividerBorderColor #0B3A53
+  DividerFontColor #FFFFFF
+}
+
+actor "Tenant/Customer\nBrowser" as UI
+participant "DashboardResolver\nDashboardPage" as PAGE
+participant "Angular\nDashboardService" as HTTP
+participant "DashboardController" as CTRL
+participant "DefaultTbDashboardService" as APP
+participant "DashboardServiceImpl" as DS
+database "PostgreSQL\ndashboard / relation" as PG
+participant "WidgetComponent\nWidgetSubscription" as WIDGET
+participant "EntityDataSubscription\nTelemetry WS client" as CLIENT
+participant "TbWebSocketHandler\nDefaultWebSocketService" as WS
+participant "EntityDataSubService\nTbEntityDataSubCtx" as SUB
+participant "EntityQueryRepository\nTimeseriesService" as QUERY
+participant "LocalSubscriptionService" as LOCAL
+participant "SubscriptionManager" as MGR
+queue "TB_CORE /\nnotification queue" as CORE
+
+== A. 读取 Dashboard 配置 ==
+UI -> PAGE: route /dashboards/{dashboardId}
+PAGE -> HTTP: getDashboard(dashboardId)
+HTTP -> CTRL: GET /api/dashboard/{dashboardId}
+CTRL -> CTRL: checkDashboardId(id, READ)
+CTRL -> DS: findDashboardById(tenantId, dashboardId)
+DS -> PG: SELECT dashboard full row
+PG --> DS: configuration + assigned_customers
+DS --> CTRL: Dashboard
+CTRL --> HTTP: 200 Dashboard
+HTTP --> PAGE: validateAndUpdateDashboard(dashboard)
+PAGE -> PAGE: create AliasController / State / Layout
+PAGE -> WIDGET: instantiate each widget by typeFullFqn
+
+note over PAGE,WIDGET
+configuration 是应用 JSON 文档；
+dashboard 行不保存任何 telemetry value。
+end note
+
+== B. Widget 两阶段 EntityData 命令 ==
+WIDGET -> WIDGET: resolve datasource alias/filter
+WIDGET -> CLIENT: EntityDataSubscription.subscribe()
+CLIENT -> CLIENT: allocate cmdId; build EntityDataCmd(query)
+CLIENT -> WS: WebSocket wrapper + AuthCmd/JWT + query
+WS -> WS: authenticate; validate command
+WS -> SUB: handleCmd(session, EntityDataCmd)
+SUB -> SUB: create TbEntityDataSubCtx(sessionId, cmdId)
+SUB -> QUERY: findEntityDataByQuery(tenant, customer, query)
+QUERY -> PG: dynamic count/data SQL
+note right of PG
+entity tables + relation
++ attribute_kv + ts_kv_latest
+end note
+PG --> QUERY: PageData<EntityData>
+QUERY --> SUB: initial entity/latest data
+SUB --> WS: EntityDataUpdate(cmdId, data)
+WS --> CLIENT: JSON update
+CLIENT --> WIDGET: datasource resolved / init complete
+
+WIDGET -> CLIENT: start()
+CLIENT -> CLIENT: same cmdId; build historyCmd/tsCmd/latestCmd
+CLIENT -> WS: update EntityDataCmd
+WS -> SUB: update existing context
+SUB -> QUERY: findAllByQueries(entity, keys, timewindow)
+QUERY -> PG: SQL/Timescale history
+alt database.ts.type = cassandra
+  QUERY -> QUERY: Cassandra async history query
+end
+QUERY --> SUB: history / aggregation results
+SUB -> LOCAL: add time-series/attribute subscriptions
+LOCAL -> MGR: local call if entity owner
+alt entity owner is remote Core partition
+  LOCAL -> CORE: TbEntitySubEvent(entityId, keys, serviceId)
+  CORE -> MGR: register remote subscription summary
+end
+SUB --> WS: initial history/latest update
+WS --> CLIENT: EntityDataUpdate
+CLIENT --> WIDGET: onDataUpdated / onLatestDataUpdated
+
+== C. 实时 telemetry 回推 ==
+UI -> MGR: previous MQTT/Rule Engine save succeeds
+note right of MGR
+实际入口见第 09 章；只有聚合保存 Future
+成功后才调用 onTimeSeriesUpdate。
+end note
+MGR -> MGR: filter subscribed services and keys
+alt WebSocket owner service is local
+  MGR -> LOCAL: onTimeSeriesUpdate(entityId, values)
+else WebSocket owner service is remote
+  MGR -> CORE: ToCoreNotificationMsg(target serviceId)
+  CORE -> LOCAL: onTimeSeriesUpdate(...)
+end
+LOCAL -> SUB: subscription update processor
+SUB -> WS: sendUpdate(sessionId, cmdId, update)
+WS -> WS: rate limit + bounded outbound queue
+WS --> CLIENT: WebSocket JSON
+CLIENT --> WIDGET: merge data and redraw
+
+== D. 保存配置与 Customer 分配 ==
+UI -> PAGE: edit widget/layout/settings
+PAGE -> HTTP: saveDashboard(full Dashboard)
+HTTP -> CTRL: POST /api/dashboard
+CTRL -> APP: save(dashboard, user)
+APP -> DS: saveDashboard(dashboard)
+DS -> DS: validate + replaceBase64WithImageUrl
+DS -> PG: JPA INSERT/UPDATE dashboard transaction
+PG --> DS: committed Dashboard
+DS -> DS: title cache eviction + SaveEntityEvent
+DS --> APP: saved Dashboard
+APP -> APP: autoCommit + audit/action
+APP --> CTRL: Dashboard
+CTRL --> UI: 200
+
+UI -> CTRL: POST customer/{customerId}/dashboard/{dashboardId}
+CTRL -> APP: assignDashboardToCustomer(dashboard, customer, user)
+APP -> DS: assignDashboardToCustomer(tenantId, dashboardId, customerId)
+DS -> PG: INSERT relation Contains / DASHBOARD
+PG --> DS: relation committed
+DS -> PG: UPDATE dashboard.assigned_customers
+PG --> DS: Dashboard
+DS --> APP: saved Dashboard
+APP -> APP: audit ASSIGNED_TO_CUSTOMER
+APP --> UI: Dashboard
+
+note over DS,PG #FDECEC
+assign 方法没有包住两次写入的外层事务。
+第二次 save 失败可留下 relation / JSON 漂移；
+并发整行更新也没有 @Version 防止 lost update。
+end note
+
+== E. 关闭、超限与重连 ==
+alt Browser unsubscribes or destroys Widget
+  CLIENT -> WS: EntityDataUnsubscribeCmd(cmdId)
+  WS -> SUB: cancelSubscription(sessionId, cmdId)
+  SUB -> LOCAL: remove entity subscriptions
+else outbound queue exceeds limit
+  WS --> CLIENT: close POLICY_VIOLATION
+else socket disconnects
+  CLIENT -> CLIENT: retain reconnect subscribers; reset cmd map
+  CLIENT -> WS: reconnect + AuthCmd + rebuild subscriptions
+end
+
+@enduml

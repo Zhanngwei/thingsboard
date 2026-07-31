@@ -1,0 +1,152 @@
+@startuml
+title ThingsBoard 3.6 Kafka consumer: poll pack, Actor callback, retry, timeout and commit
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #F8FAFC
+skinparam ParticipantFontColor #111827
+skinparam LifeLineBorderColor #64748B
+skinparam NoteBackgroundColor #FFF5CC
+skinparam NoteBorderColor #8A5A00
+skinparam NoteFontColor #111827
+skinparam GroupBorderColor #176B87
+skinparam GroupBackgroundColor #EEF6F8
+skinparam GroupFontColor #111827
+
+participant "Partition Manager" as Part
+participant "RE Consumer Thread" as Loop
+participant "Abstract Consumer Template" as Abstract
+participant "KafkaConsumer" as Kafka
+participant "Submit Strategy" as Submit
+participant "Pack Context" as Pack
+participant "App / Tenant / RuleChain / Node Actors" as Actor
+participant "Async DB / External Node" as External
+participant "Processing Strategy" as Strategy
+participant "Kafka Group Coordinator" as Group
+
+== Subscription is applied by poll ==
+Part -> Abstract: subscribe(Set<TopicPartitionInfo>)
+activate Abstract
+Abstract -> Abstract: subscribeQueue.add(latest topics)
+Abstract --> Part: return before Kafka subscribe
+deactivate Abstract
+
+Loop -> Abstract: poll(queue.pollInterval)
+activate Abstract
+Abstract -> Abstract: lock consumerLock
+Abstract -> Abstract: drain subscribeQueue and keep latest set
+Abstract -> Kafka: subscribe(full topic names)
+Kafka -> Group: join or update consumer group
+Group --> Kafka: assignment after poll protocol
+Abstract -> Kafka: poll(Duration)
+Kafka -> Kafka: local positions advance for returned records
+Kafka --> Abstract: ConsumerRecords<String, byte[]>
+Abstract -> Abstract: decode every record to Protobuf queue message
+Abstract --> Loop: decoded pack
+deactivate Abstract
+
+== First processing attempt ==
+Loop -> Submit: new strategy then init(pack)
+Loop -> Strategy: new processing strategy
+Loop -> Pack: new context(pending map, latch)
+Loop -> Submit: submitAttempt(callback factory)
+loop according to BURST / BATCH / sequential mode
+  Submit -> Loop: submitMessage(id, proto)
+  Loop -> Actor: ActorSystemContext.tell(QueueToRuleEngineMsg)
+end
+Loop -> Pack: await(packProcessingTimeout)
+activate Pack
+
+par message A succeeds
+  Actor -> External: database or external side effect
+  External --> Actor: async completion
+  Actor -> Pack: TbMsgPackCallback.onSuccess(idA)
+  Pack -> Pack: pending to success and decrement
+  Pack -> Submit: onSuccess(idA) may release next sequential msg
+else message B fails
+  Actor -> Pack: onFailure(idB, error)
+  Pack -> Pack: pending to failed and decrement
+else message C remains pending
+  Actor -> External: slow asynchronous work
+end
+
+alt all callbacks before timeout
+  Pack --> Loop: latch completed
+else timeout
+  Pack --> Loop: await false with pending messages
+end
+deactivate Pack
+
+Loop -> Strategy: analyze(success, failed, pending)
+activate Strategy
+alt SKIP strategy or retry limit reached
+  Strategy --> Loop: decision commit=true
+else RETRY strategy
+  Strategy -> Strategy: select configured result maps
+  opt pauseBetweenRetries
+    Strategy -> Strategy: sleep in consumer thread
+  end
+  Strategy --> Loop: decision commit=false plus reprocess map
+end
+deactivate Strategy
+Loop -> Pack: cleanup and clear maps
+
+alt decision requests retry
+  Loop -> Submit: update(reprocess map)
+  Loop -> Pack: create new context and callbacks
+  Loop -> Actor: resubmit selected in-memory messages
+  note over Actor,External
+    Effects from the previous attempt are not rolled back.
+    Old asynchronous work may overlap the retry attempt.
+  end note
+else decision commits
+  Loop -> Submit: stop()
+  Loop -> Abstract: commit()
+  Abstract -> Kafka: commitSync()
+  Kafka -> Group: commit current assignment positions
+  Group --> Kafka: commit result
+  Abstract --> Loop: commit completed
+end
+
+== Late callback after timeout cleanup ==
+External --> Actor: old attempt completes
+Actor -> Pack: callback checks isMsgValid()
+alt strategy can skip timed-out callbacks
+  Pack --> Actor: false, stop continuation
+else Main SKIP_ALL_FAILURES compatibility path
+  Pack --> Actor: true, chain may continue
+  Actor -> Pack: success/failure finds cleared pending map
+end
+
+== Decode poison boundary ==
+Loop -> Abstract: next poll()
+Abstract -> Kafka: poll()
+Kafka --> Abstract: records and advanced local position
+Abstract -> Abstract: decoder throws IOException
+Abstract --> Loop: RuntimeException
+Loop -> Loop: catch, log, sleep
+note over Abstract,Group
+  No seek is issued. A later successful commit may advance
+  the group offset beyond this undecoded record.
+end note
+
+== Long retry and rebalance ==
+Loop -> Loop: await or retry longer than max.poll.interval
+Group -> Kafka: revoke assignment / rebalance
+Group -> Kafka: another member receives uncommitted records
+Loop -> Abstract: commit after processing
+Abstract -> Kafka: commitSync()
+Kafka --> Abstract: CommitFailed or rebalance exception
+Abstract --> Loop: exception, outer loop logs and continues
+
+== Partition removal and close ==
+Part -> Loop: initiateStop removed consumer task
+Loop -> Loop: exit after current control point
+Loop -> Abstract: unsubscribe()
+Abstract -> Kafka: unsubscribe then close
+Kafka -> Group: leave group
+@enduml

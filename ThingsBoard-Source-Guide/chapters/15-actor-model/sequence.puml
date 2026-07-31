@@ -1,0 +1,187 @@
+@startuml
+title ThingsBoard 3.6 Actor runtime: startup, mailbox routing and partition change
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #F8FAFC
+skinparam ParticipantFontColor #111827
+skinparam LifeLineBorderColor #64748B
+skinparam LifeLineBackgroundColor #FFFFFF
+skinparam NoteBackgroundColor #FFF5CC
+skinparam NoteBorderColor #8A5A00
+skinparam NoteFontColor #111827
+skinparam GroupBorderColor #176B87
+skinparam GroupBackgroundColor #EEF6F8
+skinparam GroupFontColor #111827
+skinparam SequenceGroupHeaderFontColor #111827
+skinparam SequenceGroupBodyBackgroundColor #FFFFFF
+skinparam BoxBorderColor #64748B
+skinparam BoxBackgroundColor #F8FAFC
+
+actor Spring
+participant "DefaultActorService\n[Spring lifecycle]" as Service
+participant "DefaultTbActorSystem\n[local registry]" as System
+participant "App Mailbox\n[app-dispatcher]" as AppMb
+participant "AppActor" as App
+participant "Tenant Mailbox\n[tenant-dispatcher]" as TenantMb
+participant "TenantActor" as Tenant
+participant "RuleChain Mailbox\n[rule-dispatcher]" as ChainMb
+participant "RuleChainActor" as Chain
+participant "RuleNode Mailbox\n[rule-dispatcher]" as NodeMb
+participant "RuleNodeActor" as Node
+participant "TbMsgCallback" as Callback
+
+== Runtime startup ==
+Spring -> Service: @PostConstruct startActorSystem()
+activate Service
+Service -> System: new DefaultTbActorSystem(settings)
+Service -> System: createDispatcher(APP, executor)
+Service -> System: createDispatcher(TENANT, executor)
+Service -> System: createDispatcher(DEVICE, executor)
+Service -> System: createDispatcher(RULE, executor)
+Service -> System: createRootActor(APP, AppActor.Creator)
+activate System
+System -> System: lock actorId
+System -> AppMb: new TbActorMailbox(...)
+System -> System: actors.put(appActorId, mailbox)
+System -> AppMb: initActor()
+AppMb -> AppMb: dispatcher.execute(tryInit(1))
+System --> Service: TbActorRef
+deactivate System
+deactivate Service
+
+Spring -> Service: ApplicationReadyEvent
+Service -> AppMb: tellWithHighPriority(AppInitMsg)
+AppMb -> AppMb: highPriorityMsgs.add(msg)
+note right of AppMb
+  If ready is still false, the message remains queued.
+  tell returns without waiting for Actor processing.
+end note
+
+AppMb -> App: init(ctx)
+activate App
+App --> AppMb: return
+deactivate App
+AppMb -> AppMb: ready=true; tryProcessQueue(false)
+AppMb -> App: process(AppInitMsg)
+activate App
+App -> App: initTenantActors()
+App -> AppMb: getOrCreateChildActor(tenantId,...)
+AppMb -> System: createChildActor(TENANT,...,appId)
+activate System
+System -> TenantMb: register mailbox then initActor()
+System --> AppMb: Tenant TbActorRef
+deactivate System
+deactivate App
+
+TenantMb -> Tenant: init(ctx)
+activate Tenant
+Tenant -> Tenant: load tenant / initialize owned rule chains
+Tenant -> TenantMb: getOrCreateChildActor(ruleChainId,...)
+TenantMb -> System: createChildActor(RULE,...,tenantId)
+System -> ChainMb: register mailbox then initActor()
+System --> TenantMb: RuleChain TbActorRef
+deactivate Tenant
+
+ChainMb -> Chain: init(ctx)
+activate Chain
+Chain -> Chain: load rule nodes and relations
+Chain -> ChainMb: getOrCreateChildActor(ruleNodeId,...)
+ChainMb -> System: createChildActor(RULE,...,ruleChainId)
+System -> NodeMb: register mailbox then initActor()
+System --> ChainMb: RuleNode TbActorRef
+deactivate Chain
+NodeMb -> Node: init(ctx)
+
+== Queue message through four mailbox turns ==
+Spring -> AppMb: ActorSystemContext.tell(QueueToRuleEngineMsg)
+AppMb -> AppMb: normalPriorityMsgs.add(msg)
+AppMb -> AppMb: busy CAS FREE -> BUSY
+AppMb -> App: process(msg)
+activate App
+App -> TenantMb: tenantActor.tell(msg)
+App --> AppMb: return
+deactivate App
+AppMb -> AppMb: release/resubmit after throughput
+
+TenantMb -> TenantMb: busy CAS FREE -> BUSY
+TenantMb -> Tenant: process(msg)
+activate Tenant
+Tenant -> Tenant: resolve root or explicit ruleChainId
+Tenant -> ChainMb: chainActor.tell(msg)
+Tenant --> TenantMb: return
+deactivate Tenant
+
+ChainMb -> Chain: process(msg)
+activate Chain
+Chain -> Chain: validate state and select first/continuation node
+Chain -> NodeMb: nodeActor.tell(TbToRuleNodeActorMsg)
+Chain --> ChainMb: return
+deactivate Chain
+
+NodeMb -> Node: process(node message)
+activate Node
+Node -> Node: processor invokes TbNode.onMsg(...)
+alt node completes successfully
+  Node -> Callback: onSuccess() or tellNext relation
+else node reports failure
+  Node -> Callback: onFailure(error)
+else process throws ordinary Exception
+  NodeMb -> Node: onProcessFailure(msg,error)
+  Node --> NodeMb: ProcessFailureStrategy.resume
+  note right of NodeMb
+    The polled message is not automatically requeued.
+    Callback completion depends on business code.
+  end note
+end
+deactivate Node
+
+== High priority and throughput ==
+Spring -> TenantMb: tell(normal-1)
+Spring -> TenantMb: tell(normal-2)
+Spring -> TenantMb: tellWithHighPriority(lifecycle)
+loop up to actors.system.throughput
+  TenantMb -> TenantMb: poll high first, then normal
+  TenantMb -> Tenant: process(one message)
+end
+TenantMb -> TenantMb: dispatcher.execute(processMailbox) again
+note right of TenantMb
+  High priority does not interrupt an executing message.
+  Continuous high traffic may starve normal traffic.
+end note
+
+== Partition owner moves away ==
+Spring -> Service: PartitionChangeEvent(TB_RULE_ENGINE/TB_CORE)
+Service -> AppMb: tellWithHighPriority(PartitionChangeMsg)
+AppMb -> App: process partition change
+App -> TenantMb: broadcastToChildren(msg, high=true)
+TenantMb -> Tenant: onPartitionChangeMsg(msg)
+alt Rule Engine partition lost
+  Tenant -> System: stop(ruleChainActorId) for each chain
+  System -> ChainMb: destroy(cause=null)
+  ChainMb -> Chain: destroy(STOPPED,null)
+  System -> NodeMb: stop children recursively
+else Core partition changed
+  Tenant -> Tenant: filter Device children no longer owned
+  Tenant -> System: stop(deviceActorId)
+end
+note over System,NodeMb
+  Actor state and pending mailbox messages are local only.
+  The new owner rebuilds state; no actor migration occurs.
+end note
+
+== Shutdown ==
+Spring -> Service: @PreDestroy stopActorSystem()
+Service -> System: stop()
+System -> System: shutdown dispatchers; await up to 3s
+System -> System: scheduler.shutdownNow(); actors.clear()
+note right of System
+  Global stop does not iterate every Actor and call destroy().
+end note
+
+@enduml

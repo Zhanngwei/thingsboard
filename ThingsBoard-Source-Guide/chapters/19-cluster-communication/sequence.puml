@@ -1,0 +1,130 @@
+@startuml
+title ThingsBoard 3.6 cluster: discovery, ownership, queue routing and Actor handoff
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 220
+
+participant "Spring Boot Node" as Node
+participant "ServiceInfoProvider" as Info
+participant "ZkDiscoveryService" as Discovery
+database "ZooKeeper /nodes" as ZK
+participant "HashPartitionService" as Partition
+participant "Spring Event Bus" as Events
+participant "Core / RE Consumers" as Consumers
+participant "ActorService" as ActorService
+participant "Tenant / Device / Rule Actors" as Actors
+participant "DefaultTbClusterService" as Cluster
+queue "Queue Producer / Broker" as Broker
+participant "Remote Owner Consumer" as Remote
+participant "Remote Local Actor" as RemoteActor
+
+== Service identity and registration ==
+Node -> Info : @PostConstruct init()
+Info -> Info : serviceId = configured or hostname\nserviceTypes from service.type\nassigned tenant profiles
+Info -> Info : build ServiceInfo + system metrics
+Node -> Info : @AfterContextReady setTransports()
+Info -> Info : append transport bean names
+Node -> Discovery : ApplicationReadyEvent
+Discovery -> Info : getServiceInfo()
+Info --> Discovery : protobuf ServiceInfo
+Discovery -> ZK : create EPHEMERAL_SEQUENTIAL node
+ZK --> Discovery : nodePath
+Discovery -> ZK : PathChildrenCache current data
+ZK --> Discovery : peers
+Discovery -> Partition : recalculatePartitions(self, peers)
+
+== Deterministic ownership calculation ==
+Partition -> Partition : group services by QueueKey/type\nsort each list by serviceId
+loop every QueueKey logical partition
+  alt TB_RULE_ENGINE
+    Partition -> Partition : choose dedicated profile candidates\nowner = (hash(tenantId)+partition) mod count
+  else TB_CORE / VC
+    Partition -> Partition : owner = partition mod count
+  end
+  Partition -> Partition : add index when owner == current ServiceInfo
+end
+Partition -> Events : PartitionChangeEvent per service type
+Partition -> Events : ClusterTopologyChangeEvent if peer map changed
+Partition -> Events : ServiceListChangedEvent always
+Events -> Consumers : update subscribed physical topics
+Events -> ActorService : PartitionChangeEvent
+ActorService -> Actors : high-priority PartitionChangeMsg
+alt Core partition revoked
+  Actors -> Actors : stop Device Actors not in my partitions
+else Rule Engine tenant revoked/acquired
+  Actors -> Actors : destroy or initialize rule chains
+end
+note over Consumers,Actors
+  Consumer subscriptions and Actor cleanup are separate listeners.
+  Mailboxes, sessions and asynchronous side effects are not migrated.
+end note
+
+== Peer failure with restart debounce ==
+ZK --> Discovery : CHILD_REMOVED(peer ServiceInfo)
+Discovery -> Events : OtherServiceShutdownEvent immediately
+Discovery -> Discovery : schedule recalc after zk.recalculate_delay
+alt same serviceId returns before delay
+  ZK --> Discovery : CHILD_ADDED(same serviceId)
+  Discovery -> Discovery : cancel delayed task
+else peer remains absent
+  Discovery -> ZK : read current peers
+  Discovery -> Partition : recalculatePartitions(self, peers)
+end
+
+== Cross-node Core or Rule Engine data message ==
+Node -> Cluster : pushMsgToCore / pushMsgToRuleEngine
+Cluster -> Partition : resolve(type, queueName, tenantId, entityId)
+Partition -> Partition : entity UUID hash mod logical size
+Partition --> Cluster : TopicPartitionInfo(full physical topic)
+Cluster -> Broker : producer.send(Protobuf envelope, callback)
+Broker --> Cluster : broker acknowledgement
+Cluster --> Node : producer callback success
+note over Node,Cluster
+  This callback does not wait for the remote consumer,
+  Actor, database or external side effect.
+end note
+Broker -> Remote : poll record on owned topic
+Remote -> RemoteActor : local ActorSystem.tell(...)
+RemoteActor --> Remote : business callback
+Remote -> Broker : commit consumer position
+
+== Per-service notification broadcast ==
+Node -> Cluster : broadcast lifecycle/config notification
+Cluster -> Partition : getAllServiceIds(target type)
+Partition --> Cluster : serviceId set
+loop each target serviceId
+  Cluster -> Broker : send target notification topic
+end
+Broker -> Remote : target service notification consumer
+Remote -> Remote : update local cache/session/runtime
+note over Cluster,Remote
+  Broadcast is N producer sends. A wrapper may aggregate producer callbacks,
+  but never confirms that N consumers applied the update.
+end note
+
+== ZooKeeper session loss on current node ==
+ZK --> Discovery : connection state LOST
+Discovery -> Discovery : single-thread reconnect task
+Discovery -> ZK : delete/close old client if possible
+Discovery -> ZK : new client + blockUntilConnected
+Discovery -> Info : generate updated ServiceInfo
+Discovery -> ZK : publish new ephemeral sequential node
+note over Discovery,ZK
+  Peers may have already published shutdown and reassigned partitions.
+  The returning node rebuilds from current topology; old in-memory work is not transferred.
+end note
+@enduml

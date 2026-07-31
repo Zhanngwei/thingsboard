@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1080" viewBox="0 0 1700 1080" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Kafka producer architecture</title>
+  <desc id="desc">High contrast architecture showing business callers, queue routing, Kafka producer template, physical topic naming and callback semantics.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <marker id="blueArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#176b87"/></marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:7;stroke-linejoin:round}.box{fill:#fff;stroke:#334155;stroke-width:2}.blue{fill:#eef6f8;stroke:#176b87;stroke-width:2}.amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}.green{fill:#ecfdf5;stroke:#047857;stroke-width:2}.red{fill:#fff1f2;stroke:#be123c;stroke-width:2}.band{fill:#f8fafc;stroke:#64748b;stroke-width:2}.line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}.dash{fill:none;stroke:#176b87;stroke-width:2.5;stroke-dasharray:9 7;marker-end:url(#blueArrow)}
+    </style>
+  </defs>
+  <rect width="1700" height="1080" fill="#fff"/>
+  <text x="850" y="50" text-anchor="middle" class="title">ThingsBoard 3.6 Kafka：Producer 路由、物理 Topic 与确认边界</text>
+
+  <rect x="35" y="82" width="295" height="880" rx="6" class="band"/>
+  <text x="182" y="120" text-anchor="middle" class="section">Callers</text>
+  <rect x="65" y="165" width="235" height="105" rx="5" class="blue"/><text x="182" y="203" text-anchor="middle" class="label">Transport</text><text x="182" y="233" text-anchor="middle" class="small">telemetry / session / RPC</text>
+  <rect x="65" y="335" width="235" height="105" rx="5" class="green"/><text x="182" y="373" text-anchor="middle" class="label">Cluster Service</text><text x="182" y="403" text-anchor="middle" class="small">Core / Rule Engine routing</text>
+  <rect x="65" y="505" width="235" height="105" rx="5" class="amber"/><text x="182" y="543" text-anchor="middle" class="label">Actor / Rule Node</text><text x="182" y="573" text-anchor="middle" class="small">cross-partition handoff</text>
+  <rect x="65" y="675" width="235" height="105" rx="5" class="box"/><text x="182" y="713" text-anchor="middle" class="label">Lifecycle Services</text><text x="182" y="743" text-anchor="middle" class="small">per-service notifications</text>
+  <rect x="65" y="845" width="235" height="75" rx="5" class="red"/><text x="182" y="890" text-anchor="middle" class="label">No shared DB transaction</text>
+
+  <rect x="365" y="82" width="410" height="880" rx="6" class="band"/>
+  <text x="570" y="120" text-anchor="middle" class="section">ThingsBoard Queue Routing</text>
+  <rect x="400" y="155" width="340" height="120" rx="5" class="green"/><text x="570" y="194" text-anchor="middle" class="label">TbQueueProducerProvider</text><text x="570" y="224" text-anchor="middle" class="small">purpose-specific shared producers</text><text x="570" y="250" text-anchor="middle" class="small">factory selected by queue.type + service.type</text>
+  <rect x="400" y="340" width="340" height="145" rx="5" class="blue"/><text x="570" y="379" text-anchor="middle" class="label">HashPartitionService</text><text x="570" y="410" text-anchor="middle" class="small">hash(entity UUID) mod logical partition count</text><text x="570" y="438" text-anchor="middle" class="small">main / custom / isolated queue selection</text><text x="570" y="466" text-anchor="middle" class="small">myPartition is routing metadata only</text>
+  <rect x="400" y="550" width="340" height="155" rx="5" class="amber"/><text x="570" y="589" text-anchor="middle" class="label">TopicPartitionInfo</text><text x="570" y="620" text-anchor="middle" class="small">prefix.base.isolated.tenantUUID.logicalPart</text><text x="570" y="648" text-anchor="middle" class="small">logical partition becomes topic suffix</text><text x="570" y="676" text-anchor="middle" class="small">not ProducerRecord.partition</text>
+  <rect x="400" y="770" width="340" height="150" rx="5" class="box"/><text x="570" y="809" text-anchor="middle" class="label">TbProtoQueueMsg</text><text x="570" y="840" text-anchor="middle" class="small">UUID key + Protobuf value + headers</text><text x="570" y="868" text-anchor="middle" class="small">getData invokes value.toByteArray</text>
+
+  <rect x="810" y="82" width="440" height="880" rx="6" class="band"/>
+  <text x="1030" y="120" text-anchor="middle" class="section">Kafka Producer Client</text>
+  <rect x="845" y="155" width="370" height="165" rx="5" class="green"/><text x="1030" y="195" text-anchor="middle" class="label">TbKafkaProducerTemplate</text><text x="1030" y="226" text-anchor="middle" class="small">ensure topic · copy headers · build record</text><text x="1030" y="254" text-anchor="middle" class="small">debug adds producer/thread headers</text><text x="1030" y="282" text-anchor="middle" class="small">sync failure: callback then rethrow</text>
+  <rect x="845" y="385" width="175" height="145" rx="5" class="amber"/><text x="932" y="424" text-anchor="middle" class="label">TbKafkaAdmin</text><text x="932" y="455" text-anchor="middle" class="small">list/create topics</text><text x="932" y="483" text-anchor="middle" class="small">wait create Future</text><text x="932" y="511" text-anchor="middle" class="small">local topic cache</text>
+  <rect x="1040" y="385" width="175" height="145" rx="5" class="blue"/><text x="1127" y="424" text-anchor="middle" class="label">ProducerRecord</text><text x="1127" y="455" text-anchor="middle" class="small">topic = fullTopic</text><text x="1127" y="483" text-anchor="middle" class="small">partition = null</text><text x="1127" y="511" text-anchor="middle" class="small">key String · value byte[]</text>
+  <rect x="845" y="600" width="370" height="150" rx="5" class="box"/><text x="1030" y="639" text-anchor="middle" class="label">KafkaProducer Accumulator</text><text x="1030" y="670" text-anchor="middle" class="small">batch per physical topic + Kafka partition</text><text x="1030" y="698" text-anchor="middle" class="small">send may wait for metadata or buffer</text><text x="1030" y="726" text-anchor="middle" class="small">I/O thread executes callback</text>
+  <rect x="845" y="820" width="370" height="100" rx="5" class="red"/><text x="1030" y="858" text-anchor="middle" class="label">No Kafka transaction API</text><text x="1030" y="889" text-anchor="middle" class="small">idempotence follows client default / overrides</text>
+
+  <rect x="1285" y="82" width="380" height="880" rx="6" class="band"/>
+  <text x="1475" y="120" text-anchor="middle" class="section">Broker and Completion</text>
+  <rect x="1320" y="155" width="310" height="130" rx="5" class="amber"/><text x="1475" y="195" text-anchor="middle" class="label">Physical Kafka Topic</text><text x="1475" y="226" text-anchor="middle" class="small">usually 1 Kafka partition for Core/RE</text><text x="1475" y="254" text-anchor="middle" class="small">dynamic topics multiply by logical partitions</text>
+  <rect x="1320" y="355" width="310" height="130" rx="5" class="green"/><text x="1475" y="395" text-anchor="middle" class="label">Leader + ISR</text><text x="1475" y="426" text-anchor="middle" class="small">acks=all default</text><text x="1475" y="454" text-anchor="middle" class="small">replication factor=1 default</text>
+  <rect x="1320" y="555" width="310" height="140" rx="5" class="blue"/><text x="1475" y="595" text-anchor="middle" class="label">TbQueueCallback</text><text x="1475" y="626" text-anchor="middle" class="small">success: broker acknowledged</text><text x="1475" y="654" text-anchor="middle" class="small">failure: exception</text><text x="1475" y="682" text-anchor="middle" class="small">null callback: warning only</text>
+  <rect x="1320" y="765" width="310" height="155" rx="5" class="red"/><text x="1475" y="805" text-anchor="middle" class="label">Not Yet Completed</text><text x="1475" y="836" text-anchor="middle" class="small">consumer poll / offset commit</text><text x="1475" y="864" text-anchor="middle" class="small">Actor / Rule Node execution</text><text x="1475" y="892" text-anchor="middle" class="small">PostgreSQL / telemetry persistence</text>
+
+  <path d="M300 217 L400 217" class="line"/><path d="M300 387 L350 387 L350 215 L400 215" class="line"/><path d="M300 557 L350 557 L350 235 L400 235" class="line"/><path d="M300 727 L365 727 L365 255 L400 255" class="line"/>
+  <path d="M570 275 L570 340" class="line"/><path d="M570 485 L570 550" class="line"/><path d="M570 705 L570 770" class="line"/>
+  <path d="M740 625 L790 625 L790 238 L845 238" class="line"/><path d="M740 845 L810 845 L810 280 L845 280" class="line"/>
+  <path d="M1030 320 L932 385" class="line"/><path d="M1030 320 L1127 385" class="line"/><path d="M1127 530 L1127 600" class="line"/>
+  <path d="M1215 675 L1260 675 L1260 220 L1320 220" class="line"/><path d="M1475 285 L1475 355" class="line"/><path d="M1475 485 L1475 555" class="line"/><path d="M1475 695 L1475 765" class="dash"/>
+  <text x="760" y="612" class="edge">full topic</text><text x="1240" y="662" class="edge">batched record</text><text x="1488" y="528" class="edge">configured ack</text>
+  <text x="850" y="1015" text-anchor="middle" class="small">A ThingsBoard logical partition is encoded in the topic name. The Kafka ProducerRecord partition remains null and is selected by the Kafka client.</text>
+  <text x="850" y="1042" text-anchor="middle" class="small">Producer callback success is a broker handoff boundary, not consumer execution, database commit, MQTT business processing or end-to-end exactly-once.</text>
+</svg>

@@ -1,0 +1,771 @@
+# 13 Login 流程
+
+> 源码基线：ThingsBoard `3.6.4`，行为提交 `0cb411fc90`；源码链接按当前 `release-3.6` 工作树行号校准。本章只分析“凭据如何变成 access/refresh token”，后续请求如何解析 JWT、建立 `SecurityContext` 和执行权限判断放在第 14 章。
+
+[上一篇：12 Dashboard 流程](../12-dashboard/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/13-login.svg) | [下一篇：14 JWT 认证流程](../14-jwt-authentication/README.md)
+
+---
+
+## 一、流程目标
+
+Login 流程把浏览器提交的邮箱和密码转换为一个带 ThingsBoard 业务身份的 `SecurityUser`，再签发 access token 与 refresh token。它同时承担账户启用状态、密码策略、密码过期、失败次数、账户锁定、可选 2FA 和审计记录，因此不能把它理解成一次简单的 `SELECT + BCrypt.matches()`。
+
+```mermaid
+flowchart LR
+  UI[Angular LoginComponent] --> AUTH[AuthService.login]
+  AUTH --> FILTER[RestLoginProcessingFilter]
+  FILTER --> AM[AuthenticationManager]
+  AM --> PROVIDER[RestAuthenticationProvider]
+  PROVIDER --> USER[(tb_user)]
+  PROVIDER --> CRED[(user_credentials)]
+  PROVIDER --> POLICY[(admin_settings securitySettings)]
+  PROVIDER --> MFA{2FA enabled?}
+  MFA -->|no| AUDIT[LOGIN audit + lastLoginTs]
+  MFA -->|yes| PRE[PRE_VERIFICATION_TOKEN]
+  AUDIT --> JWT[JwtTokenFactory]
+  PRE --> MFAAPI[2FA API]
+  MFAAPI --> JWT
+  JWT --> STORE[Browser localStorage]
+```
+
+### 1.1 本章必须先建立的五个边界
+
+| 边界 | release-3.6 的实际实现 | 阅读含义 |
+|---|---|---|
+| HTTP 入口 | `/api/auth/login` 由 Security Filter 消费，不进入 `AuthController` | Controller 断点不会命中普通登录 |
+| 用户与凭据 | `tb_user` 保存身份和 authority，`user_credentials` 保存 BCrypt、enabled 与重置 token | 类似 MySQL 项目中的用户主表与认证子表拆分 |
+| 会话 | Spring Security 配置为 `STATELESS`，JWT 中的随机 `sessionId` 不是数据库 session 行 | 服务端不为每次登录插入会话表 |
+| 审计 | `lastLoginTs` 同步写 `tb_user.additional_info`，`audit_log` 通过 `JpaExecutorService` 异步写 | 登录返回成功不代表审计行一定已经落库 |
+| token 失效 | 用户 ID 或 session ID 的失效时间写入 Caffeine/Redis cache | JWT 并非完全“签名通过就永远有效到 exp” |
+
+### 1.2 核心结论
+
+1. [`ThingsboardSecurityConfiguration.filterChain(HttpSecurity)`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L290) 把应用配置成无状态，并把四个自定义认证 Filter 放在 `UsernamePasswordAuthenticationFilter` 前后；普通登录不是 Spring MVC Controller 方法。
+2. [`RestLoginProcessingFilter.attemptAuthentication(HttpServletRequest,HttpServletResponse)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestLoginProcessingFilter.java#L84) 只接受 POST，直接从 request body 反序列化 `LoginRequest`，构造 `UsernamePasswordAuthenticationToken` 后交给 `AuthenticationManager`。
+3. 登录名实际是 `tb_user.email`。Schema 对 email 建全局 `UNIQUE`，[`UserServiceImpl.findUserByEmail(TenantId,String)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L150) 调用不带 tenant 条件的 `findByEmail`，所以同一套 ThingsBoard 中不存在“不同 tenant 使用同一邮箱登录”的命名空间。
+4. 密码使用 Spring Security 默认强度的 `BCryptPasswordEncoder`；[`CryptoConfig.passwordEncoder()`](../../../application/src/main/java/org/thingsboard/server/config/CryptoConfig.java#L40) 没有显式 cost 参数，因此采用所用 Spring Security 版本的默认值。
+5. 密码错误会把 `failedLoginAttempts` 以 JSON 字段写进 `tb_user.additional_info`；成功会先重置它，再写 `lastLoginTs`。这些都是完整 JSON 的读改写，不是数据库原子计数器。
+6. 账户锁定条件使用 `failedLoginAttempts > maxFailedLoginAttempts`，若配置 5，普通密码分支在第 6 次错误时锁定；2FA 分支使用 `>=`，两者边界并不相同。
+7. 达到锁定阈值的一次请求会先异步记录 `LOCKOUT`，外层 catch 又异步记录失败的 `LOGIN`，因此审计中出现两条记录是源码设计结果。
+8. 没有 2FA 时，Provider 内部先记录登录与 `lastLoginTs`，SuccessHandler 才签发 token；有 2FA 时只签发 scope 为 `PRE_VERIFICATION_TOKEN`、无 refresh token 的临时 token，最终 LOGIN 审计延迟到验证码通过。
+9. access 与 refresh token 都是 HS512 JWT，签名参数从 `admin_settings(key='jwt')` 读取；两个 token 共享当前 `SecurityUser.sessionId`，但 refresh token额外带随机 `jti`，服务端没有 refresh-token 表。
+10. logout 会把 session ID 的失效时间写入 `userSessionsInvalidation` cache；密码修改/重置会按 user ID 失效所有旧 token。使用本地 Caffeine 的多 Core 部署无法天然共享这张失效表，集群生产环境应使用 Redis cache。
+11. `replaceUserCredentials(...)` 不是 SQL UPDATE：它先删除旧凭据行、清空 ID，再插入新行，以刷新 `created_time` 并记录密码历史；两个 DAO 调用没有外层事务，插入失败会留下没有凭据行的用户。
+12. 普通登录不经过 Actor、Rule Engine、MQTT 或 Kafka。涉及的异步行为是审计 JPA executor、邮件发送以及缓存访问，不应把认证延迟归因于规则队列。
+
+---
+
+## 二、入口
+
+### 2.1 浏览器入口
+
+[`LoginComponent.login()`](../../../ui-ngx/src/app/modules/login/pages/login/login.component.ts#L49) 校验 Angular 表单后调用 [`AuthService.login(LoginRequest)`](../../../ui-ngx/src/app/core/auth/auth.service.ts#L115)。成功响应进入 `setUserFromJwtToken(...)`；若 scope 是 `PRE_VERIFICATION_TOKEN`，前端跳转到 `login/mfa`。
+
+| 前端入口 | 方法 | 输入 | 输出/后续 |
+|---|---|---|---|
+| `/login` 表单 | `org.thingsboard.ui` 中的 `LoginComponent.login()` | `{username,password}` | `POST /api/auth/login` |
+| 应用初始化 | `AuthService.loadUser(boolean)` | URL 中的 `username/password`、publicId 或 token | 可自动调用 login；URL 凭据模式有泄漏风险 |
+| `/login/mfa` | `AuthService.checkTwoFaVerificationCode(TwoFactorAuthProviderType,number)` | pre-verification access token、provider、code | 最终 access/refresh pair |
+| `/login/createPassword` | `AuthService.activate(String,String,boolean)` | activation token、新密码 | 激活并直接登录 |
+| `/login/resetPassword` | `AuthService.resetPassword(String,String)` | reset token、新密码 | 重置并直接登录 |
+
+[`GlobalHttpInterceptor.isTokenBasedAuthEntryPoint(String)`](../../../ui-ngx/src/app/core/interceptors/global-http-interceptor.ts#L192) 明确跳过 login、token refresh 和 `/api/noauth`，因此初次登录请求不会被前端强行附加旧 access token。
+
+### 2.2 服务端入口
+
+| HTTP API | 消费者 | 身份要求 | 主要职责 |
+|---|---|---|---|
+| `POST /api/auth/login` | [`RestLoginProcessingFilter`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestLoginProcessingFilter.java#L49) | permitAll | 用户名/密码认证 |
+| `POST /api/auth/login/public` | `org.thingsboard.server.service.security.auth.rest.RestPublicLoginProcessingFilter` | permitAll | public customer 虚拟用户登录 |
+| `POST /api/auth/token` | `org.thingsboard.server.service.security.auth.jwt.RefreshTokenProcessingFilter` | permitAll | refresh token 换新 pair，第 14 章展开 |
+| `GET /api/auth/2fa/providers` | [`TwoFactorAuthController.getAvailableTwoFaProviders()`](../../../application/src/main/java/org/thingsboard/server/controller/TwoFactorAuthController.java#L152) | `PRE_VERIFICATION_TOKEN` | 返回账户可用 2FA provider |
+| `POST /api/auth/2fa/verification/send` | [`requestTwoFaVerificationCode(TwoFaProviderType)`](../../../application/src/main/java/org/thingsboard/server/controller/TwoFactorAuthController.java#L101) | `PRE_VERIFICATION_TOKEN` | 发送/准备验证码 |
+| `POST /api/auth/2fa/verification/check` | [`checkTwoFaVerificationCode(TwoFaProviderType,String,HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/TwoFactorAuthController.java#L122) | `PRE_VERIFICATION_TOKEN` | 校验后签发最终 pair |
+| `POST /api/noauth/activate` | [`AuthController.activateUser(ActivateUserRequest,boolean,HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L300) | permitAll | 激活邀请账户 |
+| `POST /api/noauth/resetPasswordByEmail` | [`requestResetPasswordByEmail(ResetPasswordEmailRequest,HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L221) | permitAll | 生成 reset token 并发邮件 |
+| `POST /api/noauth/resetPassword` | [`resetPassword(ResetPasswordRequest,HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L344) | permitAll | 替换密码并返回 pair |
+| `POST /api/auth/logout` | [`AuthController.logout(HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L121) | 已认证 | 审计 logout 并失效当前 session |
+
+### 2.3 不是入口的组件
+
+- MQTT、CoAP、LwM2M 使用设备凭据，不调用用户 Login Filter。
+- Rule Engine 和 Actor 不参与邮箱/密码认证。
+- Kafka Consumer 不签发用户 JWT。
+- Scheduler 不刷新 access token；刷新由浏览器在 token 临近/已经过期时调用 `/api/auth/token`。
+- `AuthController` 处理用户信息、logout、修改密码、激活和重置，但普通 `POST /api/auth/login` 在到达 MVC DispatcherServlet 之前已经结束响应。
+
+```mermaid
+flowchart TD
+  A{请求类型} -->|POST /api/auth/login| F[RestLoginProcessingFilter]
+  A -->|POST /api/auth/login/public| PF[RestPublicLoginProcessingFilter]
+  A -->|POST /api/auth/token| RF[RefreshTokenProcessingFilter]
+  A -->|/api/auth/2fa/*| C2[TwoFactorAuthController]
+  A -->|/api/noauth/activate or resetPassword| AC[AuthController]
+  A -->|MQTT/CoAP/LwM2M| DEV[Device authentication, 非本章]
+  F --> AM[AuthenticationManager]
+  PF --> AM
+  RF --> AM
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 Filter 注册与匹配
+
+1. [`ThingsboardSecurityConfiguration.buildRestLoginProcessingFilter()`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L191) 用精确 URL `/api/auth/login` 创建 Filter，并注入统一 `AuthenticationManager`。
+2. [`authenticationManager(ObjectPostProcessor)`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L240) 按顺序注册 `RestAuthenticationProvider`、`JwtAuthenticationProvider`、`RefreshTokenAuthenticationProvider`。
+3. [`filterChain(HttpSecurity)`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L290) 设置 `SessionCreationPolicy.STATELESS`，permitAll login URL，再将 Login Filter 放到标准 username/password Filter 前。
+4. `AbstractAuthenticationProcessingFilter` 负责 URL matcher、调用 `attemptAuthentication`，并根据返回/异常选择 success 或 failure handler。
+
+### 3.2 请求解析到 AuthenticationManager
+
+[`RestLoginProcessingFilter.attemptAuthentication(HttpServletRequest,HttpServletResponse)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestLoginProcessingFilter.java#L84) 的数据变换如下：
+
+```text
+HTTP JSON {username,password}
+  -> LoginRequest
+  -> UserPrincipal(Type.USER_NAME, username)
+  -> UsernamePasswordAuthenticationToken(principal, raw password)
+  -> RestAuthenticationDetails(client IP, parsed User-Agent)
+  -> AuthenticationManager.authenticate(token)
+```
+
+`RestAuthenticationDetails` 的 IP 算法直接取 `X-Forwarded-For` 第一个值，否则取 remote address，见 [`getClientIP(HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAuthenticationDetails.java#L60)。只有在可信反向代理覆盖该 header 时它才可信；直接暴露服务端时客户端可以伪造审计 IP。
+
+### 3.3 用户、策略与密码校验
+
+[`RestAuthenticationProvider.authenticate(Authentication)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAuthenticationProvider.java#L107) 首先读取全局 `SecuritySettings`。当 `forceUserToResetPasswordIfNotValid=true` 时，它先用当前策略验证用户提交的明文，再开始查用户；旧密码即使 BCrypt 匹配，只要不满足新策略，也返回 password-violation 响应并要求重置。
+
+[`authenticateByUsernameAndPassword(Authentication,UserPrincipal,String,String)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAuthenticationProvider.java#L154) 完成：
+
+1. `UserService.findUserByEmail(SYS_TENANT_ID, username)` 查询 `tb_user.email`。
+2. `UserService.findUserCredentialsByUserId(SYS_TENANT_ID, userId)` 查询 `user_credentials.user_id`。
+3. [`DefaultSystemSecurityService.validateUserCredentials(TenantId,UserCredentials,String,String)`](../../../application/src/main/java/org/thingsboard/server/service/security/system/DefaultSystemSecurityService.java#L182) 执行 BCrypt、失败计数、锁定、enabled 和过期判断。
+4. 检查 `user.authority != null`。
+5. 构造 `new SecurityUser(user, enabled, principal)`；构造器生成随机 session ID，见 [`SecurityUser(User,boolean,UserPrincipal)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/SecurityUser.java#L81)。
+
+```mermaid
+flowchart TD
+  START[authenticate username/password] --> U[SELECT tb_user by email]
+  U -->|missing| UNKNOWN[UsernameNotFoundException]
+  U --> C[SELECT user_credentials by user_id]
+  C -->|missing| UNKNOWN
+  C --> B{BCrypt matches?}
+  B -->|no| INC[read-modify-write failedLoginAttempts]
+  INC --> LOCK{attempts > max?}
+  LOCK -->|yes| DISABLE[enabled=false + lockout mail]
+  LOCK -->|no| BAD[BadCredentialsException]
+  DISABLE --> LERR[LockedException]
+  B -->|yes| EN{credentials enabled?}
+  EN -->|no| DERR[DisabledException]
+  EN -->|yes| RESET[failedLoginAttempts=0]
+  RESET --> EXP{credentials.created_time expired?}
+  EXP -->|yes| RT[generate reset_token]
+  RT --> XERR[UserPasswordExpiredException]
+  EXP -->|no| AUTH{authority exists?}
+  AUTH -->|no| IERR[InsufficientAuthenticationException]
+  AUTH -->|yes| SU[SecurityUser + random sessionId]
+```
+
+### 3.4 成功、审计与 token 签发
+
+无 2FA 时，Provider 调用 [`DefaultSystemSecurityService.logLoginAction(User,Object,ActionType,Exception)`](../../../application/src/main/java/org/thingsboard/server/service/security/system/DefaultSystemSecurityService.java#L368)：
+
+1. 解析 IP、browser、OS、device。
+2. LOGIN 成功时同步调用 [`UserServiceImpl.setLastLoginTs(TenantId,UserId)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L634)，再次读写 `tb_user.additional_info`。
+3. 调用 `AuditLogService.logEntityAction(...)`，返回的 Future 没有被等待。
+4. [`AuditLogServiceImpl.logAction(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L508) 在 `JpaExecutorService` 线程中保存 partitioned `audit_log`，然后调用可选 audit sink。
+5. Provider 返回已认证 token，Filter 调用 [`RestAwareAuthenticationSuccessHandler.onAuthenticationSuccess(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAwareAuthenticationSuccessHandler.java#L68)。
+6. SuccessHandler 调用 [`JwtTokenFactory.createTokenPair(SecurityUser)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L295)，写 HTTP 200 JSON。
+
+### 3.5 2FA 分支
+
+Provider 通过 [`DefaultTwoFactorAuthService.isTwoFaEnabled(TenantId,UserId)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/mfa/DefaultTwoFactorAuthService.java#L86) 读取 `user_auth_settings.two_fa_settings`。若至少一个有效 provider 配置存在，返回 `MfaAuthenticationToken`，不记录成功 LOGIN。
+
+SuccessHandler 检测到 MFA token 后签发：
+
+- scope：`PRE_VERIFICATION_TOKEN`
+- lifetime：platform 2FA 的 total allowed time，未配置时 30 分钟
+- refresh token：`null`
+- session ID：沿用第一阶段 `SecurityUser.sessionId`
+
+浏览器用临时 token 调用 2FA API。验证码通过后，Controller 记录 LOGIN，重新从 `tb_user` 构造一个 `SecurityUser`，因此最终 token pair 获得新的 session ID。
+
+```mermaid
+sequenceDiagram
+  participant UI as Angular AuthService
+  participant LF as RestLoginProcessingFilter
+  participant RP as RestAuthenticationProvider
+  participant DB as PostgreSQL
+  participant SH as SuccessHandler
+  participant MFA as TwoFactorAuthController
+  participant JWT as JwtTokenFactory
+  UI->>LF: POST /api/auth/login
+  LF->>RP: authenticate(username,password)
+  RP->>DB: read user, credentials, 2FA settings
+  DB-->>RP: enabled user with 2FA
+  RP-->>SH: MfaAuthenticationToken
+  SH->>JWT: createPreVerificationToken(user,lifetime)
+  JWT-->>UI: token, refreshToken=null, PRE_VERIFICATION_TOKEN
+  UI->>MFA: POST verification/check + pre-token
+  MFA->>DB: read credentials and validate provider code
+  alt code valid
+    MFA->>DB: reset failures, lastLoginTs, async audit
+    MFA->>JWT: createTokenPair(new SecurityUser)
+    JWT-->>UI: access + refresh
+  else code invalid
+    MFA->>DB: increment failures, async failed LOGIN audit
+    MFA-->>UI: 400 or account lock error
+  end
+```
+
+### 3.6 浏览器落地与用户加载
+
+[`AuthService.setUserFromJwtToken(Object,Object,Object)`](../../../ui-ngx/src/app/core/auth/auth.service.ts#L543) 调用 `updateAndValidateTokens`，把 access/refresh 与各自过期时间写入 `localStorage`。随后 [`loadUser(boolean)`](../../../ui-ngx/src/app/core/auth/auth.service.ts#L302) 解码 access token，普通用户再请求 `/api/auth/user` 和 `/api/system/params`，最后向 NgRx Store 派发 authenticated state。
+
+浏览器把 JWT 放在 `localStorage` 而非 HttpOnly Cookie，意味着 XSS 能读取 token；生产防护重点是 CSP、依赖治理、禁止把不可信 HTML/JS 送进 Widget，而不是仅依赖 CSRF 设置。
+
+### 3.7 密码修改、重置与 token 失效
+
+[`AuthController.changePassword(ChangePasswordRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L139) 校验旧密码、密码策略和复用规则，编码新密码后调用 [`UserServiceImpl.replaceUserCredentials(TenantId,UserCredentials)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L374)。该方法：
+
+1. 删除旧 `user_credentials` 行。
+2. 把领域对象 ID 置空。
+3. 在 `additional_info.userPasswordHistory` 追加新 BCrypt hash 与当前时间。
+4. 插入一行新 ID、新 `created_time` 的凭据。
+5. 发布 credentials-updated action event。
+6. Controller 发布 `UserCredentialsInvalidationEvent(userId)` 并返回新 token pair。
+
+[`DefaultTokenOutdatingService.onUserAuthDataChanged(UserAuthDataChangedEvent)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/DefaultTokenOutdatingService.java#L68) 把 user/session ID 对应的变更毫秒时间写入 `userSessionsInvalidation` cache。后续 access 或 refresh 验证会比较 JWT `iat`，早于失效时间即拒绝。
+
+```mermaid
+flowchart LR
+  CP[change/reset password] --> DEL[DELETE old user_credentials]
+  DEL --> INS[INSERT new credentials ID and created_time]
+  INS --> EVT[UserCredentialsInvalidationEvent userId]
+  EVT --> CACHE[(userSessionsInvalidation cache)]
+  CACHE --> CHECK[TokenOutdatingService on every token auth]
+  INS --> NEW[issue new access and refresh]
+  LOGOUT[logout current session] --> SEVT[UserSessionInvalidationEvent sessionId]
+  SEVT --> CACHE
+```
+
+---
+
+## 四、消息流
+
+### 4.1 普通登录消息流
+
+```mermaid
+flowchart TB
+  subgraph Browser[Browser]
+    FORM[LoginComponent form]
+    AS[AuthService]
+    LS[(localStorage)]
+    NGRX[NgRx AuthState]
+  end
+  subgraph Core[ThingsBoard Core]
+    FILTER[RestLoginProcessingFilter]
+    AM[ProviderManager]
+    RP[RestAuthenticationProvider]
+    SEC[DefaultSystemSecurityService]
+    SH[RestAwareAuthenticationSuccessHandler]
+    JTF[JwtTokenFactory]
+    AUD[AuditLogServiceImpl]
+  end
+  subgraph DB[PostgreSQL]
+    U[(tb_user)]
+    C[(user_credentials)]
+    A[(admin_settings)]
+    AL[(audit_log partitions)]
+  end
+  FORM --> AS --> FILTER --> AM --> RP
+  RP --> U
+  RP --> C
+  RP --> A
+  RP --> SEC --> U
+  SEC -. async .-> AUD -. executor .-> AL
+  RP --> SH --> JTF --> AS
+  JTF --> A
+  AS --> LS --> NGRX
+```
+
+### 4.2 状态机
+
+```mermaid
+stateDiagram-v2
+  [*] --> Invited: user created
+  Invited --> Active: activation token + password
+  Active --> PasswordVerified: BCrypt match
+  Active --> Active: wrong password below threshold
+  Active --> Locked: wrong password above threshold
+  Active --> PasswordExpired: credentials.created_time + policy elapsed
+  PasswordExpired --> Active: reset password replaces credentials row
+  PasswordVerified --> PreVerified: account has 2FA
+  PasswordVerified --> LoggedIn: no 2FA
+  PreVerified --> LoggedIn: verification code valid
+  PreVerified --> Locked: too many 2FA failures
+  LoggedIn --> LoggedOut: session invalidation timestamp
+  Locked --> Active: administrator enables credentials
+```
+
+### 4.3 密码错误和审计的非原子链路
+
+错误请求可能依次提交多个独立副作用：`tb_user.failedLoginAttempts`、`user_credentials.enabled=false`、`tb_user.userCredentialsEnabled=false`、LOCKOUT audit、LOGIN failure audit、锁定邮件。没有一个外层事务覆盖全部步骤，所以生产排障要逐项核对，不能假设 HTTP 401 代表所有副作用一起回滚。
+
+[点击打开独立架构 SVG](../../assets/architecture/13-login.svg)
+
+![Login 架构图](../../assets/architecture/13-login.svg)
+
+---
+
+## 五、时序图
+
+[PlantUML 源文件](sequence.puml) | [新窗口打开完整时序图 SVG](sequence.svg)
+
+![Login 完整时序图](sequence.svg)
+
+PlantUML 图覆盖普通成功、密码错误/锁定、密码过期与 2FA。图中数据库事务边界按实际 DAO 方法标注：JPA `save/remove` 各自有事务，但认证编排方法本身没有跨 DAO 外层事务。
+
+---
+
+## 六、数据变化
+
+### 6.1 PostgreSQL 写入矩阵
+
+| 场景 | `tb_user` | `user_credentials` | `user_auth_settings` | `admin_settings` | `audit_log` |
+|---|---|---|---|---|---|
+| 正常登录成功 | `failedLoginAttempts=0`，再写 `lastLoginTs` | 只读 | 只读 2FA config | 只读 security/JWT/2FA settings | 异步 LOGIN SUCCESS |
+| 密码错误 | `failedLoginAttempts + 1` | 只读 | 只读 | 只读 policy | 异步 LOGIN FAILURE |
+| 达到锁定阈值 | 写失败次数和 `userCredentialsEnabled=false` | `enabled=false` | 不变 | 只读 | 异步 LOCKOUT + LOGIN FAILURE |
+| 2FA 错误 | 复用 `failedLoginAttempts + 1` | 达阈值时 `enabled=false` | 只读 | 只读 2FA settings | 异步 LOGIN FAILURE |
+| 2FA 成功 | `failedLoginAttempts=0`、`lastLoginTs` | 只读 enabled | 只读 | 只读 | 异步 LOGIN SUCCESS |
+| 激活 | reset failures 与 enabled 摘要 | 清 activate token、写 hash、enabled=true | 不变 | 只读 policy/JWT | CREDENTIALS_UPDATED action event 可触发审计 |
+| 修改/重置密码 | 不直接改用户；登录态后续更新 | 删除旧行并插新行，更新 history/reset token | 不变 | 只读 policy/JWT | credentials action；不等同 LOGIN |
+| logout | 不变 | 不变 | 不变 | 不变 | 异步 LOGOUT |
+
+### 6.2 Cache 变化
+
+| Cache | key | value | 生命周期/用途 |
+|---|---|---|---|
+| `securitySettings` | 固定 `securitySettings` | `SecuritySettings` | 系统密码/锁定策略的 Spring cache |
+| `userSessionsInvalidation` | user ID 或 JWT session ID 字符串 | 失效毫秒时间 | TTL 被强制设置为 refresh token lifetime + 1 分钟 |
+| `twoFaVerificationCodes` | provider 定义的用户键 | 验证码/过期状态 | Email/SMS OTP；TOTP 本身不需要服务器生成码 |
+| `rateLimits` | `LimitedApi + user/provider` | 时间窗计数 | 2FA send/check 与 reset token 检查 |
+
+默认 cache type 是 Caffeine，所有失效信息只存在当前 JVM；`cache.type=redis` 时各节点共享键。登录本身没有用户对象缓存命中路径，主要身份数据每次读 PostgreSQL。
+
+### 6.3 Session 与 token
+
+- Spring HttpSession：不创建，SuccessHandler 只是用 `request.getSession(false)` 清理可能存在的认证异常。
+- `SecurityUser.sessionId`：登录时随机 UUID，写进 access/refresh JWT claims。
+- access token：包含 `sub/userId/scopes/sessionId/firstName/lastName/enabled/isPublic/tenantId/customerId/iat/exp/iss`。
+- refresh token：包含 `sub/userId/scopes=[REFRESH_TOKEN]/sessionId/isPublic/jti/iat/exp/iss`。
+- token 原文：只返回客户端，不写 PostgreSQL，也不写 cache。
+- token invalidation：cache 只保存“某 user/session 在何时之前签发的 token 已过期”，不是 token blacklist 列表。
+
+### 6.4 Actor、Kafka 与 Rule Engine
+
+普通登录不创建、唤醒或修改任何 Tenant/Device/Rule Actor，也不发送 ThingsBoard queue message 或 Kafka record。Spring `ApplicationEventPublisher` 在同 JVM 内传播 credentials/session invalidation；这不是 Kafka 集群事件总线。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类与职责
+
+| 完整类名 | 关键方法（含参数） | 职责 |
+|---|---|---|
+| [`org.thingsboard.server.config.ThingsboardSecurityConfiguration`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L76) | `filterChain(HttpSecurity)` | 定义无状态 Filter Chain 与 URL 权限 |
+| [`org.thingsboard.server.service.security.auth.rest.RestLoginProcessingFilter`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestLoginProcessingFilter.java#L50) | `attemptAuthentication(HttpServletRequest,HttpServletResponse)` | JSON 到 Spring Authentication token |
+| `org.springframework.security.authentication.ProviderManager` | `authenticate(Authentication)` | 选择支持 token 类型的 provider |
+| [`org.thingsboard.server.service.security.auth.rest.RestAuthenticationProvider`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAuthenticationProvider.java#L67) | `authenticate(Authentication)` | 用户名/密码与 2FA 分支编排 |
+| [`org.thingsboard.server.service.security.system.DefaultSystemSecurityService`](../../../application/src/main/java/org/thingsboard/server/service/security/system/DefaultSystemSecurityService.java#L85) | `validateUserCredentials(TenantId,UserCredentials,String,String)` | BCrypt、失败次数、锁定、过期 |
+| [`org.thingsboard.server.dao.user.UserServiceImpl`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L83) | `findUserByEmail(TenantId,String)`、`replaceUserCredentials(TenantId,UserCredentials)` | 用户/凭据读取与状态写入 |
+| [`org.thingsboard.server.service.security.auth.rest.RestAwareAuthenticationSuccessHandler`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAwareAuthenticationSuccessHandler.java#L52) | `onAuthenticationSuccess(HttpServletRequest,HttpServletResponse,Authentication)` | 普通 pair 或 MFA 临时 token 响应 |
+| [`org.thingsboard.server.service.security.model.token.JwtTokenFactory`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L63) | `createTokenPair(SecurityUser)`、`createPreVerificationToken(SecurityUser,Integer)` | 组装 claims 并 HS512 签名 |
+| [`org.thingsboard.server.service.security.auth.mfa.DefaultTwoFactorAuthService`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/mfa/DefaultTwoFactorAuthService.java#L59) | `checkVerificationCode(SecurityUser,TwoFaProviderType,String,boolean)` | provider code、限流和锁定 |
+| [`org.thingsboard.server.controller.TwoFactorAuthController`](../../../application/src/main/java/org/thingsboard/server/controller/TwoFactorAuthController.java#L68) | `checkTwoFaVerificationCode(TwoFaProviderType,String,HttpServletRequest)` | MFA 成功后签最终 pair |
+| [`org.thingsboard.server.service.security.auth.DefaultTokenOutdatingService`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/DefaultTokenOutdatingService.java#L42) | `isOutdated(String,UserId)` | 比较 iat 与 user/session invalidation time |
+| [`org.thingsboard.server.service.security.system.DefaultSystemSecurityService`](../../../application/src/main/java/org/thingsboard/server/service/security/system/DefaultSystemSecurityService.java#L85) | `logLoginAction(User,Object,ActionType,String,Exception)` | last login 与审计上下文 |
+| [`org.thingsboard.server.dao.audit.AuditLogServiceImpl`](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L72) | `logEntityAction(...)` | 异步持久化审计并调用 sink |
+| [`org.thingsboard.server.controller.AuthController`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L81) | `changePassword(ChangePasswordRequest)`、`resetPassword(ResetPasswordRequest,HttpServletRequest)` | 凭据生命周期与失效事件 |
+| [`org.thingsboard.server.exception.ThingsboardErrorResponseHandler`](../../../application/src/main/java/org/thingsboard/server/exception/ThingsboardErrorResponseHandler.java#L73) | `handle(AuthenticationException,HttpServletResponse)` | 认证异常映射为稳定 JSON |
+
+### 7.2 继承与 Spring Security 契约
+
+```mermaid
+classDiagram
+  class AbstractAuthenticationProcessingFilter
+  class RestLoginProcessingFilter
+  class AuthenticationProvider
+  class RestAuthenticationProvider
+  class AuthenticationSuccessHandler
+  class RestAwareAuthenticationSuccessHandler
+  class AuthenticationFailureHandler
+  class RestAwareAuthenticationFailureHandler
+  class UsernamePasswordAuthenticationToken
+  class MfaAuthenticationToken
+  class AbstractJwtAuthenticationToken
+  AbstractAuthenticationProcessingFilter <|-- RestLoginProcessingFilter
+  AuthenticationProvider <|.. RestAuthenticationProvider
+  AuthenticationSuccessHandler <|.. RestAwareAuthenticationSuccessHandler
+  AuthenticationFailureHandler <|.. RestAwareAuthenticationFailureHandler
+  AbstractJwtAuthenticationToken <|-- MfaAuthenticationToken
+  RestLoginProcessingFilter --> UsernamePasswordAuthenticationToken
+  RestAuthenticationProvider --> MfaAuthenticationToken
+```
+
+Filter 负责协议适配，Provider 负责认证决策，Handler 负责 HTTP 输出。这种拆分让普通登录、public login、access JWT 与 refresh JWT 复用同一个 `AuthenticationManager`，又由 `supports(Class<?>)` 保证 provider 不处理错误 token 类型。
+
+### 7.3 PostgreSQL 模型
+
+```mermaid
+erDiagram
+  TB_USER ||--|| USER_CREDENTIALS : "logical user_id, schema has no FK"
+  TB_USER ||--o| USER_AUTH_SETTINGS : "FK user_id"
+  TB_USER ||--o{ AUDIT_LOG : "user_id, no FK"
+  ADMIN_SETTINGS ||--o{ LOGIN_POLICY : "key securitySettings/jwt/twoFaSettings"
+  TB_USER {
+    uuid id PK
+    varchar email UK
+    varchar authority
+    uuid tenant_id
+    uuid customer_id
+    varchar additional_info
+  }
+  USER_CREDENTIALS {
+    uuid id PK
+    uuid user_id UK
+    boolean enabled
+    varchar password
+    varchar activate_token UK
+    varchar reset_token UK
+    varchar additional_info
+  }
+  USER_AUTH_SETTINGS {
+    uuid id PK
+    uuid user_id UK, FK
+    varchar two_fa_settings
+  }
+  ADMIN_SETTINGS {
+    uuid id PK
+    uuid tenant_id
+    varchar key
+    varchar json_value
+  }
+  AUDIT_LOG {
+    uuid id
+    bigint created_time "partition key"
+    uuid user_id
+    varchar action_type
+    varchar action_status
+    varchar action_data
+  }
+```
+
+`UserCredentialsEntity` 与 `UserEntity` 都没有 JPA `@Version`。`user_credentials.user_id` 只有 UNIQUE，没有 schema FK；删除用户依赖 [`UserServiceImpl.deleteUser(TenantId,User)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L399) 先删凭据。数据库无法阻止孤立 credentials 行或在异常编排下短暂缺失凭据。
+
+### 7.4 密码过期的时间语义
+
+过期判断使用 `userCredentials.createdTime + expirationDays`，见 [`validateUserCredentials(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/system/DefaultSystemSecurityService.java#L201)。密码修改/重置通过 replace 创建新 UUID，因此更新 created time；激活流程只更新已有邀请凭据行，没有刷新 created time。邀请长期未激活时，新设置的密码可能按“邀请创建时间”立即被判过期。
+
+### 7.5 失败计数的并发语义
+
+[`UserServiceImpl.increaseFailedLoginAttempts(TenantId,UserId)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L727) 是：读整行用户、解析 JSON、加一、保存整行。两个并发错误请求都从 3 读起时，可能都写 4，实际两次失败只累计一次；并发成功请求写 0 也可能覆盖刚增加的值。数据库没有 `UPDATE ... SET counter=counter+1`、行锁或 version，因此锁定策略是尽力而为，不是严格计数器。
+
+### 7.6 token 失效精度
+
+[`DefaultTokenOutdatingService.isTokenOutdated(long,Long)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/DefaultTokenOutdatingService.java#L112) 把毫秒时间都截为秒后比较 `<`。token 与失效事件发生在同一秒时不视为 outdated；这是最多约一秒的一致性窗口。新 token 必须在事件后跨秒签发才一定不被同一失效时间误判，当前 change/reset 代码通常先发布事件再立即签 token，因此同秒新 token 与旧 token共享边界，但比较规则会保留两者。
+
+---
+
+## 八、Actor 分析
+
+### 8.1 本流程为什么没有 Actor
+
+Login 是短生命周期 request/response：读取少量关系数据、执行 CPU 密集的 BCrypt、生成 JWT 后立即返回。它没有设备级顺序消息、长时间 mailbox 状态或 Rule Chain 路由需求，因此用 Servlet Filter + Spring Security Provider 更合适。
+
+```mermaid
+flowchart LR
+  HTTP[HTTP request thread] --> FILTER[Security Filter]
+  FILTER --> BCrypt[BCrypt CPU work]
+  FILTER --> JPA[JPA calls]
+  FILTER --> RESP[HTTP response]
+  AUDIT[Audit persistence] -. separate JpaExecutor .-> DB[(audit_log)]
+  ACTOR[ActorSystem] -. not used .-> HTTP
+```
+
+### 8.2 不使用 Actor 的工程影响
+
+- BCrypt 直接占用 Web request thread；突发登录会消耗 Servlet worker，而不是排入 Actor mailbox。
+- 同一用户的并发登录没有 per-user Actor 串行化，所以失败计数与 last-login JSON 存在 lost update。
+- 登录不会触发 Tenant Actor 初始化，也不依赖 Actor 分区 owner；任何 Core 节点都可处理。
+- 异步 audit executor 与 Actor dispatcher 无关，排查线程池要看 `JpaExecutorService`。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 Producer、Topic 与 Consumer
+
+本流程没有 ThingsBoard queue Producer、Kafka topic、partition 或 consumer group。普通登录的 Spring application event 在进程内同步分发到 `DefaultTokenOutdatingService`，audit Future 进入本机 executor；两者都不是 Kafka 消息。
+
+### 9.2 集群一致性真正依赖什么
+
+```mermaid
+flowchart TD
+  N1[Core node A password change/logout] --> EVT[local Spring event]
+  EVT --> TYPE{cache.type}
+  TYPE -->|caffeine| C1[(node A local cache)]
+  TYPE -->|redis| R[(shared Redis)]
+  N2[Core node B validates old JWT] --> C2[(node B local cache)]
+  N2 --> R
+  C1 -. no Kafka replication .-> C2
+```
+
+使用 Caffeine 时，node A 发布的失效事件不会自动写 node B 的本地 cache；负载均衡将旧 token 发往 B 时仍可能通过。Redis 实现让所有 Core 读取同一 invalidation key。生产多节点认证不能用“有 Kafka 集群”替代分布式 token invalidation cache。
+
+---
+
+## 十、数据库分析
+
+### 10.1 为什么写 PostgreSQL
+
+用户、凭据、2FA 配置、系统安全设置和审计都是关系型控制面数据，需要唯一约束、分页查询和稳定事务语义。它们不是时序遥测，因此不写 TimescaleDB hypertable 或 Cassandra telemetry partition。
+
+| 存储 | Login 用途 | 为什么 |
+|---|---|---|
+| PostgreSQL | 用户、凭据、2FA、策略、JWT settings、审计 | 权威持久化与唯一约束 |
+| Redis | 可选 token invalidation、2FA code、rate limit | 多节点共享、TTL 自动过期 |
+| Caffeine | 单 JVM 上述 cache 的默认实现 | 单机低延迟、部署简单 |
+| TimescaleDB | 无 | Login 数据不按设备时间范围分析 |
+| Cassandra | 无 | 不需要高吞吐 telemetry partition |
+| Kafka | 无直接写入 | 认证不走平台消息队列 |
+
+### 10.2 关键 SQL 形态
+
+等价 SQL 用于理解，不是源码中的手写 SQL：
+
+```sql
+select * from tb_user where email = ?;
+select * from user_credentials where user_id = ?;
+select * from user_auth_settings where user_id = ?;
+select * from admin_settings where tenant_id = ? and key = 'securitySettings';
+
+-- failedLoginAttempts/lastLoginTs 实际由 JPA 保存整行 additional_info
+update tb_user set additional_info = ?, ... where id = ?;
+
+-- replaceUserCredentials 的实际语义
+delete from user_credentials where id = ?;
+insert into user_credentials
+  (id, created_time, user_id, enabled, password, activate_token, reset_token, additional_info)
+values (?, ?, ?, ?, ?, ?, ?, ?);
+```
+
+### 10.3 索引与约束
+
+- `tb_user.email UNIQUE` 支撑全局登录查找。
+- `user_credentials.user_id UNIQUE` 支撑一用户一凭据。
+- activate/reset token 均 UNIQUE，但允许多个 NULL。
+- `user_auth_settings.user_id UNIQUE` 且有 FK 到 `tb_user`。
+- `audit_log` 按 `created_time` RANGE partition，并有 `(tenant_id, created_time DESC)` 与 `id` 索引。
+- `user_credentials.user_id` 没有 FK，完整性由服务删除顺序维护。
+
+### 10.4 事务边界
+
+| 操作 | 实际边界 | 风险 |
+|---|---|---|
+| 单个 JPA save/remove | `JpaAbstractDao` 方法级 `@Transactional` | 单条 DAO 操作原子 |
+| 验证成功 | reset failures save、lastLogin save、audit async 各自独立 | 部分成功可见 |
+| 锁定 | credential disable 与 user summary save 不在同一外层事务 | 摘要可能漂移 |
+| replace credentials | delete 与 insert 是两个事务 | insert 失败后凭据缺失 |
+| reset token overwrite | read-modify-save 单行，无 version | 并发请求后者覆盖前者 |
+
+### 10.5 性能与容量
+
+- BCrypt 是登录主 CPU 成本；不要通过降低 cost 解决暴力破解，应先做入口 IP/账号限流、WAF 和容量隔离。
+- `lastLoginTs` 使每次成功登录至少写一次 `tb_user`，而 reset failures 又写一次；高频 token refresh不会执行这两个写入。
+- audit 是异步写，但 executor/连接池拥塞会导致 audit 延迟或丢失，不能把 HTTP 登录延迟作为审计健康指标。
+- `failedLoginAttempts` 和 last login 放 JSON 导致整行更新、索引不可直接利用；如果需要严格安全审计，应外部汇聚认证日志并监控数据库写失败。
+- `audit_log` TTL/partition 维护属于第 36、42 章；登录故障排查至少确认当前分区存在且 executor 没有 reject。
+
+---
+
+## 十一、异常处理
+
+### 11.1 异常到 HTTP 的映射
+
+[`ThingsboardErrorResponseHandler.handleAuthenticationException(...)`](../../../application/src/main/java/org/thingsboard/server/exception/ThingsboardErrorResponseHandler.java#L285) 统一返回 401，但 body error code/message 有差异：
+
+| 异常 | 客户端结果 | 服务端副作用 |
+|---|---|---|
+| `UsernameNotFoundException` / `BadCredentialsException` | `Invalid username or password` | 已知用户密码错时计数并异步 LOGIN failure；未知用户不计数、不审计 |
+| `DisabledException` | `User account is not active` | 异步 LOGIN failure |
+| `LockedException` | `User account is locked due to security policy` | disable、邮件、LOCKOUT + LOGIN failure |
+| `UserPasswordExpiredException` | credentials-expired body + reset token | `user_credentials.reset_token` 已保存 |
+| `UserPasswordNotValidException` | password-violation body | 在用户查询前失败，不增计数 |
+| payload/HTTP method error | generic authentication failure或 method message | 不查数据库 |
+| token signing/settings error | 5xx/认证链异常 | 登录状态写入和 audit 可能已发生，但 token 未返回 |
+
+### 11.2 信息暴露边界
+
+错误用户名与错误密码使用同一消息，降低直接枚举；disabled、locked、expired 却返回不同状态文本，因此掌握邮箱的调用者可以判断账户状态。未知用户名在进入 `try` 前抛出，不生成 LOGIN audit，也不增加 per-user counter；公开入口仍需反向代理按 IP 限流。
+
+### 11.3 并发与部分失败
+
+```mermaid
+flowchart TD
+  A[Login failure/success] --> B{哪一步失败?}
+  B -->|user or credentials read| R401[401, no token]
+  B -->|failed-attempt save| R500[original auth decision interrupted]
+  B -->|lock credential save succeeded, user summary failed| DRIFT[credential disabled, tb_user summary stale]
+  B -->|lastLoginTs save failed| NOTOKEN[valid password but no token]
+  B -->|async audit failed| OKNOAUDIT[200 token may already be returned, audit missing]
+  B -->|JWT signing failed| SIDE[login state writes may exist, response fails]
+  B -->|credential delete succeeded, reinsert failed| NOCRED[user exists without credentials]
+```
+
+### 11.4 密码重置竞态
+
+每次 request/reset-expired 都生成一个新 `reset_token` 并覆盖旧值。两个并发请求可以让先返回或先发送邮件中的 token失效。`requestResetPasswordByEmail` 为防邮箱枚举总是返回 200，并 catch 所有异常；调用方不能据此判断邮件是否发送成功。
+
+### 11.5 生产排障顺序
+
+1. 确认请求命中 `/api/auth/login` 且为 POST、JSON 字段非空。
+2. 查 `tb_user.email`，确认大小写配置 `security.user_login_case_sensitive` 与库中值。
+3. 查唯一 `user_credentials.user_id`、`enabled`、created time；不要输出 password hash 到工单。
+4. 检查 `tb_user.additional_info.failedLoginAttempts/userCredentialsEnabled/lastLoginTs` 是否互相一致。
+5. 查 `admin_settings` 的 `securitySettings`、`jwt`、`twoFaSettings`，区分密码策略和 token 签名问题。
+6. 2FA 时检查 `user_auth_settings`、rate limit cache 和 provider（邮件/SMS/TOTP）日志。
+7. 登录成功但 API 立即 401 时检查 `userSessionsInvalidation` 的 user/session key、节点 cache 类型和时钟同步。
+8. 登录有状态变化但没有 audit 时检查 `JpaExecutorService`、audit partition、数据库连接池和 audit sink。
+
+---
+
+## 十二、源码阅读路线
+
+1. [`LoginComponent.login()`](../../../ui-ngx/src/app/modules/login/pages/login/login.component.ts#L49)：从真实 UI 表单开始。
+2. [`AuthService.login(LoginRequest)`](../../../ui-ngx/src/app/core/auth/auth.service.ts#L115)：看 token 如何进入前端状态。
+3. [`ThingsboardSecurityConfiguration.filterChain(HttpSecurity)`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L290)：确认 login 是 Filter 入口。
+4. [`RestLoginProcessingFilter.attemptAuthentication(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestLoginProcessingFilter.java#L84)：看协议对象如何转为 Spring token。
+5. [`RestAuthenticationProvider.authenticate(Authentication)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAuthenticationProvider.java#L107)：掌握主分支。
+6. [`authenticateByUsernameAndPassword(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAuthenticationProvider.java#L154)：跟到 user/credentials 查询。
+7. [`DefaultSystemSecurityService.validateUserCredentials(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/system/DefaultSystemSecurityService.java#L182)：逐行读 BCrypt、锁定和过期。
+8. [`UserServiceImpl.increaseFailedLoginAttempts(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L727)：确认 JSON 读改写并发语义。
+9. [`DefaultSystemSecurityService.logLoginAction(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/system/DefaultSystemSecurityService.java#L383)：看同步 last login 与异步审计分界。
+10. [`RestAwareAuthenticationSuccessHandler.onAuthenticationSuccess(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/rest/RestAwareAuthenticationSuccessHandler.java#L68)：区分普通 pair 和 MFA 临时 token。
+11. [`JwtTokenFactory.setUpToken(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L245)：核对 claims、iat、exp 与 HS512。
+12. [`TwoFactorAuthController.checkTwoFaVerificationCode(...)`](../../../application/src/main/java/org/thingsboard/server/controller/TwoFactorAuthController.java#L122)：看第二阶段登录完成点。
+13. [`AuthController.changePassword(...)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L139) 与 [`UserServiceImpl.replaceUserCredentials(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L374)：理解凭据重建。
+14. [`DefaultTokenOutdatingService.isOutdated(String,UserId)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/DefaultTokenOutdatingService.java#L83)：衔接第 14 章 token 验证。
+15. [`GlobalHttpInterceptor.intercept(HttpRequest,HttpHandler)`](../../../ui-ngx/src/app/core/interceptors/global-http-interceptor.ts#L54)：最后回到浏览器请求刷新与重试。
+
+推荐断点顺序：`LoginComponent.login` -> `RestLoginProcessingFilter.attemptAuthentication` -> `RestAuthenticationProvider.authenticate` -> `DefaultSystemSecurityService.validateUserCredentials` -> `RestAwareAuthenticationSuccessHandler.onAuthenticationSuccess` -> `JwtTokenFactory.setUpToken` -> `AuthService.setUserFromJwtToken`。MFA 再追加 `TwoFactorAuthController.checkTwoFaVerificationCode`。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard 普通登录为什么不会进入 `AuthController`？
+
+`/api/auth/login` 被 `RestLoginProcessingFilter` 的 request matcher 捕获，Filter 在 MVC Controller 前完成 AuthenticationManager 调用和响应输出。`AuthController` 处理 logout、用户信息、密码与激活/重置接口。
+
+### 2. ThingsBoard 登录名是 tenant 内唯一还是全局唯一？
+
+全局唯一。`tb_user.email` 有全局 UNIQUE，普通登录调用不带 tenant 条件的 `findByEmail`；`TenantId.SYS_TENANT_ID` 在这条 DAO 查询中不形成租户过滤。
+
+### 3. 密码存储算法和参数是什么？
+
+`BCryptPasswordEncoder`，配置 Bean 没传 strength，因此使用当前 Spring Security 依赖版本默认 cost。数据库只存 BCrypt hash，不存明文。
+
+### 4. 一次成功登录会写哪些表？
+
+至少两次完整更新 `tb_user.additional_info`：重置失败次数、写 lastLoginTs；随后异步写 `audit_log`。`user_credentials`、`user_auth_settings` 和 `admin_settings` 通常只读，JWT 本身不落表。
+
+### 5. access/refresh token 是否存数据库？
+
+不存。它们是 HS512 自包含 JWT。服务端只在 cache 中保存 user/session 的失效时间，用于让早期签发 token 提前失效。
+
+### 6. JWT 中的 `sessionId` 是否等于 HttpSession ID？
+
+不是。`SecurityUser` 构造时生成随机 UUID，写进 JWT；Security Filter Chain 是 stateless，不创建持久 HttpSession。
+
+### 7. 为什么 logout 仍有服务端 API，既然 JWT 是无状态的？
+
+它记录 LOGOUT audit，并发布 session invalidation event，使该 session 早于事件时间签发的 access/refresh token被拒绝；客户端同时清 localStorage。
+
+### 8. 密码修改后旧 token 是否仍有效？
+
+当前实现发布 user-ID 级 `UserCredentialsInvalidationEvent`，`TokenOutdatingService` 会拒绝旧 token。Controller API 注释中“旧 JWT 仍有效到过期”的描述与该实现不一致，应以运行源码为准。
+
+### 9. 多 Core 节点为什么推荐 Redis cache？
+
+失效事件是本地 Spring event。Caffeine key 只写当前 JVM，其他节点看不到；Redis 实现共享 `userSessionsInvalidation`，才能让 logout/改密在负载均衡后的节点生效。
+
+### 10. `maxFailedLoginAttempts=5` 在第几次错误锁定？
+
+密码分支判断 `attempts > max`，所以第 6 次；2FA 分支判断 `>= maxVerificationFailures`，配置 5 时第 5 次。边界不一致。
+
+### 11. 失败计数是否严格准确？
+
+不是。它存于 `tb_user.additional_info`，采用读整行、JSON 加一、保存整行，且没有 `@Version` 或原子 UPDATE；并发错误会 lost update。
+
+### 12. 为什么一次锁定会出现两条 audit？
+
+内层捕获 `LockedException` 记录 LOCKOUT 后重抛，外层 catch 又按失败 LOGIN 记录一次。两次都是异步审计调用。
+
+### 13. 未知邮箱的登录失败是否写 audit？
+
+不会。用户查找在 `authenticateByUsernameAndPassword` 的 try 块之前，missing user 直接抛 `UsernameNotFoundException`；没有可用于 audit 的 User 对象，也不增加失败次数。
+
+### 14. 普通登录是否受 ThingsBoard tenant REST rate limit？
+
+Login URL permitAll，且 rate-limit filter 只有在 SecurityContext 中存在非系统 `SecurityUser` 时才检查 tenant/customer limit；初次登录没有该用户上下文。应在反向代理/WAF增加 IP 与账号维度限制。
+
+### 15. 密码策略何时检查？
+
+当 `forceUserToResetPasswordIfNotValid` 开启时，Provider 在用户查询前检查提交密码是否满足当前策略；激活、修改和重置密码也调用完整 policy/reuse 校验。
+
+### 16. 密码过期依据什么时间？
+
+依据 `user_credentials.created_time`，不是 password-history map 的最新时间。修改/重置因重建凭据行刷新该时间，激活已有邀请凭据不会刷新。
+
+### 17. 为什么 `replaceUserCredentials` 删除再插入？
+
+新 ID 会带来新的 time-based UUID/createdTime，等价于重置密码年龄，并把 hash 追加到历史。代价是没有外层事务时 delete 成功、insert 失败会丢失凭据。
+
+### 18. 有 2FA 时第一次登录响应为什么没有 refresh token？
+
+密码只完成第一因子，SuccessHandler 返回 scope 为 `PRE_VERIFICATION_TOKEN` 的短期 access token。验证码通过后 Controller 才签发普通 access/refresh pair并记录成功 LOGIN。
+
+### 19. 2FA 最终 token 与临时 token 使用同一 session ID 吗？
+
+不是。临时 token沿用第一阶段 SecurityUser；验证码通过后 Controller 用数据库 User 构造新的 SecurityUser，构造器生成新 session ID。
+
+### 20. audit 写失败会让登录失败吗？
+
+通常不会。`AuditLogServiceImpl` 把 save 提交给 `JpaExecutorService`，调用方不等待 Future。相反，`lastLoginTs` 是同步 JPA save，失败可能阻止 token 签发。
+
+### 21. 为什么登录成功后还要请求 `/api/auth/user`？
+
+JWT 提供路由所需的精简身份 claims；完整 User 的 additionalInfo、语言和其他资料仍从 PostgreSQL 读取，并与 system params 一起装入 NgRx auth state。
+
+### 22. `X-Forwarded-For` 在登录审计中有什么风险？
+
+代码直接信任首个值。只有可信代理清洗并重写该 header 时，clientAddress 才可信；服务直接暴露时攻击者可伪造审计 IP。
+
+### 23. token invalidation 为什么有约一秒窗口？
+
+`isTokenOutdated` 把 JWT issue time 和 event time 都截到秒，再使用 `<`。同一秒签发和失效的 token不会被判旧。
+
+### 24. Login 流程为什么不用 Actor 或 Kafka？
+
+它是同步短事务认证，不需要设备级顺序 mailbox 或可重放消息队列。Actor/Kafka 只会增加延迟和状态管理复杂度；多节点一致性由共享数据库、JWT签名和 Redis cache承担。
+
+### 25. 登录 200 但稍后看不到 audit 应从哪里查？
+
+检查 `JpaExecutorService` reject/异常、数据库连接池、当前 `audit_log` partition、`audit-log.enabled` 与外部 sink。登录返回线程没有等待 audit Future。
+
+[上一篇：12 Dashboard 流程](../12-dashboard/README.md) | [返回目录](../../SUMMARY.md) | [下一篇：14 JWT 认证流程](../14-jwt-authentication/README.md)

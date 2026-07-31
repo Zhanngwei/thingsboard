@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>12 Dashboard 流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航">
+      <a href="README.md">Markdown</a>
+      <a href="../../index.html">全书目录</a>
+      <a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a>
+    </nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>12 Dashboard 流程</strong>
+      <a href="#一-流程目标">一、流程目标</a>
+      <a href="#二-入口">二、入口</a>
+      <a href="#三-完整调用链">三、完整调用链</a>
+      <a href="#四-消息流">四、消息流</a>
+      <a href="#五-时序图">五、时序图</a>
+      <a href="#六-数据变化">六、数据变化</a>
+      <a href="#七-源码分析">七、源码分析</a>
+      <a href="#八-actor-分析">八、Actor 分析</a>
+      <a href="#九-kafka-分析">九、Kafka 分析</a>
+      <a href="#十-数据库分析">十、数据库分析</a>
+      <a href="#十一-异常处理">十一、异常处理</a>
+      <a href="#十二-源码阅读路线">十二、源码阅读路线</a>
+      <a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script id="markdown-source" type="text/plain"># 12 Dashboard 流程
+
+> 源码基线：ThingsBoard `3.6.4`，行为提交 `0cb411fc90`；源码链接按当前 `release-3.6` 工作树行号校准。本章同时追踪 Dashboard 配置 CRUD、Customer/Edge 分配、Widget 数据查询和 WebSocket 实时更新。
+
+[上一篇：11 OTA 流程](../11-ota/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/12-dashboard.svg) | [下一篇：13 Login 流程](../13-login/index.html)
+
+---
+
+## 一、流程目标
+
+Dashboard 流程解决两个不同问题：**保存可复用的可视化配置**，以及**按这份配置查询并持续订阅业务数据**。前者是低频控制面，核心数据是 PostgreSQL `dashboard` 行；后者是高频数据面，运行在浏览器、WebSocket、Entity Query、Telemetry/Alarm Service 和 Core subscription 路由之间。
+
+```mermaid
+flowchart LR
+  subgraph Control[控制面：定义 Dashboard]
+    EDIT[租户管理员编辑] --> REST[Dashboard REST]
+    REST --> DS[DashboardService]
+    DS --> D[(dashboard)]
+    DS --> R[(relation)]
+  end
+  subgraph Runtime[数据面：运行 Widget]
+    LOAD[浏览器加载 configuration] --> W[WidgetComponent]
+    W --> CMD[EntityDataCmd]
+    CMD --> WS["/api/ws"]
+    WS --> EQ[Entity Query]
+    EQ --> LATEST[(attribute_kv / ts_kv_latest)]
+    WS --> TS[TimeseriesService]
+    TS --> HISTORY[(ts_kv / Timescale / Cassandra)]
+    HISTORY --> LIVE[实时 subscription]
+    LIVE --> W
+  end
+  D --> LOAD
+```
+
+### 1.1 必须先分清的四个对象
+
+| 对象 | 所在位置 | 生命周期 | 职责 |
+|---|---|---|---|
+| `Dashboard` | PostgreSQL `dashboard` | 创建到删除 | 标题、图片、移动端排序和完整 `configuration` |
+| `DashboardInfo` | 同一张 `dashboard` 表的轻量 JPA 映射 | 列表请求 | 不读取大体积 `configuration`，只返回列表字段 |
+| `Widget` / `Datasource` | `configuration` JSON，加载后驻留浏览器 | 页面打开到销毁 | 描述组件类型、实体别名、数据键、时间窗和样式 |
+| `TbEntityDataSubCtx` | Core 节点内存 | 一个 WebSocket `sessionId + cmdId` | 保存查询结果、实时订阅、动态刷新任务和回推状态 |
+
+### 1.2 本章核心结论
+
+1. Dashboard **不是遥测数据容器**。`configuration` 只保存 Widget 和查询定义，实际值来自 `attribute_kv`、`ts_kv_latest`、历史时序后端和 `alarm`。
+2. release-3.6 的 `dashboard.configuration` 在基础 schema 中是 `varchar`，Java 用 `JsonStringType` 映射为 `JsonNode`；它不是 PostgreSQL `jsonb`，数据库不负责校验 Widget schema。
+3. Customer 分配是双写：`relation` 保存 `CUSTOMER --Contains/DASHBOARD--> DASHBOARD`，`dashboard.assigned_customers` 保存 `ShortCustomerInfo` JSON 摘要。
+4. Customer Dashboard 列表按 `relation` 查询；直接读取权限按 `assigned_customers` 判断。两者漂移会造成“列表可见但打开被拒绝”或相反现象。
+5. `assignDashboardToCustomer(...)` 没有包住 relation 与 dashboard save 的外层 `@Transactional`；多 Customer API 又逐个调用，所以失败可以留下部分结果。
+6. `dashboard` 没有 JPA `@Version`。并发编辑完整 `configuration` 或并发更新 `assigned_customers` 都是最后提交者覆盖，不能按字段自动合并。
+7. 普通 Entity Widget 通常使用同一 `cmdId` 的两阶段命令：先发送 `query` 解析实体/latest，再发送 `historyCmd`、`tsCmd` 或 `latestCmd` 建立数据订阅。
+8. 初始 Entity Query 会动态拼接实体表、`relation`、`attribute_kv` 和 `ts_kv_latest`；历史曲线再通过 `TimeseriesService.findAllByQueries(...)` 进入 SQL、TimescaleDB 或 Cassandra。
+9. Dashboard 没有服务端 `DashboardActor` 或 `WidgetActor`。页面状态由 Angular 对象维护，服务端实时状态由 subscription context 和并发 Map 维护。
+10. 浏览器 WebSocket 慢消费不会无限堆积：服务端有更新速率限制和每 session 出站队列上限，超过上限会丢弃更新或关闭连接。
+
+---
+
+## 二、入口
+
+### 2.1 Dashboard REST 入口
+
+| HTTP API | Java 方法 | 权限 | 作用 |
+|---|---|---|---|
+| `GET /api/dashboard/{dashboardId}` | [`DashboardController.getDashboardById(String,boolean)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L209) | Tenant/Customer | 读取完整配置，可选内联图片 |
+| `GET /api/dashboard/info/{dashboardId}` | [`getDashboardInfoById(String)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L186) | Sys/Tenant/Customer | 只读取轻量信息 |
+| `POST /api/dashboard` | [`saveDashboard(Dashboard)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L241) | Tenant | 创建或覆盖更新 Dashboard |
+| `DELETE /api/dashboard/{dashboardId}` | [`deleteDashboard(String)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L260) | Tenant | 删除 Dashboard 和实体关系 |
+| `POST/DELETE /api/customer/{customerId}/dashboard/{dashboardId}` | [`assignDashboardToCustomer(String,String)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L283) / [`unassignDashboardFromCustomer(String,String)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L313) | Tenant | 单 Customer 分配/取消 |
+| `POST /api/dashboard/{dashboardId}/customers` | [`updateDashboardCustomers(String,String[])`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L344) | Tenant | 用目标集合替换全部分配 |
+| `POST /api/customer/public/dashboard/{dashboardId}` | [`assignDashboardToPublicCustomer(String)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L427) | Tenant | 分配给特殊 Public Customer |
+| `GET /api/tenant/dashboards` | [`getTenantDashboards(...)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L511) | Tenant | 分页查询租户 DashboardInfo |
+| `GET /api/customer/{customerId}/dashboards` | [`getCustomerDashboards(...)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L550) | Tenant/Customer | 按 Customer relation 查询 |
+| `GET /api/dashboard/home` | [`getHomeDashboard()`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L591) | Sys/Tenant/Customer | 按用户、Customer、Tenant 继承规则取得首页 |
+| `POST /api/tenant/dashboard/home/info` | [`setTenantHomeDashboardInfo(HomeDashboardInfo)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L694) | Tenant | 把首页 ID 写进 Tenant `additional_info` |
+
+将 Dashboard 设为 public 只让匿名用户能读取这份 Dashboard。Controller 的 API 说明明确指出，引用的 Device/Asset 仍需分别公开；否则 Widget 的 Entity Query 或 Telemetry 权限仍会失败。
+
+### 2.2 Angular 页面入口
+
+[`DashboardResolver.resolve(ActivatedRouteSnapshot)`](../../../ui-ngx/src/app/modules/home/pages/dashboard/dashboard-routing.module.ts#L46) 从路由参数取 `dashboardId`，调用 [`DashboardService.getDashboard(String,RequestConfig)`](../../../ui-ngx/src/app/core/http/dashboard.service.ts#L70)，记录一次非公开用户的 VISIT action，再调用 [`DashboardUtilsService.validateAndUpdateDashboard(Dashboard)`](../../../ui-ngx/src/app/core/services/dashboard-utils.service.ts#L63) 兼容旧 JSON 结构并补齐默认状态。
+
+[`DashboardPageComponent.ngOnInit()`](../../../ui-ngx/src/app/modules/home/components/dashboard-page/dashboard-page.component.ts#L362) 消费 resolver 数据；[`init(DashboardPageInitData)`](../../../ui-ngx/src/app/modules/home/components/dashboard-page/dashboard-page.component.ts#L425) 创建 `AliasController`，读取 `timewindow/settings/states/widgets/entityAliases/filters`，再让每个 Widget 进入动态组件初始化。
+
+### 2.3 Widget 与 WebSocket 入口
+
+[`WidgetComponent.createDefaultSubscription()`](../../../ui-ngx/src/app/modules/home/components/widget/widget.component.ts#L920) 根据 Widget 类型创建 `WidgetSubscriptionOptions`。RPC Widget 走第 10 章的 RPC 服务，static Widget 不订阅数据，timeseries/latest/alarm Widget 则创建相应数据订阅。
+
+[`TelemetryWebsocketService`](../../../ui-ngx/src/app/core/ws/telemetry-websocket.service.ts#L61) 使用 `api/ws`。首个 command wrapper 携带 JWT `AuthCmd`，随后发送 `EntityDataCmd`、`AlarmDataCmd`、旧版 Timeseries/Attributes command 或 unsubscribe command。
+
+### 2.4 非入口：MQTT、Actor 与 Scheduler
+
+- MQTT 不直接“调用 Dashboard”。设备上报先完成第 09 章 Telemetry 保存，成功 callback 才产生 subscription update。
+- Actor 不创建 Dashboard 页面。Rule Engine Actor 只处在遥测写入上游；Dashboard 查询是同步/异步 Service 链路。
+- Scheduler 不负责普通 Widget 刷新，但 dynamic page link 和 Alarm query 会由 `DefaultTbEntityDataSubscriptionService` 的 scheduler 定时重查实体集合。
+- Edge gRPC 可同步 Dashboard 实体和分配事件，但浏览器打开 Dashboard 仍使用本地 REST + WebSocket。
+
+```mermaid
+flowchart TD
+  ROUTE["Angular route /dashboards/:dashboardId"] --> GET["GET /api/dashboard/id"]
+  EDIT[租户编辑器] --> SAVE["POST /api/dashboard"]
+  ASSIGN[客户/公开/Edge 分配] --> RELAPI[Assignment REST]
+  WIDGET[Widget 初始化] --> SOCKET["WebSocket /api/ws"]
+  MQTT[MQTT telemetry] --> RE[Rule Engine / Save Timeseries]
+  RE -. 保存成功后的实时更新 .-> SOCKET
+  DYN[Dynamic query scheduler] --> SOCKET
+  EDGE[Edge gRPC] --> SAVE
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 打开 Dashboard：配置控制面
+
+| 步骤 | 类与方法 | 输入 -> 输出 | 职责与设计原因 |
+|---:|---|---|---|
+| 1 | `ui-ngx/src/app/modules/home/pages/dashboard/dashboard-routing.module.ts::DashboardResolver.resolve(ActivatedRouteSnapshot)` | route `dashboardId` -> `Observable<Dashboard>` | 在组件创建前完成配置加载和兼容升级 |
+| 2 | [`ui-ngx DashboardService.getDashboard(String,RequestConfig)`](../../../ui-ngx/src/app/core/http/dashboard.service.ts#L70) | ID -> HTTP GET | 前端 HTTP 边界 |
+| 3 | [`org.thingsboard.server.controller.DashboardController.getDashboardById(String,boolean)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L209) | path/query -> `Dashboard` | 参数检查、权限和可选图片内联 |
+| 4 | [`BaseController.checkDashboardId(DashboardId,Operation)`](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L1104) | ID + READ -> authorized entity | `find + AccessControlService` 统一防止越权 |
+| 5 | [`org.thingsboard.server.dao.dashboard.DashboardServiceImpl.findDashboardById(TenantId,DashboardId)`](../../../dao/src/main/java/org/thingsboard/server/dao/dashboard/DashboardServiceImpl.java#L169) | tenant + ID -> domain | 校验 ID 并委托 DAO |
+| 6 | `org.thingsboard.server.dao.sql.dashboard.JpaDashboardDao.findById(...)` | UUID -> `DashboardEntity` | 复用 `JpaAbstractDao` |
+| 7 | [`DashboardEntity.toData()`](../../../dao/src/main/java/org/thingsboard/server/dao/model/sql/DashboardEntity.java#L156) | SQL columns -> `Dashboard` | 反序列化 `assigned_customers` 和 `configuration` |
+| 8 | [`DashboardUtilsService.validateAndUpdateDashboard(Dashboard)`](../../../ui-ngx/src/app/core/services/dashboard-utils.service.ts#L63) | persisted JSON -> normalized JSON | 兼容数组式 widgets、缺失 state/layout/filter 等历史格式 |
+| 9 | [`DashboardPageComponent.init(DashboardPageInitData)`](../../../ui-ngx/src/app/modules/home/components/dashboard-page/dashboard-page.component.ts#L425) | Dashboard -> page context | 创建 Alias/State/Layout 上下文 |
+| 10 | [`WidgetComponent.loadFromWidgetInfo()`](../../../ui-ngx/src/app/modules/home/components/widget/widget.component.ts#L410) | Widget config -> component instance | 按 `typeFullFqn` 加载 Widget type 并准备订阅 |
+
+Customer User 的 READ 校验由 [`CustomerUserPermissions.customerDashboardPermissionChecker`](../../../application/src/main/java/org/thingsboard/server/service/security/permission/CustomerUserPermissions.java#L137) 完成：tenant 必须一致，且 `DashboardInfo.isAssignedToCustomer(user.customerId)` 必须为真。公开用户本质上也落到特殊 Public Customer 的分配判断。
+
+### 3.2 保存 Dashboard：完整 JSON 覆盖更新
+
+| 步骤 | 类与方法 | 输入 -> 输出 | 关键行为 |
+|---:|---|---|---|
+| 1 | [`DashboardPageComponent.saveDashboard()`](../../../ui-ngx/src/app/modules/home/components/dashboard-page/dashboard-page.component.ts#L990) | 当前页面状态 -> Dashboard | 把 state/layout/widget/timewindow 回写 configuration |
+| 2 | [`ui-ngx DashboardService.saveDashboard(Dashboard,RequestConfig)`](../../../ui-ngx/src/app/core/http/dashboard.service.ts#L82) | Dashboard -> POST | 发送完整对象，不是 JSON Patch |
+| 3 | [`DashboardController.saveDashboard(Dashboard)`](../../../application/src/main/java/org/thingsboard/server/controller/DashboardController.java#L241) | body -> Dashboard | 强制覆盖 `tenantId`，`checkEntity` 校验 CREATE/WRITE |
+| 4 | [`DefaultTbDashboardService.save(Dashboard,User)`](../../../application/src/main/java/org/thingsboard/server/service/entitiy/dashboard/DefaultTbDashboardService.java#L67) | domain + user -> saved | 判定 ADDED/UPDATED，编排 auto-commit 与 audit/action |
+| 5 | [`DashboardServiceImpl.doSaveDashboard(Dashboard,boolean)`](../../../dao/src/main/java/org/thingsboard/server/dao/dashboard/DashboardServiceImpl.java#L260) | domain -> saved | 校验、图片提取、DAO save、缓存失效和 entity event |
+| 6 | [`DashboardDataValidator.validateDataImpl(TenantId,Dashboard)`](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/DashboardDataValidator.java#L65) | Dashboard -> valid/exception | 校验 title；创建时检查租户实体数量限制 |
+| 7 | `ImageService.replaceBase64WithImageUrl(HasImage)` | base64 -> resource URL | 避免大图片继续内嵌在 Dashboard 行 |
+| 8 | [`JpaAbstractDao.save(TenantId,D)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L78) | DashboardEntity -> committed row | 单次 JPA repository transaction |
+| 9 | [`DashboardServiceImpl.publishEvictEvent(DashboardTitleEvictEvent)`](../../../dao/src/main/java/org/thingsboard/server/dao/dashboard/DashboardServiceImpl.java#L142) | dashboardId -> cache eviction | 事务内事件在提交后处理，否则立即失效 |
+| 10 | `SaveEntityEvent` + `NotificationEntityService.logEntityAction(...)` | saved entity -> Edge/audit side effect | 独立事件与日志，不属于浏览器 JSON 的原子提交结果 |
+
+`DashboardEntity` 没有 `@Version`，保存使用整行实体。两个管理员从同一旧版本分别修改不同 Widget 时，后提交者仍可能覆盖前一个人的完整 `configuration`。
+
+### 3.3 分配给 Customer：双写链路
+
+[`DefaultTbDashboardService.updateDashboardCustomers(Dashboard,Set<CustomerId>,User)`](../../../application/src/main/java/org/thingsboard/server/service/entitiy/dashboard/DefaultTbDashboardService.java#L186) 先计算 added/removed 集合，再逐个调用 DAO service：
+
+```mermaid
+sequenceDiagram
+  participant API as DashboardController
+  participant APP as DefaultTbDashboardService
+  participant DAO as DashboardServiceImpl
+  participant REL as relation
+  participant DASH as dashboard
+  API->>APP: updateDashboardCustomers(dashboard, targetIds, user)
+  loop 每个 added customer
+    APP->>DAO: assignDashboardToCustomer(tenantId,dashboardId,customerId)
+    DAO->>DAO: find dashboard + customer, add ShortCustomerInfo
+    DAO->>REL: INSERT Contains / DASHBOARD
+    DAO->>DASH: UPDATE assigned_customers
+    APP-->>APP: audit ASSIGNED_TO_CUSTOMER
+  end
+  loop 每个 removed customer
+    APP->>DAO: unassignDashboardFromCustomer(...)
+    DAO->>REL: DELETE Contains / DASHBOARD
+    DAO->>DASH: UPDATE assigned_customers
+    APP-->>APP: audit UNASSIGNED_FROM_CUSTOMER
+  end
+```
+
+[`DashboardServiceImpl.assignDashboardToCustomer(TenantId,DashboardId,CustomerId)`](../../../dao/src/main/java/org/thingsboard/server/dao/dashboard/DashboardServiceImpl.java#L295) 先保存 relation，再调用 `saveDashboard(dashboard)`。方法和调用它的批量编排都没有外层事务，因此第二步失败不会自动撤销已经提交的 relation。取消分配则先删 relation 再保存 Dashboard 摘要，风险方向相同。
+
+### 3.4 Widget 初始化：同一 cmdId 的两阶段命令
+
+一个普通 Entity timeseries Widget 的前端过程不是“一次命令得到全部数据”：
+
+1. [`WidgetComponent.createDefaultSubscription()`](../../../ui-ngx/src/app/modules/home/components/widget/widget.component.ts#L920) 从 Widget config 复制 datasources。
+2. [`WidgetSubscription.initDataSubscription()`](../../../ui-ngx/src/app/core/api/widget-subscription.ts#L469) 让 `AliasController.resolveDatasources(...)` 把 entity alias/filter 转为 `entityFilter/pageLink/keyFilters`。
+3. [`EntityDataService.prepareSubscription(EntityDataListener,boolean)`](../../../ui-ngx/src/app/core/api/entity-data.service.ts#L92) 创建 `EntityDataSubscription`。
+4. [`EntityDataSubscription.subscribe()`](../../../ui-ngx/src/app/core/api/entity-data-subscription.ts#L267) 把 entity fields、attributes、latest telemetry 和 key filters 组装为 `EntityDataCmd.query`。
+5. [`TelemetryWebsocketService.subscribe(TelemetrySubscriber)`](../../../ui-ngx/src/app/core/ws/telemetry-websocket.service.ts#L72) 分配 `cmdId`、登记 subscriber 并发送 query command。
+6. 初始 EntityData 返回后，Widget 完成 datasource 解析；[`WidgetComponent.onInit()`](../../../ui-ngx/src/app/modules/home/components/widget/widget.component.ts#L481) 调用 `defaultSubscription.subscribe()`。
+7. [`WidgetSubscription.dataSubscribe()`](../../../ui-ngx/src/app/core/api/widget-subscription.ts#L1064) 调用 `EntityDataService.startSubscription(...)`。
+8. [`EntityDataSubscription.start()`](../../../ui-ngx/src/app/core/api/entity-data-subscription.ts#L618) 创建第二个 `EntityDataCmd`，复用第一阶段 `cmdId`，加入 `historyCmd/tsCmd/latestCmd` 并调用 WebSocket `update()`。
+
+```mermaid
+sequenceDiagram
+  participant W as WidgetComponent
+  participant EDS as EntityDataSubscription
+  participant C as TelemetryWebsocketService
+  participant S as Server EntityData service
+  W->>EDS: subscribe()
+  EDS->>C: EntityDataCmd(query), new cmdId
+  C->>S: 查询实体字段、属性和 latest
+  S-->>C: EntityDataUpdate(data)
+  C-->>EDS: resolve datasource
+  EDS-->>W: init complete
+  W->>EDS: start()
+  EDS->>C: EntityDataCmd(same cmdId, ts/history/latest)
+  C->>S: update existing TbEntityDataSubCtx
+  S-->>C: history/latest + realtime subscription
+  C-->>W: dataUpdated / latestDataUpdated
+```
+
+### 3.5 服务端 EntityData 查询与时序读取
+
+| 步骤 | 类与方法 | 作用 |
+|---:|---|---|
+| 1 | [`TbWebSocketHandler.processMsg(SessionMetaData,String)`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207) | 解析 wrapper，首次消息校验 JWT |
+| 2 | [`DefaultWebSocketService.handleCommands(WebSocketSessionRef,WsCommandsWrapper)`](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L287) | 按 `WsCmdType` 分发 command |
+| 3 | [`handleWsEntityDataCmd(WebSocketSessionRef,EntityDataCmd)`](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L315) | 基础校验后进入 EntityData service |
+| 4 | [`DefaultTbEntityDataSubscriptionService.handleCmd(WebSocketSessionRef,EntityDataCmd)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L253) | 创建/更新 `sessionId + cmdId` context |
+| 5 | [`TbAbstractDataSubCtx.findEntityData()`](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbAbstractDataSubCtx.java#L101) | 调用 EntityService 执行 EntityDataQuery |
+| 6 | [`BaseEntityService.findEntityDataByQuery(TenantId,CustomerId,EntityDataQuery)`](../../../dao/src/main/java/org/thingsboard/server/dao/entity/BaseEntityService.java#L111) | 校验 query 并进入 SQL DAO |
+| 7 | [`DefaultEntityQueryRepository.findEntityDataByQuery(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L473) | 动态生成 count/data 两条 SQL |
+| 8 | [`EntityKeyMapping.buildLatestJoins(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/EntityKeyMapping.java#L444) | 对 latest key 添加 `attribute_kv/ts_kv_latest` join |
+| 9 | [`handleGetTsCmd(TbEntityDataSubCtx,GetTsCmd,boolean)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L786) | 每实体调用 `TimeseriesService.findAllByQueries(...)` |
+| 10 | [`TbAbstractDataSubCtx.createTimeSeriesSubscriptions(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbAbstractDataSubCtx.java#L211) | 初始 history 返回后注册实时 key subscription |
+
+Entity Query 的 count 和 data SQL 位于同一个 `TransactionTemplate`，但历史时序 Future 在其后独立执行。实体分页结果与随后查询的 history 并非同一数据库快照，更不可能跨 PostgreSQL/Timescale/Cassandra 形成分布式快照。
+
+### 3.6 实时 Telemetry 回推
+
+1. 第 09 章 Save Timeseries 的聚合 Future 成功。
+2. [`DefaultTelemetrySubscriptionService.onTimeSeriesUpdate(TenantId,EntityId,List)`](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L755) 按 TB_CORE 分区转发。
+3. Entity owner 节点的 [`DefaultSubscriptionManagerService.onTimeSeriesUpdate(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L231) 查找哪些 Core service 订阅该实体和 key。
+4. 本节点直接调用 local service；远端通过 [`sendCoreNotification(String,EntityId,ToCoreNotificationMsg)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L527) 发往目标 Core notification topic。
+5. [`DefaultTbLocalSubscriptionService.onTimeSeriesUpdate(EntityId,List,TbCallback)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L348) 按 key 过滤并调用 subscription processor。
+6. `TbEntityDataSubCtx` 合并 update，`DefaultWebSocketService.sendUpdate(...)` 序列化回 session。
+7. 浏览器 [`TelemetryWebsocketService.processOnMessage(...)`](../../../ui-ngx/src/app/core/ws/telemetry-websocket.service.ts#L141) 按 `cmdId` 找到 subscriber，最终触发 Widget `onDataUpdated()`。
+
+---
+
+## 四、消息流
+
+[点击打开独立架构 SVG](../../assets/architecture/12-dashboard.svg)
+
+![Dashboard 架构图](../../assets/architecture/12-dashboard.svg)
+
+```mermaid
+flowchart TB
+  subgraph Browser[Angular 浏览器]
+    ROUTER[DashboardResolver]
+    PAGE[DashboardPageComponent]
+    WIDGET[WidgetComponent]
+    WSub[WidgetSubscription]
+    ESub[EntityDataSubscription]
+    WSC[TelemetryWebsocketService]
+    ROUTER --> PAGE --> WIDGET --> WSub --> ESub --> WSC
+  end
+  subgraph Rest[配置控制面]
+    DC[DashboardController]
+    TBS[DefaultTbDashboardService]
+    DS[DashboardServiceImpl]
+    DC --> TBS --> DS
+  end
+  subgraph Ws[实时数据面]
+    WH[TbWebSocketHandler]
+    DWS[DefaultWebSocketService]
+    EDS[DefaultTbEntityDataSubscriptionService]
+    EQ[DefaultEntityQueryRepository]
+    LSUB[DefaultTbLocalSubscriptionService]
+    MGR[DefaultSubscriptionManagerService]
+    WH --> DWS --> EDS
+    EDS --> EQ
+    EDS --> LSUB
+    LSUB --> MGR
+  end
+  subgraph Store[存储]
+    DASH[(dashboard)]
+    REL[(relation)]
+    ATTR[(attribute_kv)]
+    LATEST[(ts_kv_latest)]
+    HIST[(SQL / Timescale / Cassandra history)]
+    ALARM[(alarm)]
+  end
+  ROUTER -->|HTTP GET| DC
+  PAGE -->|HTTP POST| DC
+  DS --> DASH
+  DS --> REL
+  WSC <-->|"/api/ws"| WH
+  EQ --> REL
+  EQ --> ATTR
+  EQ --> LATEST
+  EDS --> HIST
+  EDS --> ALARM
+  MGR -. Core queue when remote .-> LSUB
+```
+
+```mermaid
+flowchart LR
+  SAVE[Telemetry DB Future success] --> OWNER{Entity owner Core partition local?}
+  OWNER -->|yes| MGR[SubscriptionManager]
+  OWNER -->|no| CORE[(TB_CORE queue)]
+  CORE --> MGR
+  MGR --> TARGET{WebSocket owner service local?}
+  TARGET -->|yes| LOCAL[LocalSubscriptionService]
+  TARGET -->|no| NOTIFY[(Core notification topic)]
+  NOTIFY --> LOCAL
+  LOCAL --> CTX[TbEntityDataSubCtx]
+  CTX --> SEND[WebSocket outbound queue]
+  SEND --> UI[Widget update]
+```
+
+---
+
+## 五、时序图
+
+[PlantUML 源文件](sequence.puml) | [新窗口打开完整时序图 SVG](sequence.svg)
+
+![Dashboard 完整时序图](sequence.svg)
+
+完整时序图覆盖四段：Dashboard 配置读取、Widget 两阶段 EntityData 查询、实时 telemetry 跨节点回推、Dashboard 保存与 Customer 双写。图中 `relation` 和 `dashboard` 的分配写入没有用同一事务框包围，这是源码行为而不是图示简化。
+
+---
+
+## 六、数据变化
+
+### 6.1 Dashboard CRUD 修改的持久化对象
+
+| 操作 | `dashboard` | `relation` | Cache | Audit/Event | 其他 |
+|---|---|---|---|---|---|
+| 创建 | INSERT 完整行 | 不自动创建 Customer relation | dashboard title cache 失效 | ADDED、`SaveEntityEvent`、entity count eviction | base64 图片可先写 Image Resource |
+| 编辑 | UPDATE 完整行 | 不变 | title cache 失效 | UPDATED、`SaveEntityEvent` | 没有 `@Version` 冲突检测 |
+| 分配 Customer | UPDATE `assigned_customers` | INSERT `DASHBOARD/Contains` | title cache 也会因整行 save 失效 | ASSIGNED_TO_CUSTOMER | 两次独立持久化步骤 |
+| 取消 Customer | UPDATE `assigned_customers` | DELETE `DASHBOARD/Contains` | 同上 | UNASSIGNED_FROM_CUSTOMER | 两次独立持久化步骤 |
+| 分配 Edge | Dashboard 行不变 | INSERT `EDGE/Contains` | 不变 | `ActionEntityEvent` | Edge event 后续进入 queue |
+| 删除 | DELETE 行 | `deleteEntityRelations` 清理 from/to relation | title cache 失效 | DELETED、`DeleteEntityEvent`、count eviction | 被 Device/Asset Profile 默认 Dashboard FK 引用时失败 |
+
+[`DashboardServiceImpl.deleteDashboard(TenantId,DashboardId)`](../../../dao/src/main/java/org/thingsboard/server/dao/dashboard/DashboardServiceImpl.java#L371) 是本组操作中明确标注 `@Transactional` 的方法。它先删除实体关系和 alarm relation，再删除 Dashboard 行。若 `device_profile.default_dashboard_id` 或 `asset_profile.default_dashboard_id` 外键仍引用该行，PostgreSQL 会拒绝删除；源码只把 `fk_default_dashboard_device_profile` 转成友好错误，Asset Profile 约束可能沿通用异常路径返回。
+
+### 6.2 页面运行期间的内存对象
+
+| 位置 | 对象 | 变化 |
+|---|---|---|
+| Browser | `DashboardPageComponent.dashboard` | 编辑 states/widgets/layout/timewindow 后整体保存 |
+| Browser | `TelemetryWebsocketService.subscribersMap` | `cmdId -> TelemetrySubscriber`；重连时清空并重新登记 |
+| Core WebSocket 节点 | `DefaultWebSocketService.wsSessionsMap` | session 建立加入，关闭时移除 |
+| Core WebSocket 节点 | `subscriptionsBySessionId` | `sessionId -> cmdId -> TbAbstractSubCtx` |
+| Core WebSocket 节点 | `DefaultTbLocalSubscriptionService` maps | 按 session 和 entity 保存本地 subscription |
+| Entity owner Core 节点 | `DefaultSubscriptionManagerService.entitySubscriptions` | 保存各 service 对实体/key 的远程订阅摘要 |
+
+WebSocket 关闭时 [`DefaultWebSocketService.handleSessionEvent(...)`](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L260) 同时取消旧版订阅和 EntityData 订阅；context 会停止动态刷新 task 并从 LocalSubscriptionService 移除实体订阅。
+
+### 6.3 Widget 初始读取的数据源
+
+| Widget 请求 | 首次读取 | 后续读取/订阅 |
+|---|---|---|
+| Entity field | device/asset/customer 等实体表 | dynamic page link 可周期重查 |
+| Attribute | `attribute_kv` latest join | Attribute subscription |
+| Latest telemetry | `ts_kv_latest` join；NoSQL history 模式可能补查 latest DAO | Latest-value time-series subscription |
+| Fixed history | `TimeseriesService.findAllByQueries` | 不注册 realtime subscription |
+| Realtime history window | 同上先读历史 | 注册从 last timestamp 开始的 time-series subscription |
+| Alarm table Widget | EntityDataQuery + `alarm` query | Alarm subscription + 可选周期重查 |
+| Entity/Alarm count | count query | scheduler 定时刷新动态集合 |
+
+### 6.4 事务、Future 与消息边界
+
+```mermaid
+flowchart TD
+  A[Dashboard HTTP save] --> JPA[JPA save transaction]
+  JPA --> COMMIT[dashboard row committed]
+  COMMIT --> CACHE[cache eviction]
+  COMMIT --> EVENT[SaveEntityEvent]
+  COMMIT --> AUDIT[audit/action call]
+  B[Customer assign] --> RELTX[relation DAO transaction]
+  RELTX --> DASHTX[dashboard DAO transaction]
+  DASHTX -. failure does not roll back relation .-> DRIFT[dual-write drift]
+  C[Widget initial query] --> QTX[Entity Query TransactionTemplate]
+  QTX --> TSF[history Futures per entity]
+  TSF --> SUB[subscription registration]
+  SUB --> WSQ[session outbound queue]
+```
+
+Entity query 的 `TransactionTemplate` 只覆盖动态 SQL count/data；`TimeseriesService` Future、subscription registration 和 WebSocket send 都在其事务外。初始页面数据是多个时间点的组合视图，而不是数据库级一致性快照。
+
+---
+
+## 七、源码分析
+
+### 7.1 配置控制面类
+
+| 层 | 完整类名 | 关键方法 | 设计职责 |
+|---|---|---|---|
+| Angular HTTP | `ui-ngx/src/app/core/http/dashboard.service.ts::DashboardService` | `getDashboard(...)`、`saveDashboard(...)`、`updateDashboardCustomers(...)` | 集中 REST URL 和 request options |
+| Angular Route | `DashboardResolver` | `resolve(ActivatedRouteSnapshot)` | 组件创建前加载并升级配置 |
+| Angular Page | `DashboardPageComponent` | `ngOnInit()`、`init(...)`、`saveDashboard()` | 页面编辑状态、Alias/State/Layout 编排 |
+| REST | `org.thingsboard.server.controller.DashboardController` | `getDashboardById(...)`、`saveDashboard(...)`、assignment APIs | Authority、参数和实体权限边界 |
+| Application | `org.thingsboard.server.service.entitiy.dashboard.DefaultTbDashboardService` | `save(...)`、`delete(...)`、`updateDashboardCustomers(...)` | action/audit 与多实体编排 |
+| DAO Service | `org.thingsboard.server.dao.dashboard.DashboardServiceImpl` | `doSaveDashboard(...)`、`assignDashboardToCustomer(...)` | 校验、双写、cache/event |
+| DAO | `org.thingsboard.server.dao.sql.dashboard.JpaDashboardDao` | 继承 `JpaAbstractDao` CRUD | JPA 持久化适配 |
+| Repository | `DashboardRepository` / `DashboardInfoRepository` | `findByTenantId(...)`、Customer/Edge JPQL | 完整对象与轻量列表查询分离 |
+| SQL Entity | `DashboardEntity` / `DashboardInfoEntity` | constructor、`toData()` | 同一表的 full/light 映射 |
+
+`DashboardInfoEntity` 不映射 `configuration`，所以 Dashboard 列表不会把每份大型 Widget JSON 都搬进 JVM。打开单个 Dashboard 才使用 `DashboardEntity` 读取完整配置。这是典型的 CQRS-lite 读模型优化，但两者仍共享同一物理表。
+
+### 7.2 Widget 运行时类
+
+| 类 | 关键方法 | 职责 |
+|---|---|---|
+| `DashboardUtilsService` | `validateAndUpdateDashboard(...)` | 兼容旧 Dashboard JSON 并补默认值 |
+| `WidgetComponent` | `loadFromWidgetInfo()`、`createDefaultSubscription()`、`onInit()` | 动态加载 Widget，绑定默认 subscription |
+| `WidgetSubscription` | `initDataSubscription()`、`prepareDataSubscriptions()`、`dataSubscribe()` | 解析 datasource，聚合多个实体数据 listener |
+| `EntityDataService` | `prepareSubscription(...)`、`startSubscription(...)` | 从 datasource 构建订阅 options |
+| `EntityDataSubscription` | `subscribe()`、`start()`、`prepareSubscriptionCommands(...)` | 构造 query/history/latest/ts command 并处理 update |
+| `TelemetryWebsocketService` | `subscribe(...)`、`update(...)`、`unsubscribe(...)`、`processOnMessage(...)` | `cmdId` 分配、socket command 和浏览器回调路由 |
+
+`WidgetComponent` 对 RPC/static/alarm/timeseries/latest 做显式分支。因而“Dashboard 打开一定查询 TimescaleDB”是错误判断：static/RPC Widget 不读 history；latest Widget 可能只读 `ts_kv_latest`；只有包含历史或聚合时间窗的 datasource 才进入时序 history DAO。
+
+### 7.3 WebSocket 与查询类
+
+| 完整类名 | 关键职责 |
+|---|---|
+| `org.thingsboard.server.controller.plugin.TbWebSocketHandler` | session 建立、JWT auth、inbound/outbound 队列、ping、限流 |
+| `org.thingsboard.server.service.ws.DefaultWebSocketService` | command type 分发、subscription 限额、update send |
+| `org.thingsboard.server.service.subscription.DefaultTbEntityDataSubscriptionService` | `cmdId` context、initial query、history/latest、scheduler |
+| `org.thingsboard.server.service.subscription.TbEntityDataSubCtx` | EntityData 状态合并和 update 序列化 |
+| `org.thingsboard.server.service.subscription.TbAbstractDataSubCtx` | Entity Query、动态集合刷新、attr/ts subscription 创建 |
+| `org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository` | 根据 EntityFilter/EntityKey 动态生成 PostgreSQL SQL |
+| `org.thingsboard.server.dao.sql.query.EntityKeyMapping` | latest join、选择列、filter predicate、排序映射 |
+| `org.thingsboard.server.dao.timeseries.BaseTimeseriesService` | 将统一读 API 路由到 SQL/Timescale/Cassandra DAO |
+| `DefaultTbLocalSubscriptionService` | 本节点 subscription 明细、missed-update 检查和数据过滤 |
+| `DefaultSubscriptionManagerService` | Entity owner 分区上的跨 service 订阅目录和更新路由 |
+
+### 7.4 继承与组合关系
+
+```mermaid
+classDiagram
+  class DashboardInfo
+  class Dashboard
+  DashboardInfo <|-- Dashboard
+  class BaseSqlEntity
+  class DashboardEntity
+  BaseSqlEntity <|-- DashboardEntity
+  DashboardEntity ..> Dashboard : toData
+  class DashboardService
+  class DashboardServiceImpl
+  DashboardService <|.. DashboardServiceImpl
+  class AbstractEntityService
+  AbstractEntityService <|-- DashboardServiceImpl
+  class WebSocketService
+  class DefaultWebSocketService
+  WebSocketService <|.. DefaultWebSocketService
+  class TbAbstractSubCtx
+  class TbAbstractDataSubCtx
+  class TbEntityDataSubCtx
+  TbAbstractSubCtx <|-- TbAbstractDataSubCtx
+  TbAbstractDataSubCtx <|-- TbEntityDataSubCtx
+  DefaultWebSocketService --> TbEntityDataSubCtx
+```
+
+`DashboardServiceImpl` 继承 `AbstractEntityService` 是为了复用 relation/alarm-relation 删除和 Edge relation 操作；Widget 实时链路没有继承 Dashboard service，而是通过 `EntityDataCmd` 与通用 subscription 基础设施组合。这使同一查询引擎能服务 Dashboard、实体表格和其他实时 UI。
+
+---
+
+## 八、Actor 分析
+
+### 8.1 Dashboard 为什么没有 Actor
+
+Dashboard 配置是低冲突、低频 CRUD；Widget 页面状态天然属于浏览器 session；EntityData subscription 又需要按 WebSocket session 和实体分区维护。因此 release-3.6 没有 `DashboardActor`、`WidgetActor` 或每个 Dashboard 的 mailbox。
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    PAGE[DashboardPageComponent]
+    W[WidgetComponent]
+    S[EntityDataSubscription]
+  end
+  subgraph CoreServices[Core service state]
+    WS[WebSocket session maps]
+    CTX[TbEntityDataSubCtx]
+    LOCAL[Local subscriptions]
+    MGR[Partition subscription manager]
+  end
+  subgraph ActorPlane[Actor plane only on telemetry ingestion]
+    APP[AppActor] --> TENANT[TenantActor]
+    TENANT --> RC[RuleChainActor]
+    RC --> RN[RuleNodeActor]
+  end
+  PAGE --> W --> S --> WS --> CTX --> LOCAL --> MGR
+  RN -. saved telemetry update .-> MGR
+```
+
+### 8.2 Actor 仍在哪里间接参与
+
+- 设备 telemetry 经 Rule Engine Queue 到 `AppActor -> TenantActor -> RuleChainActor -> RuleNodeActor`，Save Timeseries Node 成功后才通知 subscription manager。
+- Dashboard 内 RPC Widget 复用第 10 章 Device Actor RPC 状态机。
+- Alarm Widget 看到的 Alarm 可能由 Rule Node Actor 创建或更新，但 Dashboard 查询/订阅 Alarm 本身是 Service context。
+
+用普通 Service/Map 而非 Actor 的代价是显式锁和并发容器：`DefaultTbLocalSubscriptionService` 使用 `subsLock`，`TbEntityDataSubCtx` 使用 WebSocket lock，session 与 command context 使用 `ConcurrentHashMap`。排障时不能把 Actor mailbox 指标当成 Dashboard WebSocket 背压指标。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 哪些路径完全不需要 Kafka
+
+- `GET/POST/DELETE /api/dashboard` 直接走 HTTP、Service、JPA。
+- Widget 初始 Entity Query 和历史查询由当前 Core 节点直接访问 DAO。
+- WebSocket owner 与 entity partition owner 在同一 Core service 时，subscription 注册和 update 都是本地方法调用。
+
+### 9.2 哪些路径可能经过 Queue/Kafka
+
+ThingsBoard 使用 Queue 抽象，Kafka 只是生产 provider 之一：
+
+| 消息 | Producer | 分区/Topic | Consumer 目的 |
+|---|---|---|---|
+| `TbEntitySubEvent` | [`DefaultTbLocalSubscriptionService.pushToQueue(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L669) | entity ID 对应 TB_CORE partition | 在 entity owner 建立/删除远程订阅摘要 |
+| Telemetry update to owner | [`AbstractSubscriptionService.forwardToSubscriptionManagerService(...)`](../../../application/src/main/java/org/thingsboard/server/service/telemetry/AbstractSubscriptionService.java#L136) | TB_CORE partition | 将保存成功后的 update 送到 owner |
+| Update to WebSocket service | [`DefaultSubscriptionManagerService.sendCoreNotification(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L527) | 目标 Core service notification topic | 在持有 session 的节点调用 local subscription |
+| Edge Dashboard event | `SaveEntityEvent/ActionEntityEvent` listener | Edge notification/Edge event queue | 同步 Dashboard 到已分配 Edge |
+| MQTT telemetry 上游 | Transport/Rule Engine producer | Rule Engine queue | 产生 Dashboard 最终订阅的数据源 |
+
+```mermaid
+sequenceDiagram
+  participant WS as WebSocket Core A
+  participant Q1 as TB_CORE partition
+  participant OWN as Entity owner Core B
+  participant Q2 as Core A notification
+  WS->>Q1: add TbEntitySubEvent(entityId, keys, service A)
+  Q1->>OWN: update remote subscription directory
+  OWN-->>Q2: subscription callback / later telemetry update
+  Q2-->>WS: local subscription update
+```
+
+### 9.3 Partition、consumer group 与失败语义
+
+Entity ID 是 subscription routing 的稳定 key，保证同一实体的订阅目录由一个 Core partition owner 管理。notification topic 则按目标 `serviceId` 定向，避免其他 Core 节点接收不属于自己的 WebSocket update。
+
+注册消息、遥测 update、WebSocket session 不是分布式事务：
+
+- add-sub event 传输期间，`DefaultTbLocalSubscriptionService` 通过 pending subscription 与 callback 后的 missed-update 查询缩小漏数窗口。
+- Core rebalance 时 owner 可能返回“external partition”；调用方需要后续重建订阅。
+- Kafka 重放 subscription event 应由 sequence/state 合并处理，但浏览器 reconnect 仍会重新发送全部 commands。
+- DB 已提交但 Core update producer 失败时，历史数据可刷新查到，当前 WebSocket 可能漏掉这次实时点。
+
+---
+
+## 十、数据库分析
+
+### 10.1 `dashboard` 表
+
+release-3.6 基础定义见 [`schema-entities.sql`](../../../dao/src/main/resources/sql/schema-entities.sql#L151)：
+
+| 字段 | 类型 | Java 字段 | 说明 |
+|---|---|---|---|
+| `id` | `uuid PK` | `DashboardId` | 实体 ID |
+| `created_time` | `bigint` | inherited | UUID timestamp/创建时间 |
+| `tenant_id` | `uuid` | `TenantId` | 所属租户 |
+| `title` | `varchar(255)` | `title` | 列表显示和搜索 |
+| `configuration` | `varchar` | transient `JsonNode` | Widget、state、layout、alias、filter、timewindow |
+| `assigned_customers` | `varchar(1000000)` | `Set<ShortCustomerInfo>` | 权限判断和展示摘要 |
+| `mobile_hide` | `boolean` | `mobileHide` | 移动端列表过滤 |
+| `mobile_order` | `int` | `mobileOrder` | 移动端排序 |
+| `image` | `varchar(1000000)` | `image` | 图片 URL/旧内联数据 |
+| `external_id` | `uuid` | `DashboardId externalId` | 导入导出映射；tenant 内唯一 |
+
+只有 `(tenant_id, external_id)` 基础索引；租户列表按 `tenant_id/title` 搜索没有专用索引。通常每租户 Dashboard 数量较小，这是可接受的设计假设；若单租户达到数万 Dashboard，应以真实 `EXPLAIN (ANALYZE, BUFFERS)` 评估 `(tenant_id, lower(title))` 或 trigram 索引，而不是直接照搬 telemetry 索引策略。
+
+### 10.2 `configuration` 的真实结构
+
+[`DashboardConfiguration`](../../../ui-ngx/src/app/shared/models/dashboard.models.ts#L117) 的主干如下：
+
+```json
+{
+  "timewindow": { "realtime": { "timewindowMs": 3600000 } },
+  "settings": { "showTitle": true, "stateControllerId": "entity" },
+  "widgets": {
+    "widget-uuid": {
+      "typeFullFqn": "system.cards.latest_value",
+      "type": "latest",
+      "config": {
+        "datasources": [
+          {
+            "type": "entity",
+            "entityAliasId": "alias-uuid",
+            "dataKeys": [{ "name": "temperature", "type": "timeseries" }]
+          }
+        ]
+      }
+    }
+  },
+  "states": {
+    "default": { "name": "Default", "root": true, "layouts": { "main": { "widgets": {} } } }
+  },
+  "entityAliases": {},
+  "filters": {}
+}
+```
+
+这是应用私有文档模型，不存在数据库外键把 widget ID 连接到 telemetry key。`typeFullFqn` 在运行时解析 Widget type；alias/filter 再被前端转换成 `EntityFilter`。因此修改 JSON 必须经过 export/import 或 UI 模型验证，直接 SQL 字符串替换极易制造悬空 widget/layout/alias 引用。
+
+### 10.3 `relation` 与 `assigned_customers`
+
+`relation` 主键包含 from/typeGroup/type/to，Customer assignment 使用：
+
+```text
+from_id              = customer_id
+from_type            = CUSTOMER
+relation_type_group  = DASHBOARD
+relation_type        = Contains
+to_id                = dashboard_id
+to_type              = DASHBOARD
+```
+
+[`DashboardInfoRepository.findByTenantIdAndCustomerId(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/dashboard/DashboardInfoRepository.java#L89) 按这组条件连接 Dashboard；权限检查则解析 `assigned_customers`。生产巡检可用以下思路比较两侧，但修复前必须先停写或设计幂等 reconciliation：
+
+```sql
+SELECT d.id,
+       d.assigned_customers,
+       array_agg(r.from_id) FILTER (WHERE r.from_id IS NOT NULL) AS relation_customers
+FROM dashboard d
+LEFT JOIN relation r
+  ON r.to_id = d.id
+ AND r.to_type = 'DASHBOARD'
+ AND r.from_type = 'CUSTOMER'
+ AND r.relation_type_group = 'DASHBOARD'
+ AND r.relation_type = 'Contains'
+WHERE d.tenant_id = :tenant_id
+GROUP BY d.id, d.assigned_customers;
+```
+
+### 10.4 Widget Entity Query SQL
+
+[`DefaultEntityQueryRepository.findEntityDataByQuery(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L473) 的流程是：
+
+```mermaid
+flowchart TD
+  FILTER[EntityFilter] --> ET[解析 entity table / relation query]
+  KEYS[Entity fields + latest + key filters] --> MAP[EntityKeyMapping]
+  MAP --> JOIN[attribute_kv / ts_kv_latest joins]
+  ET --> COUNT[动态 count SQL]
+  JOIN --> COUNT
+  ET --> DATA[动态 data SQL]
+  JOIN --> DATA
+  COUNT --> PAGE[totalElements]
+  DATA --> PAGE
+  PAGE --> ADAPTER[EntityDataAdapter]
+```
+
+`EntityKeyMapping` 对 telemetry latest 连接 `ts_kv_latest`，并通过 `ts_kv_dictionary` 把 key 字符串映射到 `key_id`；Attribute 连接 `attribute_kv` 并按 scope 过滤。Key filter 存在时可从 `LEFT JOIN` 变成 `INNER JOIN`。复杂 Dashboard 慢查询通常不是 `dashboard` 表慢，而是 datasource 生成的 EntityData 动态 SQL join 数量过多。
+
+### 10.5 History 后端矩阵
+
+| `database.ts.type` | 初始/实时 history | Latest 特殊处理 |
+|---|---|---|
+| `sql` | PostgreSQL `ts_kv`/分区查询 | Entity Query 可直接 join SQL latest |
+| `timescale` | Timescale hypertable/chunk 查询 | 同上，`tsInSqlDB=true` |
+| `cassandra` | Cassandra async query | Entity Query 先读 SQL latest；缺失 key 再调用 configured latest DAO |
+
+`database.ts_latest.type` 可与 history 类型独立配置。Dashboard 排障必须同时确认两项配置；“history 在 Cassandra”不代表 latest 也在 Cassandra。
+
+还有一个 release-3.6 源码边界：`DefaultTbEntityDataSubscriptionService.tsInSqlDB` 只根据 `database.ts.type` 计算，而不是根据 `database.ts_latest.type`。因此 history 为 SQL/Timescale、latest 却选 Cassandra 的非常规组合中，EntityData initial query 仍 join SQL `ts_kv_latest`，`handleLatestCmd(...)` 又不会进入 missing-key fallback；Dashboard latest 可能缺值。后端装配允许独立选择，不代表所有上层读取路径对每种交叉组合都完全对称。
+
+### 10.6 其他数据库与缓存
+
+- PostgreSQL：Dashboard、Relation、实体元数据、Attribute、Alarm、SQL latest、audit/event。
+- TimescaleDB：只有配置为 Timescale 的历史 telemetry；Dashboard configuration 本身不会进入 hypertable。
+- Cassandra：可作为 history/latest 后端，Dashboard 元数据仍在 PostgreSQL。
+- Redis/Caffeine：`DashboardServiceImpl.findDashboardTitleById(...)` 使用 `TbTransactionalCache`；完整 configuration 不在该 cache 中。
+
+---
+
+## 十一、异常处理
+
+### 11.1 CRUD 与权限异常
+
+| 失败点 | 已提交内容 | 对调用方的表现 | 排查重点 |
+|---|---|---|---|
+| title/实体数量校验失败 | 无 Dashboard 写入 | 4xx data validation | tenant profile limit、title |
+| Customer/Tenant 权限失败 | 无 | 403/404 | `assigned_customers`、tenant、public entity assignment |
+| 图片提取失败 | 可能已有独立 resource side effect，Dashboard 未必保存 | save 异常 + audit failure | ImageService 日志和 resource 引用 |
+| Dashboard JPA save 失败 | relation 可能已在 assignment 路径提交 | HTTP 失败 | constraint、连接池、relation/dashboard 漂移 |
+| Audit/action 失败 | Dashboard 可能已经提交 | 取决于 `logEntityAction` 实现异常传播 | 不要把 HTTP 失败直接等同 DB 回滚 |
+| 删除被 profile FK 拒绝 | delete transaction 回滚 | validation/constraint error | Device/Asset Profile 默认 Dashboard |
+
+### 11.2 分配双写与并发覆盖
+
+多 Customer 更新没有全局事务。若第 3 个 Customer 失败，前两个已成功，后续未执行。重试通常是幂等集合操作，但必须先读取当前两侧状态，特别是 relation 已存在、`assigned_customers` 未更新的漂移场景。
+
+并发 assign A/B 都先读取旧 Dashboard 时：两条 relation 都可能成功，而两次整行 save 最终只保留最后一个线程的 `assigned_customers` 集合。数据库主键只保护 relation 去重，不保护 JSON 摘要的 lost update。
+
+### 11.3 WebSocket 建连、解析与认证
+
+- [`TbWebSocketHandler.init()`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L162) 对未认证 pending session 设置默认 10 秒过期；没有 `AuthCmd` 或 token 无效会关闭连接。
+- wrapper JSON 无法解析时，已认证 session 收到 BAD_REQUEST；未认证 session 以 BAD_DATA 关闭。
+- [`DefaultWebSocketService.validateSubscriptionCmd(...)`](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L992) 拒绝既无 query 又无 data command 的 EntityDataCmd。
+- `DefaultTbEntityDataSubscriptionService` 中未捕获的 runtime exception 会通过 [`handleWsCmdRuntimeException(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L483) 以 `SERVICE_RESTARTED` 关闭整个 session，而不是只失败一个 Widget。
+
+### 11.4 查询、历史和实时更新失败
+
+- Entity Query 在 command 线程同步执行；动态 SQL 异常会进入 command catch/log 或关闭 session。
+- 每实体 history 查询是独立 Future。任一 entity/query 失败会发送 INTERNAL_ERROR；其他 Future 可能已成功读取。
+- `Futures.allAsList` callback 失败只记录 warning 的分支，不保证浏览器收到结构化错误，因此前端可能持续 loading。
+- realtime subscription 注册期间使用 sequence callback 和 missed-update lookup 缩小竞态，但跨节点 queue 故障仍可能漏实时点；刷新历史可补回。
+- dynamic page link 默认每 6 秒重查，慢 SQL 会占用默认单线程 scheduler，使其他动态 Dashboard 一起延迟。
+
+### 11.5 背压、限流和重连
+
+[`TbWebSocketHandler.SessionMetaData.sendMsg(...)`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L564) 的队列超过 `server.ws.max_queue_messages_per_session` 或 tenant profile 更小上限时，连接以 POLICY_VIOLATION 关闭。更新速率超过 `WS_UPDATES_PER_SESSION` 时先返回一次 `TOO_MANY_UPDATES` 并临时 blacklist 后续 update。
+
+浏览器 [`WebsocketService.onClose(CloseEvent)`](../../../ui-ngx/src/app/core/ws/websocket.service.ts#L233) 保存 reconnect subscribers、清空 cmdId map，并定时重连；重连后重新订阅。Widget 必须能处理初始数据重复到达，服务端也不能依赖旧 cmdId 跨连接稳定。
+
+### 11.6 生产排障顺序
+
+```mermaid
+flowchart TD
+  A[Dashboard 打不开/无数据] --> B{GET dashboard 成功?}
+  B -->|否| C[检查 dashboard / assigned_customers / 权限]
+  B -->|是| D{"浏览器 /api/ws 已认证?"}
+  D -->|否| E[JWT、auth timeout、代理 Upgrade]
+  D -->|是| F{EntityData 初始 update?}
+  F -->|否| G[EntityFilter、relation、动态 SQL、WS limits]
+  F -->|是| H{history 返回?}
+  H -->|否| I[database.ts.type、Timeseries DAO、max datapoints]
+  H -->|是| J{只有实时点缺失?}
+  J -->|是| K[Core partition、subscription event、notification topic、backpressure]
+  J -->|否| L[Widget JS、数据转换、timewindow]
+```
+
+---
+
+## 十二、源码阅读路线
+
+1. [`Dashboard`](../../../common/data/src/main/java/org/thingsboard/server/common/data/Dashboard.java#L43)：先确认服务端只把 configuration 当 `JsonNode`。
+2. [`DashboardConfiguration`](../../../ui-ngx/src/app/shared/models/dashboard.models.ts#L117)：理解 widgets/states/aliases/filters 的前端真实 schema。
+3. [`DashboardResolver.resolve(...)`](../../../ui-ngx/src/app/modules/home/pages/dashboard/dashboard-routing.module.ts#L46)：看页面如何加载配置。
+4. [`DashboardPageComponent.init(...)`](../../../ui-ngx/src/app/modules/home/components/dashboard-page/dashboard-page.component.ts#L425)：看配置如何变成运行时 context。
+5. [`WidgetComponent.createDefaultSubscription()`](../../../ui-ngx/src/app/modules/home/components/widget/widget.component.ts#L920)：分清 static/RPC/alarm/data Widget。
+6. [`WidgetSubscription.prepareDataSubscriptions()`](../../../ui-ngx/src/app/core/api/widget-subscription.ts#L505)：跟踪 alias 解析后的 datasource。
+7. [`EntityDataSubscription.subscribe()`](../../../ui-ngx/src/app/core/api/entity-data-subscription.ts#L267) 与 [`start()`](../../../ui-ngx/src/app/core/api/entity-data-subscription.ts#L618)：掌握两阶段 command。
+8. [`TelemetryWebsocketService.subscribe(...)`](../../../ui-ngx/src/app/core/ws/telemetry-websocket.service.ts#L72)：理解 cmdId 和 reconnect。
+9. [`TbWebSocketHandler.processMsg(...)`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207)：看认证和 wrapper 解码。
+10. [`DefaultTbEntityDataSubscriptionService.handleCmd(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L253)：看 context、initial query、history/realtime 分支。
+11. [`DefaultEntityQueryRepository.findEntityDataByQuery(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L473)：用日志中的真实 SQL 对照动态拼装。
+12. [`DefaultSubscriptionManagerService.onTimeSeriesUpdate(...)`](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L265)：补齐跨 Core 实时路由。
+13. [`DashboardServiceImpl.assignDashboardToCustomer(...)`](../../../dao/src/main/java/org/thingsboard/server/dao/dashboard/DashboardServiceImpl.java#L295)：最后回看配置控制面的双写一致性问题。
+
+建议实际调试时设置断点顺序：`DashboardResolver.resolve` -> `WidgetComponent.createDefaultSubscription` -> `EntityDataSubscription.subscribe/start` -> `TbWebSocketHandler.processMsg` -> `DefaultTbEntityDataSubscriptionService.handleCmd` -> `DefaultEntityQueryRepository.findEntityDataByQuery`。这样能把“JSON 配置错误”“实体解析错误”和“时序后端错误”分开。
+
+---
+
+## 十三、常见面试题
+
+### 1. Dashboard 数据都存在哪里？
+
+配置在 PostgreSQL `dashboard.configuration`；Customer 可见关系在 `relation` 和 `assigned_customers`；Widget 实际值分别来自实体表、`attribute_kv`、`ts_kv_latest`、history backend 和 `alarm`。
+
+### 2. release-3.6 为什么不用 `jsonb` 保存 configuration？
+
+基础 schema 使用 `varchar`，Hibernate `JsonStringType` 负责序列化。系统把 configuration 当应用文档整体读取/保存，避免数据库绑定前端复杂且演进频繁的 Widget schema；代价是数据库难以校验、索引和局部更新。
+
+### 3. `DashboardInfo` 和 `Dashboard` 为什么分开？
+
+它们映射同一张表，但 `DashboardInfoEntity` 不映射 configuration。分页列表只取标题、图片、分配摘要和移动端字段，避免加载大 JSON。
+
+### 4. Customer assignment 为什么同时写 relation 和 assigned_customers？
+
+Relation 适合按 Customer 反向分页查 Dashboard；`assigned_customers` 适合直接返回标题/public 标志并做单 Dashboard 权限判断。它是查询性能换一致性复杂度。
+
+### 5. 两个分配存储是否原子？
+
+否。`assignDashboardToCustomer` 先调用 relation service，再保存 Dashboard，方法没有外层事务。中间失败和并发 lost update 都可能造成漂移。
+
+### 6. 为什么公开 Dashboard 后 Widget 仍可能没有设备数据？
+
+公开只把 Dashboard 分配给 Public Customer。Device/Asset 及其 telemetry 权限仍独立；引用实体没有公开时 Entity Query 会过滤或拒绝。
+
+### 7. 打开 Dashboard 是否一定查询 TimescaleDB？
+
+不一定。配置先从 PostgreSQL 读取；static/RPC Widget 不查 history；latest Widget 主要读 SQL latest；只有历史/聚合 timeseries datasource 且 `database.ts.type=timescale` 时才读 TimescaleDB。
+
+### 8. Widget 为什么要发送两次 EntityDataCmd？
+
+第一阶段 query 解析 entity alias/filter，并取得 entity fields/latest；第二阶段复用 cmdId，依据最终实体集合和时间窗补发 history/latest/ts command，同时建立实时订阅。
+
+### 9. EntityData 初始查询如何读取 latest telemetry？
+
+`DefaultEntityQueryRepository` 用 `EntityKeyMapping` 动态 LEFT/INNER JOIN `ts_kv_latest`，key 名先经 `ts_kv_dictionary` 映射为 key ID。
+
+### 10. 历史曲线为什么不在同一条 Entity Query SQL 中返回？
+
+Entity Query 负责实体集合、字段、属性和 latest；history 可能来自 SQL、Timescale 或 Cassandra，且每实体/每 key 需要聚合参数。统一由 `TimeseriesService` Future 读取更适合多后端抽象。
+
+### 11. Dashboard 的实时 update 是否从数据库 CDC 产生？
+
+不是。Telemetry save Future 成功后应用显式调用 SubscriptionManager；它按 Core partition 和目标 service 路由内存 subscription，再推送 WebSocket。
+
+### 12. Dashboard 使用 Actor 保证顺序吗？
+
+没有 Dashboard Actor。浏览器、WebSocket context、local subscription 和 partition manager 用各自对象、锁和并发 Map 管理；遥测写入上游才经过 Rule Engine Actor。
+
+### 13. Core 集群中 WebSocket 节点不是 entity owner 怎么办？
+
+LocalSubscriptionService 把 add-sub event 发到 entity 的 TB_CORE partition owner；owner 保存目标 serviceId，更新到达后再通过该 service 的 notification topic 返回。
+
+### 14. 如何避免注册 subscription 期间漏点？
+
+本地 service 登记 pending subscription，manager 回传 entity update timestamps 后执行 missed-update 查询。它缩小竞态窗口，但 queue/节点故障仍需重连或历史刷新补偿。
+
+### 15. 浏览器太慢会发生什么？
+
+先受每 session update rate limit；出站队列达到 `wsMsgQueueLimitPerSession` 后服务端关闭连接，而不是无限占用堆内存。
+
+### 16. 为什么同一 Dashboard 两个管理员编辑会丢修改？
+
+保存是完整 configuration 覆盖，SQL entity 没有 `@Version` 或 ETag。两个客户端基于旧版本保存时最后提交者覆盖前者。
+
+### 17. Dashboard 慢应该先看哪条 SQL？
+
+先区分 `GET dashboard` 慢还是 Widget EntityData 慢。后者应打开 query log，检查动态 count/data SQL 的 relation/latest joins、page size、text search 与 key filters；不要只看 `dashboard` 表。
+
+### 18. 删除 Dashboard 为什么会被数据库拒绝？
+
+Device Profile 和 Asset Profile 的 `default_dashboard_id` 有外键指向 Dashboard。必须先解除默认引用；此外还要考虑用户/Tenant `additional_info` 中无外键保护的 home dashboard ID。
+
+### 19. Fixed history 与 realtime timewindow 的服务端差异是什么？
+
+`historyCmd` 只执行区间读取；`tsCmd` 读取当前窗口后还调用 `createTimeSeriesSubscriptions(...)`，以最后时间戳为状态继续接收实时点。
+
+### 20. `maxDatapointLimit` 解决了什么问题？
+
+它限制一次 WebSocket history/aggregation 返回的数据点规模，避免单个 Widget 用过细 interval 和过多实体拖垮 DAO、JSON 序列化及浏览器；它不替代 Entity Query page size 和 subscription 数量限制。
+
+### 21. 为什么需要同时检查 `database.ts.type` 和 `database.ts_latest.type`？
+
+History 与 latest DAO 可独立装配，但 Dashboard EntityData query 固定 join SQL latest，且 missing-key fallback 的开关只按 history 类型计算。尤其是 SQL/Timescale history + Cassandra latest 的非常规组合，可能出现普通 Timeseries API 有值而 Dashboard latest 缺值。
+
+[上一篇：11 OTA 流程](../11-ota/index.html) | [返回目录](../../SUMMARY.md) | [下一篇：13 Login 流程](../13-login/index.html)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

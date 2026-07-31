@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1780" height="1140" viewBox="0 0 1780 1140" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Cassandra telemetry write architecture</title>
+  <desc id="desc">High contrast architecture of telemetry futures, Cassandra registry/history/latest tables, buffered async IO, TTL and consistency risks.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <marker id="blueArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#176b87"/></marker>
+    <style>.title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8;stroke-linejoin:round}.band{fill:#f8fafc;stroke:#64748b;stroke-width:2}.blue{fill:#eef6f8;stroke:#176b87;stroke-width:2}.amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}.green{fill:#ecfdf5;stroke:#047857;stroke-width:2}.red{fill:#fff1f2;stroke:#be123c;stroke-width:2}.line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}.dash{fill:none;stroke:#176b87;stroke-width:2.5;stroke-dasharray:9 7;marker-end:url(#blueArrow)}</style>
+  </defs>
+  <rect width="1780" height="1140" fill="#fff"/>
+  <text x="890" y="52" text-anchor="middle" class="title">ThingsBoard 3.6 Cassandra：三表写入、异步 IO、TTL 与一致性边界</text>
+
+  <rect x="35" y="85" width="400" height="940" rx="6" class="band"/>
+  <text x="235" y="125" text-anchor="middle" class="section">Application Futures</text>
+  <rect x="75" y="165" width="320" height="145" rx="5" class="blue"/>
+  <text x="235" y="204" text-anchor="middle" class="label">Save Timeseries Node</text>
+  <text x="235" y="235" text-anchor="middle" class="small">TsKvEntry list · ttl · saveLatest</text>
+  <text x="235" y="263" text-anchor="middle" class="small">asynchronous Rule Node callback</text>
+  <rect x="75" y="370" width="320" height="175" rx="5" class="green"/>
+  <text x="235" y="409" text-anchor="middle" class="label">BaseTimeseriesService</text>
+  <text x="235" y="440" text-anchor="middle" class="small">registry Future</text>
+  <text x="235" y="468" text-anchor="middle" class="small">history Future</text>
+  <text x="235" y="496" text-anchor="middle" class="small">optional latest Future</text>
+  <text x="235" y="524" text-anchor="middle" class="small">allAsList is not a transaction</text>
+  <rect x="75" y="615" width="320" height="155" rx="5" class="amber"/>
+  <text x="235" y="654" text-anchor="middle" class="label">Success Notification</text>
+  <text x="235" y="685" text-anchor="middle" class="small">only after all Futures succeed</text>
+  <text x="235" y="713" text-anchor="middle" class="small">WebSocket / Entity View / Node relation</text>
+  <text x="235" y="741" text-anchor="middle" class="small">partial writes can be silent to subscribers</text>
+  <rect x="75" y="840" width="320" height="135" rx="5" class="red"/>
+  <text x="235" y="879" text-anchor="middle" class="label">Partial success window</text>
+  <text x="235" y="910" text-anchor="middle" class="small">failed combination does not rollback</text>
+  <text x="235" y="938" text-anchor="middle" class="small">Queue retry repeats all mutations</text>
+
+  <rect x="475" y="85" width="400" height="940" rx="6" class="band"/>
+  <text x="675" y="125" text-anchor="middle" class="section">Cassandra Data Model</text>
+  <rect x="515" y="165" width="320" height="175" rx="5" class="blue"/>
+  <text x="675" y="204" text-anchor="middle" class="label">ts_kv_partitions_cf</text>
+  <text x="675" y="235" text-anchor="middle" class="small">PK entityType + entityId + key</text>
+  <text x="675" y="263" text-anchor="middle" class="small">clustering partitionStart ASC</text>
+  <text x="675" y="291" text-anchor="middle" class="small">local cache suppresses repeat writes</text>
+  <text x="675" y="319" text-anchor="middle" class="small">system TTL only, not custom TTL</text>
+  <rect x="515" y="410" width="320" height="185" rx="5" class="green"/>
+  <text x="675" y="449" text-anchor="middle" class="label">ts_kv_cf History</text>
+  <text x="675" y="480" text-anchor="middle" class="small">PK entity + key + UTC time bucket</text>
+  <text x="675" y="508" text-anchor="middle" class="small">clustering key ts</text>
+  <text x="675" y="536" text-anchor="middle" class="small">typed nullable value cells</text>
+  <text x="675" y="564" text-anchor="middle" class="small">USING TTL optional</text>
+  <rect x="515" y="665" width="320" height="175" rx="5" class="amber"/>
+  <text x="675" y="704" text-anchor="middle" class="label">ts_kv_latest_cf</text>
+  <text x="675" y="735" text-anchor="middle" class="small">PK entityType + entityId</text>
+  <text x="675" y="763" text-anchor="middle" class="small">clustering key telemetry key</text>
+  <text x="675" y="791" text-anchor="middle" class="small">no TTL · no payload-ts guard</text>
+  <text x="675" y="819" text-anchor="middle" class="small">high key count widens one partition</text>
+  <rect x="515" y="900" width="320" height="75" rx="5" class="red"/>
+  <text x="675" y="939" text-anchor="middle" class="label">Registry / history / latest may diverge</text>
+
+  <rect x="915" y="85" width="400" height="940" rx="6" class="band"/>
+  <text x="1115" y="125" text-anchor="middle" class="section">Async IO Control</text>
+  <rect x="955" y="165" width="320" height="175" rx="5" class="blue"/>
+  <text x="1115" y="204" text-anchor="middle" class="label">Prepared Statements</text>
+  <text x="1115" y="235" text-anchor="middle" class="small">cached per DAO query string</text>
+  <text x="1115" y="263" text-anchor="middle" class="small">typed bind + default consistency</text>
+  <text x="1115" y="291" text-anchor="middle" class="small">set-null mode clears old types</text>
+  <rect x="955" y="410" width="320" height="185" rx="5" class="green"/>
+  <text x="1115" y="449" text-anchor="middle" class="label">Buffered Rate Executor</text>
+  <text x="1115" y="480" text-anchor="middle" class="small">tenant query rate limit</text>
+  <text x="1115" y="508" text-anchor="middle" class="small">bounded queue + dispatcher threads</text>
+  <text x="1115" y="536" text-anchor="middle" class="small">approximate concurrent limit</text>
+  <text x="1115" y="564" text-anchor="middle" class="small">queue + execution timeout</text>
+  <rect x="955" y="665" width="320" height="175" rx="5" class="amber"/>
+  <text x="1115" y="704" text-anchor="middle" class="label">DataStax Async Driver</text>
+  <text x="1115" y="735" text-anchor="middle" class="small">session.executeAsync</text>
+  <text x="1115" y="763" text-anchor="middle" class="small">callback / result processing pools</text>
+  <text x="1115" y="791" text-anchor="middle" class="small">default read/write CL = ONE</text>
+  <text x="1115" y="819" text-anchor="middle" class="small">success at configured consistency</text>
+  <rect x="955" y="900" width="320" height="75" rx="5" class="red"/>
+  <text x="1115" y="939" text-anchor="middle" class="label">Buffer full / timeout / overload fail Future</text>
+
+  <rect x="1355" y="85" width="390" height="940" rx="6" class="band"/>
+  <text x="1550" y="125" text-anchor="middle" class="section">Lifecycle and Risks</text>
+  <rect x="1390" y="165" width="320" height="175" rx="5" class="green"/>
+  <text x="1550" y="204" text-anchor="middle" class="label">Replica Mutation</text>
+  <text x="1550" y="235" text-anchor="middle" class="small">partition-local upsert</text>
+  <text x="1550" y="263" text-anchor="middle" class="small">same history primary key is idempotent-ish</text>
+  <text x="1550" y="291" text-anchor="middle" class="small">CL ONE is not all-replica durability</text>
+  <rect x="1390" y="410" width="320" height="185" rx="5" class="amber"/>
+  <text x="1550" y="449" text-anchor="middle" class="label">TTL and Tombstones</text>
+  <text x="1550" y="480" text-anchor="middle" class="small">history expires natively</text>
+  <text x="1550" y="508" text-anchor="middle" class="small">tombstone remains until compaction</text>
+  <text x="1550" y="536" text-anchor="middle" class="small">expiry waves create IO pressure</text>
+  <text x="1550" y="564" text-anchor="middle" class="small">latest survives history TTL</text>
+  <rect x="1390" y="665" width="320" height="175" rx="5" class="red"/>
+  <text x="1550" y="704" text-anchor="middle" class="label">Latest Can Regress</text>
+  <text x="1550" y="735" text-anchor="middle" class="small">ordinary INSERT uses write timestamp</text>
+  <text x="1550" y="763" text-anchor="middle" class="small">payload ts is stored, not compared</text>
+  <text x="1550" y="791" text-anchor="middle" class="small">older event submitted later may win</text>
+  <text x="1550" y="819" text-anchor="middle" class="small">delete rewrite also races new writes</text>
+  <rect x="1390" y="900" width="320" height="75" rx="5" class="red"/>
+  <text x="1550" y="939" text-anchor="middle" class="label">No Cassandra/Kafka exactly-once boundary</text>
+
+  <path d="M235 310 L235 370" class="line"/>
+  <path d="M395 440 L475 440 L475 252 L515 252" class="line"/>
+  <path d="M395 468 L495 468 L495 502 L515 502" class="line"/>
+  <path d="M395 496 L475 496 L475 752 L515 752" class="line"/>
+  <path d="M835 252 L900 252 L900 252 L955 252" class="line"/>
+  <path d="M835 502 L915 502 L915 502 L955 502" class="line"/>
+  <path d="M835 752 L900 752 L900 752 L955 752" class="line"/>
+  <path d="M1275 752 L1340 752 L1340 252 L1390 252" class="line"/>
+  <path d="M1550 340 L1550 410" class="dash"/>
+  <path d="M1550 595 L1550 665" class="dash"/>
+  <path d="M235 545 L235 615" class="line"/>
+  <path d="M235 770 L235 840" class="dash"/>
+
+  <text x="420" y="425" class="edge">registry</text>
+  <text x="425" y="488" class="edge">history</text>
+  <text x="425" y="735" class="edge">latest</text>
+  <text x="850" y="488" class="edge">tasks</text>
+  <text x="1300" y="737" class="edge">async execute</text>
+  <text x="890" y="1062" text-anchor="middle" class="small">Each telemetry point expands into independent registry, history and optional latest mutations; aggregate Future failure cannot undo completed writes.</text>
+  <text x="890" y="1090" text-anchor="middle" class="small">History TTL is native and creates tombstones, while latest has no TTL or business-timestamp guard and may outlive or regress behind history.</text>
+</svg>

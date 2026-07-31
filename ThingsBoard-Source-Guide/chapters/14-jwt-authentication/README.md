@@ -1,0 +1,833 @@
+# 14 JWT 认证流程
+
+> 源码基线：ThingsBoard `3.6.4`，行为提交 `0cb411fc90`；源码链接按当前 `release-3.6` 工作树行号校准。本章从登录已经得到 JWT 之后开始，分析 REST、refresh、权限、WebSocket、失效 cache 与签名配置热更新。
+
+[上一篇：13 Login 流程](../13-login/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/14-jwt-authentication.svg) | [下一篇：15 Actor 模型](../15-actor-model/README.md)
+
+---
+
+## 一、流程目标
+
+JWT 认证流程解决三个不同问题：证明 token 是 ThingsBoard 签发且尚未过期；把 claims 恢复成当前请求可用的 `SecurityUser`；在 Controller 方法和具体实体上继续执行授权。签名有效只解决第一个问题，并不等于调用者可以访问任意 `/api/**`。
+
+```mermaid
+flowchart LR
+  CLIENT[Browser / API client] --> HEADER[X-Authorization or Authorization]
+  HEADER --> FILTER[JwtTokenAuthenticationProcessingFilter]
+  FILTER --> PROVIDER[JwtAuthenticationProvider]
+  PROVIDER --> PARSE[JwtTokenFactory.parseAccessJwtToken]
+  PARSE --> SETTINGS[(JWT settings in memory)]
+  PROVIDER --> INVALID[(user/session invalidation cache)]
+  PROVIDER --> CTX[SecurityContext SecurityUser]
+  CTX --> ROLE[Method @PreAuthorize]
+  ROLE --> ENTITY[BaseController + AccessControlService]
+  ENTITY --> DAO[Business DAO / service]
+```
+
+### 1.1 必须区分的五层判断
+
+| 层 | 主要类 | 判断内容 | 失败结果 |
+|---|---|---|---|
+| 路径匹配 | `SkipPathRequestMatcher` | 是否属于受保护 `/api/**` 且不在 skip list | 不匹配则 Filter 不运行 |
+| token 认证 | `JwtAuthenticationProvider` | JWS 签名、exp、claims、失效时间 | 401 |
+| URL 认证 | Spring Security chain | `/api/**` 是否 authenticated | 401/403 |
+| 方法角色 | `@PreAuthorize` | SYS_ADMIN/TENANT_ADMIN/CUSTOMER_USER/PRE_VERIFICATION | 403 |
+| 实体权限 | `BaseController` + `AccessControlService` | tenant/customer/资源/操作是否匹配 | 403 或规范化错误 |
+
+### 1.2 核心结论
+
+1. [`ThingsboardSecurityConfiguration.buildJwtTokenAuthenticationProcessingFilter()`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L212) 为 `/api/**` 创建 JWT Filter，并显式跳过 login、refresh、WebSocket、设备 HTTP API、静态资源和 `/api/noauth/**`。
+2. [`JwtHeaderTokenExtractor.extract(HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/extractor/JwtHeaderTokenExtractor.java#L48) 优先读 `X-Authorization`，再读标准 `Authorization`；只检查 header 长度，不验证前七字符确实是 `Bearer `，随后无条件丢弃七字符。
+3. [`JwtTokenAuthenticationProcessingFilter.attemptAuthentication(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtTokenAuthenticationProcessingFilter.java#L76) 把原始文本包装为未认证 `JwtAuthenticationToken`，交给统一 `AuthenticationManager`。
+4. [`JwtAuthenticationProvider.authenticate(String)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtAuthenticationProvider.java#L70) 解析 access token 并查失效 cache，不读取 `tb_user` 或 `user_credentials`。正常 access 请求的认证固定成本主要是 HS512 和最多两个 cache lookup。
+5. [`JwtTokenFactory.parseTokenClaims(String)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L275) 用当前 signing key 调用 `parseClaimsJws`，验证签名和标准 exp；代码没有 `requireIssuer`，token 的 `iss` claim 在解析时不参与显式等值校验。
+6. access token 中的 authority、tenantId、customerId、name 和 enabled 是签发时快照。普通 User 更新不会发布 credentials invalidation；旧 access token可继续携带旧 claims，直到 exp、refresh 或显式失效事件。
+7. 认证成功后 Filter 新建 `SecurityContext`，放入可信 `JwtAuthenticationToken(SecurityUser)` 再继续 chain；`AbstractJwtAuthenticationToken` 的可信构造器同时擦除 raw credentials。
+8. `/api/**.authenticated()` 只要求 Authentication 已认证。真正角色限制来自 `@PreAuthorize`，实体归属限制来自 `checkEntityId(...)` 和 authority-specific `PermissionChecker`；缺少后两层的 API 不能仅靠 URL 规则获得细粒度隔离。
+9. refresh endpoint 不使用 access header。`RefreshTokenProcessingFilter` 从 JSON body 读取 token，Provider 验证 `REFRESH_TOKEN` scope、重读用户/凭据 enabled 与 authority，再签新 pair。
+10. refresh 不调用密码过期判断，因此已经登录的用户可以在 password-expiration 日期之后继续用未过期 refresh token续签；只有再次用户名/密码登录才触发 password age 检查。
+11. 每次 refresh 生成新 refresh token 与新 `jti`，但旧 refresh token不被登记或撤销，可以重复使用到 exp 或 user/session invalidation。它是 rotation-shaped response，不是 one-time rotation。
+12. WebSocket `/api/ws/**` 被 REST JWT Filter 跳过。`TbWebSocketHandler` 在 query token 或首个 `AuthCmd` 中直接调用同一个 `JwtAuthenticationProvider`；认证后把 `SecurityUser` 固定在连接对象，后续 command 不逐条重新检查 exp/invalidation。
+13. JWT settings 保存到 `admin_settings(key='jwt')` 并通过 cluster lifecycle 通知各服务 reload。没有新旧 key重叠窗口，传播期间可能出现 node A 已接受新 key、node B 仍只接受旧 key的短暂分裂。
+14. `userSessionsInvalidation` 的 TTL 由 `CacheSpecsMap` 在启动时按 YAML `security.jwt.refreshTokenExpTime` 计算，而真正 token lifetime 可由数据库 JWT settings 修改；DB lifetime 大于 YAML TTL 时，失效 marker可能先于 refresh token消失。
+15. 多 Core 部署使用本地 Caffeine 时，logout/改密/禁用事件只影响处理事件的 JVM；共享 Redis 才能让各节点看到同一 user/session invalidation time。
+
+---
+
+## 二、入口
+
+### 2.1 REST access token 入口
+
+浏览器 [`GlobalHttpInterceptor.updateAuthorizationHeader(HttpRequest)`](../../../ui-ngx/src/app/core/interceptors/global-http-interceptor.ts#L165) 把 access token写为：
+
+```http
+X-Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
+```
+
+服务端也接受标准 `Authorization`。若两个 header 同时存在，`X-Authorization` 优先，标准 header被忽略。
+
+| 请求 | 是否进入 REST JWT Filter | 认证来源 |
+|---|---:|---|
+| `/api/device/{id}` | 是 | access header |
+| `/api/auth/user` | 是 | access header |
+| `/api/auth/login` | 否 | Login Filter |
+| `/api/auth/token` | 否 | refresh body |
+| `/api/noauth/**` | 否 | permitAll |
+| `/api/v1/**` | 否 | Device HTTP transport credentials |
+| `/api/ws/**` | 否 | WebSocket query/AuthCmd |
+| `/api/images/public/**` | 否 | public resource |
+
+### 2.2 Refresh 入口
+
+[`AuthService.refreshJwtToken(boolean)`](../../../ui-ngx/src/app/core/auth/auth.service.ts#L463) 发送：
+
+```http
+POST /api/auth/token
+Content-Type: application/json
+
+{"refreshToken":"eyJhbGciOiJIUzUxMiJ9..."}
+```
+
+[`RefreshTokenProcessingFilter.attemptAuthentication(HttpServletRequest,HttpServletResponse)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/RefreshTokenProcessingFilter.java#L81) 只接受 POST，解析 body 并创建未认证 `RefreshAuthenticationToken`。
+
+### 2.3 WebSocket 入口
+
+WebSocket 有两种认证形态：
+
+1. upgrade URI query 包含 `token=` 时，[`TbWebSocketHandler.toRef(WebSocketSession)`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L416) 在创建 session ref 时认证。
+2. 没有 query token 时，连接先进入 pending set；首个 wrapper 必须包含 `AuthCmd.token`，[`processMsg(SessionMetaData,String)`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207) 认证后才处理同 wrapper 中的 subscription commands。
+
+### 2.4 管理与失效入口
+
+| 操作 | 方法 | 对 token 的影响 |
+|---|---|---|
+| logout | [`AuthController.logout(HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L121) | session ID invalidation |
+| change/reset password | [`AuthController.changePassword(ChangePasswordRequest)`](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L139) | user ID invalidation |
+| disable credentials | [`UserController.setUserCredentialsEnabled(String,boolean)`](../../../application/src/main/java/org/thingsboard/server/controller/UserController.java#L545) | disabled 时 user ID invalidation |
+| delete user | [`UserServiceImpl.deleteUser(TenantId,User)`](../../../dao/src/main/java/org/thingsboard/server/dao/user/UserServiceImpl.java#L399) | user ID invalidation |
+| update JWT settings | [`AdminController.saveJwtSettings(JwtSettings)`](../../../application/src/main/java/org/thingsboard/server/controller/AdminController.java#L267) | 替换唯一 signing key/lifetimes，返回新 pair |
+
+```mermaid
+flowchart TD
+  R{Request} -->|protected REST| AF[Access JWT Filter]
+  R -->|POST /api/auth/token| RF[Refresh Filter]
+  R -->|WebSocket query/AuthCmd| WF[TbWebSocketHandler]
+  R -->|logout/password/disable| EVT[Invalidation event]
+  R -->|save JWT settings| CFG[DB setting + cluster reload]
+  AF --> AP[JwtAuthenticationProvider]
+  WF --> AP
+  RF --> RP[RefreshTokenAuthenticationProvider]
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 RequestMatcher 与 Filter 顺序
+
+[`SkipPathRequestMatcher.matches(HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/SkipPathRequestMatcher.java#L68) 先检查 skip matchers；命中任一 skip path 就返回 false，否则检查 `/api/**`。它不按 HTTP method 区分，受保护路径上的 GET/POST/DELETE 都进入同一个 JWT Filter。
+
+[`ThingsboardSecurityConfiguration.filterChain(HttpSecurity)`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L290) 的关键顺序是：
+
+1. login/public-login/access-JWT/refresh 四个 Filter 都注册在标准 username/password Filter 前。
+2. JWT Filter 验证成功后设置 per-request `SecurityContext` 并调用 `chain.doFilter`。
+3. `RateLimitProcessingFilter` 在 `UsernamePasswordAuthenticationFilter` 后执行，读取刚建立的 `SecurityUser`，检查 tenant/customer REST 限额。
+4. Controller 与方法安全随后执行。
+
+### 3.2 Header 到可信 Authentication
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant E as JwtHeaderTokenExtractor
+  participant F as JwtTokenAuthenticationProcessingFilter
+  participant M as AuthenticationManager
+  participant P as JwtAuthenticationProvider
+  participant J as JwtTokenFactory
+  participant I as TokenOutdatingService
+  participant X as SecurityContext
+  participant API as Controller
+  C->>F: /api request + X-Authorization
+  F->>E: extract(request)
+  E-->>F: raw JWT after first 7 chars
+  F->>M: JwtAuthenticationToken(raw, authenticated=false)
+  M->>P: authenticate(token)
+  P->>J: parseAccessJwtToken(raw)
+  J-->>P: SecurityUser from claims
+  P->>I: isOutdated(raw,userId)
+  I-->>P: false
+  P-->>M: trusted JwtAuthenticationToken(SecurityUser)
+  M-->>F: authenticated result
+  F->>X: set Authentication
+  F->>API: chain.doFilter
+```
+
+[`AbstractJwtAuthenticationToken(RawAccessJwtToken)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/AbstractJwtAuthenticationToken.java#L50) 强制 `authenticated=false`；只有接受 `SecurityUser` 的构造器才设置 authorities 与 authenticated=true，[`setAuthenticated(true)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/AbstractJwtAuthenticationToken.java#L76) 被显式禁止，避免调用方把未经 Provider验证的 raw token原地标成可信。
+
+### 3.3 JWS 解析与 SecurityUser 重建
+
+[`JwtTokenFactory.parseAccessJwtToken(String)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L135) 的重建顺序：
+
+1. `parseTokenClaims` 用当前 signing key 验证 compact JWS 和 exp。
+2. 读取 subject 与 scopes，要求 scopes 非空。
+3. 只使用 `scopes[0]` 转成 ThingsBoard `Authority`。
+4. 从 userId 创建 `SecurityUser`，恢复 tenant/customer/session。
+5. 非 PRE_VERIFICATION token恢复 name、enabled、isPublic 和 principal type。
+6. 不查询数据库，不确认 user仍存在，也不比较当前 authority/customer归属。
+
+```mermaid
+flowchart TD
+  RAW[compact JWT] --> JWS[parseClaimsJws current key]
+  JWS -->|bad signature/malformed| BAD[BadCredentialsException]
+  JWS -->|expired| EXP[JwtExpiredTokenException]
+  JWS --> CLAIMS[Claims]
+  CLAIMS --> SCOPE{scopes non-empty?}
+  SCOPE -->|no| BAD
+  SCOPE --> USER[SecurityUser from userId + first scope]
+  USER --> IDS[tenantId customerId sessionId]
+  IDS --> TYPE{PRE_VERIFICATION?}
+  TYPE -->|no| PROFILE[name enabled isPublic principal]
+  TYPE -->|yes| PRE[limited principal claims]
+  PROFILE --> CACHE[check invalidation cache]
+  PRE --> CACHE
+```
+
+`iss` 在签发时写入，但 parser 没有 `requireIssuer(expected)`；运维修改 issuer 不会单独让旧 token失效，修改 signing key才会。
+
+### 3.4 User/session 提前失效
+
+[`DefaultTokenOutdatingService.isOutdated(String,UserId)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/DefaultTokenOutdatingService.java#L83) 再解析一次 token claims以取得 `iat` 与 session ID，然后：
+
+1. 查 key=`userId.toString()`；若 issue time早于 user invalidation time，拒绝。
+2. 否则 sessionId 非空时再查 session key；早于 session invalidation time则拒绝。
+3. 两侧时间都截到秒并用 `<`，同秒 token保留。
+
+这意味着一次 REST access token认证会解析 JWS 两次：Provider 的 `parseAccessJwtToken` 一次，TokenOutdatingService 的 `parseTokenClaims` 又一次。cache miss也不是“没有 lookup”，仍会查询本地 Caffeine或 Redis。
+
+### 3.5 SecurityContext 到方法权限
+
+Filter 的 [`successfulAuthentication(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtTokenAuthenticationProcessingFilter.java#L92) 创建 empty context并设置 Authentication。Controller 的 [`BaseController.getCurrentUser()`](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L750) 从 `SecurityContextHolder` 取 principal。
+
+授权有两道应用层门：
+
+- `@PreAuthorize("hasAnyAuthority(...)")` 使用 token第一 scope生成的 `SimpleGrantedAuthority`。
+- [`BaseController.checkEntityId(I,ThrowingBiFunction,Operation)`](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L926) 先按 token tenantId读取实体，再调用 [`DefaultAccessControlService.checkPermission(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/permission/DefaultAccessControlService.java#L98)。
+
+```mermaid
+flowchart LR
+  CTX[SecurityContext SecurityUser] --> METHOD{@PreAuthorize role allowed?}
+  METHOD -->|no| DENY403[403]
+  METHOD -->|yes| LOAD[load entity using token tenantId]
+  LOAD --> EXISTS{entity exists?}
+  EXISTS -->|no| NOTFOUND[not found / normalized error]
+  EXISTS -->|yes| MAP[Authority to Permissions map]
+  MAP --> CHECK[Resource PermissionChecker]
+  CHECK -->|deny| DENY403
+  CHECK -->|allow| BUSINESS[Business method]
+```
+
+Tenant admin checker要求实体 tenantId相等；Customer user checker通常还要求 customerId相等并限制 operation；Sys admin主要访问 system-owned资源。`@PreAuthorize` 解决“角色能否进入方法”，PermissionChecker解决“这个角色能否操作这一行实体”。
+
+### 3.6 Refresh 完整链路
+
+[`RefreshTokenAuthenticationProvider.authenticate(Authentication)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/RefreshTokenAuthenticationProvider.java#L78) 与 access provider差异很大：
+
+1. [`parseRefreshToken(String)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L199) 验证签名/exp并强制 first scope=`REFRESH_TOKEN`。
+2. 普通用户按 token userId重新查询 `tb_user` 和 `user_credentials`。
+3. 检查 credentials存在、enabled=true、authority非空。
+4. public principal则重查 Customer存在且仍 public。
+5. 从旧 token复制 sessionId到新 `SecurityUser`。
+6. 检查 user/session invalidation cache。
+7. 返回可信 `RefreshAuthenticationToken`，SuccessHandler签发新 access和refresh。
+
+```mermaid
+sequenceDiagram
+  participant UI as AuthService
+  participant F as RefreshTokenProcessingFilter
+  participant P as RefreshTokenAuthenticationProvider
+  participant J as JwtTokenFactory
+  participant DB as PostgreSQL
+  participant I as Invalidation cache
+  participant S as SuccessHandler
+  UI->>F: POST /api/auth/token {refreshToken}
+  F->>P: authenticate RefreshAuthenticationToken(raw)
+  P->>J: parseRefreshToken(raw)
+  J-->>P: unsafe userId, principal, sessionId
+  alt normal user
+    P->>DB: SELECT tb_user by userId
+    P->>DB: SELECT user_credentials by userId
+    DB-->>P: current authority and enabled
+  else public user
+    P->>DB: SELECT customer and verify public
+  end
+  P->>I: check user and session invalidation
+  I-->>P: not outdated
+  P-->>S: trusted RefreshAuthenticationToken
+  S->>J: createTokenPair(current SecurityUser)
+  J-->>UI: new access + new refresh, same sessionId
+```
+
+Provider不调用 `validateUserCredentials`，所以不检查 BCrypt、密码年龄或 2FA。它只用 refresh possession、当前 user/credentials状态和 invalidation cache判断。
+
+### 3.7 前端 refresh 合并与重试
+
+[`GlobalHttpInterceptor.handleResponseError(...)`](../../../ui-ngx/src/app/core/interceptors/global-http-interceptor.ts#L89) 只在本地 token无效、refresh pending或服务端明确返回 `JWT_TOKEN_EXPIRED` 时进入 refresh；其他 401通常转为 logout。
+
+[`AuthService.refreshJwtToken(boolean)`](../../../ui-ngx/src/app/core/auth/auth.service.ts#L463) 用单个 `ReplaySubject<LoginResponse>(1)` 合并同一浏览器进程内的并发 refresh。它先把 refresh token读到局部变量，再清空 localStorage；成功后写新 pair，失败则保持清空并通知所有等待请求。多 tab之间没有共享锁，仍可能同时复用同一个 refresh token。
+
+### 3.8 WebSocket 认证与长期连接
+
+[`TbWebSocketHandler.processMsg(...)`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207) 首次认证调用 access Provider并把结果写入 `WebSocketSessionRef.securityCtx`。后续消息只判断 `securityCtx != null` 后直接交给 WebSocket service，不再次解析 token。
+
+因此：
+
+- 握手/首命令时检查签名、exp和 invalidation。
+- 连接建立后 access token到期不会主动关闭连接。
+- logout/改密写 invalidation cache也不会遍历并关闭已认证 WebSocket。
+- 断线重连时必须使用仍有效 token，届时才重新验证。
+
+### 3.9 JWT settings 热更新
+
+[`DefaultJwtSettingsService.saveJwtSettings(JwtSettings)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/settings/DefaultJwtSettingsService.java#L136) 先保存 `admin_settings`，广播 SYS tenant UPDATED lifecycle，再强制 reload本节点 volatile settings。远端 [`AbstractConsumerService.handleComponentLifecycleMsg(...)`](../../../application/src/main/java/org/thingsboard/server/service/queue/processing/AbstractConsumerService.java#L266) 收到消息后 reload。
+
+```mermaid
+flowchart LR
+  ADMIN[SYS_ADMIN save JWT settings] --> DB[(admin_settings key jwt)]
+  DB --> BROADCAST[cluster lifecycle broadcast]
+  DB --> LOCAL[local volatile reload]
+  LOCAL --> NEWPAIR[response pair signed with new key]
+  BROADCAST --> Q[(notification queues)]
+  Q --> N2[node B reload]
+  Q --> N3[node C reload]
+  OLD[old key tokens] -->|accepted until each reload| N2
+  NEWPAIR -->|may arrive before reload| N2
+```
+
+没有 dual-key grace period或 key ID选择。负载均衡环境改 key时应预期短暂 401，并避免在业务高峰直接旋转。
+
+---
+
+## 四、消息流
+
+### 4.1 REST、refresh 与 WebSocket 分层图
+
+```mermaid
+flowchart TB
+  subgraph Clients[Clients]
+    B[Browser localStorage]
+    API[External REST client]
+    WS[WebSocket client]
+  end
+  subgraph Filters[Servlet Security]
+    MATCH[SkipPathRequestMatcher]
+    AF[Access JWT Filter]
+    RF[Refresh Filter]
+    RL[RateLimitProcessingFilter]
+  end
+  subgraph Auth[Authentication]
+    AM[AuthenticationManager]
+    AP[JwtAuthenticationProvider]
+    RP[RefreshTokenAuthenticationProvider]
+    J[JwtTokenFactory]
+    INV[TokenOutdatingService]
+  end
+  subgraph Authorization[Authorization]
+    SC[SecurityContext]
+    PRE[Method Security]
+    AC[AccessControlService]
+  end
+  subgraph State[State]
+    DB[(PostgreSQL user / credentials / settings)]
+    CACHE[(Caffeine or Redis invalidation)]
+  end
+  B --> MATCH --> AF --> AM --> AP
+  API --> MATCH
+  B --> RF --> AM --> RP
+  WS --> WH[TbWebSocketHandler] --> AP
+  AP --> J
+  AP --> INV --> CACHE
+  RP --> J
+  RP --> DB
+  RP --> INV
+  AP --> SC --> RL --> PRE --> AC --> DB
+```
+
+### 4.2 Access token 生命周期
+
+```mermaid
+stateDiagram-v2
+  [*] --> Issued
+  Issued --> Accepted: valid signature and exp and cache
+  Issued --> Expired: now >= exp
+  Issued --> OutdatedUser: iat < user invalidation
+  Issued --> OutdatedSession: iat < session invalidation
+  Issued --> BadSignature: active signing key changed
+  Accepted --> Authorized: method and entity checks pass
+  Accepted --> Forbidden: role or entity check fails
+  Accepted --> WebSocketBound: WS stores SecurityUser
+  WebSocketBound --> WebSocketBound: commands do not reparse token
+  WebSocketBound --> [*]: disconnect
+  Expired --> Refreshing: refresh token available
+  Refreshing --> Issued: refresh provider succeeds
+  Refreshing --> [*]: refresh rejected
+```
+
+### 4.3 Refresh token“轮换”模型
+
+每次 refresh 响应都带新 refresh token，但服务端没有保存 `jti`、used-at或 token family。旧 token与新 token共享 session ID并同时有效，直到各自 exp或 user/session invalidation。这适合无状态扩展，但无法检测 refresh replay。
+
+[点击打开独立架构 SVG](../../assets/architecture/14-jwt-authentication.svg)
+
+![JWT 认证架构图](../../assets/architecture/14-jwt-authentication.svg)
+
+---
+
+## 五、时序图
+
+[PlantUML 源文件](sequence.puml) | [新窗口打开完整时序图 SVG](sequence.svg)
+
+![JWT 认证完整时序图](sequence.svg)
+
+PlantUML 图同时展示正常 REST access、token expired -> refresh -> retry、实体权限拒绝、WebSocket 首次认证和 signing key集群更新。图中的 PostgreSQL访问只属于 refresh、业务实体读取和配置更新；access Provider本身不查用户表。
+
+---
+
+## 六、数据变化
+
+### 6.1 普通 access 请求
+
+| 状态 | 是否变化 | 说明 |
+|---|---:|---|
+| PostgreSQL 用户/凭据 | 否 | JWT Provider不重读也不更新 |
+| PostgreSQL业务实体 | 取决于 API | 认证之后的 Controller职责 |
+| SecurityContext | 是，request-local | Filter放入可信 Authentication |
+| HttpSession | 否 | `STATELESS`，不持久化 Context |
+| invalidation cache | 只读 | user key后可能读 session key |
+| audit_log | 认证本身不写 | 业务 Controller可能另行审计 |
+| Actor/Kafka | 认证本身不触发 | 业务 API后续可能进入 Queue |
+
+### 6.2 Refresh 请求
+
+| 对象 | 行为 |
+|---|---|
+| `tb_user` | 按 userId读取当前 email、authority、tenant/customer/name |
+| `user_credentials` | 按 userId读取并确认 enabled |
+| public Customer | public refresh时确认 Customer仍存在且 public |
+| JWT settings | 读取 JVM volatile对象；首次/force reload才查 `admin_settings` |
+| invalidation cache | 读取 user/session time |
+| token store | 服务端不写；浏览器用新 pair覆盖 localStorage |
+
+### 6.3 Invalidation 写入
+
+```mermaid
+flowchart LR
+  DISABLE[disable credentials] --> UEVT[UserCredentialsInvalidationEvent userId]
+  PASSWORD[change/reset password] --> UEVT
+  DELETE[delete user] --> UEVT
+  LOGOUT[logout] --> SEVT[UserSessionInvalidationEvent sessionId]
+  UEVT --> LISTENER[DefaultTokenOutdatingService listener]
+  SEVT --> LISTENER
+  LISTENER --> TYPE{cache.type}
+  TYPE -->|caffeine| LOCAL[(JVM-local timestamp)]
+  TYPE -->|redis| SHARED[(shared Redis timestamp + TTL)]
+```
+
+事件 value是 `System.currentTimeMillis()`；没有 token原文。失效 marker TTL应覆盖 refresh token最长寿命，否则 marker消失后仍未过期的旧 refresh token会再次被接受。
+
+### 6.4 JWT settings 变化
+
+`admin_settings` 的 `jwt` 行保存 tokenExpirationTime、refreshTokenExpTime、issuer、signingKey。保存后：
+
+- 本节点立即替换内存配置。
+- cluster lifecycle异步通知其他服务 reload。
+- Admin API用新配置为当前管理员签新 pair。
+- 旧 key没有保留，节点 reload后旧 token全部 signature failure。
+- `CacheSpecsMap` 不随 DB settings reload，因此 invalidation cache TTL不自动调整。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类与职责
+
+| 完整类名 | 关键方法（含参数） | 职责 |
+|---|---|---|
+| [`org.thingsboard.server.config.ThingsboardSecurityConfiguration`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L76) | `buildJwtTokenAuthenticationProcessingFilter()`、`filterChain(HttpSecurity)` | 路径与 Filter顺序 |
+| [`org.thingsboard.server.service.security.auth.jwt.SkipPathRequestMatcher`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/SkipPathRequestMatcher.java#L39) | `matches(HttpServletRequest)` | skip list + `/api/**` matcher |
+| [`org.thingsboard.server.service.security.auth.jwt.extractor.JwtHeaderTokenExtractor`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/extractor/JwtHeaderTokenExtractor.java#L35) | `extract(HttpServletRequest)` | header选择与文本截取 |
+| [`org.thingsboard.server.service.security.auth.jwt.JwtTokenAuthenticationProcessingFilter`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtTokenAuthenticationProcessingFilter.java#L45) | `attemptAuthentication(...)`、`successfulAuthentication(...)` | raw token与 SecurityContext |
+| [`org.thingsboard.server.service.security.auth.JwtAuthenticationToken`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/JwtAuthenticationToken.java#L30) | 两个构造器 | 未认证/可信 token类型 |
+| [`org.thingsboard.server.service.security.auth.AbstractJwtAuthenticationToken`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/AbstractJwtAuthenticationToken.java#L31) | `setAuthenticated(boolean)`、`eraseCredentials()` | 防止绕过 Provider |
+| [`org.thingsboard.server.service.security.auth.jwt.JwtAuthenticationProvider`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtAuthenticationProvider.java#L43) | `authenticate(String)` | access claims + invalidation |
+| [`org.thingsboard.server.service.security.model.token.JwtTokenFactory`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L63) | `parseAccessJwtToken(String)`、`parseTokenClaims(String)` | JWS验证和 SecurityUser重建 |
+| [`org.thingsboard.server.service.security.auth.DefaultTokenOutdatingService`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/DefaultTokenOutdatingService.java#L42) | `isOutdated(String,UserId)` | user/session时间比较 |
+| [`org.thingsboard.server.service.security.auth.jwt.RefreshTokenProcessingFilter`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/RefreshTokenProcessingFilter.java#L49) | `attemptAuthentication(...)` | refresh body适配 |
+| [`org.thingsboard.server.service.security.auth.jwt.RefreshTokenAuthenticationProvider`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/RefreshTokenAuthenticationProvider.java#L59) | `authenticate(Authentication)` | refresh claims + DB重读 |
+| [`org.thingsboard.server.controller.BaseController`](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L163) | `getCurrentUser()`、`checkEntityId(...)` | Context与实体授权桥梁 |
+| [`org.thingsboard.server.service.security.permission.DefaultAccessControlService`](../../../application/src/main/java/org/thingsboard/server/service/security/permission/DefaultAccessControlService.java#L43) | `checkPermission(...)` | authority -> resource checker |
+| [`org.thingsboard.server.service.security.permission.TenantAdminPermissions`](../../../application/src/main/java/org/thingsboard/server/service/security/permission/TenantAdminPermissions.java#L36) | constructor与 checker | tenant同源判断 |
+| [`org.thingsboard.server.service.security.permission.CustomerUserPermissions`](../../../application/src/main/java/org/thingsboard/server/service/security/permission/CustomerUserPermissions.java#L43) | constructor与 checker | customer、operation判断 |
+| [`org.thingsboard.server.controller.plugin.TbWebSocketHandler`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L96) | `processMsg(...)`、`toRef(...)` | WS独立认证与连接态保存 |
+| [`org.thingsboard.server.service.security.auth.jwt.settings.DefaultJwtSettingsService`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/settings/DefaultJwtSettingsService.java#L55) | `saveJwtSettings(JwtSettings)`、`getJwtSettings(boolean)` | DB/内存签名配置 |
+| [`org.thingsboard.server.cache.CacheSpecsMap`](../../../common/cache/src/main/java/org/thingsboard/server/cache/CacheSpecsMap.java#L32) | `replaceTheJWTTokenRefreshExpTime()` | 启动时设置 invalidation TTL |
+
+### 7.2 类型关系
+
+```mermaid
+classDiagram
+  class AbstractAuthenticationProcessingFilter
+  class JwtTokenAuthenticationProcessingFilter
+  class RefreshTokenProcessingFilter
+  class AbstractAuthenticationToken
+  class AbstractJwtAuthenticationToken
+  class JwtAuthenticationToken
+  class RefreshAuthenticationToken
+  class AuthenticationProvider
+  class JwtAuthenticationProvider
+  class RefreshTokenAuthenticationProvider
+  AbstractAuthenticationProcessingFilter <|-- JwtTokenAuthenticationProcessingFilter
+  AbstractAuthenticationProcessingFilter <|-- RefreshTokenProcessingFilter
+  AbstractAuthenticationToken <|-- AbstractJwtAuthenticationToken
+  AbstractJwtAuthenticationToken <|-- JwtAuthenticationToken
+  AbstractJwtAuthenticationToken <|-- RefreshAuthenticationToken
+  AuthenticationProvider <|.. JwtAuthenticationProvider
+  AuthenticationProvider <|.. RefreshTokenAuthenticationProvider
+```
+
+### 7.3 Claims 与信任来源
+
+| claim | access | refresh | 使用位置 |
+|---|---:|---:|---|
+| `sub` | 是 | 是 | email/publicId principal |
+| `userId` | 是 | 是 | principal ID、refresh DB lookup |
+| `scopes` | 业务 authority | `REFRESH_TOKEN` | Spring authorities / token类型 |
+| `tenantId/customerId` | 是 | 否 | access实体隔离；refresh后从 DB重建 |
+| `firstName/lastName/enabled` | 是 | 否 | UI身份快照 |
+| `isPublic` | 是 | 是 | principal type |
+| `sessionId` | 是 | 是 | logout粒度与 refresh继承 |
+| `jti` | 否 | 是 | 随机生成，但服务端没有消费记录 |
+| `iss/iat/exp` | 是 | 是 | 签发信息、过期、失效比较 |
+
+access path信任签名 claims；refresh path把 claims缩减为 lookup key，再从 DB获得当前业务身份。这是两者性能与一致性不同的根本原因。
+
+### 7.4 权限 Map 的设计
+
+[`DefaultAccessControlService`](../../../application/src/main/java/org/thingsboard/server/service/security/permission/DefaultAccessControlService.java#L43) 在构造时建立 `Authority -> Permissions` map；每个 `Permissions` 又是 `Resource -> PermissionChecker` map。新增 Resource若没有在某 authority map注册，会默认 deny，而不是 allow。
+
+Customer permission checker把 operation白名单、tenantId和customerId组合；Dashboard还读取 `assigned_customers`。因此 token角色正确但实体摘要漂移时仍会 403，这与第 12 章 Dashboard双写问题直接相连。
+
+### 7.5 Header 与 query token风险
+
+- Header extractor不验证 `startsWith("Bearer ")`，任何七字符前缀都会被剥离；签名仍必须有效，但代理/WAF与应用对认证 scheme的理解可能不一致。
+- `X-Authorization` 优先可能让调用方以为标准 Authorization生效，实际被旧自定义 header覆盖。
+- query token可能进入 URL日志、浏览器历史和代理访问日志。前端 WebSocket优先使用首个 `AuthCmd` 能减少这类暴露。
+- localStorage token能被同源 XSS读取；HttpOnly cookie的 CSRF/XSS权衡在此实现中没有采用。
+
+### 7.6 Invalidation TTL 配置漂移
+
+[`CacheSpecsMap.replaceTheJWTTokenRefreshExpTime()`](../../../common/cache/src/main/java/org/thingsboard/server/cache/CacheSpecsMap.java#L60) 使用 `@Value("${security.jwt.refreshTokenExpTime:604800}")`，换算分钟加一后覆盖 cache spec。`DefaultJwtSettingsService` 却在 DB存在时忽略 YAML token参数。
+
+```mermaid
+flowchart TD
+  Y[YAML refreshTokenExpTime] --> START[CacheSpecsMap at startup]
+  START --> TTL[invalidation cache TTL]
+  DB[(admin_settings jwt refreshTokenExpTime)] --> JWT[actual refresh exp]
+  ADMIN[Runtime admin change] --> DB
+  ADMIN -. does not update .-> TTL
+  COMPARE{actual refresh lifetime > marker TTL?}
+  JWT --> COMPARE
+  TTL --> COMPARE
+  COMPARE -->|yes| RISK[marker may expire while old refresh token is valid]
+  COMPARE -->|no| SAFE[marker covers token lifetime]
+```
+
+生产上应让 YAML refresh lifetime不小于 DB设置，并在改长 refresh lifetime后重启/校正 cache配置；仅在 UI保存 DB settings不足以延长 invalidation marker TTL。
+
+---
+
+## 八、Actor 分析
+
+### 8.1 REST JWT 不经过 Actor
+
+REST认证完全运行在 Servlet Filter线程，`SecurityContextHolder` 是请求线程上下文。Controller认证后可能把业务消息发送给 Actor，但 Actor接收到的是已经构造的业务请求/`SecurityUser`信息，而不是再次执行 JWT Provider。
+
+```mermaid
+flowchart LR
+  HTTP[Servlet request] --> FILTER[JWT Filter]
+  FILTER --> CTX[ThreadLocal SecurityContext]
+  CTX --> CTRL[Controller]
+  CTRL -->|some APIs| ACTOR[Actor/Queue business flow]
+  ACTOR -. no JWT parsing .-> FILTER
+```
+
+### 8.2 WebSocket 与 Actor
+
+WebSocket连接在 `TbWebSocketHandler` 保存 `SecurityUser`，subscription service按它执行权限与路由；这仍不是 User Actor。实时更新可能经 Core queue/subscription manager，但 JWT只在连接认证时验证一次。
+
+### 8.3 JWT settings lifecycle 不是 Tenant Actor 主流程
+
+保存 settings通过 `TbClusterService.broadcastEntityStateChangeEvent` 发送 SYS tenant lifecycle message，各 consumer service的 `AbstractConsumerService` 直接 reload settings。Tenant Actor也处理其他 lifecycle事件，但 JWT reload的源码落点在 consumer基类，不应只在 Actor断点等待。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 普通 access 与 refresh
+
+两者不发送 Kafka。access是本地签名计算/cache lookup，refresh是本地计算加 PostgreSQL读取。Kafka故障不会直接阻断每个 JWT请求。
+
+### 9.2 签名配置集群传播
+
+JWT settings更新使用 ThingsBoard cluster notification机制；底层队列提供者可为 Kafka。逻辑消息是 `ComponentLifecycleMsg`，不是携带 signing key的明文消息。消费者收到 SYS tenant UPDATED后从 PostgreSQL重新加载。
+
+```mermaid
+sequenceDiagram
+  participant A as Core A Admin API
+  participant DB as PostgreSQL admin_settings
+  participant C as TbClusterService
+  participant Q as Notifications topic
+  participant B as Core B consumer
+  participant J as JwtSettingsService B
+  A->>DB: save jwt settings
+  A->>C: broadcast SYS tenant UPDATED
+  C->>Q: ComponentLifecycleMsg
+  A->>A: reload local settings
+  Q-->>B: lifecycle record
+  B->>J: reloadJwtSettings()
+  J->>DB: read key=jwt
+```
+
+消息传播不是数据库事务的一部分，也没有全节点 barrier。Queue延迟、consumer暂停或分区会延长 signing-key分裂窗口。
+
+---
+
+## 十、数据库分析
+
+### 10.1 哪些路径读数据库
+
+| 路径 | JWT认证阶段数据库访问 | 说明 |
+|---|---:|---|
+| access REST | 0 | settings在内存，invalidation在 cache |
+| refresh普通用户 | 2次 | `tb_user` + `user_credentials` |
+| refresh public | 1次 | Customer lookup |
+| WebSocket首次 access认证 | 0 | 与 access Provider相同 |
+| Controller实体授权 | 通常1次以上 | 读取实体后做 PermissionChecker |
+| JWT settings首次加载/reload | 1次 | `admin_settings key=jwt` |
+
+### 10.2 `admin_settings` 中的 JWT 配置
+
+`DefaultJwtSettingsService` 把整个 `JwtSettings` 序列化到 `admin_settings.json_value` varchar。`key='jwt'` 没有在基础 schema看到 `(tenant_id,key)` unique约束；Service按 key查询并更新已有 ID，完整性依赖 DAO/service约定。
+
+### 10.3 Access 性能模型
+
+单次认证包含两次 JJWT解析与 1-2次 cache get。Caffeine模式没有网络 IO；Redis模式每个受保护请求可能有 user key和session key两个网络 round trip。若 REST QPS很高，Redis token invalidation lookup是需要单独监控的认证依赖。
+
+可以优化为一次解析后传 Claims给 outdating service，但 release-3.6 当前实现没有这么做。不要通过缓存整个 SecurityUser来绕开签名验证，否则会改变撤销和 exp语义。
+
+### 10.4 Refresh 数据库压力
+
+默认 access 2.5小时、refresh 1周，正常浏览器 refresh频率远低于业务 API。若把 access lifetime调到几十秒，大量客户端会周期性执行两次用户表查询并签新 pair，形成同步 refresh尖峰。调短 access token应配合随机抖动、连接池容量和客户端 refresh合并。
+
+### 10.5 无 refresh-token 表的取舍
+
+优势是无 session表热点、节点无状态、水平扩展简单；代价是无法单独撤销某一个 refresh `jti`、无法 one-time rotation、无法检测 token family replay，只能按 user/session时间批量失效。
+
+### 10.6 TimescaleDB、Cassandra 与 Redis
+
+- TimescaleDB/Cassandra不保存用户 JWT，也不参与签名验证。
+- PostgreSQL保存身份当前状态和签名配置。
+- Redis只在选择 `cache.type=redis` 时保存 invalidation/rate-limit等短状态。
+- 业务 API在认证后仍可能访问 Timescale/Cassandra；那是业务 DAO阶段，不是 JWT阶段。
+
+---
+
+## 十一、异常处理
+
+### 11.1 access 异常
+
+| 失败 | 来源 | 响应/行为 |
+|---|---|---|
+| header缺失/过短 | `JwtHeaderTokenExtractor` | 401 generic authentication failure |
+| compact token malformed | JJWT parser | 401 invalid credentials |
+| signature错误 | JJWT parser | 当前代码与 expired同一 catch分支包装为 `JwtExpiredTokenException`，客户端可能看到 token expired |
+| exp到期 | JJWT parser | 401 `JWT_TOKEN_EXPIRED`，前端尝试 refresh |
+| user/session outdated | `JwtAuthenticationProvider` | `JwtExpiredTokenException("Token is outdated")` |
+| role不匹配 | Method Security | 403 |
+| entity不归属 | PermissionChecker | 403 |
+| tenant/customer rate limit | `RateLimitProcessingFilter` | 429 |
+
+[`JwtTokenFactory.parseTokenClaims(String)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L275) 把 `SignatureException` 与 `ExpiredJwtException` 放在同一 catch并转成 `JwtExpiredTokenException`。这会让签名错误表现为“expired”，排障不能仅按前端文案判断真实原因。
+
+### 11.2 refresh 异常
+
+- payload空或非 POST：Filter直接失败。
+- scope不是 `REFRESH_TOKEN`：非法 refresh。
+- user已删除、credentials缺失/disabled、authority null：refresh拒绝。
+- password已经超过过期天数：当前 refresh path不检查，仍可成功。
+- old refresh被重复使用：只要未 exp且未 outdated，仍可成功。
+- Redis/Caffeine marker缺失：按“未失效”处理，不回源数据库确认 logout。
+
+### 11.3 Key rotation 分裂
+
+```mermaid
+flowchart TD
+  SAVE[Node A saves new signing key] --> A[A reloads immediately]
+  SAVE --> MSG[async lifecycle message]
+  A --> NEW[returns token signed new key]
+  NEW --> LB{load balancer target}
+  LB -->|A| OK[accepted]
+  LB -->|B before reload| FAILNEW[401 signature error]
+  OLD[old token] --> LB2{target}
+  LB2 -->|A| FAILOLD[401]
+  LB2 -->|B before reload| OKOLD[temporarily accepted]
+  MSG --> B[B reloads, convergence]
+```
+
+不要把传播期间的混合401误诊为用户 credentials问题；先核对所有节点 JWT settings reload日志与 queue lag。
+
+### 11.4 WebSocket 失效窗口
+
+已建立连接不重新检查 token。若安全事件要求立即终止会话，仅写 invalidation cache不足；需要主动关闭相应 WebSocket或缩短连接生命周期，release-3.6普通 logout路径没有这一步。
+
+### 11.5 生产排障顺序
+
+1. 区分 REST access、refresh还是 WebSocket认证。
+2. 检查实际 header优先级和七字符截取后的 token，不在日志输出完整 token。
+3. 解码但不要信任 claims，核对 `exp/iat/scopes/sessionId/userId`。
+4. 核对节点当前 `admin_settings jwt` reload时间和 signing key fingerprint，不比较/暴露原 key。
+5. 查 `userSessionsInvalidation` 的 user/session key与事件时间，注意同秒比较。
+6. refresh失败再查 `tb_user/user_credentials.enabled/authority`；access失败通常无需先查用户表。
+7. 401后区分 expired、signature、outdated；当前异常映射会混淆 signature和expired。
+8. 403查看 `@PreAuthorize` 与具体 Resource checker，不要反复刷新 token。
+9. 集群只在部分节点失败时查 lifecycle notification lag、cache.type和时钟同步。
+10. WebSocket仍可用但 REST已401时，确认它是否是失效前已经建立的连接。
+
+---
+
+## 十二、源码阅读路线
+
+1. [`GlobalHttpInterceptor.intercept(HttpRequest,HttpHandler)`](../../../ui-ngx/src/app/core/interceptors/global-http-interceptor.ts#L54)：看浏览器何时附加/刷新 token。
+2. [`ThingsboardSecurityConfiguration.buildJwtTokenAuthenticationProcessingFilter()`](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L212)：确认 skip paths。
+3. [`SkipPathRequestMatcher.matches(HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/SkipPathRequestMatcher.java#L68)：验证请求是否进入 Filter。
+4. [`JwtHeaderTokenExtractor.extract(HttpServletRequest)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/extractor/JwtHeaderTokenExtractor.java#L48)：看 header优先级和截取。
+5. [`JwtTokenAuthenticationProcessingFilter.attemptAuthentication(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtTokenAuthenticationProcessingFilter.java#L76)：raw token边界。
+6. [`AbstractJwtAuthenticationToken`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/AbstractJwtAuthenticationToken.java#L31)：理解 trusted/untrusted构造器。
+7. [`JwtAuthenticationProvider.authenticate(String)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtAuthenticationProvider.java#L70)：看 access不查 DB。
+8. [`JwtTokenFactory.parseAccessJwtToken(String)`](../../../application/src/main/java/org/thingsboard/server/service/security/model/token/JwtTokenFactory.java#L135)：逐 claim重建 SecurityUser。
+9. [`DefaultTokenOutdatingService.isOutdated(String,UserId)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/DefaultTokenOutdatingService.java#L83)：看 user/session失效。
+10. [`JwtTokenAuthenticationProcessingFilter.successfulAuthentication(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/JwtTokenAuthenticationProcessingFilter.java#L92)：看 Context建立。
+11. [`BaseController.getCurrentUser()`](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L750) 与 [`checkEntityId(...)`](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L926)：连接方法与实体权限。
+12. [`DefaultAccessControlService.checkPermission(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/permission/DefaultAccessControlService.java#L98)：进入 authority map。
+13. [`RefreshTokenProcessingFilter.attemptAuthentication(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/RefreshTokenProcessingFilter.java#L81)：refresh协议入口。
+14. [`RefreshTokenAuthenticationProvider.authenticate(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/RefreshTokenAuthenticationProvider.java#L78)：对比 DB重读。
+15. [`TbWebSocketHandler.processMsg(...)`](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207)：理解 WS独立认证。
+16. [`DefaultJwtSettingsService.saveJwtSettings(...)`](../../../application/src/main/java/org/thingsboard/server/service/security/auth/jwt/settings/DefaultJwtSettingsService.java#L136)：看 key rotation传播。
+17. [`CacheSpecsMap.replaceTheJWTTokenRefreshExpTime()`](../../../common/cache/src/main/java/org/thingsboard/server/cache/CacheSpecsMap.java#L60)：最后核对 invalidation TTL来源。
+
+推荐 REST断点：`GlobalHttpInterceptor.intercept` -> `JwtHeaderTokenExtractor.extract` -> `JwtAuthenticationProvider.authenticate` -> `JwtTokenFactory.parseAccessJwtToken` -> `DefaultTokenOutdatingService.isOutdated` -> `JwtTokenAuthenticationProcessingFilter.successfulAuthentication` -> `BaseController.checkEntityId` -> `DefaultAccessControlService.checkPermission`。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard 每次 access token请求会查用户表吗？
+
+不会。Provider只验证 JWT并查 invalidation cache，SecurityUser从 claims重建。Controller后续业务和实体授权可能查数据库，但那不是 token认证所需。
+
+### 2. 为什么 refresh token请求要查 `tb_user` 和 `user_credentials`？
+
+refresh claims只作为 lookup key；Provider需要获得当前 authority/name/tenant/customer并确认凭据仍 enabled，然后才签新 access token。
+
+### 3. `X-Authorization` 与 `Authorization` 谁优先？
+
+自定义 `X-Authorization` 优先。只有它空白时才读取标准 Authorization。
+
+### 4. 服务端是否严格校验 `Bearer ` 前缀？
+
+没有。代码只要求长度至少7，然后丢弃前7字符；后面的 JWT仍必须通过签名，但 scheme文本本身未校验。
+
+### 5. JWT issuer是否被验证？
+
+签发时写 `iss`，解析代码只设置 signing key并 `parseClaimsJws`，没有显式 `requireIssuer`。issuer不是当前接受判断条件。
+
+### 6. access token中的用户权限是实时的吗？
+
+不是，是签发快照。disable/delete/改密会发布 invalidation；普通 User更新不发布该事件，旧 access claims可持续到 exp/refresh。
+
+### 7. Spring Security的 `authenticated()` 是否等于有业务权限？
+
+不等于。它只表示 Provider接受了 token；方法还要过 `@PreAuthorize`，具体实体还要过 PermissionChecker。
+
+### 8. 为什么 `AbstractJwtAuthenticationToken` 有两个构造器？
+
+raw构造器产生 authenticated=false且没有 principal；SecurityUser构造器只供 Provider验证后创建可信 token并擦除 credentials，避免直接调用 setter提升信任。
+
+### 9. token失效 cache保存什么？
+
+key是 userId或sessionId，value是失效事件毫秒时间。每次验证比较 token iat；不保存 token原文或 jti列表。
+
+### 10. logout是撤销一个 token还是一个登录会话？
+
+按 JWT sessionId失效同一登录产生的 access/refresh。改密、重置、禁用、删除按 userId失效该用户所有会话。
+
+### 11. 多节点使用 Caffeine 有什么问题？
+
+失效事件写当前 JVM本地 cache；其他节点仍可能接受旧 token。Redis才提供共享 invalidation状态。
+
+### 12. refresh token是否一次性？
+
+不是。新响应虽生成新 refresh和 jti，但旧 token不被记录为 used，可以重复使用至 exp或显式失效。
+
+### 13. refresh token为何保留 sessionId？
+
+Provider从旧 refresh恢复 sessionId并放进重建 SecurityUser，新 pair继承它。logout才能一次失效该登录链产生的所有轮换 token。
+
+### 14. 密码过期后 refresh会失败吗？
+
+不会因为密码年龄失败。Refresh Provider只检查用户存在、credentials enabled和authority；密码 expiration只在用户名/密码登录的 `validateUserCredentials` 中检查。
+
+### 15. access token为何解析两次？
+
+JwtTokenFactory先解析并构造 SecurityUser；TokenOutdatingService又解析一次取 iat/sessionId。当前接口没有复用 Claims。
+
+### 16. 修改 signing key后旧 token如何处理？
+
+节点reload后立即签名失败，没有 grace key。远端节点异步reload，传播期间新旧 token在不同节点的接受结果可能相反。
+
+### 17. 修改 issuer但不修改 key会让旧 token失效吗？
+
+按当前 parser不会，因为没有 requireIssuer。新 token的iss变化主要是声明变化。
+
+### 18. invalidation cache TTL为什么可能不正确？
+
+TTL启动时取 YAML refreshTokenExpTime；实际 JWT lifetime可能取 DB并在运行时修改。若 DB寿命更长，marker可能先过期。
+
+### 19. WebSocket会在 access token到期时自动断开吗？
+
+不会。它只在 query/首个 AuthCmd认证一次，之后持有 SecurityUser并处理命令；到期或logout不会主动重验/关闭。
+
+### 20. 为什么 WebSocket endpoint在 Security配置中 permitAll？
+
+浏览器 WebSocket握手不方便统一使用普通 REST header流程，ThingsBoard在应用消息层执行 query/AuthCmd认证；permitAll只放行握手，不代表订阅命令无需认证。
+
+### 21. refresh失败后前端如何处理并发请求？
+
+单 tab内用一个 ReplaySubject合并 refresh，失败清 token并让等待者一起失败；不同浏览器 tab没有共享锁，仍会并发 refresh。
+
+### 22. 签名错误为什么可能显示 token expired？
+
+`parseTokenClaims` 把 SignatureException与ExpiredJwtException放进同一 catch，统一抛 JwtExpiredTokenException，错误映射可能混淆根因。
+
+### 23. PermissionChecker为什么用双层 Map？
+
+第一层按 authority选择权限集合，第二层按 Resource选择 checker；未注册资源默认拒绝，checker再结合 Operation和实体tenant/customer字段判断。
+
+### 24. REST JWT认证是否依赖 Actor或Kafka？
+
+每次请求不依赖。只有 JWT settings集群热更新用 lifecycle notification队列；普通签名验证在本机完成。
+
+### 25. 如何判断401来自 token还是业务授权？
+
+认证失败通常401，方法/实体权限失败通常403。结合错误码、Filter日志、token exp/signature/outdated检查；不要把403用refresh重试解决。
+
+[上一篇：13 Login 流程](../13-login/README.md) | [返回目录](../../SUMMARY.md) | [下一篇：15 Actor 模型](../15-actor-model/README.md)

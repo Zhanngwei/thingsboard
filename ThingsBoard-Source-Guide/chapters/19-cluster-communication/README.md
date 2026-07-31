@@ -1,0 +1,659 @@
+# 19 Cluster 通信
+
+> 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章区分 ZooKeeper 服务发现、PartitionService 所有权、broker 数据队列、service notification topic 与 JVM 内 Actor，避免把它们统称为“集群消息”。
+
+[上一篇：18 Queue 管理](../18-queue-management/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/19-cluster-communication.svg) | [下一篇：20 Cassandra 写入流程](../20-cassandra-write/README.md)
+
+---
+
+## 一、流程目标
+
+ThingsBoard 集群通信解决四类不同问题：
+
+1. **谁在线**：通过 ZooKeeper 发布/监听 `ServiceInfo`，识别 Core、Rule Engine、Transport、VC Executor 等服务实例。
+2. **谁负责**：`HashPartitionService` 根据 QueueKey、tenant、entity 和逻辑 partition 计算 producer topic与当前 owner。
+3. **消息怎样跨节点**：业务消息写 Core/Rule Engine 物理 topic，目标节点的 consumer 再投本地 Actor；不存在远程 Actor 引用。
+4. **配置怎样广播**：每个 serviceId 有独立 notification topic，生命周期、RPC response、Queue 更新等逐服务发送。
+
+```mermaid
+flowchart LR
+    ZK[(ZooKeeper nodes)] --> DISC[DiscoveryService]
+    DISC --> PART[HashPartitionService]
+    PART --> ROUTE[TopicPartitionInfo]
+    ROUTE --> BROKER[(Kafka or configured queue)]
+    BROKER --> CONSUMER[owner service consumer]
+    CONSUMER --> ACTOR[local Actor tree]
+    PART --> NF[per-service notification topics]
+    NF --> CACHE[local cache/session/runtime update]
+```
+
+从 Java/Spring 视角，`DefaultTbClusterService` 不是 RPC client。它是一个路由与序列化门面：先向 `PartitionService` 查询 `TopicPartitionInfo`，再选择对应 `TbQueueProducer` 写 Protobuf record。所谓“发给另一个 Actor”实质是“写一个由 owner 节点消费的 broker topic”。
+
+### 1.1 与常见 Spring Cloud 思维的区别
+
+| 常见微服务组件 | ThingsBoard 3.6 对应实现 |
+|---|---|
+| Service Registry | ZooKeeper + Curator `PathChildrenCache` |
+| Client-side load balancer | `HashPartitionService.resolve(...)` |
+| Remote method call | Queue producer -> broker -> consumer |
+| Node-local event bus | Spring `ApplicationEventPublisher` |
+| Stateful shard handoff | PartitionChangeEvent + stop/rebuild local state |
+
+它强调 entity affinity：同一 Device/tenant 的消息稳定进入相同逻辑 partition，使 Device Actor 或 Rule Chain 状态在一个 owner 上串行处理。代价是拓扑变更会触发 owner 迁移，内存 mailbox、Session 与正在运行的异步工作不会自动搬迁。
+
+---
+
+## 二、入口
+
+### 2.1 服务启动
+
+- `DefaultTbServiceInfoProvider.init()`：确定 `service.id`、service types、assigned tenant profiles，生成 `ServiceInfo`。
+- `ZkDiscoveryService.onApplicationEvent(ApplicationReadyEvent)`：发布 ZK ephemeral-sequential 节点并重算分区。
+- `DummyDiscoveryService.onApplicationEvent(...)`：当 `zk.enabled=false` 时，只用当前服务和空 peer 列表重算，适用于单节点/monolith。
+
+```mermaid
+flowchart TD
+    BOOT[Spring Boot ready] --> ENABLED{zk.enabled?}
+    ENABLED -- false --> DUMMY[DummyDiscoveryService]
+    DUMMY --> SELF[recalculate self only]
+    ENABLED -- true --> ZK[ZkDiscoveryService]
+    ZK --> NODE[create ephemeral sequential node]
+    NODE --> PEERS[read PathChildrenCache peers]
+    PEERS --> RECALC[recalculate partitions]
+```
+
+源码：[DefaultTbServiceInfoProvider.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/DefaultTbServiceInfoProvider.java#L102)、[ZkDiscoveryService.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/ZkDiscoveryService.java#L213)、[DummyDiscoveryService.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/DummyDiscoveryService.java#L69)。
+
+### 2.2 ZooKeeper 拓扑事件
+
+`PathChildrenCacheListener.childEvent(...)` 处理 peer 的 `CHILD_ADDED` 与 `CHILD_REMOVED`：
+
+- 新节点：立即重算；如果是相同 `serviceId` 在延迟窗口内重启，则取消待执行的 remove 重算。
+- 节点移除：立即发布 `OtherServiceShutdownEvent`，但 partition 重算可按 `zk.recalculate_delay` 延迟。
+- 当前节点自己的 remove：尝试重新 publish，不参与 peer 逻辑。
+- `CHILD_UPDATED`：switch 默认忽略；每分钟更新 system metrics 不触发分区重算。
+
+### 2.3 业务调用入口
+
+| 调用 | 方法 | 典型来源 |
+|---|---|---|
+| 发 Core 数据消息 | `pushMsgToCore(TenantId, EntityId, ToCoreMsg, TbQueueCallback)` | Transport session、RPC、state、subscription |
+| 发 Rule Engine 数据消息 | `pushMsgToRuleEngine(TenantId, EntityId, TbMsg, TbQueueCallback)` | Transport、REST、Rule Node 跨 partition |
+| 定向通知某 Core | `pushNotificationToCore(String serviceId, ...)` | RPC response 回原请求节点 |
+| 广播 Core | `broadcastToCore(ToCoreNotificationMsg)` | startup、共享状态 |
+| 广播 Transport | `broadcastEntityChangeToTransport(...)` | Device/Profile/Tenant 变更 |
+| 广播生命周期 | `broadcastEntityStateChangeEvent(...)` | DAO 后业务编排 |
+
+### 2.4 本地事件入口
+
+`PartitionChangeEvent` 被 Core consumer、Rule Engine consumer、ActorService、API usage、subscription 等组件监听；`ClusterTopologyChangeEvent` 与 `OtherServiceShutdownEvent` 主要用于 WebSocket subscription ownership/清理。
+
+---
+
+## 三、完整调用链
+
+### 3.1 ServiceInfo 创建与注册
+
+```mermaid
+flowchart TD
+    A[DefaultTbServiceInfoProvider.init] --> B{service.id configured?}
+    B -- no --> C[hostname or random fallback]
+    B -- yes --> D[configured id]
+    C --> E[service.type]
+    D --> E
+    E -- monolith --> F[all ServiceType values]
+    E -- dedicated --> G[single ServiceType]
+    F --> H[assigned profiles + system info]
+    G --> H
+    H --> I[ServiceInfo protobuf]
+    I --> J[ZK ephemeral sequential node]
+```
+
+`ServiceInfo` 包含 `serviceId`、`serviceTypes`、assigned tenant profile UUID、transport names 和 CPU/memory/disk 信息。`setTransports()` 在 Spring context ready 后补充 Transport bean 名称；ZK 每分钟更新节点数据。
+
+ZK path 形如 `<zk_dir>/nodes/<sequence>`。节点名不是 serviceId，serviceId 在 protobuf data 内。唯一性没有由 ZK path 保证，所以生产部署必须显式设置稳定且全局唯一的 `service.id`；多个实例共用 hostname/serviceId 会破坏重启去抖与确定性排序假设。
+
+### 3.2 拓扑变化到分区重算
+
+```mermaid
+sequenceDiagram
+    participant P as Peer Pod
+    participant Z as ZooKeeper
+    participant D as ZkDiscoveryService
+    participant H as HashPartitionService
+    participant E as Spring Event Bus
+    participant C as Consumers
+    participant A as ActorService
+    P->>Z: create/remove ephemeral node
+    Z-->>D: CHILD_ADDED/REMOVED
+    alt added
+      D->>H: recalculatePartitions(self, peers)
+    else removed
+      D->>E: OtherServiceShutdownEvent immediately
+      D->>D: schedule recalc after delay
+      D->>H: recalculatePartitions unless same serviceId returns
+    end
+    H->>H: deterministic ownership calculation
+    H->>E: PartitionChangeEvent per ServiceType
+    H->>E: ClusterTopologyChangeEvent + ServiceListChangedEvent
+    E->>C: subscribe new topic set
+    E->>A: high-priority PartitionChangeMsg
+```
+
+### 3.3 分区算法
+
+`HashPartitionService.recalculatePartitions(...)`：
+
+1. 将当前实例和 peers 按支持的 service type 加入 `QueueKey -> List<ServiceInfo>`。
+2. 每个 list 按 `serviceId` 排序，保证各节点输入相同时得到相同结果。
+3. 遍历 `partitionSizesMap` 的每个逻辑 partition。
+4. Core/VC 使用 `servers[partition % size]`。
+5. Rule Engine 使用 `servers[abs((hash(tenantId)+partition) % size)]`；若配置 dedicated profiles，先缩小候选服务器集合。
+6. 只把“当前 ServiceInfo 等于 owner”的 partition 放入 `myPartitions`。
+7. 与旧集合 diff，发布 `PartitionChangeEvent`。
+
+```mermaid
+flowchart TD
+    Q[QueueKey + partition index] --> TYPE{service type}
+    TYPE -- Core / VC --> MOD[index mod serverCount]
+    TYPE -- Rule Engine --> DED{dedicated profile servers exist?}
+    DED -- yes --> PROFILE[servers assigned to tenant profile]
+    DED -- no --> COMMON[unassigned common RE servers]
+    PROFILE --> HASH["(hash tenant + index) mod count"]
+    COMMON --> HASH
+    MOD --> OWNER[ServiceInfo owner]
+    HASH --> OWNER
+```
+
+虽然源码目录存在 `ConsistentHashCircle`，release-3.6 当前引用搜索没有调用者；实际 owner 路径是排序后取模。服务数量变化时可能移动大量 partition，不能按“一致性哈希只移动少量 key”设计容量切换。
+
+源码：[HashPartitionService.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L454)、同文件 [resolveByPartitionIdx](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L805)。
+
+### 3.4 Producer 路由到 Core
+
+`DefaultTbClusterService.pushMsgToCore(tenantId, entityId, msg, callback)`：
+
+1. `partitionService.resolve(TB_CORE, tenantId, entityId)` 对 entity UUID hash 得到逻辑 partition。
+2. 构造 Core `TopicPartitionInfo`，其中 topic 已含逻辑 partition 后缀。
+3. Protobuf envelope 使用随机 UUID 或 Device UUID 作为 queue key。
+4. producer 写 broker；callback 只覆盖 producer 结果。
+5. 当前 owner 的 Core consumer poll record，再按消息类型投本地 Device Actor、StateService、Subscription 等。
+
+### 3.5 Producer 路由到 Rule Engine
+
+`pushMsgToRuleEngine(...)` 会先查 Device/Asset Profile：必要时根据 profile 的 `defaultQueueName`、default Rule Chain 等信息转换 `TbMsg`，再调用 `resolve(TB_RULE_ENGINE, queueName, tenantId, entityId)`。这一步选择物理 Queue topic，不直接选择 RuleEngine pod；pod owner 由同一分区表和 consumer subscription体现。
+
+```mermaid
+flowchart LR
+    MSG[TbMsg + entityId] --> PROFILE[Device/Asset Profile cache]
+    PROFILE --> QNAME[effective queue name]
+    QNAME --> HASH[entity UUID hash]
+    HASH --> TPI[physical topic suffix]
+    TPI --> PROD[Rule Engine producer]
+    PROD --> BROKER[(broker)]
+    BROKER --> OWNER[owner RE consumer]
+    OWNER --> APP[local AppActor]
+```
+
+### 3.6 广播与定向通知
+
+通知不是向一个共享 topic 发布一次，而是遍历 `partitionService.getAllServiceIds(type)`，为每个 serviceId 构造专属 topic。Monolith 同时拥有 Core/Rule Engine/Transport 角色时，部分广播会从后续集合移除已经覆盖的 serviceId，避免同一进程接收两次。
+
+`broadcast(ToTransportMsg, callback)` 使用 `MultipleTbQueueCallbackWrapper` 等待 N 次 producer callback；这仍不等待 N 个 consumer应用。若目标集合为空，wrapper 不会自行完成；若一个 send failure后其他 send success使计数归零，源码没有 terminal CAS，调用方理论上可能收到 failure 后又收到 success。
+
+---
+
+## 四、消息流
+
+![Cluster通信整体架构图](../../assets/architecture/19-cluster-communication.svg)
+
+### 4.1 数据消息与通知消息
+
+```mermaid
+flowchart TB
+    subgraph Data[Partitioned data plane]
+      CORE[Core topics]
+      RE[Rule Engine Queue topics]
+      CCON[Core consumer]
+      RCON[RE consumer]
+      CORE --> CCON
+      RE --> RCON
+    end
+    subgraph Notification[Per-service control plane]
+      CN[Core serviceId topic]
+      RN[RE serviceId topic]
+      TN[Transport serviceId topic]
+    end
+    PART[PartitionService] --> CORE
+    PART --> RE
+    PART --> CN
+    PART --> RN
+    PART --> TN
+```
+
+数据 topic 按 entity/Queue 分区，保证 affinity；notification topic 按 serviceId 定向，保证所有目标实例都可收到配置/生命周期广播。两者的 consumer group、消息语义和提交策略不同。
+
+### 4.2 Actor 所有权变化
+
+```mermaid
+stateDiagram-v2
+    [*] --> Owned
+    Owned --> Revoked: PartitionChangeEvent
+    Revoked --> StopConsumer: unsubscribe old topics
+    Revoked --> StopActors: high priority PartitionChangeMsg
+    StopActors --> Stateless: Device actors / rule chains destroyed
+    Stateless --> Acquired: later ownership gained
+    Acquired --> Subscribe: subscribe topics
+    Acquired --> Rebuild: lazy DB/cache reconstruction
+    Subscribe --> Owned
+    Rebuild --> Owned
+```
+
+Core tenant Actor 收到 TB_CORE partition change 后停止不再属于本节点的 Device Actor；TB_RULE_ENGINE 变化会初始化或销毁 tenant rule chains并继续广播到 Rule Nodes。状态不是从旧节点复制到新节点，而是由数据库、缓存、后续消息和 session重新建立。
+
+### 4.3 远程 RPC response 回原 Core
+
+RPC 请求会携带发起 `serviceId`。设备响应到另一个组件后，`pushNotificationToCore(serviceId, response, callback)` 直接计算该 serviceId 的 Core notification topic，原 Core consumer收到后完成本地 Future/REST response。这是“return address in message”，不是同步网络连接保持在执行节点之间。
+
+---
+
+## 五、时序图
+
+![Cluster通信完整时序图](sequence.svg)
+
+图中同时展示服务注册、peer 故障去抖、partition 重算、Core/Rule Engine 数据路由、per-service广播与 Actor 状态清理。独立 SVG 可在新窗口缩放。
+
+```mermaid
+sequenceDiagram
+    participant S as Source Node
+    participant P as PartitionService
+    participant Q as Queue Producer
+    participant B as Broker
+    participant C as Owner Consumer
+    participant A as Local Actor
+    S->>P: resolve(type, queue, tenant, entity)
+    P-->>S: TopicPartitionInfo
+    S->>Q: send(Protobuf envelope, callback)
+    Q->>B: producer record
+    B-->>Q: broker acknowledgement
+    Q-->>S: callback success
+    Note over S,Q: producer handoff only
+    B->>C: poll record on owner subscription
+    C->>A: local tell(...)
+    A-->>C: business callback
+    C->>B: commit offset
+```
+
+---
+
+## 六、数据变化
+
+### 6.1 ZooKeeper
+
+| 数据 | 生命周期 | 内容 |
+|---|---|---|
+| ephemeral-sequential node | ZK session | `ServiceInfo` protobuf |
+| PathChildrenCache snapshot | 当前 JVM | 其他服务节点数据 |
+| delayedTasks[serviceId] | remove debounce window | 延迟重算 Future |
+
+每分钟 `publishCurrentServer()` 更新 CPU/memory/disk 信息，但 partition 算法不按负载加权；这些指标用于可观测性，不改变 owner。
+
+### 6.2 PartitionService JVM 状态
+
+- `partitionTopicsMap`：QueueKey 到 topic base。
+- `partitionSizesMap`：QueueKey 到逻辑 partition 数。
+- `myPartitions`：当前节点拥有的 QueueKey -> partition list。
+- `currentOtherServices`：上次参与重算的 peers。
+- `responsibleServices`：tenant profile 到 dedicated RE services。
+- `tbTransportServicesByType`：协议 transport 名到 service instances。
+
+这些都不是数据库表；每个节点依据相同 `ServiceInfo` 列表和 Queue配置独立计算，正确性依赖输入最终一致、serviceId唯一和排序确定。
+
+### 6.3 Broker
+
+```mermaid
+flowchart LR
+    ENTITY[entity message] --> DATA[data topic record]
+    LIFE[entity lifecycle] --> N1[service A notification record]
+    LIFE --> N2[service B notification record]
+    LIFE --> N3[service C notification record]
+    DATA --> OFFSET1[data consumer group offset]
+    N1 --> OFFSET2[service A notification offset]
+    N2 --> OFFSET3[service B notification offset]
+    N3 --> OFFSET4[service C notification offset]
+```
+
+广播会生成 N 条独立 record；目标数越大，producer调用和存储开销线性增加。
+
+### 6.4 Actor、Session 与缓存
+
+- Device Actor/Rule Chain Actor 在 owner revoke时停止，mailbox和未持久化状态不迁移。
+- Transport Session驻留在接入节点；Core Device Actor通过 transport notification topic把下行发回持有session的nodeId。
+- Profile/Tenant/Queue等更新通过 notification consumer刷新本地缓存或运行时对象，不共享单一事务。
+- WebSocket subscription manager收到节点shutdown/topology事件后清理或重路由订阅，但连接本身仍属于原服务。
+
+### 6.5 数据库
+
+服务发现与 partition owner不写 PostgreSQL。数据库保存 Device、Profile、Queue等权威业务状态，供新 owner重建；它不保存当前 Actor owner、mailbox、Kafka offset或ZK session。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类型
+
+| 完整包路径 | 职责 |
+|---|---|
+| `org.thingsboard.server.queue.discovery.DefaultTbServiceInfoProvider` | 组装当前服务身份与能力 |
+| `org.thingsboard.server.queue.discovery.ZkDiscoveryService` | 注册 ephemeral node、监听 peers、去抖重算 |
+| `org.thingsboard.server.queue.discovery.DummyDiscoveryService` | 无 ZK 的单服务重算 |
+| `org.thingsboard.server.queue.discovery.HashPartitionService` | producer routing、owner计算、事件发布 |
+| `org.thingsboard.server.service.queue.DefaultTbClusterService` | Core/RE/Transport消息与通知门面 |
+| `org.thingsboard.server.service.queue.DefaultTbCoreConsumerService` | Core partitions订阅与本地分发 |
+| `org.thingsboard.server.service.queue.DefaultTbRuleEngineConsumerService` | QueueKey manager与RE partitions订阅 |
+| `org.thingsboard.server.actors.service.DefaultActorService` | PartitionChangeEvent转高优先级Actor消息 |
+| `org.thingsboard.server.actors.tenant.TenantActor` | stop/rebuild Device和Rule Chain子树 |
+
+### 7.2 service.id 不是展示字段
+
+缺省使用 hostname，解析失败才随机。Kubernetes中hostname通常是pod名，重建后会变化；这意味着ZK会把它视为新serviceId，remove去抖无法取消，notification return address也发生变化。需要稳定重启语义时必须结合部署方式显式配置，并保证并发实例不重复。
+
+### 7.3 ZK 初始化和断线
+
+Curator使用 `RetryForever(zkRetryInterval)`，`initZkClient()` 调用 `blockUntilConnected()`。ZK不可达可阻塞/失败启动链路；session `LOST` 后本节点destroy并重建client，再publish新ephemeral node。其他节点在旧node消失时立即发shutdown event，partition重算则按delay执行。
+
+```mermaid
+flowchart TD
+    CONNECT[Curator connected] --> SESSION[ephemeral node alive]
+    SESSION --> LOST{session LOST?}
+    LOST -- no --> UPDATE[minute ServiceInfo update]
+    UPDATE --> SESSION
+    LOST -- yes --> REMOVE[old ephemeral removed]
+    REMOVE --> PEERS[peers publish shutdown + delayed recalc]
+    REMOVE --> LOCAL[local destroy/init/publish]
+    LOCAL --> RETURN{same serviceId before delay?}
+    RETURN -- yes --> CANCEL[cancel partition recalc]
+    RETURN -- no --> MOVE[reassign partitions]
+```
+
+### 7.4 owner计算不是负载均衡器
+
+ServiceInfo里的CPU/memory不会进入`resolveByPartitionIdx`。算法按server数量均匀分配partition，但不同partition的消息量可能极不均衡；热tenant/热device仍会产生热点。扩容会因取模改变广泛owner，需要观察rebalance、consumer lag与Actor重建，而不能只看节点数。
+
+### 7.5 dedicated Rule Engine
+
+只要集群存在assigned tenant profile的RE服务，某profile优先使用声明负责该profile的列表；没有专属列表时，使用`assignedTenantProfilesCount==0`的公共RE服务。若候选为空，`resolveByPartitionIdx`返回null，当前节点不会拥有partition，路由/消费会出现不可用状态。
+
+### 7.6 Spring事件与Actor事件
+
+PartitionService先同步调用`ApplicationEventPublisher.publishEvent`。`DefaultActorService`监听后把`PartitionChangeMsg`以high priority投给AppActor；high priority只是进入Mailbox高优先队列，不抢占当前正在执行的消息。Consumer订阅更新与Actor清理是不同listener，没有全局顺序事务。
+
+---
+
+## 八、Actor 分析
+
+### 8.1 为什么跨节点不直接引用Actor
+
+`TbActorRef`只在当前JVM有效。集群路由把entity affinity映射到broker topic，owner consumer再进入本地`AppActor -> TenantActor -> Device/RuleChainActor`。这样不需要远程Actor协议，也利用broker持久化和backpressure，但增加序列化、offset和重复处理边界。
+
+```mermaid
+flowchart LR
+    A[Actor on node A] --> CS[DefaultTbClusterService]
+    CS --> TOPIC[partitioned broker topic]
+    TOPIC --> C[consumer on node B]
+    C --> APP[AppActor B]
+    APP --> TENANT[TenantActor B]
+    TENANT --> TARGET[target local Actor]
+```
+
+### 8.2 TB_CORE owner变化
+
+TenantActor遍历Device子Actor，`!isMyPartition(entityId)` 的Actor被stop。新owner并不会接收旧Actor对象；下一条消息到达后按数据库/profile/cache重新创建。在线Session仍在Transport节点，通过nodeId和notification topic协作。
+
+### 8.3 TB_RULE_ENGINE owner变化
+
+如果tenant现在归当前服务且rule chains未初始化，则`initRuleChains()`；失去管理权则`destroyRuleChains()`。随后partition message广播给RuleChain/RuleNode，外部集成节点可在`onPartitionChangeMsg`中调整资源。
+
+### 8.4 迁移窗口
+
+旧consumer退订、旧Actor停止、新consumer订阅、新Actor重建不是原子动作。broker consumer group与offset降低丢失风险，但已提交外部副作用、旧异步callback和内存定时器可能跨越owner切换；业务节点仍须幂等。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 Kafka 与 ZooKeeper 各负责什么
+
+本章中的ZooKeeper是ThingsBoard服务发现，不是旧版Kafka broker内部ZK概念。即使Kafka集群自带自己的controller机制，ThingsBoard仍需要知道service types、serviceId、assigned profiles和transport capabilities。
+
+| 组件 | 保存 | 不保存 |
+|---|---|---|
+| ZooKeeper | 在线ServiceInfo与session | 业务record、offset |
+| Kafka/Queue broker | Protobuf record与consumer offset | Actor对象、权威service registry |
+| PostgreSQL | 业务实体/Queue配置 | 在线节点、partition owner |
+
+### 9.2 callback边界
+
+`pushMsgToCore`/`pushMsgToRuleEngine` callback在producer模板完成时触发。它不等待owner consumer、Actor或数据库。广播wrapper只聚合每个target producer send，仍不聚合consumer应用结果。
+
+### 9.3 partition owner与consumer group
+
+PartitionService决定“本节点应订阅哪些物理topic”，Kafka group再维护实际assignment/offset。两者是叠加控制面：ZK拓扑视图短暂不一致会导致订阅集合变动，broker group rebalance又有自己的时间线。故障排查要同时看ZK节点、PartitionChange日志、consumer assignment与lag。
+
+### 9.4 targeted notification
+
+```mermaid
+flowchart LR
+    RESPONSE[RPC response] --> SID[origin serviceId]
+    SID --> T[core.notification.serviceId]
+    T --> K[(Kafka)]
+    K --> ORIGIN[origin Core consumer]
+    ORIGIN --> FUTURE[local pending Future / REST]
+```
+
+若origin service已退出，旧serviceId topic中的response没有活跃consumer；请求最终timeout。它不会自动路由到新owner，因为pending Future是原JVM内存状态。
+
+---
+
+## 十、数据库分析
+
+### 10.1 为什么Cluster通信不落数据库
+
+ServiceInfo、owner和partition assignment变化频繁且是可重建运行时状态，写PostgreSQL会引入热点与过期清理。ZK提供session型presence，Queue配置提供分区基线，broker保存待处理消息，数据库保存新owner恢复业务所需的持久状态。
+
+### 10.2 数据库事务与集群消息
+
+绝大多数Entity Service采用以下模式：
+
+```mermaid
+flowchart LR
+    TX[(PostgreSQL transaction)] --> COMMIT[entity committed]
+    COMMIT --> CLUSTER[ClusterService send]
+    CLUSTER --> BROKER[(notification/data topic)]
+    BROKER --> REMOTE[remote cache/Actor/runtime]
+```
+
+但并非所有调用都严格after-commit；前面Device删除等章节已展示部分通知在外层事务提交前发送。没有通用transactional outbox，必须逐流程确认调用位置。DB rollback不能撤回已被broker确认的cluster消息，send失败也不能自动回滚已提交实体。
+
+### 10.3 新owner重建依赖
+
+- Device/RuleChain/Profile配置从PostgreSQL DAO/cache读。
+- Telemetry history可能在PostgreSQL/TimescaleDB/Cassandra，Actor owner迁移不移动数据。
+- Redis/Caffeine缓存是否共享取决于部署配置；Caffeine状态不会跨节点。
+- Kafka offset独立存于broker，不在业务事务中。
+
+### 10.4 不应写入数据库的状态
+
+不要把当前serviceId owner缓存进业务表作为强路由依据。拓扑事件随ZK session变化，持久化副本很快过期；正确入口是`PartitionService.resolve/isManagedByCurrentService`。
+
+---
+
+## 十一、异常处理
+
+### 11.1 ZooKeeper不可用
+
+- 启动时`blockUntilConnected()`和RetryForever使服务依赖ZK可达。
+- 已运行节点session LOST后旧ephemeral node被删除，peer可能重分区；本节点异步重建client并重新publish。
+- remove delay减少短暂重启引发的partition churn，但`OtherServiceShutdownEvent`不等待delay，subscription cleanup可能先发生。
+
+### 11.2 拓扑输入不一致
+
+```mermaid
+flowchart TD
+    VIEW[each node PathChildrenCache view] --> SAME{same peers and Queue configs?}
+    SAME -- yes --> OWNER[deterministic same ownership]
+    SAME -- no --> DIVERGE[temporary divergent subscriptions]
+    DIVERGE --> GROUP[broker group rebalance / duplicates or pauses]
+    GROUP --> CONVERGE[eventual ZK + config convergence]
+```
+
+算法确定性不等于强一致；PathChildrenCache事件、Queue notification和Spring listener各自异步。
+
+### 11.3 producer失败
+
+- 有callback的单播可向调用方报告broker send失败。
+- null callback广播只留producer日志/指标。
+- producer success不代表consumer applied。
+- `MultipleTbQueueCallbackWrapper`没有零目标立即成功，也没有terminal once guard，使用方不能把它当严格的all-of future。
+
+### 11.4 owner迁移失败
+
+- Consumer subscribe失败会造成lag增长。
+- Actor init失败按Actor init策略处理，partition本身不会自动回退给旧owner。
+- 旧异步Node工作无法被partition change统一取消。
+- serviceId重复、assigned profile配置错误可造成owner集合异常。
+
+### 11.5 生产排障顺序
+
+1. 检查每个pod的`service.id`、service.type、assigned profiles和transport list。
+2. 检查ZK `/nodes` 数量、ephemeral owner、data能否解析和session状态。
+3. 对比各节点“Found common server”和“Partitions changed”日志。
+4. 检查物理topic、consumer group assignment、rebalance与lag。
+5. 检查Core/RE notification consumer是否提交消息。
+6. 检查Actor stop/init、Device session nodeId、WebSocket subscription cleanup。
+7. 最后检查业务DB与外部副作用幂等，不把消息重复误判为仅Kafka问题。
+
+---
+
+## 十二、源码阅读路线
+
+1. 读 [DefaultTbServiceInfoProvider.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/DefaultTbServiceInfoProvider.java#L102)，列出ServiceInfo全部字段。
+2. 读 [ZkDiscoveryService.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/ZkDiscoveryService.java#L161)，跟踪publish、session LOST与childEvent。
+3. 对比 [DummyDiscoveryService.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/DummyDiscoveryService.java#L69)，理解单节点模式。
+4. 精读 [HashPartitionService.recalculatePartitions](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L454)。
+5. 紧接着读 [resolveByPartitionIdx](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L805)，不要根据类名假设一致性哈希。
+6. 从 [DefaultTbClusterService.pushMsgToCore](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L172) 和 [pushMsgToRuleEngine](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L292) 跟一条数据消息。
+7. 读同类 `broadcast(...)` 与 `MultipleTbQueueCallbackWrapper`，确认广播callback边界。
+8. 读 [DefaultTbCoreConsumerService.java](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L315) 与RE consumer的partition listener。
+9. 读 [DefaultActorService.java](../../../application/src/main/java/org/thingsboard/server/actors/service/DefaultActorService.java#L191) 和 [TenantActor.java](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L310)，观察内存状态如何清理。
+10. 最后结合第15–18章，把Actor、producer、consumer、Queue和Cluster连成一张图。
+
+推荐断点：`ZkDiscoveryService.childEvent` -> `HashPartitionService.recalculatePartitions` -> `publishPartitionChangeEvent` -> `DefaultTbCoreConsumerService.onTbApplicationEvent` -> `DefaultActorService.onTbApplicationEvent` -> `TenantActor.onPartitionChangeMsg`。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard多节点服务发现依赖什么？
+
+release-3.6这条路径使用ZooKeeper和Curator PathChildrenCache；Kafka consumer group不替代ServiceInfo发现。
+
+### 2. ZK节点为什么用ephemeral-sequential？
+
+ephemeral随session消失表达presence，sequential避免path冲突；serviceId存于node data而非path。
+
+### 3. service.id不配置时从哪里来？
+
+优先本机hostname，解析失败时使用随机字符串。
+
+### 4. service.id为什么必须唯一？
+
+它参与服务排序、定向notification topic和重启去抖；重复会使节点身份与路由语义冲突。
+
+### 5. monolith一定需要ZooKeeper吗？
+
+单节点且`zk.enabled=false`时DummyDiscoveryService只对当前实例重算，不需要ZK；多节点则需要一致的服务发现。
+
+### 6. ServiceInfo中的CPU负载参与分区分配吗？
+
+不参与。system metrics每分钟更新，owner算法仍是排序后取模。
+
+### 7. 3.6分区算法是真正的一致性哈希吗？
+
+当前调用链不是。`ConsistentHashCircle`无引用，实际使用server list排序后modulo。
+
+### 8. entity如何选择逻辑partition？
+
+对entity UUID计算hash，再对Queue partition size取模，得到进入物理topic名的编号。
+
+### 9. Rule Engine owner如何选择？
+
+候选RE服务按serviceId排序，再按`abs(hash(tenantId)+partition)%count`选择；dedicated profile会先过滤候选集。
+
+### 10. Core owner如何选择？
+
+按逻辑partition index对Core服务数取模。
+
+### 11. 扩容只会迁移少量partition吗？
+
+不能保证。取模的除数变化可能导致大量partition owner改变。
+
+### 12. CHILD_REMOVED后为什么延迟重算？
+
+给同serviceId短暂重启留窗口，避免立即搬迁全部状态；CHILD_ADDED可取消pending task。
+
+### 13. OtherServiceShutdownEvent也延迟吗？
+
+不延迟。remove事件会立即发布shutdown event，partition recalc才按配置延迟。
+
+### 14. 跨节点Actor调用是gRPC吗？
+
+不是。ClusterService写broker topic，owner consumer再tell本地Actor。
+
+### 15. producer callback代表远端Actor完成吗？
+
+不代表，只表示producer/broker阶段完成。
+
+### 16. notification广播为何是N条消息？
+
+每个serviceId有独立notification topic，发送方遍历目标实例以保证每个实例都能消费。
+
+### 17. 广播callback是严格all-of Future吗？
+
+不是。它只聚合producer callbacks，且当前wrapper没有零目标完成和terminal once保护。
+
+### 18. PartitionChangeEvent是broker消息吗？
+
+不是，是当前JVM内Spring ApplicationEvent；它由本地PartitionService计算后发布。
+
+### 19. PartitionChangeMsg如何进入Actor？
+
+DefaultActorService监听Spring事件，再以high priority发送给AppActor并向tenant子树传播。
+
+### 20. owner迁移会复制Device Actor mailbox吗？
+
+不会。旧owner停止Actor，新owner从持久状态和后续消息重建。
+
+### 21. Transport Session会跟Device Actor一起迁移吗？
+
+不会。Session留在接入Transport节点，Core通过nodeId定向notification返回下行。
+
+### 22. dedicated Rule Engine配置错误会怎样？
+
+若tenant profile没有候选dedicated服务且也没有可用公共服务，partition可能无人负责。
+
+### 23. ZK session LOST期间有什么风险？
+
+peer可能删除旧node并重分区，本节点又在重连；旧异步业务、consumer rebalance和新owner处理可能重叠。
+
+### 24. Cluster通信需要写PostgreSQL owner表吗？
+
+不需要。owner是可重建运行时状态；PostgreSQL只保存业务实体和Queue等基线。
+
+### 25. 如何判断集群路由已经收敛？
+
+对齐ZK ServiceInfo视图、各节点partition日志、consumer实际assignment/lag、Actor初始化/清理和notification消费，不能只看pod Ready。
+
+---
+
+[上一篇：18 Queue 管理](../18-queue-management/README.md) | [返回全书目录](../../SUMMARY.md) | [下一篇：20 Cassandra 写入流程](../20-cassandra-write/README.md)

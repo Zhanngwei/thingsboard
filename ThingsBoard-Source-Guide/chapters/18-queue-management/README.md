@@ -1,0 +1,642 @@
+# 18 Queue 管理
+
+> 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章中的 Queue 专指 Rule Engine Queue 配置与运行时管理，不把所有 Kafka topic 都等同为可管理 Queue。
+
+[上一篇：17 Kafka 消费流程](../17-kafka-consumer/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/18-queue-management.svg) | [下一篇：19 Cluster 通信](../19-cluster-communication/README.md)
+
+---
+
+## 一、流程目标
+
+Queue 管理解决两个不同层面的问题：控制面决定一类 Rule Engine 消息应进入哪个逻辑队列、多少个逻辑分区以及采用何种提交/重试策略；数据面把这份配置落实为物理 topic、partition routing、consumer task 和 pack processing 行为。
+
+Java/Spring 开发者容易把 `Queue` 理解成 `KafkaTemplate` 的一个 topic 字符串。ThingsBoard 3.6 的实际对象更接近一份运行时调度规格：
+
+| 层次 | 状态 | 负责内容 |
+|---|---|---|
+| PostgreSQL | `queue` 行 | name/topic、逻辑 partitions、poll/timeout、submit/processing strategy |
+| Broker | `topic[.isolated.tenantId].partitionNo` | 真正承载 Protobuf record |
+| PartitionService | `QueueKey -> topic/size/owner partitions` | 计算消息应发到哪个逻辑分区、哪个服务消费 |
+| ConsumerService | `QueueKey -> TbRuleEngineQueueConsumerManager` | 创建、更新、停止每个 Queue 的消费者 |
+| Pack runtime | Submit/Processing Strategy 实例 | 控制 pack 内并发顺序、失败重试和 offset commit |
+
+```mermaid
+flowchart LR
+    UI[SYS_ADMIN Queue REST] --> DB[(PostgreSQL queue)]
+    DB --> ADMIN[TbQueueAdmin]
+    ADMIN --> TOPIC[Broker physical topics]
+    DB --> NF[service notification topics]
+    NF --> PS[PartitionService]
+    NF --> CS[Rule Engine ConsumerService]
+    PS --> ROUTE[producer routing]
+    CS --> CM[Consumer Manager]
+    CM --> STRATEGY[submit + processing strategies]
+```
+
+这一设计允许 Main、HighPriority、SequentialByOriginator 或租户自定义 Queue 使用不同吞吐/顺序/失败策略，也允许 isolated tenant 获得独立 topic 与 consumer group。不过它不是数据库、broker 和运行时的原子配置事务，理解失败窗口是本章重点。
+
+---
+
+## 二、入口
+
+### 2.1 SYS_ADMIN REST
+
+控制器只接受系统管理员，并且 release-3.6 的 switch 只处理 `TB_RULE_ENGINE`：
+
+| HTTP | 方法 | 入口 | 结果 |
+|---|---|---|---|
+| `POST /api/queues?serviceType=TB_RULE_ENGINE` | `saveQueue(Queue, String)` | `org.thingsboard.server.controller.QueueController` | 创建或更新系统 Queue |
+| `DELETE /api/queues/{queueId}` | `deleteQueue(String)` | 同上 | 删除 Queue 配置并广播删除 |
+| `GET /api/queues...` | 查询方法 | 同上 | 查询系统或 isolated tenant 的 Queue |
+
+源码：[QueueController.java](../../../application/src/main/java/org/thingsboard/server/controller/QueueController.java#L162)。`saveQueue` 会覆盖请求中的 `tenantId`，客户端不能借请求体修改归属。
+
+### 2.2 Tenant Profile 与 Tenant 变更
+
+isolated Rule Engine 的 Queue 配置嵌在 `TenantProfile.profileData.queueConfiguration`。保存 Profile 或切换 Tenant Profile 后，应用层比较旧/新配置并为每个受影响 tenant 创建、更新或删除独立 `queue` 行。
+
+```mermaid
+flowchart TD
+    A[save TenantProfile or Tenant] --> B[old/new profile]
+    B --> C{isolated before or after?}
+    C -- no --> X[no Queue change]
+    C -- yes --> D[diff by queue name]
+    D --> E[toCreate]
+    D --> F[toUpdate]
+    D --> G[toRemove]
+    E --> H[Queue tenantId + profile config]
+    F --> H
+    H --> I[save rows + notify]
+    G --> J[delete rows + notify]
+```
+
+入口源码：[DefaultTbTenantProfileService.java](../../../application/src/main/java/org/thingsboard/server/service/entitiy/tenant/profile/DefaultTbTenantProfileService.java#L68)、[DefaultTbTenantService.java](../../../application/src/main/java/org/thingsboard/server/service/entitiy/tenant/DefaultTbTenantService.java#L73)。
+
+### 2.3 服务启动与集群通知
+
+- `DefaultTbRuleEngineConsumerService.init()` 启动时读取 `findAllQueues()`，为本服务当前管理的 tenant 创建 manager。
+- service notification consumer 收到 `QueueUpdateMsg`/`QueueDeleteMsg` 后动态更新 manager 和 `PartitionService`。
+- `PartitionChangeEvent` 在 owner 变化或分区重算后更新订阅集合。
+- 本章没有 MQTT、CoAP、LwM2M 直接入口；协议消息只是按 Device Profile 的 `defaultQueueName` 或 Rule Chain 路由结果使用已经存在的 Queue。
+
+---
+
+## 三、完整调用链
+
+### 3.1 REST 创建或更新
+
+```mermaid
+flowchart TD
+    A[QueueController.saveQueue] --> B[DefaultTbQueueService.saveQueue]
+    B --> C{create?}
+    C -- update --> D[read old Queue]
+    C -- create --> E[oldQueue = null]
+    D --> F[BaseQueueService.saveQueue]
+    E --> F
+    F --> G[QueueValidator]
+    G --> H[JpaQueueDao.save]
+    H --> I[(queue row committed)]
+    I --> J[createTopicsIfNeeded]
+    J --> K[TbQueueAdmin.createTopicIfNotExists]
+    K --> L[TbClusterService.onQueuesUpdate]
+    L --> M[per-service notification producer]
+```
+
+1. `QueueController.saveQueue(Queue queue, String serviceType)`：校验权限与类型，把 tenant 固定为当前系统 tenant；输入 JSON `Queue`，输出已保存对象。
+2. `DefaultTbQueueService.saveQueue(Queue queue)`：更新时先读旧配置，用于判断新增 partition；随后调用 DAO service。
+3. `BaseQueueService.saveQueue(Queue queue)`：执行 `QueueValidator`、JPA save，并发布本 JVM 的 `SaveEntityEvent`。
+4. `QueueValidator.validateCreate/validateUpdate/validateDataImpl`：校验 isolated 条件、name/topic、正数参数和策略；更新时禁止改 name/topic。
+5. `JpaQueueDao`/`QueueRepository`：把策略对象序列化进 varchar 列，完成单次数据库事务。
+6. `createTopicsIfNeeded(savedQueue, oldQueue)`：只遍历 `[oldPartitions,newPartitions)`；仅补建新增编号的物理 topic。
+7. `DefaultTbClusterService.onQueuesUpdate(List<Queue>)`：构造精简 `QueueUpdateMsg`，发送给所有 Rule Engine/Core/Transport service notification topic；send callback 为 `null`。
+
+关键源码：[DefaultTbQueueService.java](../../../application/src/main/java/org/thingsboard/server/service/entitiy/queue/DefaultTbQueueService.java#L71)、[BaseQueueService.java](../../../dao/src/main/java/org/thingsboard/server/dao/queue/BaseQueueService.java#L85)、[QueueValidator.java](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/QueueValidator.java#L63)。
+
+### 3.2 isolated Profile 批量同步
+
+`DefaultTbQueueService.updateQueuesByTenants(List<TenantId>, TenantProfile, TenantProfile)` 以 Queue name 为 diff key。每个 tenant 的 create/update 对象来自 `new Queue(tenantId, TenantProfileQueueConfiguration)`；批量代码是循环多次 DAO save，不是一个覆盖全部 tenant/queue 的事务。
+
+更新分支有一个容易忽略的顺序差异：它在 `queueService.saveQueue(queue)` 之前调用 `createTopicsIfNeeded(queue, foundQueue)`，而普通 REST save 是先保存再建 topic。因此二者的部分失败状态不同。
+
+```mermaid
+flowchart LR
+    P[Profile saved] --> CACHE[profile cache + lifecycle notify]
+    CACHE --> IDS[find affected tenant ids]
+    IDS --> DIFF[diff queue names]
+    DIFF --> TOPICS[update branch creates topics first]
+    TOPICS --> ROWS[save Queue rows one by one]
+    ROWS --> NOTIFY[one notification pack]
+```
+
+### 3.3 运行时更新
+
+`DefaultTbRuleEngineConsumerService.updateQueues(List<QueueUpdateMsg>)` 先只对当前管理的 tenant 读取完整 Queue 行并 create/update consumer，然后更新 `HashPartitionService` 中的 topic/partition size，最后触发全局 partition 重算。
+
+`QueueUpdateMsg` 只携带 id/name/topic/partitions，不携带 pollInterval、timeout 或策略；因此 consumer service 必须回查 PostgreSQL 才能获得完整配置。
+
+```mermaid
+sequenceDiagram
+    participant N as Notification Consumer
+    participant S as QueueService
+    participant C as RE ConsumerService
+    participant M as ConsumerManager
+    participant P as PartitionService
+    N->>C: QueueUpdateMsg
+    C->>P: isManagedByCurrentService(tenant)
+    alt current service owns tenant
+        C->>S: findQueueById(tenantId, queueId)
+        S-->>C: full Queue strategies
+        C->>M: update(queue) or createConsumer
+    end
+    C->>P: updateQueues(msgs)
+    C->>P: recalculatePartitions(...)
+```
+
+### 3.4 manager 配置切换
+
+`TbRuleEngineQueueConsumerManager` 把 `CONFIG_UPDATE`、`PARTITION_CHANGE`、`DELETE` 放进无界 management task queue，用 `tryLock` 和 management executor 串行折叠更新：一次处理批次只保留最后一个配置和最后一组 partitions。
+
+- `consumerPerPartition` 改变：stop 所有 consumer、最多等待每个 task 30 秒、重建 wrapper，再应用 partitions。
+- partitions 改变：wrapper 增删 consumer task 或改变订阅。
+- pollInterval/timeout/submit/processing strategy 改变：不重启；下一次 consumer loop 读取 volatile-like shared `queue` 引用，并为下一 pack 新建策略实例。
+- name/topic：验证器禁止修改。
+
+这里 `queue` 字段没有显式 `volatile`；实际可见性依赖 management/consumer 线程交互及随后队列操作，源码没有用 Java Memory Model 注解声明强可见性契约。
+
+---
+
+## 四、消息流
+
+![Queue管理整体架构图](../../assets/architecture/18-queue-management.svg)
+
+### 4.1 配置面与数据面
+
+```mermaid
+flowchart TB
+    subgraph Control[Control plane]
+      REST[REST or Tenant Profile]
+      PG[(queue table)]
+      ADMIN[Queue Admin]
+      NF[service notifications]
+      REST --> PG --> ADMIN
+      PG --> NF
+    end
+    subgraph Runtime[Runtime plane]
+      ROUTING[HashPartitionService]
+      MANAGER[ConsumerManager]
+      CONSUMER[Queue Consumer]
+      PACK[Pack strategies]
+      ROUTING --> CONSUMER --> PACK
+      MANAGER --> CONSUMER
+    end
+    NF --> ROUTING
+    NF --> MANAGER
+```
+
+### 4.2 逻辑分区到物理 topic
+
+`TopicPartitionInfo` 不使用 Kafka 原生 partition 字段表达 ThingsBoard 逻辑 partition，而是拼物理名称：
+
+```text
+system queue:   tb_rule_engine.main.0
+isolated queue: <topic>.isolated.<tenantUuid>.0
+next logical:   <topic>.isolated.<tenantUuid>.1
+```
+
+```mermaid
+flowchart LR
+    E[entity UUID] --> H[hash to logical partition]
+    H --> Q{isolated tenant?}
+    Q -- no --> S[topic.partitionNo]
+    Q -- yes --> I[topic.isolated.tenantId.partitionNo]
+    S --> B[broker]
+    I --> B
+```
+
+源码：[TopicPartitionInfo.java](../../../common/message/src/main/java/org/thingsboard/server/common/msg/queue/TopicPartitionInfo.java#L68)、[HashPartitionService.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L376)。
+
+### 4.3 submit 与 processing 是两条正交轴
+
+```mermaid
+flowchart TD
+    PACK[poll pack] --> SUBMIT{Submit Strategy}
+    SUBMIT --> BURST[BURST all concurrently]
+    SUBMIT --> BATCH[BATCH N at a time]
+    SUBMIT --> SEQ[SEQUENTIAL one at a time]
+    SUBMIT --> ORIGIN[SEQUENTIAL by originator]
+    SUBMIT --> TENANT[SEQUENTIAL by tenant]
+    BURST --> RESULT[success failed pending maps]
+    BATCH --> RESULT
+    SEQ --> RESULT
+    ORIGIN --> RESULT
+    TENANT --> RESULT
+    RESULT --> PROCESS{Processing Strategy}
+    PROCESS --> COMMIT[skip or success: commit pack]
+    PROCESS --> RETRY[in-memory selected reprocess map]
+```
+
+Submit Strategy 控制同一 poll pack 内何时把下一条交给 Actor；Processing Strategy 在 callback/timeout 后决定哪些 map 重投。二者都不改变 broker record，也不提供数据库幂等。
+
+---
+
+## 五、时序图
+
+![Queue管理完整时序图](sequence.svg)
+
+时序图覆盖 REST 更新、topic 增量创建、无 callback 集群广播、运行时 manager 更新、consumerPerPartition 重建、策略热读取与删除 drain。浏览器新窗口打开后可直接缩放，不受正文宽度限制。
+
+```mermaid
+sequenceDiagram
+    participant A as SYS_ADMIN
+    participant C as QueueController
+    participant S as DefaultTbQueueService
+    participant D as Queue DAO
+    participant B as Broker Admin
+    participant N as Cluster Notifications
+    A->>C: POST /api/queues
+    C->>S: saveQueue(queue)
+    S->>D: saveQueue(queue)
+    D-->>S: committed Queue
+    loop only new partition numbers
+      S->>B: createTopicIfNotExists(fullTopic)
+    end
+    S->>N: onQueuesUpdate(queue), callback=null
+    S-->>C: saved Queue
+    C-->>A: HTTP 200
+    Note over A,N: HTTP success does not prove every service applied the runtime update
+```
+
+---
+
+## 六、数据变化
+
+### 6.1 PostgreSQL
+
+`queue` 表字段来自 [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L226)：
+
+| 列 | Java 字段 | 运行时意义 |
+|---|---|---|
+| `id`, `tenant_id`, `name`, `topic` | identity/routing key | QueueKey 与物理 topic 基名 |
+| `poll_interval` | `pollInterval` | consumer poll 超时参数 |
+| `partitions` | `partitions` | ThingsBoard 逻辑分区数量 |
+| `consumer_per_partition` | `consumerPerPartition` | 单 manager 一个 consumer，或每逻辑分区一个 consumer |
+| `pack_processing_timeout` | timeout | 等待 pack callback 的最长时间 |
+| `submit_strategy` | JSON/string mapping | pack 内提交方式 |
+| `processing_strategy` | JSON/string mapping | skip/retry、次数、失败阈值与退避 |
+| `additional_info` | JSON string | 包含 broker `customProperties` 等扩展配置 |
+
+schema 本身没有 `(tenant_id,name)` 或 `(tenant_id,topic)` UNIQUE constraint。`QueueValidator.validateCreate` 先查再插，两个并发创建请求可同时通过校验；数据库不能像唯一索引那样封闭竞态。
+
+### 6.2 Broker
+
+- 新建 Queue：为 `0..partitions-1` 创建 topic。
+- partitions 增大：只创建新增编号。
+- partitions 减小：运行时停止订阅超出范围的逻辑 topic，但保存流程不删除旧物理 topic。
+- Queue 删除：Rule Engine consumer manager 收到通知后异步 drain，并逐 topic 调用 `deleteTopic`；DB 删除本身不删除 broker 状态。
+
+### 6.3 JVM 状态
+
+```mermaid
+stateDiagram-v2
+    [*] --> Missing
+    Missing --> Configured: queue row saved
+    Configured --> TopicsReady: topic create succeeds
+    TopicsReady --> Managed: update notification consumed
+    Managed --> Rebuilding: consumerPerPartition changed
+    Rebuilding --> Managed: new wrapper subscribed
+    Managed --> Draining: delete notification
+    Draining --> TopicsDeleted
+    TopicsDeleted --> [*]
+```
+
+### 6.4 Actor、Session、缓存和 Kafka topic
+
+- 不直接修改 Device/RuleChain Actor；新 Queue 只改变后续 `QueueToRuleEngineMsg` 由哪个 consumer 投递 Actor。
+- 不修改设备 Session。
+- Tenant Profile cache 在 Profile 保存路径先更新；Queue row 与 consumer 更新随后发生，存在短暂不一致窗口。
+- 更新/删除通知发送到每个服务实例专属 notification topic，不写公共事务日志。
+- 物理 Queue topic 中已有 record 在策略更新时保持原样；新策略会处理下一次/后续 pack。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类型
+
+| 包路径 | 类型 | 职责 |
+|---|---|---|
+| `org.thingsboard.server.common.data.queue.Queue` | data contract | 持久化与跨层 Queue 配置 |
+| `org.thingsboard.server.common.data.tenant.profile.TenantProfileQueueConfiguration` | profile config | isolated tenant Queue 模板 |
+| `org.thingsboard.server.controller.QueueController` | REST | SYS_ADMIN CRUD |
+| `org.thingsboard.server.service.entitiy.queue.DefaultTbQueueService` | application orchestration | DB、topic、cluster notification 编排 |
+| `org.thingsboard.server.dao.queue.BaseQueueService` | DAO service | 校验、JPA DAO、entity event |
+| `org.thingsboard.server.dao.service.validator.QueueValidator` | validator | create/update/data invariants |
+| `org.thingsboard.server.service.queue.DefaultTbRuleEngineConsumerService` | runtime registry | QueueKey 到 manager，处理通知/partition event |
+| `org.thingsboard.server.service.queue.ruleengine.TbRuleEngineQueueConsumerManager` | lifecycle manager | consumer wrapper、task folding、poll loop |
+| `org.thingsboard.server.service.queue.processing.TbRuleEngineSubmitStrategyFactory` | strategy factory | 创建五类 submit strategy |
+| `org.thingsboard.server.service.queue.processing.TbRuleEngineProcessingStrategyFactory` | strategy factory | 创建 skip/retry strategy |
+| `org.thingsboard.server.queue.discovery.HashPartitionService` | routing | QueueKey topic/size、owner、producer resolve |
+
+### 7.2 Queue 对象不是 broker metadata
+
+`Queue` 构造器从 `TenantProfileQueueConfiguration` 复制字段；`getCustomProperties()` 从 `additionalInfo.customProperties` 取字符串交给 `TbQueueAdmin`。它不保存 broker offsets、lag、consumer group 或 topic 实际存在状态，因此数据库行只能表示期望配置，不能证明 broker 已收敛。
+
+### 7.3 配置验证
+
+`QueueValidator` 保证正数 poll/partitions/timeout、策略非空、BATCH size 正数，并禁止非 isolated tenant 保存私有 Queue。Tenant Profile validator 另外要求 isolated profile 至少含名为 `Main` 的 Queue、name 不重复、retry 参数范围合法。
+
+```mermaid
+flowchart TD
+    Q[Queue input] --> T{SYS tenant or isolated?}
+    T -- no --> ERR[reject]
+    T -- yes --> N[name/topic syntax]
+    N --> P[poll partitions timeout > 0]
+    P --> S[submit strategy valid]
+    S --> R[processing strategy valid]
+    R --> U{create or update}
+    U -- create --> LOOKUP[application uniqueness lookups]
+    U -- update --> IMMUTABLE[name/topic immutable]
+    LOOKUP --> SAVE[JPA save]
+    IMMUTABLE --> SAVE
+```
+
+### 7.4 动态配置读取
+
+consumer 每次 `processMsgs(msgs, consumer, queue)` 都接收当时 manager 的 Queue 引用，并据此创建新的 strategy instance。正在处理的 pack 不会中途切换参数；通知到达后，下一个 pack 才使用新值。`consumerPerPartition` 是结构性配置，必须重建 task；其余参数被设计为热读取。
+
+### 7.5 删除 drain 的真实语义
+
+`doDelete(true)` 先把 manager 标为 stopped，等待 consumer loop，随后把 drain 工作提交到 consumers executor，再逐 topic delete/unsubscribe。Controller 在 DB delete 与通知 producer 调用后已经返回；它不等待各服务 drain 完成。若一个 topic 被多个服务的 manager 同时处理，删除调用可能重复，异常只记录日志。
+
+---
+
+## 八、Actor 分析
+
+Queue 配置本身不由 Actor 管理。原因是它需要同时协调数据库、broker 管理 API、集群服务列表和 consumer thread 生命周期，这些都是服务级资源，不适合挂在 Device/RuleChain Actor mailbox 上。
+
+```mermaid
+flowchart LR
+    CONFIG[Queue config update] --> SERVICE[ConsumerService]
+    SERVICE --> THREAD[consumer task]
+    THREAD --> ACTOR[AppActor]
+    ACTOR --> TENANT[TenantActor]
+    TENANT --> CHAIN[RuleChainActor]
+    CHAIN --> NODE[RuleNodeActor]
+```
+
+Actor 与 Queue 的接点发生在消费数据时：consumer 为 record 创建 `TbMsgPackCallback`，调用 ActorSystem `tell(QueueToRuleEngineMsg)`。Submit Strategy 控制何时 tell；Actor callback 决定 pack map 何时完成。Queue 配置更新不清空 Actor mailbox，也不会取消旧 pack 已经投递的消息。
+
+把配置管理放在普通 service 而不是 Actor 的代价是：manager task queue、lock、executor、stop flag 和 consumer task Future 都要自行处理并发；这些状态不获得 Actor 的单线程 mailbox 保证。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 Queue 与 Kafka partition 的区别
+
+ThingsBoard 的 `partitions` 是物理 topic 后缀数量，不是单 Kafka topic 的原生 partition count。Kafka producer 构造 `ProducerRecord(topic,key,value)` 时 partition 为 `null`；逻辑分区已经进入 topic 名。
+
+### 9.2 consumerPerPartition
+
+| 值 | consumer 结构 | 适用点 | 风险 |
+|---|---|---|---|
+| `false` | 一个 consumer 订阅 owner 的多个物理 topic | task 少、group 简单 | 一个慢 pack 阻塞该 consumer 的下一次 poll |
+| `true` | 每个物理逻辑分区一个 consumer task | 分区级并行与故障隔离 | 线程/consumer/group 开销显著增加 |
+
+切换该字段会 stop/await/recreate，属于有消费间隙的重配置，不是无缝迁移。
+
+### 9.3 通知的可靠性
+
+`doSendQueueNotifications` 对 producer 使用 `callback=null`。方法返回只说明 send 调用已提交给 producer 模板；异步 broker 失败不会回到 REST/Profile 操作，也没有 outbox 或重放表。服务重启会通过 `findAllQueues()` 从 PostgreSQL 重建，因而数据库是最终恢复基线，但在线节点可能在失败后长期保留旧配置直到下一次通知/重启。
+
+### 9.4 删除与积压
+
+```mermaid
+flowchart TD
+    D[DELETE Queue] --> DB[(row removed)]
+    DB --> NF[delete notification]
+    NF --> STOP[stop current consumers]
+    STOP --> DRAIN{drainQueue true}
+    DRAIN --> POLL[poll/process remaining records]
+    POLL --> DEL[delete physical topics]
+    DEL --> UNSUB[unsubscribe]
+```
+
+如果通知丢失，DB 已经没有 Queue，旧节点仍可能继续消费；重启后不会重新创建该 manager，但遗留 topic 仍需要运维清理。
+
+---
+
+## 十、数据库分析
+
+Queue 控制面只写 PostgreSQL。TimescaleDB/Cassandra 不保存 Queue 配置，Redis 也不是其权威来源。
+
+### 10.1 事务边界
+
+```mermaid
+flowchart LR
+    TX1[DAO transaction: queue row] --> TOPIC[broker admin call]
+    TOPIC --> SEND[notification producer send]
+    SEND --> APPLY[remote runtime apply]
+    style TX1 fill:#ecfdf5,stroke:#047857,color:#111827
+    style TOPIC fill:#fff7e8,stroke:#9a5b13,color:#111827
+    style SEND fill:#eef6f8,stroke:#176b87,color:#111827
+    style APPLY fill:#fff1f2,stroke:#be123c,color:#111827
+```
+
+只有第一格是 PostgreSQL 事务。没有 XA、Kafka transaction 或 transactional outbox 串起后续步骤。
+
+### 10.2 部分失败矩阵
+
+| 失败点 | 已完成状态 | 可见症状 | 恢复 |
+|---|---|---|---|
+| DB save 失败 | 无新 row | REST 失败 | 修复校验/DB 后重试 |
+| REST 路径 topic create 失败 | row 已提交 | API 失败，运行时未通知 | 重试同一 Queue 更新或人工建 topic |
+| Profile update 路径 DB save 失败 | topic 可能已创建 | orphan topic | 修复 DB 后重跑 Profile sync |
+| notification send 异步失败 | row/topic 已存在 | 部分节点旧配置 | 再次更新或重启节点从 DB 重建 |
+| delete notification 丢失 | row 已删除 | consumer/topic 残留 | 重启服务、人工删除 topic |
+| partition 缩容 | row 新值已提交 | 高编号 topic orphan | 人工确认 lag 后删除 |
+
+### 10.3 生产检查 SQL
+
+```sql
+select tenant_id, name, count(*)
+from queue
+group by tenant_id, name
+having count(*) > 1;
+
+select tenant_id, topic, count(*)
+from queue
+group by tenant_id, topic
+having count(*) > 1;
+```
+
+由于 schema 无对应 UNIQUE constraint，生产环境应至少监控重复项；直接补唯一索引前必须先检查历史数据和 isolated profile 同步逻辑。
+
+---
+
+## 十一、异常处理
+
+### 11.1 保存异常
+
+- 参数不合法由 `DataValidationException` 阻止写入。
+- name/topic 唯一性是应用层查询，无法消除并发竞态。
+- broker topic 创建异常向 REST save 传播，但不会回滚已经提交的 Queue 行。
+- 集群通知使用 null callback；异步失败不改变 HTTP 响应。
+
+### 11.2 更新异常
+
+manager 的 task 处理 catch 只记录错误；任务已经从 queue poll 掉，不自动重新入队。下一次配置通知、partition event 或服务重启才可能修复。
+
+`awaitCompletion()` 最多等 30 秒，超时后记录 warning 并把 task 置 null；旧 consumer work 是否真正结束不能由这个字段证明。随后重建 consumer 可能和旧异步 Actor/Node 工作重叠。
+
+### 11.3 删除异常
+
+```mermaid
+flowchart TD
+    A[delete request] --> B{referenced by device profile?}
+    B -- yes --> FK[DB FK violation -> validation error]
+    B -- no --> ROW[remove queue row]
+    ROW --> NF[send delete notification]
+    NF --> C{node receives?}
+    C -- no --> STALE[stale consumer and topic]
+    C -- yes --> DRAIN[drain]
+    DRAIN --> DEL[delete each topic]
+    DEL --> E{admin error?}
+    E -- yes --> LOG[log only; continue]
+    E -- no --> END[unsubscribe]
+```
+
+DAO 只专门识别 `fk_default_queue_device_profile`；其他引用或约束异常原样抛出。物理 topic 删除失败只写日志，不恢复 Queue row。
+
+### 11.4 需要的工程防线
+
+1. Queue 变更前记录旧配置、目标 topic 列表和 broker lag。
+2. 分区缩容先停止向高编号 topic 生产，确认 lag 为零，再变更配置并人工回收遗留 topic。
+3. 策略更新后观察 notification consumer、manager update、consumer lag 和 retry/timeout 指标，不以 HTTP 200 作为收敛证据。
+4. isolated Profile 批量更新要按 tenant 数评估 DAO/broker 调用量；流程不是全有或全无。
+5. Queue 删除前检查 Device/Asset Profile 默认 Queue 引用以及积压副作用的幂等性。
+
+---
+
+## 十二、源码阅读路线
+
+1. 从 [Queue.java](../../../common/data/src/main/java/org/thingsboard/server/common/data/queue/Queue.java#L42) 看清配置字段。
+2. 阅读 [QueueController.java](../../../application/src/main/java/org/thingsboard/server/controller/QueueController.java#L162)，确认权限与 serviceType 边界。
+3. 精读 [DefaultTbQueueService.java](../../../application/src/main/java/org/thingsboard/server/service/entitiy/queue/DefaultTbQueueService.java#L71)，画出 DB/topic/notification 顺序。
+4. 对照 [QueueValidator.java](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/QueueValidator.java#L63) 与 schema，区分应用校验和数据库约束。
+5. 读 [DefaultTbClusterService.java](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L895)，确认 update proto 内容和 null callback。
+6. 读 [DefaultTbRuleEngineConsumerService.java](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbRuleEngineConsumerService.java#L129)，看启动重建与通知处理。
+7. 读 [TbRuleEngineQueueConsumerManager.java](../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L143)，跟踪 CONFIG_UPDATE/PARTITION_CHANGE/DELETE。
+8. 并排读 Submit/Processing Strategy Factory，理解配置怎样变成每 pack 的对象。
+9. 回看第 17 章的 poll/commit/retry，连接“配置值”和“运行时后果”。
+10. 最后读 `HashPartitionService.resolve(...)` 与 `TopicPartitionInfo`，确认逻辑 partition 实际进入 topic 名。
+
+推荐断点：`QueueController.saveQueue` -> `DefaultTbQueueService.saveQueue` -> `QueueValidator.validateDataImpl` -> `TbQueueAdmin.createTopicIfNotExists` -> `DefaultTbClusterService.onQueuesUpdate` -> `DefaultTbRuleEngineConsumerService.updateQueues` -> `TbRuleEngineQueueConsumerManager.doUpdate`。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard Queue 是否等于 Kafka topic？
+
+不等于。Queue 是数据库中的调度配置；一个 Queue 会按逻辑 partitions 和 isolated tenant 展开为多个物理 topic。
+
+### 2. `partitions` 是 Kafka 原生 partition 数吗？
+
+不是。3.6 把编号拼进 topic 名，ProducerRecord 的原生 partition 参数仍为 null。
+
+### 3. Queue 配置保存在哪？
+
+权威配置在 PostgreSQL `queue` 表；broker、PartitionService 和 consumer manager 是派生运行时状态。
+
+### 4. 谁能通过 REST 修改 Queue？
+
+`QueueController` 要求 `SYS_ADMIN`，并且该版本只处理 `TB_RULE_ENGINE` serviceType。
+
+### 5. isolated tenant 的 Queue 从哪里来？
+
+来自 isolated Tenant Profile 的 `queueConfiguration`，保存 Profile或切换 Tenant Profile时展开为 tenant 私有 Queue 行。
+
+### 6. Queue name/topic 能在线改名吗？
+
+不能。`QueueValidator.validateUpdate` 明确禁止改变；需要迁移到新 Queue再删除旧 Queue。
+
+### 7. Queue 保存是一个跨 DB/Kafka 事务吗？
+
+不是。DB row、broker topic、notification producer和远端应用没有共同事务。
+
+### 8. REST 保存先写 DB 还是先建 topic？
+
+普通 REST路径先写 DB再建新增 topic；isolated Profile批量 update分支会先补 topic再逐行保存。
+
+### 9. 分区缩容会自动删旧 topic 吗？
+
+不会。创建逻辑只处理新增编号，缩容后的高编号物理 topic可能残留。
+
+### 10. 为什么 `QueueUpdateMsg` 到节点后还要查数据库？
+
+proto只带id/name/topic/partitions，不带timeout和两类strategy；完整配置需要按id回查。
+
+### 11. 配置通知可靠地等待broker ack吗？
+
+调用方传入null callback，异步失败不反馈REST/Profile流程，也没有outbox。
+
+### 12. 节点重启如何恢复Queue运行时？
+
+`DefaultTbRuleEngineConsumerService.init()`读取所有Queue行，并为当前管理的tenant重建manager。
+
+### 13. Submit Strategy控制什么？
+
+控制一个poll pack内消息进入Actor的并发与顺序，不决定Kafka offset提交。
+
+### 14. Processing Strategy控制什么？
+
+根据success/failed/pending maps决定commit整个pack还是在内存中重投选中的消息。
+
+### 15. BATCH和Kafka producer batch是一回事吗？
+
+不是。这里的BATCH是Rule Engine consumer向Actor提交pack内消息的批次大小。
+
+### 16. `retries=0` 表示不重试吗？
+
+在Processing Strategy实现中不是；只有`maxRetries>0`才检查上限，所以零表示不限次数。
+
+### 17. `consumerPerPartition=true` 有什么代价？
+
+每个逻辑分区独立consumer task，提高隔离和并行度，同时增加线程、consumer group连接和运维开销。
+
+### 18. 切换consumerPerPartition是否无损？
+
+不是。旧consumer被stop并等待，wrapper重建后再订阅，存在消费间隙和旧异步业务重叠窗口。
+
+### 19. 正在处理的pack会中途使用新策略吗？
+
+不会。策略在每次`processMsgs`开始时创建；运行中的pack保留旧实例，后续pack使用新配置。
+
+### 20. Queue表如何保证name/topic唯一？
+
+该schema没有唯一约束，仅由Validator查询检查，因此并发创建存在竞态。
+
+### 21. 删除Queue会先drain吗？
+
+运行时收到删除通知后会异步drain；Controller响应不等待所有节点完成。
+
+### 22. 删除通知丢失会怎样？
+
+数据库行已删除，但旧节点可能保留consumer和topic；重启不再重建manager，topic仍可能需要人工清理。
+
+### 23. Queue更新会影响Device Actor mailbox吗？
+
+不直接影响。它改变后续record的路由、消费与pack策略，不撤回已经tell给Actor的消息。
+
+### 24. 如何验证Queue变更已收敛？
+
+同时检查数据库行、物理topic集合、service notification消费日志、PartitionService分配、consumer订阅和lag。
+
+### 25. 生产环境修改失败策略最重要的前提是什么？
+
+明确Rule Node副作用是否幂等，因为内存retry不会回滚已完成的DB、HTTP、Kafka、告警或通知动作。
+
+---
+
+[上一篇：17 Kafka 消费流程](../17-kafka-consumer/README.md) | [返回全书目录](../../SUMMARY.md) | [下一篇：19 Cluster 通信](../19-cluster-communication/README.md)

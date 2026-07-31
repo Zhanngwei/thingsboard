@@ -1,0 +1,191 @@
+@startuml
+title ThingsBoard 3.6 Login 完整时序
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontColor #111827
+skinparam sequence {
+  ArrowColor #253746
+  LifeLineBorderColor #334155
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #FFFFFF
+  ParticipantFontColor #111827
+  ActorBorderColor #334155
+  ActorBackgroundColor #FFFFFF
+  ActorFontColor #111827
+  GroupBorderColor #176B87
+  GroupBackgroundColor #EEF6F8
+  GroupFontColor #111827
+  DividerBorderColor #9A5B13
+  DividerBackgroundColor #FFF7E8
+  DividerFontColor #111827
+  NoteBorderColor #8A5A00
+  NoteBackgroundColor #FFF5CC
+  NoteFontColor #111827
+}
+
+actor Browser
+participant "LoginComponent\nAuthService" as UI
+participant "RestLoginProcessingFilter" as Filter
+participant "AuthenticationManager\nProviderManager" as Manager
+participant "RestAuthenticationProvider" as Provider
+participant "DefaultSystemSecurityService" as Security
+participant "UserServiceImpl" as UserService
+database "PostgreSQL\ntb_user / user_credentials\nuser_auth_settings / admin_settings" as DB
+participant "AuditLogServiceImpl\nJpaExecutorService" as Audit
+participant "RestAwareAuthentication\nSuccessHandler" as Success
+participant "JwtTokenFactory" as JWT
+participant "TwoFactorAuthController\nDefaultTwoFactorAuthService" as MFA
+collections "userSessionsInvalidation\nCaffeine or Redis" as Invalidations
+
+== 第一因子：用户名与密码 ==
+Browser -> UI: submit(username, password)
+UI -> Filter: POST /api/auth/login JSON
+Filter -> Filter: require POST; parse LoginRequest
+Filter -> Filter: build UserPrincipal and RestAuthenticationDetails
+Filter -> Manager: authenticate(UsernamePasswordAuthenticationToken)
+Manager -> Provider: authenticate(Authentication)
+Provider -> Security: getSecuritySettings()
+Security -> DB: SELECT admin_settings key=securitySettings
+DB --> Security: password and lockout policy
+
+opt force reset when password violates current policy
+  Provider -> Security: validatePasswordByPolicy(raw password, policy)
+  Security --> Provider: UserPasswordNotValidException
+  Provider --> Filter: authentication failure
+  Filter --> UI: 401 password-violation response
+end
+
+Provider -> UserService: findUserByEmail(SYS_TENANT_ID, username)
+UserService -> DB: SELECT tb_user WHERE email=?
+DB --> UserService: User or null
+
+alt user missing
+  UserService --> Provider: null
+  Provider --> Filter: UsernameNotFoundException
+  Filter --> UI: 401 Invalid username or password
+else user found
+  Provider -> UserService: findUserCredentialsByUserId(SYS_TENANT_ID,userId)
+  UserService -> DB: SELECT user_credentials WHERE user_id=?
+  DB --> UserService: UserCredentials
+  Provider -> Security: validateUserCredentials(tenantId,credentials,username,password)
+
+  alt BCrypt mismatch
+    Security -> UserService: increaseFailedLoginAttempts(tenantId,userId)
+    UserService -> DB: read and UPDATE tb_user.additional_info
+    DB --> UserService: committed count
+    alt count > maxFailedLoginAttempts
+      Security -> UserService: setUserCredentialsEnabled(SYS,userId,false)
+      UserService -> DB: UPDATE user_credentials.enabled=false
+      UserService -> DB: UPDATE tb_user.additional_info summary
+      Security -> Security: optional lockout email
+      Security --> Provider: LockedException
+      Provider -> Security: logLoginAction(LOCKOUT,null)
+      Security -> Audit: async audit LOCKOUT
+    else below threshold
+      Security --> Provider: BadCredentialsException
+    end
+    Provider -> Security: logLoginAction(LOGIN,error)
+    Security -> Audit: async audit LOGIN FAILURE
+    Audit -> DB: INSERT audit_log partition
+    Provider --> Filter: authentication exception
+    Filter --> UI: 401 mapped error
+
+  else BCrypt matches
+    alt credentials disabled
+      Security --> Provider: DisabledException
+      Provider -> Security: logLoginAction(LOGIN,error)
+      Security -> Audit: async audit LOGIN FAILURE
+      Provider --> Filter: failure
+      Filter --> UI: 401 account inactive
+    else enabled
+      Security -> UserService: resetFailedLoginAttempts(tenantId,userId)
+      UserService -> DB: UPDATE tb_user.additional_info count=0
+      alt password age expired
+        Security -> UserService: requestExpiredPasswordReset(tenantId,credentialsId)
+        UserService -> DB: UPDATE user_credentials.reset_token
+        Security --> Provider: UserPasswordExpiredException(resetToken)
+        Provider -> Security: logLoginAction(LOGIN,error)
+        Security -> Audit: async audit LOGIN FAILURE
+        Provider --> Filter: failure
+        Filter --> UI: 401 credentials-expired + resetToken
+      else credentials valid
+        Provider -> DB: SELECT user_auth_settings and 2FA admin settings
+        alt 2FA disabled
+          Provider -> Security: logLoginAction(LOGIN,null)
+          Security -> UserService: setLastLoginTs(tenantId,userId)
+          UserService -> DB: UPDATE tb_user.additional_info lastLoginTs
+          Security -> Audit: async audit LOGIN SUCCESS
+          Provider --> Manager: authenticated UsernamePasswordAuthenticationToken
+          Manager --> Filter: authenticated result
+          Filter -> Success: onAuthenticationSuccess(request,response,result)
+          Success -> JWT: createTokenPair(SecurityUser)
+          JWT -> DB: read cached/lazy admin_settings key=jwt
+          JWT --> Success: HS512 access + refresh
+          Success --> UI: 200 JwtPair
+          UI -> UI: store tokens and expiration in localStorage
+          UI -> Filter: GET /api/auth/user with access token
+        else 2FA enabled
+          Provider --> Manager: MfaAuthenticationToken(SecurityUser)
+          Manager --> Filter: first-factor result
+          Filter -> Success: onAuthenticationSuccess(...)
+          Success -> JWT: createPreVerificationToken(user,lifetime)
+          JWT --> Success: PRE_VERIFICATION_TOKEN, no refresh
+          Success --> UI: 200 token + scope
+          UI -> UI: navigate /login/mfa
+          UI -> MFA: POST verification/check(provider,code)
+          MFA -> UserService: read credentials.enabled
+          UserService -> DB: SELECT user_credentials
+          MFA -> MFA: provider check + rate limit
+          alt code valid
+            MFA -> Security: validateTwoFaVerification(success=true)
+            Security -> UserService: resetFailedLoginAttempts
+            UserService -> DB: UPDATE tb_user.additional_info count=0
+            MFA -> Security: logLoginAction(LOGIN,null)
+            Security -> UserService: setLastLoginTs
+            UserService -> DB: UPDATE tb_user.additional_info lastLoginTs
+            Security -> Audit: async audit LOGIN SUCCESS
+            MFA -> JWT: createTokenPair(new SecurityUser)
+            JWT --> MFA: final access + refresh with new sessionId
+            MFA --> UI: 200 JwtPair
+          else code invalid
+            MFA -> Security: validateTwoFaVerification(success=false)
+            Security -> UserService: increaseFailedLoginAttempts
+            UserService -> DB: UPDATE tb_user.additional_info
+            opt attempts >= 2FA lock threshold
+              Security -> UserService: setUserCredentialsEnabled(false)
+              UserService -> DB: UPDATE credentials and user summary
+            end
+            MFA -> Security: logLoginAction(LOGIN,error)
+            Security -> Audit: async audit LOGIN FAILURE
+            MFA --> UI: 400 incorrect code or lock error
+          end
+        end
+      end
+    end
+  end
+end
+
+== Password change / logout invalidation ==
+Browser -> UI: change password
+UI -> UserService: via AuthController replaceUserCredentials
+UserService -> DB: DELETE old user_credentials (transaction 1)
+UserService -> DB: INSERT new ID/hash/created_time (transaction 2)
+UI -> Invalidations: UserCredentialsInvalidationEvent(userId)
+UI -> JWT: createTokenPair(current SecurityUser)
+JWT --> UI: new pair
+
+Browser -> UI: logout
+UI -> Invalidations: UserSessionInvalidationEvent(sessionId)
+UI -> Audit: async LOGOUT audit
+UI -> UI: clear localStorage even on HTTP failure
+
+note over Invalidations
+  Caffeine is JVM-local.
+  Redis shares user/session invalidation timestamps across Core nodes.
+  Cache TTL is refresh-token lifetime plus one minute.
+end note
+
+@enduml

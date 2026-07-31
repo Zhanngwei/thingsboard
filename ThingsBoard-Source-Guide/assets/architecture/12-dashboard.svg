@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1350" viewBox="0 0 2000 1350" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Dashboard 架构图</title>
+  <desc id="desc">展示 Dashboard 配置控制面、Widget EntityData 查询、WebSocket 实时订阅、Core 跨节点路由和数据库落点。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1f2937"/></marker>
+    <marker id="blueArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#005a85"/></marker>
+    <marker id="redArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#8a3b12"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Segoe UI",Arial,sans-serif;fill:#111827;letter-spacing:0}
+      .title{font-size:30px;font-weight:700}.subtitle{font-size:15px;fill:#374151}
+      .section{font-size:19px;font-weight:700}.head{font-size:16px;font-weight:700}.body{font-size:14px}.small{font-size:13px;fill:#374151}
+      .whiteHead{font-size:16px;font-weight:700;fill:#fff}.whiteBody{font-size:13px;fill:#fff}
+      .panel{stroke:#263746;stroke-width:2}.box{fill:#fff;stroke:#334155;stroke-width:2}
+      .line{fill:none;stroke:#1f2937;stroke-width:2.2;marker-end:url(#arrow)}
+      .blue{fill:none;stroke:#005a85;stroke-width:2.4;marker-end:url(#blueArrow)}
+      .async{fill:none;stroke:#8a3b12;stroke-width:2.3;stroke-dasharray:8 6;marker-end:url(#redArrow)}
+      .dash{fill:none;stroke:#64748b;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <rect width="2000" height="1350" fill="#fff"/>
+  <text x="36" y="48" class="title">ThingsBoard 3.6 Dashboard：配置控制面与 Widget 实时数据面</text>
+  <text x="36" y="76" class="subtitle">Dashboard 行保存查询定义；实体/latest/history/alarm 数据按 Widget datasource 在运行时读取，并通过 Core subscription 路由实时更新。</text>
+
+  <rect x="28" y="105" width="380" height="1110" rx="6" fill="#e8f3f8" class="panel"/>
+  <rect x="430" y="105" width="385" height="1110" rx="6" fill="#eef5e9" class="panel"/>
+  <rect x="837" y="105" width="415" height="1110" rx="6" fill="#fff3df" class="panel"/>
+  <rect x="1274" y="105" width="355" height="1110" rx="6" fill="#f4ecf7" class="panel"/>
+  <rect x="1651" y="105" width="321" height="1110" rx="6" fill="#edf2f7" class="panel"/>
+
+  <text x="50" y="140" class="section">1. Angular 浏览器</text>
+  <text x="452" y="140" class="section">2. REST 配置控制面</text>
+  <text x="859" y="140" class="section">3. WebSocket 数据面</text>
+  <text x="1296" y="140" class="section">4. Core 订阅路由</text>
+  <text x="1673" y="140" class="section">5. 存储与查询</text>
+
+  <rect x="58" y="175" width="320" height="92" rx="5" class="box"/>
+  <text x="218" y="208" text-anchor="middle" class="head">DashboardResolver</text>
+  <text x="218" y="235" text-anchor="middle" class="body">GET configuration + VISIT</text>
+  <text x="218" y="256" text-anchor="middle" class="small">validateAndUpdateDashboard</text>
+
+  <rect x="58" y="305" width="320" height="120" rx="5" class="box"/>
+  <text x="218" y="338" text-anchor="middle" class="head">DashboardPageComponent</text>
+  <text x="218" y="365" text-anchor="middle" class="body">AliasController / State / Layout</text>
+  <text x="218" y="388" text-anchor="middle" class="small">widgets · filters · timewindow</text>
+  <text x="218" y="410" text-anchor="middle" class="small">save = 完整 configuration 覆盖</text>
+
+  <rect x="58" y="465" width="320" height="116" rx="5" class="box"/>
+  <text x="218" y="498" text-anchor="middle" class="head">WidgetComponent</text>
+  <text x="218" y="525" text-anchor="middle" class="body">typeFullFqn 动态组件</text>
+  <text x="218" y="548" text-anchor="middle" class="small">static / rpc / alarm / latest / timeseries</text>
+  <text x="218" y="570" text-anchor="middle" class="small">createDefaultSubscription</text>
+
+  <rect x="58" y="620" width="320" height="152" rx="5" class="box"/>
+  <text x="218" y="653" text-anchor="middle" class="head">WidgetSubscription</text>
+  <text x="218" y="680" text-anchor="middle" class="body">resolve aliases + filters</text>
+  <text x="218" y="704" text-anchor="middle" class="small">阶段 1：EntityDataCmd(query)</text>
+  <text x="218" y="727" text-anchor="middle" class="small">阶段 2：同 cmdId history/ts/latest</text>
+  <text x="218" y="750" text-anchor="middle" class="small">dataUpdated / latestDataUpdated</text>
+
+  <rect x="58" y="812" width="320" height="110" rx="5" fill="#0b3a53" class="panel"/>
+  <text x="218" y="848" text-anchor="middle" class="whiteHead">TelemetryWebsocketService</text>
+  <text x="218" y="876" text-anchor="middle" class="whiteBody">subscribersMap: cmdId → subscriber</text>
+  <text x="218" y="900" text-anchor="middle" class="whiteBody">/api/ws · JWT · reconnect</text>
+
+  <rect x="58" y="970" width="320" height="150" rx="5" fill="#fff7d6" class="panel"/>
+  <text x="218" y="1003" text-anchor="middle" class="head">浏览器运行时边界</text>
+  <text x="78" y="1033" class="body">• Dashboard JSON 只定义查询</text>
+  <text x="78" y="1058" class="body">• Widget 销毁时 unsubscribe</text>
+  <text x="78" y="1083" class="body">• socket 重连后 cmdId 重建</text>
+  <text x="78" y="1108" class="body">• 多管理员保存无 ETag/@Version</text>
+
+  <rect x="462" y="175" width="321" height="112" rx="5" class="box"/>
+  <text x="622" y="208" text-anchor="middle" class="head">DashboardController</text>
+  <text x="622" y="235" text-anchor="middle" class="body">READ / CREATE / WRITE / ASSIGN</text>
+  <text x="622" y="260" text-anchor="middle" class="small">Tenant、Customer、Public 权限</text>
+
+  <rect x="462" y="325" width="321" height="122" rx="5" class="box"/>
+  <text x="622" y="358" text-anchor="middle" class="head">DefaultTbDashboardService</text>
+  <text x="622" y="385" text-anchor="middle" class="body">CRUD 与多 Customer 编排</text>
+  <text x="622" y="409" text-anchor="middle" class="small">autoCommit · audit/action</text>
+  <text x="622" y="432" text-anchor="middle" class="small">批量 assignment 可部分成功</text>
+
+  <rect x="462" y="485" width="321" height="150" rx="5" class="box"/>
+  <text x="622" y="518" text-anchor="middle" class="head">DashboardServiceImpl</text>
+  <text x="622" y="545" text-anchor="middle" class="body">validate · ImageService · JPA</text>
+  <text x="622" y="570" text-anchor="middle" class="small">DashboardTitle cache eviction</text>
+  <text x="622" y="594" text-anchor="middle" class="small">Save/Delete/Action EntityEvent</text>
+  <text x="622" y="618" text-anchor="middle" class="small">Customer = relation + JSON 双写</text>
+
+  <rect x="462" y="675" width="321" height="98" rx="5" fill="#6b2c0c" class="panel"/>
+  <text x="622" y="710" text-anchor="middle" class="whiteHead">非原子 assignment</text>
+  <text x="622" y="738" text-anchor="middle" class="whiteBody">relation transaction → dashboard transaction</text>
+  <text x="622" y="760" text-anchor="middle" class="whiteBody">失败/并发可导致两侧漂移</text>
+
+  <rect x="462" y="812" width="321" height="135" rx="5" class="box"/>
+  <text x="622" y="845" text-anchor="middle" class="head">Dashboard / DashboardInfo Entity</text>
+  <text x="622" y="872" text-anchor="middle" class="body">同表 full / light JPA 映射</text>
+  <text x="622" y="897" text-anchor="middle" class="small">Info 不加载 configuration</text>
+  <text x="622" y="921" text-anchor="middle" class="small">configuration = varchar ↔ JsonNode</text>
+
+  <rect x="870" y="175" width="349" height="118" rx="5" class="box"/>
+  <text x="1044" y="208" text-anchor="middle" class="head">TbWebSocketHandler</text>
+  <text x="1044" y="235" text-anchor="middle" class="body">AuthCmd/JWT · ping · session limits</text>
+  <text x="1044" y="260" text-anchor="middle" class="small">bounded outbound queue + rate limit</text>
+  <text x="1044" y="282" text-anchor="middle" class="small">过载时关闭或 TOO_MANY_UPDATES</text>
+
+  <rect x="870" y="332" width="349" height="120" rx="5" class="box"/>
+  <text x="1044" y="365" text-anchor="middle" class="head">DefaultWebSocketService</text>
+  <text x="1044" y="392" text-anchor="middle" class="body">WsCmdType dispatcher</text>
+  <text x="1044" y="417" text-anchor="middle" class="small">EntityData / AlarmData / unsubscribe</text>
+  <text x="1044" y="440" text-anchor="middle" class="small">session close 清理全部 subscription</text>
+
+  <rect x="870" y="492" width="349" height="172" rx="5" class="box"/>
+  <text x="1044" y="525" text-anchor="middle" class="head">DefaultTbEntityDataSubscriptionService</text>
+  <text x="1044" y="552" text-anchor="middle" class="body">sessionId + cmdId → TbEntityDataSubCtx</text>
+  <text x="1044" y="578" text-anchor="middle" class="small">Entity Query · history · latest · alarm</text>
+  <text x="1044" y="603" text-anchor="middle" class="small">dynamic page scheduler（默认 6s）</text>
+  <text x="1044" y="628" text-anchor="middle" class="small">max entities / datapoints limits</text>
+  <text x="1044" y="651" text-anchor="middle" class="small">history 后注册实时 subscription</text>
+
+  <rect x="870" y="704" width="349" height="148" rx="5" fill="#0b3a53" class="panel"/>
+  <text x="1044" y="738" text-anchor="middle" class="whiteHead">TbEntityDataSubCtx</text>
+  <text x="1044" y="766" text-anchor="middle" class="whiteBody">query + PageData + initialDataSent</text>
+  <text x="1044" y="791" text-anchor="middle" class="whiteBody">实体/key subscription + WebSocket lock</text>
+  <text x="1044" y="816" text-anchor="middle" class="whiteBody">合并 update → EntityDataUpdate</text>
+  <text x="1044" y="840" text-anchor="middle" class="whiteBody">fixed history 不注册 realtime</text>
+
+  <rect x="1305" y="175" width="293" height="142" rx="5" class="box"/>
+  <text x="1451" y="208" text-anchor="middle" class="head">LocalSubscriptionService</text>
+  <text x="1451" y="235" text-anchor="middle" class="body">本节点 subscription 明细</text>
+  <text x="1451" y="260" text-anchor="middle" class="small">按 entity/key 过滤 update</text>
+  <text x="1451" y="284" text-anchor="middle" class="small">pending + missed-update lookup</text>
+  <text x="1451" y="307" text-anchor="middle" class="small">add/remove TbEntitySubEvent</text>
+
+  <rect x="1305" y="360" width="293" height="148" rx="5" class="box"/>
+  <text x="1451" y="393" text-anchor="middle" class="head">SubscriptionManager</text>
+  <text x="1451" y="420" text-anchor="middle" class="body">Entity owner Core partition</text>
+  <text x="1451" y="445" text-anchor="middle" class="small">serviceId → keys/all-keys 摘要</text>
+  <text x="1451" y="469" text-anchor="middle" class="small">本地调用或远程 notification</text>
+  <text x="1451" y="493" text-anchor="middle" class="small">partition rebalance 需重建</text>
+
+  <rect x="1305" y="552" width="293" height="140" rx="5" fill="#fff7d6" class="panel"/>
+  <text x="1451" y="586" text-anchor="middle" class="head">Queue 抽象（Kafka 可选）</text>
+  <text x="1451" y="614" text-anchor="middle" class="body">TB_CORE partition</text>
+  <text x="1451" y="638" text-anchor="middle" class="body">Core service notification topic</text>
+  <text x="1451" y="664" text-anchor="middle" class="small">entityId 分区；serviceId 定向</text>
+
+  <rect x="1305" y="736" width="293" height="138" rx="5" class="box"/>
+  <text x="1451" y="769" text-anchor="middle" class="head">Telemetry Save callback</text>
+  <text x="1451" y="796" text-anchor="middle" class="body">history/latest aggregate success</text>
+  <text x="1451" y="821" text-anchor="middle" class="small">onTimeSeriesUpdate</text>
+  <text x="1451" y="845" text-anchor="middle" class="small">DB commit ≠ WebSocket delivered</text>
+
+  <rect x="1678" y="175" width="267" height="138" rx="5" fill="#263746" class="panel"/>
+  <text x="1811" y="209" text-anchor="middle" class="whiteHead">dashboard</text>
+  <text x="1811" y="237" text-anchor="middle" class="whiteBody">configuration varchar</text>
+  <text x="1811" y="262" text-anchor="middle" class="whiteBody">assigned_customers JSON</text>
+  <text x="1811" y="287" text-anchor="middle" class="whiteBody">title / image / mobile / external</text>
+
+  <rect x="1678" y="350" width="267" height="122" rx="5" class="box"/>
+  <text x="1811" y="383" text-anchor="middle" class="head">relation</text>
+  <text x="1811" y="410" text-anchor="middle" class="body">Customer/Edge Contains Dashboard</text>
+  <text x="1811" y="436" text-anchor="middle" class="small">Customer 列表按 relation 查询</text>
+  <text x="1811" y="459" text-anchor="middle" class="small">权限按 assigned_customers 判断</text>
+
+  <rect x="1678" y="510" width="267" height="148" rx="5" class="box"/>
+  <text x="1811" y="543" text-anchor="middle" class="head">Entity Query PostgreSQL</text>
+  <text x="1811" y="570" text-anchor="middle" class="body">实体表 + relation</text>
+  <text x="1811" y="596" text-anchor="middle" class="body">attribute_kv + ts_kv_latest</text>
+  <text x="1811" y="621" text-anchor="middle" class="small">动态 count/data SQL</text>
+  <text x="1811" y="645" text-anchor="middle" class="small">latest join / filter / sort / page</text>
+
+  <rect x="1678" y="698" width="267" height="145" rx="5" class="box"/>
+  <text x="1811" y="731" text-anchor="middle" class="head">History TimeseriesService</text>
+  <text x="1811" y="758" text-anchor="middle" class="body">PostgreSQL ts_kv</text>
+  <text x="1811" y="783" text-anchor="middle" class="body">Timescale hypertable/chunks</text>
+  <text x="1811" y="808" text-anchor="middle" class="body">Cassandra ts_kv_cf</text>
+  <text x="1811" y="832" text-anchor="middle" class="small">database.ts.type 选择</text>
+
+  <rect x="1678" y="882" width="267" height="124" rx="5" class="box"/>
+  <text x="1811" y="915" text-anchor="middle" class="head">alarm / audit_log / resources</text>
+  <text x="1811" y="942" text-anchor="middle" class="body">Alarm Widget / action audit</text>
+  <text x="1811" y="968" text-anchor="middle" class="small">ImageService 可拆出 base64 图片</text>
+  <text x="1811" y="992" text-anchor="middle" class="small">Dashboard title cache 仅缓存标题</text>
+
+  <path d="M378 220 H462" class="line"/>
+  <path d="M378 365 H430 V230 H462" class="blue"/>
+  <path d="M783 386 H820 V560 H870" class="line"/>
+  <path d="M783 560 H820 V246 H870" class="line"/>
+  <path d="M378 867 H870" class="blue"/>
+  <path d="M1219 392 H1250 V246 H1305" class="line"/>
+  <path d="M1219 578 H1270 V434 H1305" class="blue"/>
+  <path d="M1598 434 H1650 V411 H1678" class="line"/>
+  <path d="M1598 622 H1650 V584 H1678" class="async"/>
+  <path d="M1598 805 H1678" class="async"/>
+  <path d="M1598 434 H1620 V770 H1678" class="blue"/>
+  <path d="M1678 245 H1625 V230 H783" class="dash"/>
+
+  <path d="M1451 874 V925 H1270 V790 H1219" class="async"/>
+  <path d="M1305 622 H1260 V800 H1219" class="async"/>
+  <path d="M870 778 H815 V867 H378" class="blue"/>
+
+  <rect x="28" y="1240" width="1944" height="74" rx="5" fill="#263746"/>
+  <text x="52" y="1270" class="whiteHead">读图结论</text>
+  <text x="52" y="1296" class="whiteBody">实线：同步调用/数据库读取　蓝线：浏览器或 WebSocket 数据回路　红色虚线：跨节点 Queue/异步事件　灰色虚线：配置与运行时的间接关系</text>
+</svg>

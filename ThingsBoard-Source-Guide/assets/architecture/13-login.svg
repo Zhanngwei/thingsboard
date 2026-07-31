@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard release-3.6 Login architecture</title>
+  <desc id="desc">High contrast architecture showing browser, security filters, authentication provider, PostgreSQL, MFA, JWT signing, audit and token invalidation cache.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 z" fill="#253746"/>
+    </marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .section{font:700 23px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:600 19px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:16px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:16px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:7;stroke-linejoin:round}
+      .box{fill:#fff;stroke:#334155;stroke-width:2}
+      .blue{fill:#eef6f8;stroke:#176b87;stroke-width:2}
+      .amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:2}
+      .band{fill:#f8fafc;stroke:#64748b;stroke-width:2}
+      .db{fill:#fff;stroke:#334155;stroke-width:2}
+      .line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#176b87;stroke-width:2.5;stroke-dasharray:9 7;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1600" height="1040" fill="#ffffff"/>
+  <text x="800" y="52" text-anchor="middle" class="title">ThingsBoard 3.6 Login：凭据、MFA、JWT 与失效边界</text>
+
+  <rect x="35" y="85" width="300" height="880" rx="6" class="band"/>
+  <text x="185" y="122" text-anchor="middle" class="section">Browser / Angular</text>
+  <rect x="70" y="165" width="230" height="92" rx="5" class="box"/>
+  <text x="185" y="202" text-anchor="middle" class="label">LoginComponent</text>
+  <text x="185" y="230" text-anchor="middle" class="small">username + password</text>
+  <rect x="70" y="315" width="230" height="110" rx="5" class="blue"/>
+  <text x="185" y="352" text-anchor="middle" class="label">AuthService</text>
+  <text x="185" y="380" text-anchor="middle" class="small">login / MFA / refresh</text>
+  <text x="185" y="406" text-anchor="middle" class="small">load current user</text>
+  <rect x="70" y="505" width="230" height="105" rx="5" class="amber"/>
+  <text x="185" y="543" text-anchor="middle" class="label">localStorage</text>
+  <text x="185" y="571" text-anchor="middle" class="small">access + refresh token</text>
+  <text x="185" y="596" text-anchor="middle" class="small">client expiration time</text>
+  <rect x="70" y="690" width="230" height="100" rx="5" class="box"/>
+  <text x="185" y="730" text-anchor="middle" class="label">NgRx AuthState</text>
+  <text x="185" y="760" text-anchor="middle" class="small">user + authority + params</text>
+
+  <rect x="370" y="85" width="760" height="880" rx="6" class="band"/>
+  <text x="750" y="122" text-anchor="middle" class="section">ThingsBoard Core / Spring Security</text>
+  <rect x="410" y="165" width="270" height="95" rx="5" class="blue"/>
+  <text x="545" y="201" text-anchor="middle" class="label">RestLoginProcessingFilter</text>
+  <text x="545" y="230" text-anchor="middle" class="small">POST JSON to Authentication</text>
+  <rect x="795" y="165" width="290" height="95" rx="5" class="box"/>
+  <text x="940" y="201" text-anchor="middle" class="label">AuthenticationManager</text>
+  <text x="940" y="230" text-anchor="middle" class="small">provider selection</text>
+  <rect x="575" y="315" width="350" height="125" rx="5" class="green"/>
+  <text x="750" y="352" text-anchor="middle" class="label">RestAuthenticationProvider</text>
+  <text x="750" y="381" text-anchor="middle" class="small">user + credentials + policy</text>
+  <text x="750" y="407" text-anchor="middle" class="small">BCrypt / enabled / expiry / 2FA</text>
+  <rect x="410" y="505" width="285" height="120" rx="5" class="amber"/>
+  <text x="552" y="542" text-anchor="middle" class="label">SystemSecurityService</text>
+  <text x="552" y="571" text-anchor="middle" class="small">failure count / lockout</text>
+  <text x="552" y="597" text-anchor="middle" class="small">lastLoginTs / audit context</text>
+  <rect x="805" y="505" width="280" height="120" rx="5" class="blue"/>
+  <text x="945" y="542" text-anchor="middle" class="label">SuccessHandler</text>
+  <text x="945" y="571" text-anchor="middle" class="small">normal pair or</text>
+  <text x="945" y="597" text-anchor="middle" class="small">PRE_VERIFICATION_TOKEN</text>
+  <rect x="410" y="695" width="285" height="115" rx="5" class="box"/>
+  <text x="552" y="733" text-anchor="middle" class="label">TwoFactorAuth</text>
+  <text x="552" y="762" text-anchor="middle" class="small">provider code + rate limit</text>
+  <text x="552" y="788" text-anchor="middle" class="small">final login audit</text>
+  <rect x="805" y="695" width="280" height="115" rx="5" class="green"/>
+  <text x="945" y="733" text-anchor="middle" class="label">JwtTokenFactory</text>
+  <text x="945" y="762" text-anchor="middle" class="small">HS512 claims + sessionId</text>
+  <text x="945" y="788" text-anchor="middle" class="small">no token database row</text>
+  <rect x="575" y="865" width="350" height="70" rx="5" class="amber"/>
+  <text x="750" y="895" text-anchor="middle" class="label">DefaultTokenOutdatingService</text>
+  <text x="750" y="920" text-anchor="middle" class="small">compare JWT iat to invalidation time</text>
+
+  <rect x="1165" y="85" width="400" height="880" rx="6" class="band"/>
+  <text x="1365" y="122" text-anchor="middle" class="section">Persistence / Cache</text>
+  <ellipse cx="1365" cy="192" rx="155" ry="35" class="db"/>
+  <rect x="1210" y="192" width="310" height="115" class="db"/>
+  <ellipse cx="1365" cy="307" rx="155" ry="35" class="db"/>
+  <text x="1365" y="224" text-anchor="middle" class="label">PostgreSQL identity</text>
+  <text x="1365" y="253" text-anchor="middle" class="small">tb_user</text>
+  <text x="1365" y="279" text-anchor="middle" class="small">user_credentials</text>
+  <ellipse cx="1365" cy="420" rx="155" ry="35" class="db"/>
+  <rect x="1210" y="420" width="310" height="115" class="db"/>
+  <ellipse cx="1365" cy="535" rx="155" ry="35" class="db"/>
+  <text x="1365" y="451" text-anchor="middle" class="label">PostgreSQL settings</text>
+  <text x="1365" y="480" text-anchor="middle" class="small">user_auth_settings</text>
+  <text x="1365" y="506" text-anchor="middle" class="small">admin_settings</text>
+  <ellipse cx="1365" cy="650" rx="155" ry="35" class="db"/>
+  <rect x="1210" y="650" width="310" height="95" class="db"/>
+  <ellipse cx="1365" cy="745" rx="155" ry="35" class="db"/>
+  <text x="1365" y="686" text-anchor="middle" class="label">audit_log partitions</text>
+  <text x="1365" y="715" text-anchor="middle" class="small">async JPA executor</text>
+  <rect x="1210" y="835" width="310" height="95" rx="5" class="amber"/>
+  <text x="1365" y="870" text-anchor="middle" class="label">Caffeine or Redis</text>
+  <text x="1365" y="899" text-anchor="middle" class="small">user/session invalidation + TTL</text>
+
+  <path d="M185 257 L185 315" class="line"/>
+  <path d="M300 370 L410 215" class="line"/>
+  <path d="M680 212 L795 212" class="line"/>
+  <path d="M940 260 L825 315" class="line"/>
+  <path d="M750 440 L625 505" class="line"/>
+  <path d="M855 440 L915 505" class="line"/>
+  <path d="M552 625 L552 695" class="line"/>
+  <path d="M945 625 L945 695" class="line"/>
+  <path d="M805 752 L695 752" class="line"/>
+  <path d="M945 810 L825 865" class="line"/>
+  <path d="M1085 375 L1210 245" class="line"/>
+  <path d="M1085 555 L1210 475" class="line"/>
+  <path d="M695 565 L735 655 L1110 655 L1210 695" class="dash"/>
+  <path d="M925 900 L1210 882" class="line"/>
+  <path d="M805 752 L735 830 L350 830 L350 557 L300 557" class="dash"/>
+  <path d="M185 610 L185 690" class="line"/>
+
+  <text x="344" y="286" class="edge">POST /api/auth/login</text>
+  <text x="1125" y="355" class="edge">read/write</text>
+  <text x="1010" y="649" class="edge">async audit</text>
+  <text x="1020" y="874" class="edge">logout/change password</text>
+  <text x="365" y="815" class="edge">token response</text>
+
+  <text x="800" y="1010" text-anchor="middle" class="small">JWT is stateless, but early invalidation is stateful: use Redis when multiple Core nodes must share logout/password-change state.</text>
+</svg>

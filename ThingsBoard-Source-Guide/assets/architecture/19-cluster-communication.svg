@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1780" height="1140" viewBox="0 0 1780 1140" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 cluster communication architecture</title>
+  <desc id="desc">High contrast architecture of ZooKeeper discovery, deterministic partition ownership, broker routing, service notifications and local Actor state.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <marker id="blueArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L12,6 L0,12 z" fill="#176b87"/></marker>
+    <style>.title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.label{font:600 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}.edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8;stroke-linejoin:round}.band{fill:#f8fafc;stroke:#64748b;stroke-width:2}.blue{fill:#eef6f8;stroke:#176b87;stroke-width:2}.amber{fill:#fff7e8;stroke:#9a5b13;stroke-width:2}.green{fill:#ecfdf5;stroke:#047857;stroke-width:2}.red{fill:#fff1f2;stroke:#be123c;stroke-width:2}.line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}.dash{fill:none;stroke:#176b87;stroke-width:2.5;stroke-dasharray:9 7;marker-end:url(#blueArrow)}</style>
+  </defs>
+  <rect width="1780" height="1140" fill="#fff"/>
+  <text x="890" y="52" text-anchor="middle" class="title">ThingsBoard 3.6 Cluster：发现、所有权、Queue 路由与 Actor 交接</text>
+
+  <rect x="35" y="85" width="400" height="940" rx="6" class="band"/>
+  <text x="235" y="125" text-anchor="middle" class="section">Discovery</text>
+  <rect x="75" y="165" width="320" height="155" rx="5" class="blue"/>
+  <text x="235" y="204" text-anchor="middle" class="label">ServiceInfoProvider</text>
+  <text x="235" y="235" text-anchor="middle" class="small">serviceId · serviceTypes</text>
+  <text x="235" y="263" text-anchor="middle" class="small">assigned profiles · transports</text>
+  <text x="235" y="291" text-anchor="middle" class="small">system metrics are not routing weights</text>
+  <rect x="75" y="380" width="320" height="175" rx="5" class="green"/>
+  <text x="235" y="419" text-anchor="middle" class="label">ZooKeeper /nodes</text>
+  <text x="235" y="450" text-anchor="middle" class="small">ephemeral-sequential protobuf nodes</text>
+  <text x="235" y="478" text-anchor="middle" class="small">PathChildrenCache peer view</text>
+  <text x="235" y="506" text-anchor="middle" class="small">remove debounce by same serviceId</text>
+  <text x="235" y="534" text-anchor="middle" class="small">session LOST triggers reconnect</text>
+  <rect x="75" y="625" width="320" height="145" rx="5" class="amber"/>
+  <text x="235" y="664" text-anchor="middle" class="label">Topology Events</text>
+  <text x="235" y="695" text-anchor="middle" class="small">add → immediate recalc</text>
+  <text x="235" y="723" text-anchor="middle" class="small">remove → shutdown now, recalc later</text>
+  <rect x="75" y="840" width="320" height="135" rx="5" class="red"/>
+  <text x="235" y="879" text-anchor="middle" class="label">Identity boundary</text>
+  <text x="235" y="910" text-anchor="middle" class="small">serviceId must be stable and unique</text>
+  <text x="235" y="938" text-anchor="middle" class="small">ZK view convergence is asynchronous</text>
+
+  <rect x="475" y="85" width="400" height="940" rx="6" class="band"/>
+  <text x="675" y="125" text-anchor="middle" class="section">Ownership</text>
+  <rect x="515" y="165" width="320" height="175" rx="5" class="blue"/>
+  <text x="675" y="204" text-anchor="middle" class="label">HashPartitionService</text>
+  <text x="675" y="235" text-anchor="middle" class="small">QueueKey → topic + logical size</text>
+  <text x="675" y="263" text-anchor="middle" class="small">service lists sorted by serviceId</text>
+  <text x="675" y="291" text-anchor="middle" class="small">actual path is modulo, not hash ring</text>
+  <text x="675" y="319" text-anchor="middle" class="small">dedicated RE profile candidate sets</text>
+  <rect x="515" y="410" width="320" height="165" rx="5" class="green"/>
+  <text x="675" y="449" text-anchor="middle" class="label">Local Spring Events</text>
+  <text x="675" y="480" text-anchor="middle" class="small">PartitionChangeEvent</text>
+  <text x="675" y="508" text-anchor="middle" class="small">ClusterTopologyChangeEvent</text>
+  <text x="675" y="536" text-anchor="middle" class="small">ServiceListChangedEvent</text>
+  <rect x="515" y="645" width="320" height="155" rx="5" class="amber"/>
+  <text x="675" y="684" text-anchor="middle" class="label">Consumer Subscriptions</text>
+  <text x="675" y="715" text-anchor="middle" class="small">subscribe newly owned topics</text>
+  <text x="675" y="743" text-anchor="middle" class="small">unsubscribe revoked topics</text>
+  <text x="675" y="771" text-anchor="middle" class="small">broker group has its own rebalance</text>
+  <rect x="515" y="870" width="320" height="105" rx="5" class="red"/>
+  <text x="675" y="909" text-anchor="middle" class="label">Scale-out moves many partitions</text>
+  <text x="675" y="940" text-anchor="middle" class="small">server-count modulo changes broadly</text>
+
+  <rect x="915" y="85" width="400" height="940" rx="6" class="band"/>
+  <text x="1115" y="125" text-anchor="middle" class="section">Queue Transport</text>
+  <rect x="955" y="165" width="320" height="175" rx="5" class="blue"/>
+  <text x="1115" y="204" text-anchor="middle" class="label">DefaultTbClusterService</text>
+  <text x="1115" y="235" text-anchor="middle" class="small">resolve TopicPartitionInfo</text>
+  <text x="1115" y="263" text-anchor="middle" class="small">Core / Rule Engine Protobuf envelope</text>
+  <text x="1115" y="291" text-anchor="middle" class="small">producer callback = broker handoff</text>
+  <text x="1115" y="319" text-anchor="middle" class="small">no direct remote Actor reference</text>
+  <rect x="955" y="410" width="320" height="165" rx="5" class="amber"/>
+  <text x="1115" y="449" text-anchor="middle" class="label">Partitioned Data Topics</text>
+  <text x="1115" y="480" text-anchor="middle" class="small">entity hash → logical topic suffix</text>
+  <text x="1115" y="508" text-anchor="middle" class="small">owner consumer polls then commits</text>
+  <text x="1115" y="536" text-anchor="middle" class="small">messages survive process handoff</text>
+  <rect x="955" y="645" width="320" height="155" rx="5" class="green"/>
+  <text x="1115" y="684" text-anchor="middle" class="label">Per-service Notifications</text>
+  <text x="1115" y="715" text-anchor="middle" class="small">one topic per target serviceId</text>
+  <text x="1115" y="743" text-anchor="middle" class="small">broadcast expands to N sends</text>
+  <text x="1115" y="771" text-anchor="middle" class="small">consumer apply is not acknowledged</text>
+  <rect x="955" y="870" width="320" height="105" rx="5" class="red"/>
+  <text x="1115" y="909" text-anchor="middle" class="label">No outbox / no XA</text>
+  <text x="1115" y="940" text-anchor="middle" class="small">DB and cluster message can diverge</text>
+
+  <rect x="1355" y="85" width="390" height="940" rx="6" class="band"/>
+  <text x="1550" y="125" text-anchor="middle" class="section">Local Runtime</text>
+  <rect x="1390" y="165" width="320" height="175" rx="5" class="green"/>
+  <text x="1550" y="204" text-anchor="middle" class="label">Owner Consumer</text>
+  <text x="1550" y="235" text-anchor="middle" class="small">decode queue record</text>
+  <text x="1550" y="263" text-anchor="middle" class="small">dispatch Core service or AppActor</text>
+  <text x="1550" y="291" text-anchor="middle" class="small">business callback then offset commit</text>
+  <rect x="1390" y="410" width="320" height="175" rx="5" class="blue"/>
+  <text x="1550" y="449" text-anchor="middle" class="label">Local Actor Tree</text>
+  <text x="1550" y="480" text-anchor="middle" class="small">App → Tenant → Device / RuleChain</text>
+  <text x="1550" y="508" text-anchor="middle" class="small">partition change is high priority</text>
+  <text x="1550" y="536" text-anchor="middle" class="small">current message is not preempted</text>
+  <rect x="1390" y="655" width="320" height="165" rx="5" class="amber"/>
+  <text x="1550" y="694" text-anchor="middle" class="label">Revoke / Acquire</text>
+  <text x="1550" y="725" text-anchor="middle" class="small">stop old Device Actors / rule chains</text>
+  <text x="1550" y="753" text-anchor="middle" class="small">new owner rebuilds from DB/cache</text>
+  <text x="1550" y="781" text-anchor="middle" class="small">mailbox and Session do not migrate</text>
+  <rect x="1390" y="890" width="320" height="85" rx="5" class="red"/>
+  <text x="1550" y="929" text-anchor="middle" class="label">Old async work may overlap</text>
+  <text x="1550" y="958" text-anchor="middle" class="small">idempotency remains mandatory</text>
+
+  <path d="M235 320 L235 380" class="line"/>
+  <path d="M395 467 L470 467 L470 252 L515 252" class="line"/>
+  <path d="M675 340 L675 410" class="line"/>
+  <path d="M675 575 L675 645" class="line"/>
+  <path d="M835 252 L955 252" class="line"/>
+  <path d="M1115 340 L1115 410" class="line"/>
+  <path d="M1275 492 L1340 492 L1340 252 L1390 252" class="line"/>
+  <path d="M1275 722 L1360 722 L1360 492 L1390 492" class="dash"/>
+  <path d="M1550 340 L1550 410" class="line"/>
+  <path d="M1550 585 L1550 655" class="line"/>
+  <path d="M1550 820 L1550 890" class="dash"/>
+  <path d="M515 500 L450 500 L450 697 L395 697" class="dash"/>
+
+  <text x="425" y="450" class="edge">peer view</text>
+  <text x="855" y="240" class="edge">resolve</text>
+  <text x="1285" y="478" class="edge">poll</text>
+  <text x="1290" y="708" class="edge">targeted update</text>
+  <text x="445" y="683" class="edge">topology events</text>
+  <text x="890" y="1062" text-anchor="middle" class="small">ZooKeeper discovers service capabilities; PartitionService computes ownership; the configured queue broker carries cross-node data and notifications.</text>
+  <text x="890" y="1090" text-anchor="middle" class="small">Ownership changes do not transfer Actor objects, mailboxes, Sessions or in-flight side effects; the new owner reconstructs runtime state.</text>
+</svg>
