@@ -1,0 +1,216 @@
+@startuml
+title ThingsBoard 3.6 Device Claim - register, customer claim, reclaim and consistency boundaries
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam actorBorderColor #334155
+skinparam actorBackgroundColor #FFFFFF
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 240
+
+actor "Device" as Device
+participant "HTTP / MQTT / CoAP\nTransport" as Protocol
+participant "Credential Validation\nand SessionInfo" as Auth
+participant "DefaultTransportService" as Transport
+queue "Core Queue Producer" as Producer
+queue "Core Queue Consumer\ntb-core-node" as Consumer
+participant "Device Actor" as Actor
+participant "ClaimDevicesServiceImpl" as ClaimService
+collections "claimDevices Cache" as ClaimCache
+database "SERVER_SCOPE\nattribute_kv" as Attributes
+actor "Customer User" as CustomerUser
+participant "DeviceController" as Rest
+participant "DefaultTbDeviceService" as TbDeviceService
+database "device Table" as DeviceDb
+participant "Cluster / Audit" as Notify
+
+== Device-side registration ==
+alt HTTP Device API
+  Device -> Protocol : POST /api/v1/{token}/claim\nJSON or empty body
+  Protocol -> Auth : ValidateDeviceTokenRequestMsg
+  Auth --> Protocol : DeviceInfo and DeviceProfile
+else MQTT device or gateway
+  Device -> Protocol : PUBLISH v1/devices/me/claim\nor v1/gateway/claim
+  note over Device,Protocol
+    MQTT reuses the authenticated connection SessionInfo.
+    Gateway resolves each connected virtual DeviceId.
+  end note
+else CoAP Device API
+  Device -> Protocol : POST /api/v1/{token}/claim\nJSON or Protobuf
+  Protocol -> Auth : validate token or reuse DTLS identity
+  Auth --> Protocol : DeviceInfo and DeviceProfile
+end
+
+Protocol -> Protocol : adaptor builds ClaimDeviceMsg\nusing authenticated DeviceId
+Protocol -> Transport : process(sessionInfo, claimMsg, callback)
+Transport -> Transport : checkLimits and recordActivityInternal
+Transport -> Producer : send ToCoreMsg\nkey = DeviceId
+alt producer callback succeeds
+  Producer --> Protocol : callback success
+  alt HTTP
+    Protocol --> Device : 200 OK
+  else MQTT QoS 1
+    Protocol --> Device : PUBACK success
+  else CoAP
+    Protocol --> Device : 2.01 CREATED
+  end
+else producer callback fails
+  Producer --> Protocol : callback failure
+  Protocol --> Device : HTTP 500 / close MQTT / CoAP 5.00
+end
+
+Producer -> Consumer : Core Queue record
+Consumer -> Actor : TransportToDeviceActorMsgWrapper
+Actor -> ClaimService : registerClaimingInfo(tenantId, deviceId, secretKey, durationMs)
+Actor --> Consumer : callback.onSuccess immediately
+Consumer -> Consumer : commit pack
+note over Actor,ClaimService
+  The Actor does not await the ListenableFuture.
+  Registration failure cannot change the earlier device response
+  and normally cannot prevent the Core Queue commit.
+end note
+
+ClaimService -> DeviceDb : findDeviceById(tenantId, deviceId)
+DeviceDb --> ClaimService : Device snapshot
+alt device already has a Customer
+  ClaimService --> ClaimService : failed Future with IllegalArgumentException
+else allowClaimingByDefault is true
+  ClaimService -> ClaimCache : putIfAbsent([DeviceId], ClaimData)
+else global default is false
+  ClaimService -> Attributes : find SERVER_SCOPE claimingAllowed
+  Attributes --> ClaimService : Boolean value or empty
+  alt Boolean true and unassigned
+    ClaimService -> ClaimCache : putIfAbsent([DeviceId], ClaimData)
+  else missing false wrong type or already assigned
+    ClaimService --> ClaimService : failed Future with IllegalArgumentException
+  end
+end
+note over ClaimService,ClaimCache
+  ClaimData stores plaintext secretKey and expirationTime.
+  durationMs <= 0 uses security.claim.duration.
+  putIfAbsent keeps the first unexpired or stale cache entry.
+end note
+
+== Customer REST claim ==
+CustomerUser -> Rest : POST /api/customer/device/{deviceName}/claim\nJWT and ClaimRequest
+Rest -> DeviceDb : find by JWT tenantId and deviceName
+DeviceDb --> Rest : Device snapshot
+Rest -> Rest : check CLAIM_DEVICES permission\nand derive JWT customerId
+Rest -> TbDeviceService : claimDevice(tenantId, device, customerId, secretKey, user)
+TbDeviceService -> ClaimService : claimDevice(device, customerId, secretKey)
+ClaimService -> ClaimCache : get([DeviceId])
+alt cache miss
+  ClaimService -> Attributes : find SERVER_SCOPE claimingData
+  Attributes --> ClaimService : JSON ClaimData or empty
+end
+
+alt no ClaimData and unassigned
+  ClaimService --> TbDeviceService : ClaimResult FAILURE
+  TbDeviceService --> Rest : FAILURE
+  Rest --> CustomerUser : 400 FAILURE
+else no ClaimData and already assigned
+  ClaimService --> TbDeviceService : ClaimResult CLAIMED
+  TbDeviceService --> Rest : CLAIMED
+  Rest --> CustomerUser : 400 CLAIMED
+else expired or wrong secret
+  alt source is cache
+    ClaimService -> ClaimCache : evict([DeviceId])
+  else source is SERVER_SCOPE
+    note over ClaimService,Attributes
+      Failed persistent claimingData is retained.
+    end note
+  end
+  ClaimService --> TbDeviceService : ClaimResult FAILURE
+  TbDeviceService --> Rest : FAILURE
+  Rest --> CustomerUser : 400 FAILURE
+else valid ClaimData but already assigned
+  ClaimService -> ClaimCache : evict if cache source
+  ClaimService -> Attributes : delete claimingAllowed and claimingData
+  Attributes --> ClaimService : delete callback
+  ClaimService --> TbDeviceService : ClaimResult CLAIMED
+  TbDeviceService --> Rest : CLAIMED
+  Rest --> CustomerUser : 400 CLAIMED
+else valid ClaimData and unassigned
+  ClaimService -> DeviceDb : saveDevice(customerId)\nindependent transaction
+  DeviceDb --> ClaimService : committed Device
+  ClaimService -> Notify : onDeviceUpdated(savedDevice, device)
+  ClaimService -> ClaimCache : evict if cache source
+  ClaimService -> Attributes : delete claimingAllowed and claimingData
+  alt attribute delete succeeds
+    Attributes --> ClaimService : callback success
+    ClaimService --> TbDeviceService : ClaimResult SUCCESS
+    TbDeviceService -> Notify : audit ASSIGNED_TO_CUSTOMER
+    TbDeviceService --> Rest : ClaimResult SUCCESS
+    Rest --> CustomerUser : 200 ClaimResult
+  else attribute delete fails
+    Attributes --> ClaimService : callback failure
+    ClaimService --> TbDeviceService : failed Future
+    TbDeviceService --> Rest : error
+    Rest --> CustomerUser : error response
+    note over DeviceDb,CustomerUser
+      device.customer_id is already committed.
+      Attribute failure does not roll it back.
+    end note
+  end
+end
+
+== Concurrent customer claim risk ==
+note over CustomerUser,DeviceDb
+  Customer REST does not pass through Device Actor.
+  There is no row lock, @Version, distributed lock, or
+  conditional UPDATE WHERE customer_id IS NULL.
+  Two customers may both return SUCCESS while last write wins.
+end note
+
+== Reclaim / unclaim ==
+CustomerUser -> Rest : DELETE /api/customer/device/{deviceName}/claim
+Rest -> DeviceDb : find by tenantId and deviceName
+DeviceDb --> Rest : Device snapshot
+Rest -> Rest : CLAIM_DEVICES permission
+Rest -> TbDeviceService : reclaimDevice(tenantId, device, user)
+TbDeviceService -> ClaimService : reClaimDevice(tenantId, device)
+ClaimService -> ClaimCache : evict([DeviceId])
+alt device is assigned
+  ClaimService -> DeviceDb : saveDevice(customerId = NULL_UUID)\nindependent transaction
+  DeviceDb --> ClaimService : committed Device
+  ClaimService -> Notify : onDeviceUpdated(savedDevice, device)
+  alt allowClaimingByDefault is false
+    ClaimService -> Attributes : save SERVER_SCOPE claimingAllowed = true
+    alt attribute save succeeds
+      Attributes --> ClaimService : callback success
+      ClaimService --> TbDeviceService : ReclaimResult
+    else attribute save fails
+      Attributes --> ClaimService : callback failure
+      ClaimService --> TbDeviceService : failed Future
+      note over DeviceDb,Attributes
+        The Device is already unassigned even though REST fails.
+      end note
+    end
+  else global default is true
+    ClaimService --> TbDeviceService : ReclaimResult
+  end
+else already unassigned
+  ClaimService --> TbDeviceService : ReclaimResult without Customer
+end
+TbDeviceService -> Notify : audit UNASSIGNED_FROM_CUSTOMER when applicable
+TbDeviceService --> Rest : completion
+Rest --> CustomerUser : 200 OK
+
+note over Protocol,Notify
+  Claim and reclaim broadcast Device updates, but the 3.6 Transport
+  onDeviceUpdate merge does not rewrite SessionInfo customerId fields.
+  Long-lived MQTT or CoAP sessions can retain the old customer snapshot
+  until credentials are validated again or the device reconnects.
+end note
+@enduml

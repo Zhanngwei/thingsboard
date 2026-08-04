@@ -1,0 +1,788 @@
+# 27 Device Provision 流程
+
+> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章分析原生 HTTP、MQTT、CoAP `/provision` 控制面，以及与它容易混淆的 X.509 证书链自动注册旁路。
+
+[上一篇：26 MQTT Gateway 流程](../26-mqtt-gateway/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/27-device-provision.svg) | [下一篇：28 Device Claim 流程](../28-device-claim/README.md)
+
+---
+
+## 一、流程目标
+
+Device Provision 解决的是设备第一次拿到长期凭据的问题。设备尚无 access token、MQTT Basic 或 X.509 凭据，不能走普通 Device API 认证；它先提交 Device Profile 级的 `provisionDeviceKey + provisionDeviceSecret`，Core 决定是创建新设备，还是为已经预创建设备返回现有凭据。
+
+三个协议入口最终都生成 [org.thingsboard.server.gen.transport.TransportProtos.ProvisionDeviceRequestMsg](../../../common/proto/src/main/proto/queue.proto#L510)，再进入 `DefaultTransportService -> Transport API request/reply -> DefaultTransportApiService -> DeviceProvisionServiceImpl`。这里没有普通设备 `SessionInfoProto`，也不经过 Device Actor。成功创建时，`device` 与 `device_credentials` 在一个 DAO 事务内提交；`provisionState`、集群通知、Rule Engine 事件和审计日志在事务之外完成。
+
+```mermaid
+flowchart TB
+    H["HTTP POST /api/v1/provision"] --> U["ProvisionDeviceRequestMsg"]
+    M["MQTT clientId or username = provision"] --> U
+    C["CoAP POST /api/v1/provision"] --> U
+    U --> T["DefaultTransportService.process"]
+    T --> Q["Transport API request and reply"]
+    Q --> A["DefaultTransportApiService.handle"]
+    A --> P["DeviceProvisionServiceImpl.provisionDevice"]
+    P --> S{"Device Profile strategy"}
+    S -->|"ALLOW_CREATE_NEW_DEVICES"| N["Create device and credentials"]
+    S -->|"CHECK_PRE_PROVISIONED_DEVICES"| E["Return existing credentials"]
+    N --> D[("PostgreSQL")]
+    E --> D
+    P -. "events after the main write" .-> R["Rule Engine and audit"]
+```
+
+阅读本章时要先区分四组概念：
+
+1. `provisionDeviceKey` 用于全局定位 Device Profile，`provisionDeviceSecret` 再完成共享秘密校验；它们不是最终设备凭据。
+2. `ALLOW_CREATE_NEW_DEVICES` 创建新 `device`；`CHECK_PRE_PROVISIONED_DEVICES` 要求同租户、同名且绑定同一 Profile 的设备已经存在。
+3. 请求中的 `credentialsType/token/clientId/username/password/hash` 只影响新建设备；预建设备路径直接返回数据库里的现有凭据。
+4. Profile 的 `X509_CERTIFICATE_CHAIN` 策略由 TLS/DTLS 握手的 `ValidateOrCreateDeviceX509CertRequestMsg` 触发，不是三个 `/provision` 入口统一使用的 `ProvisionDeviceRequestMsg`。
+
+---
+
+## 二、入口
+
+### 2.1 三协议入口
+
+| 协议 | 建立入口 | Provision 请求 | Payload | 成功/业务失败映射 |
+|---|---|---|---|---|
+| HTTP | `POST /api/v1/provision` | body 直接解析 | 仅 JSON | Transport 回调成功一律 HTTP `200 OK`；业务状态在 body |
+| MQTT | CONNECT 的 `clientId` 或 `username` 等于 `provision` | PUBLISH `/provision/request` | 先 JSON，JSON parse error 才回退 Protobuf | PUBACK 成功后直写 `/provision/response`；60 秒后计划关闭连接 |
+| CoAP | `POST /api/v1/provision` | 无 access token path | 先 JSON，JSON parse error 才回退 Protobuf | `SUCCESS -> 2.01 CREATED`；`NOT_FOUND/FAILURE -> 4.00 BAD_REQUEST` |
+
+源码入口分别是 [org.thingsboard.server.transport.http.DeviceApiController.provisionDevice(String)](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L544)、[org.thingsboard.server.transport.mqtt.MqttTransportHandler.processProvisionSessionMsg(ChannelHandlerContext, MqttMessage)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L337) 和 [org.thingsboard.server.transport.coap.CoapTransportResource.processProvision(CoapExchange)](../../../common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java#L237)。
+
+```mermaid
+flowchart LR
+    H["HTTP JSON body"] --> J["JsonConverter"]
+    MC["MQTT CONNECT with provision identity"] --> MP["PUBLISH /provision/request"]
+    MP --> MJ{"JSON parse succeeds"}
+    MJ -->|"yes"| J
+    MJ -->|"no, parse error only"| PB["ProtoConverter"]
+    CP["CoAP POST /api/v1/provision"] --> CJ{"JSON parse succeeds"}
+    CJ -->|"yes"| J
+    CJ -->|"no, parse error only"| PB
+    J --> U["ProvisionDeviceRequestMsg"]
+    PB --> U
+```
+
+MQTT 的 Provision CONNECT 不先校验设备凭据。[MqttTransportHandler.processConnect(ChannelHandlerContext, MqttConnectMessage)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1230) 只要发现用户名或 clientId 为 `provision`，就把连接标记为 `provisionOnly` 并返回成功 CONNACK。这个连接不会注册普通设备 session；真正的授权发生在随后 payload 的 Profile key/secret 校验。
+
+### 2.2 输入契约
+
+JSON 由 [org.thingsboard.server.common.adaptor.JsonConverter.buildProvisionRequestMsg(JsonObject)](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/JsonConverter.java#L976) 转换。`provisionDeviceKey` 和 `provisionDeviceSecret` 是必填字段；`credentialsType` 缺省为 `ACCESS_TOKEN`，其他最终凭据字段允许为空。
+
+```json
+{
+  "deviceName": "line-01-sensor",
+  "provisionDeviceKey": "profile-key",
+  "provisionDeviceSecret": "profile-secret",
+  "credentialsType": "MQTT_BASIC",
+  "clientId": "line-01",
+  "username": "sensor",
+  "password": "change-me"
+}
+```
+
+Proto 的精确字段为：`deviceName`、`credentialsType`、`ProvisionDeviceCredentialsMsg` 和 `CredentialsDataProto`。后者同时容纳 access token、Basic MQTT 和 X.509 输入，所以协议适配层不需要维护三套业务 DTO。
+
+```mermaid
+flowchart TB
+    R["Provision request"] --> K["provisionDeviceKey required"]
+    R --> S["provisionDeviceSecret required"]
+    R --> N["deviceName optional for create strategy"]
+    R --> CT{"credentialsType"}
+    CT -->|"ACCESS_TOKEN"| AT["token optional; empty means generated token"]
+    CT -->|"MQTT_BASIC"| MB["clientId, username and password"]
+    CT -->|"X509_CERTIFICATE"| X["hash field carried as certificate value"]
+    CT -->|"omitted in JSON"| DEF["ACCESS_TOKEN"]
+```
+
+### 2.3 默认配置与边界
+
+| 配置 | release-3.6 默认值 | Provision 影响 |
+|---|---:|---|
+| `transport.api_enabled` | `true` | 总 Transport API 开关 |
+| `transport.http.enabled` | `true` | 本地 HTTP Transport |
+| `transport.mqtt.bind_port` | `1883` | MQTT 明文监听端口 |
+| `transport.coap.bind_port` | `5683` | CoAP UDP 监听端口 |
+| `spring.mvc.async.request-timeout` | `30000 ms` | Provision `DeferredResult` 未单独设置 timeout，使用 Spring 默认 |
+| `queue.transport_api.max_pending_requests` | `10000` | Transport 实例的 request/reply pending map 上限 |
+| `queue.transport_api.max_requests_timeout` | `10000 ms` | Provision Transport API Future 的默认超时 |
+| `queue.transport_api.request_poll_interval` | `25 ms` | Core 请求轮询 |
+| `queue.transport_api.response_poll_interval` | `25 ms` | Transport 响应轮询 |
+| Kafka transport-api topic | `10 partitions` | request/reply topic 的默认分区数 |
+| `cache.type` | `caffeine` | Profile/device/credentials 默认本地缓存 |
+| `deviceCredentials` cache | `TTL 1440 min`, `maxSize 10000` | 最终凭据按 credentialsId 查询缓存 |
+| `deviceProfiles` cache | `TTL 1440 min`, `maxSize 10000` | Provision key 到 Profile 的查询缓存 |
+
+配置来源：[thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L484)、[Transport API Queue defaults](../../../application/src/main/resources/thingsboard.yml#L1539) 和 [Kafka topic defaults](../../../application/src/main/resources/thingsboard.yml#L1409)。
+
+---
+
+## 三、完整调用链
+
+### 3.1 公共主链
+
+| 步骤 | 全限定类名、精确方法与参数 | 输入 | 输出与职责 | 设计原因与确认边界 |
+|---:|---|---|---|---|
+| 1 | `org.thingsboard.server.transport.http.DeviceApiController.provisionDevice(String json)` | HTTP JSON body | `DeferredResult<ResponseEntity>`；调用 `JsonConverter` | Servlet 请求不执行 DAO；业务失败仍走正常 callback |
+| 1 | `org.thingsboard.server.transport.mqtt.MqttTransportHandler.processProvisionSessionMsg(ChannelHandlerContext ctx, MqttMessage msg)` | Provision-only PUBLISH | JSON/Proto `ProvisionDeviceRequestMsg` | MQTT 会话只承载一次 Provision；不是 Device Actor session |
+| 1 | `org.thingsboard.server.transport.coap.CoapTransportResource.processProvision(CoapExchange exchange)` | token-less CoAP POST | JSON/Proto `ProvisionDeviceRequestMsg` | 随机 UUID 只用于日志/adaptor；没有注册 Transport session |
+| 2 | `org.thingsboard.server.common.adaptor.JsonConverter.convertToProvisionRequestMsg(String json)` | JSON object | 统一 Proto | 必填 key/secret 在边缘转换；credentialsType 默认 ACCESS_TOKEN |
+| 3 | `org.thingsboard.server.common.transport.service.DefaultTransportService.process(ProvisionDeviceRequestMsg requestMsg, TransportServiceCallback<ProvisionDeviceResponseMsg> callback)` | 统一 Proto | `TransportApiRequestMsg.provisionDeviceRequestMsg` | 生成外层 UUID key，进入相关 request/reply；不走 Core/RE 设备消息 |
+| 4 | `org.thingsboard.server.queue.common.DefaultTbQueueRequestTemplate.send(Request request, long requestTimeoutNs)` | Transport API request | `ListenableFuture<Response>` | 写 requestId、responseTopic、expireTs headers；pending map 是响应关联边界 |
+| 5 | `org.thingsboard.server.service.transport.TbCoreTransportApiService.init()` 创建的 response template | request topic record | 调用 `TransportApiService.handle(...)` | Core 共享 consumer group 消费；处理完成后按 header 指定 response topic 回复 |
+| 6 | `org.thingsboard.server.service.transport.DefaultTransportApiService.handle(TbProtoQueueMsg<TransportApiRequestMsg> tbProtoQueueMsg)` | Transport API envelope | 分派到 Provision overload | 控制面复用统一 Queue；单体 in-memory 与微服务 Kafka 使用相同抽象 |
+| 7 | `org.thingsboard.server.service.transport.DefaultTransportApiService.handle(ProvisionDeviceRequestMsg requestMsg)` | Proto | 构造 `ProvisionRequest`，返回 `TransportApiResponseMsg` | `ProvisionFailedException.message` 被解释成 `ResponseStatus` |
+| 8 | `org.thingsboard.server.service.device.DeviceProvisionServiceImpl.provisionDevice(ProvisionRequest provisionRequest)` | 领域请求 | `ProvisionResponse` 或异常 | 查 Profile、验 secret、选择创建或预置策略；此方法没有 `@Transactional` |
+| 9 | `org.thingsboard.server.dao.device.DeviceProfileServiceImpl.findDeviceProfileByProvisionDeviceKey(String provisionDeviceKey)` | Profile key | `DeviceProfile` 或 `null` | key cache miss 才访问 `device_profile`；key 由数据库唯一约束保护 |
+| 10 | `org.thingsboard.server.dao.device.DeviceServiceImpl.findDeviceByTenantIdAndName(TenantId tenantId, String name)` | Profile tenant + deviceName | 现有 `Device` 或 `null` | 先判断策略所需的存在性；device cache 可缓存 null |
+| 11A | `org.thingsboard.server.service.device.DeviceProvisionServiceImpl.processCreateDevice(ProvisionRequest provisionRequest, DeviceProfile profile)` | create 策略 | 新设备凭据 | 调 DAO 事务后同步等待 `provisionState`，但不等待 RE producer callback |
+| 11B | `org.thingsboard.server.service.device.DeviceProvisionServiceImpl.processProvision(Device device, ProvisionRequest provisionRequest)` | pre-provision 策略 | 现有凭据 | 只写 `SERVER_SCOPE/provisionState`；请求中的新 credentialsData 不生效 |
+| 12 | `org.thingsboard.server.service.transport.DefaultTransportApiService.getTransportApiResponseMsg(DeviceCredentials deviceCredentials, ResponseStatus status)` | 凭据与状态 | `ProvisionDeviceResponseMsg` | ACCESS_TOKEN 返回 credentialsId；Basic/X.509 返回 credentialsValue |
+| 13 | 三协议 `DeviceProvisionCallback.onSuccess(ProvisionDeviceResponseMsg msg)` | 统一响应 | HTTP/MQTT/CoAP 协议响应 | 此时主数据库写与 `provisionState` 已完成；RE 事件处理不在确认边界内 |
+
+关键源码：[DefaultTransportService.java:747](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L747)、[DefaultTransportApiService.java:537](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L537)、[DeviceProvisionServiceImpl.java:187](../../../application/src/main/java/org/thingsboard/server/service/device/DeviceProvisionServiceImpl.java#L187)、[DeviceServiceImpl.java:803](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L803)。
+
+```mermaid
+sequenceDiagram
+    participant D as "Device"
+    participant P as "HTTP, MQTT or CoAP adaptor"
+    participant T as "DefaultTransportService"
+    participant Q as "Transport API request template"
+    participant C as "DefaultTransportApiService"
+    participant S as "DeviceProvisionServiceImpl"
+    participant DAO as "Device and credential services"
+    participant DB as "PostgreSQL"
+    D->>P: "Provision request"
+    P->>T: "process(ProvisionDeviceRequestMsg, callback)"
+    T->>Q: "send(TransportApiRequestMsg)"
+    Q->>C: "request topic with correlation headers"
+    C->>S: "provisionDevice(ProvisionRequest)"
+    S->>DAO: "lookup profile and device"
+    alt "create strategy and name absent"
+        S->>DAO: "saveDevice(ProvisionRequest, DeviceProfile)"
+        DAO->>DB: "transaction: device plus device_credentials"
+        DB-->>DAO: "commit"
+    else "pre-provisioned strategy"
+        S->>DB: "save SERVER_SCOPE provisionState"
+    end
+    S-->>C: "ProvisionResponse"
+    C-->>Q: "ProvisionDeviceResponseMsg"
+    Q-->>T: "correlated future completion"
+    T-->>P: "callback onSuccess"
+    P-->>D: "protocol response"
+```
+
+### 3.2 策略分支
+
+[DeviceProvisionServiceImpl.provisionDevice(ProvisionRequest)](../../../application/src/main/java/org/thingsboard/server/service/device/DeviceProvisionServiceImpl.java#L187) 先 trim 非空 deviceName，再验证 key/secret 非空，通过 key 找 Profile，最后按 `DeviceProfileProvisionType` 分支：
+
+```mermaid
+flowchart TB
+    R["ProvisionRequest"] --> V{"key and secret are non-empty"}
+    V -->|"no"| NF["NOT_FOUND"]
+    V -->|"yes"| P{"Profile found by provisionDeviceKey"}
+    P -->|"no"| NF
+    P -->|"yes"| SEC{"secret equals Profile secret"}
+    SEC -->|"no"| NF
+    SEC -->|"yes"| ST{"Provision type"}
+    ST -->|"ALLOW_CREATE_NEW_DEVICES"| EX{"same tenant and name already exists"}
+    EX -->|"yes"| F["FAILURE and failure event"]
+    EX -->|"no"| CREATE["create device"]
+    ST -->|"CHECK_PRE_PROVISIONED_DEVICES"| MATCH{"device exists and Profile id matches"}
+    MATCH -->|"yes"| PRE["save provisionState and return existing credentials"]
+    MATCH -->|"no"| F
+    ST -->|"DISABLED"| NF
+    ST -->|"X509_CERTIFICATE_CHAIN"| BAD["custom exception text; response mapping hazard"]
+```
+
+`ALLOW_CREATE_NEW_DEVICES` 不是 upsert。同名设备存在时明确失败，因此成功响应丢失后重试不会稳定返回原凭据。`CHECK_PRE_PROVISIONED_DEVICES` 对已经是 `provisioned` 的设备仍执行 else 分支、再次保存同值并返回成功，所以表现更接近可重复读取，但代码没有行锁或 compare-and-set。
+
+### 3.3 凭据创建与返回
+
+`DeviceServiceImpl.saveDevice(ProvisionRequest, DeviceProfile)` 先调用普通 `saveDevice(Device)`，后者为新设备创建 20 位随机 ACCESS_TOKEN；只有请求至少提供了 token、X.509 值、clientId、username 或 password 之一时，才把默认凭据更新为请求类型。整个过程位于同一个 `@Transactional` 方法中。
+
+```mermaid
+flowchart TB
+    C["Create new device"] --> BASE["Create default 20 character ACCESS_TOKEN"]
+    BASE --> DATA{"Any requested credential field is non-empty"}
+    DATA -->|"no"| RANDOM["Keep generated access token"]
+    DATA -->|"yes"| TYPE{"credentialsType"}
+    TYPE -->|"ACCESS_TOKEN"| TOKEN["credentialsId = token"]
+    TYPE -->|"MQTT_BASIC"| BASIC["credentialsValue = BasicMqttCredentials JSON"]
+    BASIC --> BID["credentialsId derived from clientId and username"]
+    TYPE -->|"X509_CERTIFICATE"| CERT["trim certificate value"]
+    CERT --> CID["credentialsId = SHA3 certificate value"]
+    RANDOM --> RESP["ProvisionDeviceResponseMsg"]
+    TOKEN --> RESP
+    BID --> RESP
+    CID --> RESP
+```
+
+Basic MQTT 的 `credentialsId` 规则来自 [DeviceCredentialsServiceImpl.formatSimpleMqttCredentials(DeviceCredentials)](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceCredentialsServiceImpl.java#L227)：只有 username 时直接使用 username；只有 clientId 时使用其 SHA3；两者都有时对 `"|", clientId, username` 求 SHA3；clientId + password 但无 username 被拒绝。X.509 由 [formatCertData(DeviceCredentials)](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceCredentialsServiceImpl.java#L261) 规范换行并计算 SHA3。
+
+### 3.4 事务和确认边界
+
+1. `DeviceServiceImpl.saveDevice(ProvisionRequest, DeviceProfile)` 的 Spring 事务原子覆盖 `device` 与 `device_credentials`。凭据唯一约束失败会抛异常并回滚这两个写入。
+2. `DeviceProvisionServiceImpl` 自身没有事务。DAO 返回后才调用 `clusterService.onDeviceUpdated(...)`、同步等待 `attributesService.save(...).get()`、发送两个 Rule Engine 事件并记录 audit。
+3. `provisionState` 保存失败会让客户端得到 `FAILURE`，但已经提交的 device/credentials 不会回滚；下一次 create 策略请求又会因同名设备存在而失败。这是生产排障必须识别的“部分成功”窗口。
+4. Provision 响应不等待 `ENTITY_CREATED` 或 `PROVISION_SUCCESS` 被 Rule Engine 消费；`sendToRuleEngine(..., callback=null)` 连 producer callback 都没有纳入响应。
+5. HTTP `200`、MQTT PUBACK、CoAP `2.01` 都只说明 Core 返回了 `SUCCESS`，不是 Rule Chain 业务成功确认。
+
+---
+
+## 四、消息流
+
+主链有两类 Queue 流量和三类本地/数据库调用：
+
+| 流量 | Topic/实现 | key 与路由 | 消费者 | 是否等待 |
+|---|---|---|---|---|
+| Provision request | `tb_transport.api.requests` | `TbProtoQueueMsg` 随机 UUID；Kafka 按 key 选择 partition | `tb-core-transport-api-consumer` group | Transport Future 等待 response，默认 10 秒 |
+| Provision response | `tb_transport.api.responses.{serviceId}` | requestId header 相关；responseTopic header 定向 | `transport-node-{serviceId}` group | 完成原 Transport pending Future |
+| Profile/device lookup | DAO + Caffeine/Redis cache | provision key、tenant/name | Core 本地服务 | 同步 |
+| device/credentials 写入 | Spring/JPA transaction | tenant/name 与 credentials unique constraints | PostgreSQL | 事务提交后继续 |
+| Provision Rule Engine events | tenant queue/partition | tenantId + device originator | Rule Engine consumer | 不等待 producer callback 或消费 |
+
+```mermaid
+flowchart TB
+    U["ProvisionDeviceRequestMsg"] --> TAQ["tb_transport.api.requests"]
+    TAQ --> CORE["Core Transport API consumer"]
+    CORE --> DB["DAO transaction and attribute future"]
+    DB --> TAR["tb_transport.api.responses.serviceId"]
+    TAR --> CB["Protocol callback"]
+    DB -. "ENTITY_CREATED" .-> REQ["Rule Engine queue"]
+    DB -. "PROVISION_SUCCESS or PROVISION_FAILURE" .-> REQ
+    REQ -. "consumer later" .-> RC["Rule Chain"]
+    CB --> ACK["HTTP body, MQTT response or CoAP code"]
+```
+
+### 4.1 Session 与 cache
+
+```mermaid
+flowchart LR
+    H["HTTP DeferredResult"] --> PM["Transport API pending request map"]
+    M["MQTT provisionOnly channel state"] --> PM
+    C["CoAP exchange and log UUID"] --> PM
+    PM -->|"requestId"| F["ListenableFuture"]
+    KEY["provisionDeviceKey"] --> PC["Device Profile cache"]
+    DN["tenantId plus deviceName"] --> DC["Device cache"]
+    CID["credentialsId"] --> CC["Device credentials cache"]
+    NOTE["No SessionInfoProto and no Transport session registration"] -.-> PM
+```
+
+HTTP 的 `DeferredResult`、MQTT 的 Netty channel 和 CoAP 的 `CoapExchange` 是协议等待对象；它们不是 ThingsBoard 设备 session。公共层只在 `DefaultTbQueueRequestTemplate.pendingRequests` 保存 requestId 到 Future 的临时关联。进程崩溃后这些等待对象不会恢复。
+
+Profile cache 的 key 包括 provision key；Profile 更新事务事件会清理该 key。[DeviceProfileServiceImpl.handleEvictEvent(DeviceProfileEvictEvent)](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L143) 证明不是依赖 TTL 才生效。Credentials 更新同样通过 [DeviceCredentialsServiceImpl.handleEvictEvent(DeviceCredentialsEvictEvent)](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceCredentialsServiceImpl.java#L84) 同时失效新旧 credentialsId。
+
+---
+
+## 五、时序图
+
+下图覆盖三协议入口、统一 Transport API、两种策略、事务后副作用和协议响应差异。
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="ThingsBoard Device Provision 完整时序图"></a>
+
+```mermaid
+sequenceDiagram
+    participant D as "Device"
+    participant I as "Protocol ingress"
+    participant T as "DefaultTransportService"
+    participant K as "Kafka or in-memory Transport API"
+    participant A as "DefaultTransportApiService"
+    participant P as "DeviceProvisionServiceImpl"
+    participant DB as "PostgreSQL"
+    D->>I: "HTTP, MQTT or CoAP provision payload"
+    I->>T: "ProvisionDeviceRequestMsg"
+    T->>K: "request with requestId and responseTopic"
+    K->>A: "handle TransportApiRequestMsg"
+    A->>P: "provisionDevice ProvisionRequest"
+    alt "allow create"
+        P->>DB: "transaction: device and device_credentials"
+        DB-->>P: "commit"
+        P->>DB: "attribute_kv provisionState"
+    else "check pre-provisioned"
+        P->>DB: "find device and existing credentials"
+        P->>DB: "attribute_kv provisionState"
+    end
+    P-->>A: "credentials and SUCCESS"
+    A-->>K: "correlated response"
+    K-->>T: "future completed"
+    T-->>I: "callback"
+    I-->>D: "protocol-specific response"
+```
+
+PlantUML 图比 Mermaid 图多展示了 Profile cache、数据库唯一约束、Rule Engine event 和错误分支，适合排障时新窗口缩放查看。
+
+---
+
+## 六、数据变化
+
+### 6.1 策略对应的数据变化
+
+| 数据/状态 | ALLOW_CREATE_NEW_DEVICES | CHECK_PRE_PROVISIONED_DEVICES | 失败时可能状态 |
+|---|---|---|---|
+| `device_profile` | 只读 key、secret、策略 | 同左 | 不变 |
+| Profile cache | 命中或回填 | 命中或回填 | 可缓存未命中；Profile 更新事件负责失效 |
+| `device` | 新增一行 | 读取已有行 | 主事务失败则回滚；属性失败时设备行已提交 |
+| `device_credentials` | 与 device 同事务新增，可能从随机 token 更新为指定类型 | 读取已有行，不采用请求里的凭据 | 唯一冲突回滚主事务 |
+| `attribute_kv` | 写 `SERVER_SCOPE/provisionState=provisioned` | 写同一属性 | 失败不会回滚已提交 device/credentials |
+| `audit_log` | `PROVISION_SUCCESS` 或后续 failure | 同左 | audit 能力可由 Dummy 实现关闭 |
+| Rule Engine Queue | `ENTITY_CREATED` + `PROVISION_SUCCESS` | `PROVISION_SUCCESS` | 某些分支发 `PROVISION_FAILURE`；不保证与响应原子 |
+| Actor/session | 无 | 无 | 无需恢复 Device Actor session |
+
+```mermaid
+stateDiagram-v2
+    state "ProfileLocated" as ProfileLocated
+    state "CreateTransaction" as CreateTransaction
+    state "DeviceAndCredentialsCommitted" as DeviceAndCredentialsCommitted
+    state "ProvisionStateSaved" as ProvisionStateSaved
+    state "PartialSuccess" as PartialSuccess
+    state "ExistingDeviceChecked" as ExistingDeviceChecked
+    state "ResponseSuccess" as ResponseSuccess
+    state "ResponseFailure" as ResponseFailure
+    state "ResponseNotFound" as ResponseNotFound
+    [*] --> ProfileLocated
+    ProfileLocated --> CreateTransaction: "allow create and device absent"
+    CreateTransaction --> DeviceAndCredentialsCommitted: "commit"
+    DeviceAndCredentialsCommitted --> ProvisionStateSaved: "attribute future success"
+    DeviceAndCredentialsCommitted --> PartialSuccess: "attribute future failure"
+    ProfileLocated --> ExistingDeviceChecked: "pre-provisioned strategy"
+    ExistingDeviceChecked --> ProvisionStateSaved: "same Profile id"
+    ProvisionStateSaved --> ResponseSuccess
+    PartialSuccess --> ResponseFailure
+    ProfileLocated --> ResponseNotFound: "bad key or secret"
+    ProfileLocated --> ResponseFailure: "name conflict or Profile mismatch"
+```
+
+### 6.2 随机值、预置值与持久化形式
+
+1. Profile UI 在普通 Provision 策略首次启用时用 [generateSecret(20)](../../../ui-ngx/src/app/modules/home/components/profile/device-profile-provision-configuration.component.ts#L120) 同时生成 key 和 secret；底层 [generateSecret](../../../ui-ngx/src/app/core/utils.ts#L710) 使用 `Math.random()`。后端没有再次随机化，也没有把 secret hash 后存储。
+2. X.509 chain Profile 不使用 UI 随机 key。[DeviceProfileServiceImpl.formatDeviceProfileCertificate(...)](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L626) 规范证书链，取 leaf certificate 的 SHA3 作为 `provision_device_key`。
+3. 新设备未指定凭据数据时，[DeviceServiceImpl.doSaveDevice(Device, String, boolean)](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L295) 生成 20 位 alphanumeric access token。
+4. ACCESS_TOKEN 存在 `device_credentials.credentials_id`；MQTT Basic 的 JSON 与 X.509 证书值存在 `credentials_value`，另有可索引的派生 `credentials_id`。
+
+```mermaid
+flowchart TB
+    UI["Profile UI"] -->|"Math.random generateSecret 20"| PK["provisionDeviceKey"]
+    UI -->|"Math.random generateSecret 20"| PS["provisionDeviceSecret"]
+    PK --> DP[("device_profile.provision_device_key")]
+    PS --> PD[("device_profile.profile_data JSONB")]
+    REQ["Provision request without final credentials"] -->|"RandomStringUtils 20"| AT["device_credentials.credentials_id"]
+    REQ2["Provision request with final credentials"] --> CV["token or Basic or X.509 value"]
+    CV --> DC[("device_credentials")]
+```
+
+这里的安全结论必须克制：源码能证明 UI 使用 `Math.random()`、后端 access token 使用 `RandomStringUtils.randomAlphanumeric(20)`，但不能据此宣称它们满足特定密码学随机标准。高安全场景应由受控系统生成足够强的 key、secret 和最终凭据，并通过 TLS/DTLS 传输。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类型与真实命名
+
+规划中的“DefaultDeviceProvisionService、ProvisionProfileService”在当前 `release-3.6` 源码中不存在。实际类型是：
+
+| 类型 | 源码职责 |
+|---|---|
+| [DeviceProvisionService](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/device/DeviceProvisionService.java#L31) | 声明普通 Provision 与 X.509 chain Provision 两个入口 |
+| [DeviceProvisionServiceImpl](../../../application/src/main/java/org/thingsboard/server/service/device/DeviceProvisionServiceImpl.java#L86) | Profile secret 校验、策略编排、属性/事件/审计 |
+| [DeviceProfileServiceImpl](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceProfileServiceImpl.java#L83) | provision key 查询、Profile cache 与 X.509 Profile 格式化 |
+| [DeviceServiceImpl](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L103) | device + credentials 的创建事务 |
+| [DeviceCredentialsServiceImpl](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceCredentialsServiceImpl.java#L64) | 凭据格式化、唯一校验、保存和 cache eviction |
+| [DefaultTransportApiService](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L239) | Proto/领域对象转换与 response status 编码 |
+
+```mermaid
+flowchart LR
+    IN["Protocol adaptors"] --> TS["DefaultTransportService"]
+    TS --> API["DefaultTransportApiService"]
+    API --> DPS["DeviceProvisionService interface"]
+    DPS --> IMPL["DeviceProvisionServiceImpl"]
+    IMPL --> PROF["DeviceProfileServiceImpl"]
+    IMPL --> DEV["DeviceServiceImpl"]
+    DEV --> CRED["DeviceCredentialsServiceImpl"]
+    IMPL --> ATTR["AttributesService"]
+    IMPL --> AUDIT["AuditLogService"]
+    IMPL --> RE["Rule Engine producer"]
+```
+
+### 7.2 ResponseStatus 的真实语义
+
+Proto 枚举只有 `UNKNOWN/SUCCESS/NOT_FOUND/FAILURE`。普通业务错误通过 `ProvisionFailedException` 携带枚举名称，再由 `ResponseStatus.valueOf(e.getMessage())` 转换：
+
+| status | 典型来源 | JSON body | HTTP | CoAP |
+|---|---|---|---:|---:|
+| `SUCCESS` | 创建完成或预置设备匹配 | `credentialsType`, `credentialsValue`, `status` | 200 | 2.01 |
+| `NOT_FOUND` | key/secret 缺失、Profile/secret 不匹配、DISABLED | `errorMsg: Provision data was not found!` | 200 | 4.00 |
+| `FAILURE` | 同名冲突、预置设备/Profile 不匹配、写入异常 | `errorMsg: Failed to provision device!` | 200 | 4.00 |
+| Transport error | Queue send、pending overflow、timeout、未映射异常 | 无标准业务 body | 500 callback | 5.00 |
+
+源码存在一个需要排障时特别注意的脆弱点：普通 `/provision` 如果 key 命中 `X509_CERTIFICATE_CHAIN` Profile，会抛文本 `Invalid provision strategy type!`；[DefaultTransportApiService.handle(ProvisionDeviceRequestMsg)](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L552) 再做 `ResponseStatus.valueOf(...)` 时无法映射。这不是 `FAILURE` 业务响应，而可能升级为 Transport API 处理异常和客户端超时/5xx。
+
+### 7.3 X.509 chain 自动 Provision 旁路
+
+```mermaid
+sequenceDiagram
+    participant X as "MQTT TLS or CoAP DTLS client"
+    participant V as "Certificate verifier"
+    participant T as "DefaultTransportService"
+    participant A as "DefaultTransportApiService"
+    participant P as "DeviceProvisionServiceImpl"
+    X->>V: "certificate chain during handshake"
+    V->>T: "ValidateOrCreateDeviceX509CertRequestMsg"
+    T->>A: "Transport API request"
+    A->>A: "hash every certificate in chain"
+    alt "existing X.509 credentials"
+        A-->>V: "existing device info"
+    else "hash matches X509_CERTIFICATE_CHAIN Profile"
+        A->>P: "provisionDeviceViaX509Chain Profile and request"
+        P->>P: "extract deviceName from leaf CN by regex"
+        P-->>A: "created or updated credentials"
+        A-->>V: "device info"
+    end
+```
+
+该旁路由 [DefaultTransportApiService.validateOrCreateDeviceX509Certificate(String certificateChain)](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L344) 和 [DeviceProvisionServiceImpl.provisionDeviceViaX509Chain(DeviceProfile, ProvisionRequest)](../../../application/src/main/java/org/thingsboard/server/service/device/DeviceProvisionServiceImpl.java#L148) 实现。它可以从证书 CN 正则提取设备名，并按 Profile 配置决定是否自动创建设备。它不接收 `provisionDeviceKey/provisionDeviceSecret` JSON，也不返回 `ProvisionDeviceResponseMsg`。
+
+### 7.4 测试证明与覆盖缺口
+
+MQTT JSON/Proto、MQTT 5、CoAP JSON/Proto 测试覆盖 disabled、pre-provisioned、create、坏 key、随机 token、指定 ACCESS_TOKEN、MQTT_BASIC 和 X.509。黑盒测试还证明 HTTP/MQTT/CoAP 都能返回与数据库一致的 credentials。代表性源码：[MqttProvisionJsonDeviceTest](../../../application/src/test/java/org/thingsboard/server/transport/mqtt/mqttv3/provision/MqttProvisionJsonDeviceTest.java#L76)、[CoapProvisionProtoDeviceTest](../../../application/src/test/java/org/thingsboard/server/transport/coap/provision/CoapProvisionProtoDeviceTest.java#L87)、[HttpClientTest](../../../msa/black-box-tests/src/test/java/org/thingsboard/server/msa/connectivity/HttpClientTest.java#L169)。
+
+现有测试没有直接覆盖：同一 name 的并发 create、device 事务成功但 `provisionState` 失败、Transport API 响应丢失后的重试、普通 `/provision` 错误命中 X509 chain Profile、Rule Engine producer 失败与 audit 失败。这些正是生产压测和故障注入应补的场景。
+
+---
+
+## 八、Actor 分析
+
+普通 Device Provision 主链不经过 Actor。源码中 `ProvisionDeviceRequestMsg` 虽然还出现在 `TransportToDeviceActorMsg.provisionDevice` 字段，但本章三协议入口调用的是无 `SessionInfoProto` 的 `TransportService.process(ProvisionDeviceRequestMsg, callback)`，它直接封装成 Transport API request；当前主链没有把该字段投递到 Core Queue。
+
+```mermaid
+flowchart TB
+    P["ProvisionDeviceRequestMsg"] --> TA["Transport API Queue"]
+    TA --> DS["Core services and DAO"]
+    DS --> DB[("device, credentials and attributes")]
+    DS -. "entity and provision events" .-> REQ["Rule Engine Queue"]
+    REQ --> RNA["Rule Node Actors"]
+    X["No App Actor"] -.-> P
+    Y["No Tenant Actor"] -.-> P
+    Z["No Device Actor"] -.-> P
+```
+
+设计原因是设备在 Provision 前还没有可信 `DeviceId + SessionInfoProto`，而 Profile key 可能决定 tenant 和新 DeviceId。先路由到 Device Actor 会形成“必须先知道设备，才能创建设备”的循环。Core 服务完成创建后，`clusterService.onDeviceUpdated(savedDevice, null)` 才广播 CREATED 生命周期和 Device State 事件，后续普通连接再由 Actor 管理。
+
+Actor 只在两个间接位置出现：
+
+1. `ENTITY_CREATED`、`PROVISION_SUCCESS/FAILURE` 作为 Rule Engine `TbMsg` 被 Rule Node Actor 消费。
+2. `onDeviceUpdated` 发送的 Core 生命周期/Device State 消息可能初始化设备相关状态，但不参与当前 Provision 响应。
+
+因此排查 Provision timeout 时，不应先看 Device Actor mailbox；应先看 Transport API pending、Core Transport API handler、DAO 和 attribute future。只有排查创建后的规则事件或设备状态时才进入 Actor 层。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 Topic、partition 与 consumer group
+
+Kafka 部署下的精确默认值来自 [KafkaTbTransportQueueFactory.createTransportApiRequestTemplate()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbTransportQueueFactory.java#L141) 与 [KafkaTbCoreQueueFactory.createTransportApiRequestConsumer()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L283)：
+
+| 方向 | 默认 topic | partition | client/group |
+|---|---|---|---|
+| Transport -> Core request | `tb_transport.api.requests` | 默认 10；随机 UUID message key 参与 Kafka 分区 | Core client `tb-core-transport-api-consumer-{serviceId}`，共享 group `tb-core-transport-api-consumer` |
+| Core -> Transport response | `tb_transport.api.responses.{transportServiceId}` | 每个 Transport 实例独立 response topic | client `transport-api-response-{serviceId}`，group `transport-node-{serviceId}` |
+| Provision events -> Rule Engine | tenant Profile queue 对应 topic | `PartitionService.resolve(TB_RULE_ENGINE, tenantId, deviceId)` | 对应 Rule Engine queue consumer group |
+
+```mermaid
+sequenceDiagram
+    participant T1 as "Transport instance A"
+    participant RP as "Request topic partitions"
+    participant CG as "Core shared consumer group"
+    participant DB as "PostgreSQL"
+    participant RT as "Response topic for instance A"
+    participant RQ as "Rule Engine topic"
+    T1->>RP: "request keyed by random UUID"
+    RP->>CG: "one Core consumer owns partition"
+    CG->>DB: "provision service and DAO"
+    CG->>RT: "response with requestId"
+    RT->>T1: "complete local pending Future"
+    CG-->>RQ: "ENTITY_CREATED and PROVISION event"
+```
+
+### 9.2 提交、超时与重试
+
+[DefaultTbQueueRequestTemplate.send(...)](../../../common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueRequestTemplate.java#L332) 先检查 10000 条 pending 上限，再写 requestId、目标 response topic 和 expire timestamp。10 秒内没收到响应，Future 失败并触发协议 `onError`。这只清除等待，不会撤销 Core 已提交的数据库事务。
+
+Core 侧 [DefaultTbQueueResponseTemplate](../../../common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueResponseTemplate.java#L141) 为每条请求启动异步 handler，然后提交本批 request consumer offset。若进程在 offset commit 后、数据库处理或 response produce 前崩溃，Transport 只能超时；源码没有为 Provision 建立业务级重放日志。
+
+```mermaid
+flowchart TB
+    SEND["Transport sends request"] --> PENDING{"pending map below 10000"}
+    PENDING -->|"no"| FULL["Immediate error"]
+    PENDING -->|"yes"| WAIT["Wait up to 10000 ms"]
+    WAIT -->|"response"| DONE["Complete protocol callback"]
+    WAIT -->|"timeout"| TO["Remove pending and return transport error"]
+    WAIT -. "Core may already commit DB" .-> COMMIT["device and credentials remain"]
+    TO --> RETRY{"Device retries"}
+    RETRY -->|"allow create"| CONFLICT["Usually name conflict FAILURE"]
+    RETRY -->|"pre-provisioned"| AGAIN["Existing credentials may be returned again"]
+```
+
+Rule Engine 事件使用 `callback=null`，Provision response 不依赖 Kafka broker ack，也不依赖 Rule Engine consumer offset。事件丢失或重复不会改变已返回的 credentials；需要通过数据库、audit 和 queue 指标交叉核对，而不是把 response 当作事件已处理证明。
+
+---
+
+## 十、数据库分析
+
+### 10.1 表与约束
+
+```mermaid
+erDiagram
+    DEVICE_PROFILE ||--o{ DEVICE : "selected profile"
+    DEVICE ||--|| DEVICE_CREDENTIALS : "one credential row"
+    DEVICE ||--o{ ATTRIBUTE_KV : "server scope state"
+    DEVICE ||--o{ AUDIT_LOG : "provision action"
+    DEVICE_PROFILE {
+        uuid id PK
+        uuid tenant_id
+        varchar provision_device_key UK
+        varchar provision_type
+        jsonb profile_data
+    }
+    DEVICE {
+        uuid id PK
+        uuid tenant_id
+        varchar name
+        uuid device_profile_id FK
+    }
+    DEVICE_CREDENTIALS {
+        uuid id PK
+        uuid device_id UK
+        varchar credentials_id UK
+        varchar credentials_type
+        varchar credentials_value
+    }
+    ATTRIBUTE_KV {
+        uuid entity_id
+        varchar attribute_type
+        varchar attribute_key
+        varchar str_v
+    }
+```
+
+Schema 证据：[device_profile](../../../dao/src/main/resources/sql/schema-entities.sql#L277)、[device](../../../dao/src/main/resources/sql/schema-entities.sql#L328)、[device_credentials](../../../dao/src/main/resources/sql/schema-entities.sql#L349)、[attribute_kv](../../../dao/src/main/resources/sql/schema-entities.sql#L105) 和 [audit_log](../../../dao/src/main/resources/sql/schema-entities.sql#L89)。
+
+关键唯一约束：
+
+1. `device_provision_key_unq_key` 使 provision key 在整个表中唯一，不是仅 tenant 内唯一。
+2. `device_name_unq_key(tenant_id, name)` 决定并发 create 最多一个事务成功。
+3. `device_credentials_id_unq_key(credentials_id)` 防止两个设备共享同一最终 credentialsId。
+4. `device_credentials_device_id_unq_key(device_id)` 保证一台设备一行 credentials。
+
+### 10.2 原子性与部分成功
+
+```mermaid
+flowchart LR
+    TX["Spring transaction"] --> D1["insert device"]
+    D1 --> C1["insert default credentials"]
+    C1 --> O{"requested credentials present"}
+    O -->|"yes"| C2["update credential type and value"]
+    O -->|"no"| KEEP["keep random access token"]
+    C2 --> COMMIT["transaction commit"]
+    KEEP --> COMMIT
+    COMMIT --> ATTR["separate attribute_kv future"]
+    ATTR --> EVENT["non-atomic cluster, Rule Engine and audit effects"]
+    ATTR -->|"failure"| PART["device remains but response is FAILURE"]
+```
+
+`attributesService.save(...).get()` 让响应等待 `provisionState` 的异步 DAO Future，但它没有加入前一个 JPA 事务。`audit_log` 和 Rule Engine 事件也不是 outbox。由此可得三个生产结论：
+
+1. `SUCCESS` 能证明 device/credentials 主事务与 `provisionState` 写完成，但不能证明 Rule Chain 处理完成。
+2. `FAILURE` 不能证明数据库完全没变化；先查 `device` 和 `device_credentials`，再决定是否清理或人工补属性。
+3. 没有自动补偿删除逻辑。创建异常 catch 只尝试查同名 device 并发送 failure 事件，不删除已提交实体。
+
+[点击新窗口打开原始 SVG](../../assets/architecture/27-device-provision.svg)
+
+<a class="static-svg-thumbnail" href="../../assets/architecture/27-device-provision.svg" target="_blank" rel="noopener noreferrer"><img src="../../assets/architecture/27-device-provision.svg" alt="ThingsBoard Device Provision 架构与事务边界图"></a>
+
+---
+
+## 十一、异常处理
+
+### 11.1 协议错误矩阵
+
+| 失败点 | HTTP | MQTT | CoAP | 数据是否可能已变化 |
+|---|---|---|---|---|
+| JSON 格式错误 | Controller 无本地 catch，由 Spring 异常链处理 | JSON parse error 尝试 Proto；仍失败则关闭 channel | JSON parse error 尝试 Proto；仍失败返回 4.00 | 否 |
+| key/secret 缺失或错误 | 200 + `NOT_FOUND` body | PUBACK success + response topic `NOT_FOUND` | 4.00 + `NOT_FOUND` payload | 否 |
+| 同名设备已存在 | 200 + `FAILURE` | PUBACK success + `FAILURE` response | 4.00 + `FAILURE` payload | 原设备存在；可能发 failure event/audit |
+| credentials 唯一冲突 | 200 + `FAILURE` | 业务 response `FAILURE` | 4.00 | 新 device/credentials 事务回滚 |
+| `provisionState` 写失败 | 200 + `FAILURE` | 业务 response `FAILURE` | 4.00 | **device/credentials 已提交** |
+| Transport API pending 满 | 500 callback | implementation-specific ack 后关闭 | 5.00 | Core 未必收到 |
+| Transport API 10 秒 timeout | 500 callback | error ack 后关闭 | 5.00 | Core 可能已经提交 |
+| response 丢失 | 客户端 timeout | 客户端收不到 PUBLISH | UDP timeout | 数据可能成功，重试语义因策略而异 |
+| X509 chain Profile 误走普通入口 | 可能 5xx/timeout | error/close | 5.00 | 通常无变化 |
+
+```mermaid
+flowchart TB
+    R["Incoming provision request"] --> PARSE{"Payload converts"}
+    PARSE -->|"no"| PERR["Protocol parse error"]
+    PARSE -->|"yes"| AUTH{"Profile key and secret valid"}
+    AUTH -->|"no"| NF["NOT_FOUND business response"]
+    AUTH -->|"yes"| WRITE{"Main write succeeds"}
+    WRITE -->|"no"| FAIL["FAILURE business response"]
+    WRITE -->|"yes"| ATTR{"provisionState save succeeds"}
+    ATTR -->|"no"| PART["FAILURE with committed device"]
+    ATTR -->|"yes"| OK["SUCCESS response"]
+    OK --> LOST{"Response reaches device"}
+    LOST -->|"no"| RETRY["Client retry may conflict"]
+```
+
+### 11.2 并发、安全与生产排障
+
+**并发。** `DeviceProvisionServiceImpl` 没有 per-key/per-name lock。并发 create 都可能在预查阶段看到 `targetDevice == null`，最终由 `(tenant_id,name)` 唯一约束裁决；一个成功，其他事务回滚并返回 `FAILURE`。预置路径的 `provisionState` 是 read-then-write，没有数据库 CAS；重复调用会返回同一凭据。
+
+**安全。** `/provision` 是未认证入口，共享 key/secret 就是授权材料。HTTP/MQTT/CoAP 明文端口会暴露 secret 和返回的长期凭据，生产必须使用 HTTPS、MQTTS 或 DTLS，并限制源网络、速率和日志 body。Profile secret 位于 JSONB，MQTT Basic password 位于 credentials JSON；数据库备份和管理员权限同样属于凭据安全边界。错误响应把“key 不存在”和“secret 不匹配”统一为 `NOT_FOUND`，避免直接区分，但没有消除暴力尝试风险。
+
+**排障顺序。** 建议按以下证据链检查：协议连接与 path/topic -> payload 类型与必填字段 -> Transport API pending 数/10 秒 timeout -> request topic lag 和 Core group -> Profile key cache/数据库 -> device name/credentials unique constraint -> `attribute_kv` Future -> response topic -> 协议 callback -> Rule Engine event lag/audit。不要先从 Device Actor 或普通 transport notification topic 开始，因为主链根本不经过它们。
+
+**恢复。** 对客户端 timeout，先用管理 API 按 deviceName 查询，不要立即盲目重试 create。若 device/credentials 已存在而 `provisionState` 缺失，应由受控运维修复或删除半成品后重试；直接把策略改成 pre-provisioned 会改变安全语义。系统没有自动补偿、幂等 requestId 或凭据再次读取 API。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    A["queue.proto Provision messages"] --> B["JsonConverter"]
+    B --> C["HTTP, MQTT and CoAP ingress"]
+    C --> D["DefaultTransportService"]
+    D --> E["DefaultTbQueueRequestTemplate"]
+    E --> F["TbCoreTransportApiService"]
+    F --> G["DefaultTransportApiService"]
+    G --> H["DeviceProvisionServiceImpl"]
+    H --> I["DeviceProfileServiceImpl"]
+    H --> J["DeviceServiceImpl"]
+    J --> K["DeviceCredentialsServiceImpl"]
+    H --> L["Attributes, Rule Engine and audit"]
+```
+
+建议按下面顺序逐文件阅读：
+
+1. [queue.proto:510](../../../common/proto/src/main/proto/queue.proto#L510)：先固定统一 request/response 和 status 的字段边界。
+2. [JsonConverter:951](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/JsonConverter.java#L951)：核对必填字段、默认 credentialsType 和 JSON response 形状。
+3. [DeviceApiController:543](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L543)、[MqttTransportHandler:337](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L337)、[CoapTransportResource:237](../../../common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java#L237)：对比协议入口、payload fallback 和错误映射。
+4. [DefaultTransportService:747](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L747)：确认 Provision 只进入 Transport API template。
+5. [DefaultTbQueueRequestTemplate:332](../../../common/queue/src/main/java/org/thingsboard/server/queue/common/DefaultTbQueueRequestTemplate.java#L332)：理解 requestId、responseTopic、pending 上限和 timeout。
+6. [DefaultTransportApiService:537](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L537)：看 Proto 到领域模型和异常到 status 的转换。
+7. [DeviceProvisionServiceImpl:187](../../../application/src/main/java/org/thingsboard/server/service/device/DeviceProvisionServiceImpl.java#L187)：逐分支验证 Profile、secret、存在性和事件顺序。
+8. [DeviceServiceImpl:803](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L803)：确认唯一的主创建事务和默认 access token 覆盖逻辑。
+9. [DeviceCredentialsServiceImpl:153](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceCredentialsServiceImpl.java#L153)：跟踪 Basic/X.509 格式化、唯一约束和 cache eviction。
+10. [DeviceProvisionServiceTest:167](../../../application/src/test/java/org/thingsboard/server/service/device/provision/DeviceProvisionServiceTest.java#L167) 与协议集成测试：用断言反证自己的理解，最后再看 X.509 chain 旁路。
+
+---
+
+## 十三、常见面试题
+
+### 1. HTTP、MQTT、CoAP Device Provision 最终统一成什么消息？
+
+统一成 `TransportProtos.ProvisionDeviceRequestMsg`。它包含 deviceName、credentialsType、Profile key/secret 和三类最终凭据输入；协议层只负责 payload 与协议 response 的转换。
+
+### 2. Provision 请求会先创建 ThingsBoard 设备 session 吗？
+
+不会。HTTP 只有 `DeferredResult`，MQTT 是 `provisionOnly` channel 状态，CoAP 的 UUID 只用于日志/adaptor；主链没有 `SessionInfoProto`、session 注册或 SessionEvent。
+
+### 3. Provision 为什么不经过 Device Actor？
+
+请求开始时还没有可信 DeviceId，tenant 也要由 provision key 命中的 Profile 决定。Core service/DAO 先创建实体，避免为了路由 Actor 而预先假定设备身份。
+
+### 4. `provisionDeviceKey` 和 `provisionDeviceSecret` 分别做什么？
+
+key 全局定位 `device_profile`，secret 与 Profile JSONB 中的配置做等值比较。两者共同授权，但 key 不是 tenant-scoped，数据库对它建立全表唯一约束。
+
+### 5. 普通 Provision 有哪些策略？
+
+有效业务策略是 `ALLOW_CREATE_NEW_DEVICES` 和 `CHECK_PRE_PROVISIONED_DEVICES`。`DISABLED` 最终表现为 `NOT_FOUND`；`X509_CERTIFICATE_CHAIN` 应走证书握手旁路，不应调用普通 `/provision`。
+
+### 6. create 策略允许 deviceName 为空吗？
+
+允许。`processCreateDevice` 会生成 20 位随机 alphanumeric 名称；但客户端随后只得到 credentials，不会在响应里得到生成的 deviceName，运维可观测性较差。
+
+### 7. 没指定最终凭据时返回什么？
+
+返回 `DeviceServiceImpl` 在创建设备时生成的 20 位 ACCESS_TOKEN，存入 `device_credentials.credentials_id`。
+
+### 8. 指定 ACCESS_TOKEN 时是否先产生过随机 token？
+
+是。普通 `saveDevice(Device)` 先创建默认随机 token，外层 Provision 事务随后把同一 credentials 行更新为请求 token；两步都在 `saveDevice(ProvisionRequest, DeviceProfile)` 事务内。
+
+### 9. MQTT Basic credentialsId 怎么生成？
+
+只有 username 时直接使用 username；只有 clientId 时对 clientId 求 SHA3；两者都有时对分隔符、clientId、username 求 SHA3。完整 clientId/username/password JSON 存在 credentialsValue。
+
+### 10. Provision 的 X.509 `hash` 字段最终怎么存？
+
+它先作为 credentialsValue 传入，`formatCertData` 规范证书换行并对该值求 SHA3 作为 credentialsId。JSON 名称叫 `hash`，但实现会再次计算 SHA3，不能把字段名误解为“数据库直接采用调用者给的 hash”。
+
+### 11. 预建设备 Provision 会更新请求里携带的新凭据吗？
+
+不会。该路径只验证设备存在且 Profile id 匹配，保存 `provisionState`，然后读取并返回原 `device_credentials`；credentialsType 和 credentialsData 只对新建设备路径生效。
+
+### 12. device 与 device_credentials 是否在同一事务？
+
+是。`DeviceServiceImpl.saveDevice(ProvisionRequest, DeviceProfile)` 标注 `@Transactional`，设备插入、默认凭据创建和可选凭据覆盖属于同一事务。
+
+### 13. `provisionState` 是否与设备创建在同一事务？
+
+否。创建事务返回后，`DeviceProvisionServiceImpl` 才调用 `attributesService.save(...).get()`。属性失败时响应是 `FAILURE`，但 device 与 credentials 已经提交。
+
+### 14. SUCCESS 是否证明 Rule Engine 已处理 Provision 事件？
+
+不证明。`ENTITY_CREATED` 和 `PROVISION_SUCCESS` 通过 Rule Engine producer 异步发送，调用时 callback 为 null；响应既不等 broker ack，也不等 consumer、Rule Chain 或 Rule Node Actor。
+
+### 15. HTTP 为什么业务失败仍可能是 200？
+
+HTTP callback 只区分 Transport Future 成功或异常。只要 Core 返回 `ProvisionDeviceResponseMsg`，包括 `NOT_FOUND/FAILURE`，Controller 就用 `HttpStatus.OK`，客户端必须检查 body.status。
+
+### 16. CoAP 如何映射业务 status？
+
+`SUCCESS` 返回 `2.01 CREATED`；任何非 SUCCESS 的 Provision response 返回 `4.00 BAD_REQUEST`，同时 body 保留 JSON 或 Proto status；Transport callback error 返回 `5.00`。
+
+### 17. MQTT PUBACK 成功是否等于 Provision 成功？
+
+不等于。`onSuccess` 收到任何业务 `ProvisionDeviceResponseMsg` 都先 ACK SUCCESS，再把真正的 `SUCCESS/NOT_FOUND/FAILURE` 发布到 `/provision/response`。设备必须解析响应 payload。
+
+### 18. 默认 Transport API timeout 和 pending 上限是多少？
+
+默认 timeout 是 10000 ms，pending request 上限是 10000，request/response poll interval 都是 25 ms。超时只结束等待，不回滚 Core 可能已经完成的数据库事务。
+
+### 19. Kafka request 和 response 如何关联？
+
+Request template 生成 requestId，写入 request header，并把当前 Transport 实例的 response topic 也写入 header；Core 把同一 requestId 放入 response，Transport 的 pending map 据此完成 Future。
+
+### 20. Provision 的 Kafka consumer group 是什么？
+
+Core 请求消费者使用共享 `tb-core-transport-api-consumer` group；每个 Transport 实例的响应消费者使用 `transport-node-{serviceId}` group，并订阅实例专属 response topic。
+
+### 21. create 请求超时后直接重试是否幂等？
+
+不是。如果第一次已提交但响应丢失，第二次会发现同名设备存在，create 策略返回 `FAILURE`，不会重放第一次凭据。客户端应先通过受控管理面确认设备是否已经创建。
+
+### 22. 并发创建同名设备如何裁决？
+
+服务没有显式锁。并发请求可能都预查为不存在，最终由数据库 `(tenant_id,name)` 唯一约束决定一个事务成功，其他事务回滚并返回 `FAILURE`。
+
+### 23. Profile key/secret 是后端安全随机生成的吗？
+
+不能这样宣称。UI 默认用基于 `Math.random()` 的 `generateSecret(20)` 生成，后端接受并持久化调用者给出的值；源码没有提供后端 CSPRNG 保证。生产可由安全系统预生成并轮换。
+
+### 24. X.509 certificate chain 自动 Provision 与 `/provision` 有什么不同？
+
+它发生在 MQTT TLS/CoAP DTLS 握手，使用 `ValidateOrCreateDeviceX509CertRequestMsg`，按证书 SHA3 找已有 credentials 或 X509 chain Profile，再从 leaf CN 正则提取 deviceName。它不使用普通 key/secret JSON，也不返回 `ProvisionDeviceResponseMsg`。
+
+### 25. 排查“Provision 超时但设备已出现”应先看什么？
+
+先查 `device`、`device_credentials` 和 `attribute_kv/provisionState`，判断是否落入主事务成功、属性或 response 失败的窗口；再查 Transport API request/response topic、Core consumer group、pending timeout 和协议 callback。Device Actor 不在主链，不应作为第一站。
+
+---
+
+[上一篇：26 MQTT Gateway 流程](../26-mqtt-gateway/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/27-device-provision.svg) | [下一篇：28 Device Claim 流程](../28-device-claim/README.md)

@@ -1,0 +1,201 @@
+@startuml
+title ThingsBoard release-3.6 Device Provision: ingress, transaction, events and replies
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #1F2937
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam actorBorderColor #0F766E
+skinparam actorFontColor #111827
+skinparam databaseBorderColor #7C2D12
+skinparam databaseBackgroundColor #FFF7ED
+skinparam noteBackgroundColor #FFF4C2
+skinparam noteBorderColor #92400E
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.6
+skinparam maxMessageSize 230
+
+actor "Unprovisioned Device" as Device
+participant "HTTP DeviceApiController" as HTTP
+participant "MQTT MqttTransportHandler" as MQTT
+participant "CoAP CoapTransportResource" as COAP
+participant "JsonConverter / ProtoConverter" as Convert
+participant "DefaultTransportService" as Transport
+participant "Transport API Request Template" as RequestTemplate
+queue "tb_transport.api.requests" as RequestTopic
+participant "Core Transport API Consumer" as CoreConsumer
+participant "DefaultTransportApiService" as CoreApi
+participant "DeviceProvisionServiceImpl" as Provision
+collections "Profile / Device / Credentials Cache" as Cache
+participant "DeviceProfileServiceImpl" as ProfileService
+participant "DeviceServiceImpl" as DeviceService
+participant "DeviceCredentialsServiceImpl" as CredentialService
+participant "AttributesService" as Attributes
+database "PostgreSQL" as DB
+queue "Rule Engine Queue" as RuleQueue
+participant "AuditLogService" as Audit
+queue "tb_transport.api.responses.{serviceId}" as ResponseTopic
+
+== Protocol ingress ==
+alt HTTP JSON only
+  Device -> HTTP : POST /api/v1/provision with JSON body
+  HTTP -> Convert : convertToProvisionRequestMsg(String json)
+  Convert --> HTTP : ProvisionDeviceRequestMsg
+  HTTP -> Transport : process(requestMsg, DeviceProvisionCallback)
+else MQTT provision-only connection
+  Device -> MQTT : CONNECT clientId or username = provision
+  MQTT --> Device : successful CONNACK without device authentication
+  Device -> MQTT : PUBLISH /provision/request
+  MQTT -> Convert : try JSON, fallback to Proto only on JSON parse error
+  Convert --> MQTT : ProvisionDeviceRequestMsg
+  MQTT -> Transport : process(requestMsg, DeviceProvisionCallback)
+else CoAP token-less resource
+  Device -> COAP : POST /api/v1/provision
+  COAP -> Convert : try JSON, fallback to Proto only on JSON parse error
+  Convert --> COAP : ProvisionDeviceRequestMsg
+  COAP -> Transport : process(requestMsg, DeviceProvisionCallback)
+end
+
+note over HTTP,COAP
+  All three protocol paths converge on ProvisionDeviceRequestMsg.
+  No SessionInfoProto is built and no device transport session is registered.
+end note
+
+== Correlated Transport API request ==
+Transport -> RequestTemplate : send(TransportApiRequestMsg)
+RequestTemplate -> RequestTemplate : reject if pendingRequests >= 10000
+RequestTemplate -> RequestTemplate : add requestId, responseTopic and expireTs headers
+RequestTemplate -> RequestTopic : produce UUID-keyed request
+RequestTopic -> CoreConsumer : shared group tb-core-transport-api-consumer
+CoreConsumer -> CoreApi : handle(TbProtoQueueMsg<TransportApiRequestMsg>)
+CoreApi -> CoreApi : handle(ProvisionDeviceRequestMsg)
+CoreApi -> Provision : provisionDevice(ProvisionRequest)
+
+== Profile authorization and strategy ==
+Provision -> ProfileService : findDeviceProfileByProvisionDeviceKey(String key)
+ProfileService -> Cache : get by provision-key cache key
+alt profile cache miss
+  ProfileService -> DB : SELECT device_profile by provision_device_key
+  DB --> ProfileService : DeviceProfile or null
+  ProfileService -> Cache : cache profile lookup
+end
+ProfileService --> Provision : DeviceProfile or null
+
+alt missing key or secret, profile absent, secret mismatch, or DISABLED
+  Provision --> CoreApi : throw ProvisionFailedException(NOT_FOUND)
+  CoreApi -> CoreApi : build response status NOT_FOUND
+else valid ordinary Profile
+  Provision -> DeviceService : findDeviceByTenantIdAndName(tenantId, deviceName)
+  DeviceService -> Cache : lookup tenantId and name
+  alt device cache miss
+    DeviceService -> DB : SELECT device by tenant_id and name
+    DB --> DeviceService : Device or null
+  end
+
+  alt ALLOW_CREATE_NEW_DEVICES and device already exists
+    Provision -> RuleQueue : PROVISION_FAILURE event, callback null
+    Provision -> Audit : log PROVISION_FAILURE
+    Provision --> CoreApi : throw ProvisionFailedException(FAILURE)
+  else ALLOW_CREATE_NEW_DEVICES and device absent
+    opt deviceName is empty
+      Provision -> Provision : generate random alphanumeric name, length 20
+    end
+    Provision -> DeviceService : saveDevice(ProvisionRequest, DeviceProfile)
+    group Spring transaction in DeviceServiceImpl
+      DeviceService -> DB : INSERT device
+      DeviceService -> CredentialService : create default ACCESS_TOKEN credentials
+      CredentialService -> DB : INSERT device_credentials and flush
+      opt requested credential fields are present
+        DeviceService -> CredentialService : update ACCESS_TOKEN, MQTT_BASIC or X509 credentials
+        CredentialService -> CredentialService : derive credentialsId and format credentialsValue
+        CredentialService -> DB : UPDATE device_credentials and flush
+      end
+      alt unique constraint or credential validation fails
+        DB --> DeviceService : exception
+        DeviceService -> DB : ROLLBACK device and credentials
+        DeviceService --> Provision : ProvisionFailedException(FAILURE)
+      else main writes succeed
+        DB --> DeviceService : COMMIT device and credentials
+        DeviceService -> Cache : publish device and credential eviction events
+        DeviceService --> Provision : saved Device
+      end
+    end
+    Provision -> Provision : clusterService.onDeviceUpdated(savedDevice, null)
+    Provision -> Attributes : save SERVER_SCOPE provisionState=provisioned
+    Attributes -> DB : independent attribute_kv write
+    DB --> Attributes : Future completion
+    Attributes --> Provision : get() returns
+    Provision -> RuleQueue : ENTITY_CREATED event, callback null
+    Provision -> RuleQueue : PROVISION_SUCCESS event, callback null
+    Provision -> Audit : log PROVISION_SUCCESS
+    Provision -> CredentialService : findDeviceCredentialsByDeviceId(tenantId, deviceId)
+    CredentialService -> DB : SELECT existing credentials by device_id
+    DB --> CredentialService : DeviceCredentials
+    CredentialService --> Provision : DeviceCredentials
+    Provision --> CoreApi : ProvisionResponse SUCCESS
+  else CHECK_PRE_PROVISIONED_DEVICES and device/profile match
+    Provision -> Attributes : find SERVER_SCOPE provisionState
+    Attributes -> DB : SELECT attribute_kv
+    DB --> Attributes : empty or current value
+    Attributes --> Provision : current state
+    Provision -> Attributes : save provisionState=provisioned
+    Attributes -> DB : independent attribute_kv write
+    DB --> Attributes : Future completion
+    Provision -> RuleQueue : PROVISION_SUCCESS event, callback null
+    Provision -> Audit : log PROVISION_SUCCESS
+    Provision -> CredentialService : findDeviceCredentialsByDeviceId(tenantId, deviceId)
+    CredentialService -> DB : SELECT existing credentials
+    DB --> CredentialService : existing DeviceCredentials
+    CredentialService --> Provision : DeviceCredentials
+    Provision --> CoreApi : ProvisionResponse SUCCESS
+  else CHECK_PRE_PROVISIONED_DEVICES mismatch
+    Provision --> CoreApi : throw ProvisionFailedException(FAILURE)
+  end
+end
+
+note over Provision,RuleQueue
+  DeviceProvisionServiceImpl is not transactional.
+  provisionState, cluster broadcasts, Rule Engine events and audit are outside
+  the device + device_credentials transaction. Rule Engine callbacks are not awaited.
+end note
+
+== Correlated response and protocol mapping ==
+CoreApi -> CoreApi : getTransportApiResponseMsg(credentials, status)
+CoreApi --> CoreConsumer : TransportApiResponseMsg
+CoreConsumer -> ResponseTopic : produce using responseTopic header and requestId
+ResponseTopic -> RequestTemplate : transport-node-{serviceId} consumer
+RequestTemplate -> RequestTemplate : remove matching pending request
+RequestTemplate --> Transport : complete ListenableFuture
+
+alt HTTP callback
+  Transport --> HTTP : onSuccess(ProvisionDeviceResponseMsg)
+  HTTP --> Device : HTTP 200 with SUCCESS, NOT_FOUND or FAILURE JSON
+else MQTT callback
+  Transport --> MQTT : onSuccess(ProvisionDeviceResponseMsg)
+  MQTT --> Device : PUBACK success
+  MQTT --> Device : PUBLISH /provision/response with business status
+  MQTT -> MQTT : schedule channel close after 60 seconds
+else CoAP callback with SUCCESS
+  Transport --> COAP : onSuccess(SUCCESS)
+  COAP --> Device : 2.01 CREATED with JSON or Proto credentials
+else CoAP callback with business failure
+  Transport --> COAP : onSuccess(NOT_FOUND or FAILURE)
+  COAP --> Device : 4.00 BAD_REQUEST with status payload
+else request template error or 10 second timeout
+  Transport --> HTTP : onError -> HTTP 500
+  Transport --> MQTT : onError -> error ACK and close
+  Transport --> COAP : onError -> 5.00 INTERNAL_SERVER_ERROR
+end
+
+note over RequestTemplate,DB
+  A Transport API timeout removes the local pending Future only.
+  Core may already have committed device and credentials. A create retry is not idempotent:
+  the same device name normally produces FAILURE because the row now exists.
+end note
+@enduml

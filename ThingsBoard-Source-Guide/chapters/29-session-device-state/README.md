@@ -1,0 +1,675 @@
+# 29 Session 与 Device State 流程
+
+> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章只讨论设备 Transport session、Device Actor 会话状态和 Core Device State，不把用户登录会话、WebSocket UI 会话或 Sparkplug 自定义 `ONLINE/OFFLINE` 遥测混入主流程。
+
+[上一篇：28 Device Claim 流程](../28-device-claim/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/29-session-device-state.svg) | [下一篇：30 Telemetry 查询流程](../30-telemetry-query/README.md)
+
+---
+
+## 一、流程目标
+
+Session 与 Device State 解决的是两个相关但不等价的问题：Transport 要知道“哪个本地 listener 能接收下行消息、何时注销”，Device Actor 要知道“同一设备有哪些 ASYNC session 和订阅”，Device State Service 则根据活动时间判断 `active/inactive` 并持久化六个状态键。源码没有通用的 `online` 或 `offline` 字段；平台界面常把 `active=true/false` 口语化为在线/离线，但连接事件和活动状态在实现上是两条独立状态轴。
+
+```mermaid
+flowchart TB
+    DEV["Device using MQTT, CoAP, HTTP, LwM2M or Gateway"] --> ENTRY["Protocol transport entry"]
+    ENTRY --> INFO["SessionInfoProto with node, session, tenant and device ids"]
+    INFO --> LOCAL["Transport local sessions and activity states"]
+    LOCAL --> CORE["Core Queue logical partition by device id"]
+    CORE --> ACTOR["Device Actor session and subscription maps"]
+    ACTOR --> STATE["DefaultDeviceStateService deviceStates"]
+    STATE --> PERSIST{"state.persistToTelemetry"}
+    PERSIST -->|"false by default"| ATTR["SERVER_SCOPE attribute_kv"]
+    PERSIST -->|"true"| TS["ts_kv and ts_kv_latest"]
+    STATE --> RE["CONNECT, DISCONNECT, ACTIVITY and INACTIVITY events"]
+```
+
+本章需要守住四个边界：
+
+1. `registerAsyncSession`/`registerSyncSession` 只登记当前 Transport 实例的 listener；它们本身不向 Device Actor 发送 `OPEN`。
+2. `deregisterSession` 只取消本地定时器并移除本地 map；它本身不发送 `CLOSED`。协议实现必须显式调用 `process(..., SessionEventMsg, ...)`。
+3. `CONNECT_EVENT`/`DISCONNECT_EVENT` 由 Device Actor 的“第一条 session 打开/最后一条 session 关闭”触发；`ACTIVITY_EVENT`/`INACTIVITY_EVENT` 由 Device State 的时间窗口触发。
+4. Queue producer callback、Core consumer commit、状态持久化回调和 Rule Engine 处理是四个不同确认点，没有跨层数据库事务。
+
+---
+
+## 二、入口
+
+### 2.1 会话模型入口
+
+[org.thingsboard.server.common.transport.auth.SessionInfoCreator.create(ValidateDeviceCredentialsResponse, TransportContext, UUID)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/SessionInfoCreator.java#L44) 把认证结果转换为跨 Queue 的 `SessionInfoProto`。其字段定义在 [queue.proto 的 SessionInfoProto](../../../common/proto/src/main/proto/queue.proto#L82)：`nodeId`、session/tenant/device/customer/deviceProfile 的 UUID 高低位，以及设备名称和类型；gateway 子设备还可携带 `gwSessionIdMSB/LSB`。
+
+[queue.proto 的 SessionType 与 SessionEvent](../../../common/proto/src/main/proto/queue.proto#L100) 只有两组枚举：`SYNC/ASYNC` 和 `OPEN/CLOSED`。`SessionEventMsg` 只携带 type 与 event，不携带时间；Device Actor 最终用 Core 节点当前时间生成 connect/disconnect 时间。
+
+```mermaid
+flowchart LR
+    AUTH["ValidateDeviceCredentialsResponse"] --> CREATOR["SessionInfoCreator.create"]
+    CREATOR --> NODE["nodeId routes downlink to Transport instance"]
+    CREATOR --> SID["sessionId correlates local listener and Actor maps"]
+    CREATOR --> ENTITY["tenantId, deviceId, customerId and profileId"]
+    SID --> TYPE{"Session type"}
+    TYPE -->|"SYNC"| ONE["One request, response or timeout"]
+    TYPE -->|"ASYNC"| LONG["Long-lived connection or observation"]
+    LONG --> EVENT["Explicit OPEN and CLOSED messages"]
+```
+
+### 2.2 典型协议入口
+
+| 场景 | 精确入口 | 本地注册 | Actor 事件 | 结束方式 |
+|---|---|---|---|---|
+| MQTT 连接 | [MqttTransportHandler.onValidateDeviceResponse(ValidateDeviceCredentialsResponse, ChannelHandlerContext, MqttConnectMessage)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1586) | producer 成功后 `registerAsyncSession(...)` | 先发送 `OPEN` | [doDisconnect()](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1559) 显式 `CLOSED` 后 deregister |
+| MQTT PING | [MqttTransportHandler.channelRead(ChannelHandlerContext, Object)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L251) 的 `PINGREQ` 分支 | 复用 ASYNC | 无新事件 | `recordActivity(...)` 刷新活动时间 |
+| HTTP GET Attributes | [DeviceApiController.getDeviceAttributes(String, String, String)](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L168) | `registerSyncSession(..., defaultTimeout)` | 不发 `OPEN` | response 自动注销或 scheduler timeout |
+| CoAP Observe | [DefaultCoapClientContext.registerFeatureObservation(TbCoapClientState, String, CoapExchange, FeatureType)](../../../common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/client/DefaultCoapClientContext.java#L397) | `registerAsyncSession(...)` | 显式 `OPEN` | 最后一个 observation 清理时显式 `CLOSED` |
+| LwM2M registration | [DefaultLwM2MSessionManager.register(SessionInfoProto)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/session/DefaultLwM2MSessionManager.java#L85) | `registerAsyncSession(...)` | 组合发送 `OPEN` 与两类订阅 | [deregister(SessionInfoProto)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/session/DefaultLwM2MSessionManager.java#L103) |
+| MQTT Gateway 子设备 | [AbstractGatewaySessionHandler.processOnConnect(MqttPublishMessage, String, String)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L333) | 每个子设备一个 ASYNC session | `OPEN` 与订阅同一 Core 消息 | gateway disconnect 遍历注销 |
+
+### 2.3 关键默认配置
+
+默认值都来自 [application/src/main/resources/thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L780)，不能把秒和毫秒混用：
+
+| 配置 | 默认值 | 语义 |
+|---|---:|---|
+| `transport.sessions.inactivity_timeout` | `600000 ms` | Transport 与 Device Actor session 过期阈值 |
+| `transport.sessions.report_timeout` | `3000 ms` | 活动聚合上报周期，也是 Actor session timeout 广播周期 |
+| `transport.activity.reporting_strategy` | `LAST` | 每个报告周期只上报最后活动时间 |
+| `state.defaultInactivityTimeoutInSec` | `600 s` | Device State 的默认 active 窗口；设备可用 SERVER_SCOPE `inactivityTimeout` 毫秒值覆盖 |
+| `state.defaultStateCheckIntervalInSec` | `60 s` | Device State inactivity 扫描固定延迟 |
+| `state.persistToTelemetry` | `false` | 默认把六个状态键保存为 SERVER_SCOPE attributes |
+| `state.telemetryTtl` | `0` | telemetry 模式下的状态遥测 TTL；`0` 表示禁用 TTL |
+| `actors.session.max_concurrent_sessions_per_device` | `1` | Device Actor 每设备最多保留的 session 数 |
+| `actors.session.sync.timeout` | `10000 ms` | HTTP/CoAP SYNC 请求默认处理超时 |
+| `cache.type` | `caffeine` | 默认会话快照不跨 Core 进程恢复；Redis 模式才读取共享快照 |
+| `cache.specs.sessions.timeToLiveInMinutes` | `1440 min` | sessions cache 条目 TTL |
+| `usage.stats.devices.report_interval` | `60 s` | active/inactive 租户计数上报周期 |
+
+源码配置注释明确要求 session inactivity 大于或等于 device inactivity；两者默认都为 10 分钟，但前者单位毫秒、后者单位秒。设置为同一数值字符串会产生 1000 倍误差。
+
+---
+
+## 三、完整调用链
+
+### 3.1 ASYNC OPEN：以 MQTT 为主线
+
+```mermaid
+flowchart TB
+    A["MqttTransportHandler.onValidateDeviceResponse"] --> B["SessionInfoCreator.create with random session UUID"]
+    B --> C["DefaultTransportService.process SessionInfoProto and OPEN"]
+    C --> D["checkLimits and recordActivityInternal"]
+    D --> E["sendToDeviceActor builds TransportToDeviceActorMsg"]
+    E --> F["sendToCore resolves TB_CORE partition by device id"]
+    F --> G["Kafka topic tb_core.partition or configured queue provider"]
+    G --> H["Producer callback succeeds"]
+    H --> I["registerAsyncSession and MQTT CONNACK success"]
+    G --> J["DefaultTbCoreConsumerService polls later"]
+    J --> K["App Actor to Tenant Actor to Device Actor"]
+    K --> L["processSessionStateMsgs OPEN"]
+    L --> M["First session calls onDeviceConnect"]
+    L --> N["Every new session calls onDeviceActivity"]
+```
+
+逐步调用如下：
+
+1. [org.thingsboard.server.transport.mqtt.MqttTransportHandler.onValidateDeviceResponse(ValidateDeviceCredentialsResponse, ChannelHandlerContext, MqttConnectMessage)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1586) 输入认证响应、Netty channel 和 CONNECT 包；创建 `SessionInfoProto`，输出是提交 `OPEN` 的异步动作。职责是把协议认证结果切换为平台 session。设计原因是 CONNACK 必须建立在 Core Queue producer 接受 `OPEN` 之后。
+2. [org.thingsboard.server.common.transport.auth.SessionInfoCreator.create(ValidateDeviceCredentialsResponse, TransportContext, UUID)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/SessionInfoCreator.java#L44) 输入设备/租户/profile 快照和本次 UUID；输出不可变 protobuf。它固定跨进程字段契约，并让 `nodeId` 成为下行 notification 的路由地址。
+3. [org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto, SessionEventMsg, TransportServiceCallback<Void>)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L782) 输入 session、`ASYNC/OPEN` 和 callback；先做 rate limit，再调用 `recordActivityInternal(sessionInfo)`，最后构造 `TransportToDeviceActorMsg`。输出不是 Actor 结果，而是 Queue producer callback。
+4. [org.thingsboard.server.common.transport.service.DefaultTransportService.sendToDeviceActor(SessionInfoProto, TransportToDeviceActorMsg, TransportServiceCallback<Void>)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1600) 把消息包装成 `ToCoreMsg`；[sendToCore(TenantId, EntityId, ToCoreMsg, UUID, TransportServiceCallback<Void>)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1615) 用 device UUID 同时作为实体路由依据和 Queue key。
+5. [org.thingsboard.server.queue.discovery.HashPartitionService.resolve(ServiceType, TenantId, EntityId)](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L405) 委托私有 `resolve(QueueKey, EntityId)`，计算 `abs(hash(deviceUuid) % queue.core.partitions)`。输出 `TopicPartitionInfo`，默认 full topic 是 `tb_core.0` 到 `tb_core.9`。
+6. [org.thingsboard.server.service.queue.DefaultTbCoreConsumerService.launchMainConsumers()](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L334) poll `ToCoreMsg` pack，识别 `hasToDeviceActorMsg()` 后调用 [forwardToDeviceActor(TransportToDeviceActorMsg, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L989)。输入是 Queue record，输出是带 pack callback 的 Actor wrapper。
+7. [org.thingsboard.server.actors.app.AppActor.doProcess(TbActorMsg)](../../../application/src/main/java/org/thingsboard/server/actors/app/AppActor.java#L109)、[org.thingsboard.server.actors.tenant.TenantActor.doProcess(TbActorMsg)](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L170) 和 [org.thingsboard.server.actors.device.DeviceActor.doProcess(TbActorMsg)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActor.java#L83) 按 tenant/device 建立串行 Actor 边界。
+8. [org.thingsboard.server.actors.device.DeviceActorMessageProcessor.process(TransportToDeviceActorMsgWrapper)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L569) 分派 session event；[processSessionStateMsgs(SessionInfoProto, SessionEventMsg)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L998) 对重复 OPEN 直接返回，否则加入 `sessions`。第一条 session 调用 `reportSessionOpen()`，每条新 session 都调用 `DeviceStateService.onDeviceActivity(..., System.currentTimeMillis())`，最后 `dumpSessions()`。
+9. [org.thingsboard.server.service.state.DefaultDeviceStateService.onDeviceConnect(TenantId, DeviceId, long)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L319) 更新 `lastConnectTime`、异步持久化、推送 `CONNECT_EVENT` 并校正 active；[onDeviceActivity(TenantId, DeviceId, long)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L351) 更新 `lastActivityTime`，必要时将 `active` 从 false 切到 true。
+
+**确认边界**：MQTT `CONNACK SUCCESS` 位于 Transport 的 Queue producer success callback 内；它不等待第 6 至第 9 步。Kafka `acks=all` 只确认 broker 接收，不能证明 Device Actor、状态保存或 Rule Engine 已完成。producer error 时 MQTT 返回 `SERVER_UNAVAILABLE_5` 并关闭 channel。
+
+### 3.2 Activity：record、聚合与 report
+
+```mermaid
+flowchart TB
+    MSG["Any accepted uplink or explicit keepalive"] --> REC["DefaultTransportService.recordActivityInternal"]
+    REC --> ABS["AbstractActivityManager.onActivity"]
+    ABS --> MAP["states by sessionId keeps max lastRecordedTime"]
+    MAP --> STRAT{"Reporting strategy"}
+    STRAT -->|"LAST default"| WAIT["Wait for 3000 millisecond period end"]
+    STRAT -->|"FIRST, FIRST_AND_LAST or ALL"| MAYBE["May report immediately"]
+    WAIT --> END["onReportingPeriodEnd"]
+    MAYBE --> END
+    END --> SNAP["TransportActivityManager.reportActivity builds SubscriptionInfoProto"]
+    SNAP --> CORE["Core Queue to Device Actor.handleSessionActivity"]
+    CORE --> DS["DefaultDeviceStateService.onDeviceActivity"]
+    DS --> SAVE["Save lastActivityTime and possibly active=true"]
+```
+
+1. Telemetry、attributes、GET attributes、subscriptions、RPC status 等 `DefaultTransportService.process(...)` overload 在通过限流后调用 [recordActivityInternal(SessionInfoProto)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1152)；MQTT `PINGREQ` 和无有效业务 payload 的分支也可显式调用 [recordActivity(SessionInfoProto)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1142)。输入只有 session，时间取 Transport 当前系统时钟。
+2. [org.thingsboard.server.common.transport.activity.AbstractActivityManager.onActivity(Key, Metadata, long)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/AbstractActivityManager.java#L146) 用 `ConcurrentHashMap.compute` 保存每个 session 最大 `lastRecordedTime`。默认 [LastEventActivityStrategy.onActivity()](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/strategy/LastEventActivityStrategy.java#L54) 返回 false，避免每个 uplink 都写 Core Queue。
+3. [AbstractActivityManager.onReportingPeriodEnd()](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/AbstractActivityManager.java#L197) 每 `sessionReportTimeout` 扫描一次。存在 ASYNC session 时刷新 metadata 和订阅快照；不存在本地 session 时移除 activity state，但仍会把最后记录时间上报一次。这正是无本地 listener 的 HTTP telemetry 也能更新 Device State 的原因，测试 [givenSessionDoesNotExist...](../../../common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/service/TransportActivityManagerTest.java#L181) 固定了该行为。
+4. [org.thingsboard.server.common.transport.service.TransportActivityManager.reportActivity(UUID, SessionInfoProto, long, ActivityReportCallback<UUID>)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/TransportActivityManager.java#L171) 构造 `SubscriptionInfoProto(lastActivityTime, attributeSubscription, rpcSubscription)`，再调用 [DefaultTransportService.process(SessionInfoProto, SubscriptionInfoProto, TransportServiceCallback<Void>)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L765)。成功只代表该 Core Queue producer 调用成功。
+5. [DeviceActorMessageProcessor.handleSessionActivity(SessionInfoProto, SubscriptionInfoProto)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1067) 若 Actor 中存在 session 就刷新 last activity 与订阅 maps；无论 session 是否存在，都会调用 `DeviceStateService.onDeviceActivity(...)`。这让晚到的最后活动报告仍能激活设备。
+6. [DefaultDeviceStateService.updateActivityState(DeviceId, DeviceStateData, long)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L370) 先异步保存 `lastActivityTime`，再更新内存；仅当原 `active=false` 时保存 `active=true`、发 `ACTIVITY_EVENT` 和 notification trigger。连续活动不会连续发 ACTIVITY event。
+
+gateway 子设备还有一条例外：如果 gateway 设备 additionalInfo 的 `overwriteActivityTime=true`，`TransportActivityManager.updateState(...)` 会把子设备活动时间提升为 `max(child, gateway)`；对应分支在 [TransportActivityManager.updateState(UUID, ActivityState)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/TransportActivityManager.java#L104)，测试覆盖在 [TransportActivityManagerTest](../../../common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/service/TransportActivityManagerTest.java#L413)。
+
+### 3.3 CLOSED、deregister 与多 session
+
+```mermaid
+flowchart TB
+    NET["Network disconnect or protocol unsubscribe"] --> CLOSE["Protocol sends SessionEvent CLOSED"]
+    CLOSE --> PRODUCE["Core Queue producer submission"]
+    NET --> DEREG["deregisterSession removes local listener"]
+    PRODUCE --> ACTOR["Device Actor removes session and subscriptions"]
+    ACTOR --> LEFT{"Actor sessions empty"}
+    LEFT -->|"no"| KEEP["Device remains connected by another session"]
+    LEFT -->|"yes"| DISC["onDeviceDisconnect with Core current time"]
+    DISC --> TIME["Persist lastDisconnectTime"]
+    DISC --> EVENT["Push DISCONNECT_EVENT"]
+    TIME --> ACTIVE["active flag is not forced false"]
+```
+
+[MqttTransportHandler.doDisconnect()](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1559) 先 `process(..., CLOSED, null)`，再 `deregisterSession(...)`。CoAP 和 LwM2M 也显式执行两步；二者不是可以互换的同义调用。
+
+[DefaultTransportService.deregisterSession(SessionInfoProto)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1246) 输入 session，若 `SessionMetaData` 带 `ScheduledFuture` 就 `cancel(false)`，随后从 `sessions` 删除；无输出、无 Queue、无 Device State 副作用。ASYNC OPEN/CLOSED 的正确性由协议实现保证，不是 `TransportService` 自动配对。
+
+[DeviceActorMessageProcessor.processSessionStateMsgs(...)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L998) 在 CLOSED 分支删除三张 map。只有 `sessions.isEmpty()` 才调用 [reportSessionClose()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L653)，因此多 session 下关闭一条连接不会产生 DISCONNECT。默认最大 session 数是 1；超过限制时 [LinkedHashMapRemoveEldest.removeEldestEntry(...)](../../../common/util/src/main/java/org/thingsboard/common/util/LinkedHashMapRemoveEldest.java#L71) 移除最早插入项，并由 Actor 向旧 Transport 发送 `max concurrent sessions limit reached per device!`。
+
+[DefaultDeviceStateService.onDeviceDisconnect(...)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L399) 只更新 `lastDisconnectTime` 并推 `DISCONNECT_EVENT`，不会把 `active` 立即改为 false。设备在 disconnect 后仍可保持 active，直到 `lastActivityTime + inactivityTimeout` 到期；这是源码定义，不是状态延迟 bug。
+
+### 3.4 三类超时与事务边界
+
+| 超时/确认 | 源码入口 | 动作 | 不保证什么 |
+|---|---|---|---|
+| SYNC request timeout | [registerSyncSession(SessionInfoProto, SessionMsgListener, long)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1223) | scheduler 通知 listener `session timeout!` 并本地 deregister | 不撤销已生产的 Core/Rule Engine 消息 |
+| Transport ASYNC inactivity | [TransportActivityManager.hasExpired(long)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/TransportActivityManager.java#L139) | 本地移除、发 CLOSED、通知协议关闭 socket/relation | CLOSED producer callback 为 null，失败不会由业务层补偿 |
+| Device Actor session timeout | [checkSessionsTimeout()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1431) | 删除 Actor session/订阅并通知原 Transport | 不调用 `reportSessionClose()`，因此不补写 lastDisconnectTime |
+| Device inactivity | [updateInactivityStateIfExpired(long, DeviceId, DeviceStateData)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L732) | 保存 alarm time 与 `active=false`，发 INACTIVITY event | 不等同于网络 socket 已断开 |
+| Core producer callback | [DefaultTransportService.sendToCore(...)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1615) | broker/provider 接受 record | 不等待 Core consumer |
+| Core consumer commit | [DefaultTbCoreConsumerService.launchMainConsumers()](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L334) | 等 pack 或超时后 `mainConsumer.commit()` | 不和后续 attribute/timeseries/Rule Engine 写入组成事务 |
+| 状态 save callback | [TelemetrySaveCallback](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L1267) | 只记录成功 trace 或失败 warn | 失败不回滚内存状态和已推送 Rule Engine event |
+
+---
+
+## 四、消息流
+
+### 4.1 Protobuf 消息族
+
+```mermaid
+flowchart LR
+    S["SessionInfoProto"] --> EV["SessionEventMsg with SYNC or ASYNC and OPEN or CLOSED"]
+    S --> SUB["SubscriptionInfoProto with activity and subscription flags"]
+    EV --> TDA["TransportToDeviceActorMsg.sessionEvent"]
+    SUB --> TDA2["TransportToDeviceActorMsg.subscriptionInfo"]
+    TDA --> CORE["ToCoreMsg.toDeviceActorMsg"]
+    TDA2 --> CORE
+    CORE --> DA["Device Actor"]
+    DA --> DS["Direct DeviceStateService calls"]
+    RN["Device State Rule Node"] --> DCP["DeviceConnectProto"]
+    RN --> DAP["DeviceActivityProto"]
+    RN --> DDP["DeviceDisconnectProto"]
+    RN --> DIP["DeviceInactivityProto"]
+    DCP --> CORE2["ToCoreMsg fields 50 through 52 or field 6"]
+    DAP --> CORE2
+    DDP --> CORE2
+    DIP --> CORE2
+```
+
+`SessionEventMsg`、`SubscriptionInfoProto` 与 `TransportToDeviceActorMsg` 定义在 [queue.proto](../../../common/proto/src/main/proto/queue.proto#L189) 和 [queue.proto 的 session cache 区段](../../../common/proto/src/main/proto/queue.proto#L586)。正常 Transport session 流先到 Device Actor，Actor 再直接调用本地 `DeviceStateService`，不会再生产 `DeviceActivityProto`。
+
+`DeviceConnectProto`、`DeviceActivityProto`、`DeviceDisconnectProto`、`DeviceInactivityProto` 定义在 [queue.proto](../../../common/proto/src/main/proto/queue.proto#L554)，主要供 Rule Engine 的 Device State node 跨服务路由。 [DefaultRuleEngineDeviceStateManager.routeEvent(ConnectivityEventInfo, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultRuleEngineDeviceStateManager.java#L273) 若当前服务同时是目标 Core owner 就直调，否则把对应 proto 放入 Core Queue。
+
+### 4.2 返回路径与确认层级
+
+```mermaid
+flowchart TB
+    SEND["Transport tbCoreMsgProducer.send"] --> ACK1{"Producer callback"}
+    ACK1 -->|"error"| PERR["Protocol-specific error or fire-and-forget loss"]
+    ACK1 -->|"success"| BROKER["Record retained by queue provider"]
+    BROKER --> POLL["Core consumer poll"]
+    POLL --> ACT["Actor or State service callback"]
+    ACT --> COMMIT["Core consumer commitSync for Kafka"]
+    ACT --> ASAVE["Asynchronous state save"]
+    ACT --> REPUSH["Asynchronous Rule Engine message"]
+    ASAVE --> DBACK{"DAO future callback"}
+    REPUSH --> REACK{"Rule Engine producer and consumer chain"}
+    DBACK -->|"failure"| LOG["Warning only, no cross-layer rollback"]
+```
+
+Transport 的 `SubscriptionInfoProto` report 有 callback，可在 producer error 时保留 `lastReportedTime` 旧值，下个活动周期可能再次尝试；`OPEN/CLOSED` 若调用方传 `null` callback，则只有 producer stats 可观察。Core consumer 使用手动 commit，但 [launchMainConsumers()](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L334) 即使 pack timeout 或 `failedMap` 非空也会执行 commit，所以它不是“失败 record 自动重放队列”。状态方法以时间单调检查吸收一部分重复和乱序，而非依赖 exactly-once。
+
+---
+
+## 五、时序图
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="ThingsBoard Session 与 Device State 完整时序图"></a>
+
+可直接查看 [PlantUML 源文件](sequence.puml)。下图提炼状态而不是替代高分辨率时序图：
+
+```mermaid
+flowchart TB
+    NONE["No Actor session"] -->|"first ASYNC OPEN"| CONNECTED["At least one Actor session"]
+    CONNECTED -->|"activity report newer than stored time"| ACTIVE["active equals true"]
+    ACTIVE -->|"additional ASYNC OPEN"| MULTI["Multiple sessions when configured limit allows"]
+    MULTI -->|"one CLOSED"| CONNECTED
+    CONNECTED -->|"last CLOSED"| NOSESSION["No Actor session and lastDisconnectTime updated"]
+    ACTIVE -->|"lastActivityTime plus timeout reached"| INACTIVE["active equals false"]
+    INACTIVE -->|"new activity"| ACTIVE
+    NOSESSION -->|"recent activity window not expired"| ACTIVE
+    NOSESSION -->|"inactivity scheduler"| INACTIVE
+```
+
+需要特别注意：`CONNECTED/NOSESSION` 是根据 Actor session 数解释出的连接维度；持久化的只有 `lastConnectTime/lastDisconnectTime`，没有 `connected` boolean。`ACTIVE/INACTIVE` 才对应持久化 `active`。因此合法状态包括“无 session 但 active=true”，例如 HTTP 设备刚上报完 telemetry；也包括“session 尚在 Actor cache 中但 active=false”，例如活动 report 长时间失败。
+
+---
+
+## 六、数据变化
+
+### 6.1 Transport、Actor、cache 与 Device State
+
+```mermaid
+flowchart TB
+    subgraph TRANSPORT["Transport process memory"]
+        TSESS["sessions UUID to SessionMetaData"]
+        TACT["AbstractActivityManager private states"]
+        TIMER["SYNC ScheduledFuture"]
+    end
+    subgraph ACTOR["Device Actor serialized state"]
+        ASESS["sessions UUID to SessionInfoMetaData"]
+        AATTR["attributeSubscriptions"]
+        ARPC["rpcSubscriptions"]
+    end
+    subgraph CACHE["DeviceSessionCacheService"]
+        CAFF["Caffeine default, local and not restored"]
+        REDIS["Redis optional, protobuf snapshot"]
+    end
+    subgraph STATE["Core partition-owned state"]
+        DSTATE["deviceStates DeviceId to DeviceStateData"]
+        KEYS["active and five time or timeout keys"]
+    end
+    TSESS --> ASESS
+    TACT --> ASESS
+    TIMER --> TSESS
+    ASESS --> AATTR
+    ASESS --> ARPC
+    ASESS -->|"dump only for non-local cache"| REDIS
+    CAFF -. "restore and dump short-circuit" .-> ASESS
+    ASESS --> DSTATE
+    DSTATE --> KEYS
+```
+
+| 层 | 结构/字段 | 写入时机 | 生命周期 |
+|---|---|---|---|
+| Transport | `ConcurrentMap<UUID, SessionMetaData> sessions` | SYNC/ASYNC register | response、timeout、协议 close 或进程退出 |
+| Transport activity | `ActivityStateWrapper` 的 metadata、lastRecorded、lastReported、strategy | 任意 accepted uplink | session 消失后的下个报告周期，或 inactivity expiry |
+| `SessionMetaData` | listener、type、scheduledFuture、两类订阅 flag、overwriteActivityTime | register、subscribe/unsubscribe、device update | 当前 Transport 实例内存 |
+| Device Actor | `sessions`、`attributeSubscriptions`、`rpcSubscriptions` | OPEN/CLOSED、subscribe、activity report | Actor 生命周期；Redis 可提供快照恢复 |
+| Actor session metadata | type、nodeId、lastActivityTime、订阅 flags | OPEN、activity report | session 被关闭、淘汰或 Actor timeout |
+| Device State | `ConcurrentMap<DeviceId, DeviceStateData>` | partition load 或首次事件 lazy fetch | 仅当前 TB_CORE owner；rebalance/remove 清理 |
+| `DeviceState` | active、lastConnect、lastActivity、lastDisconnect、lastInactivityAlarm、inactivityTimeout | connect/activity/disconnect/scheduler/attribute update | 内存 + attribute 或 telemetry 持久化 |
+
+[SessionMetaData](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/SessionMetaData.java#L37) 使用 `volatile` 字段承载跨 callback 更新；[DeviceStateData](../../../application/src/main/java/org/thingsboard/server/service/state/DeviceStateData.java#L39) 除 metadata 外保存 tenant/customer/device identity 与 device creation time，creation time 用于避免“新建后立刻报 inactivity”。
+
+### 6.2 restart 与快照语义
+
+[DeviceActorMessageProcessor.restoreSessions()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1328) 在 `cache.type=caffeine` 时直接返回；Redis 模式从 `DeviceSessionsCacheEntry` 恢复 ASYNC session、nodeId、last activity 和订阅 flags。 [dumpSessions()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1370) 跳过 SYNC session，并把 snapshot 交给 [DefaultDeviceSessionCacheService.put(DeviceId, DeviceSessionsCacheEntry)](../../../application/src/main/java/org/thingsboard/server/service/session/DefaultDeviceSessionCacheService.java#L72)。Redis serializer 是 protobuf byte array，见 [SessionRedisCache](../../../application/src/main/java/org/thingsboard/server/service/session/SessionRedisCache.java#L52)。
+
+快照不是网络连接恢复：Transport 进程重启后 listener、socket、activity manager 和 SYNC timer 都丢失，Redis 中旧 nodeId 也不能重新构造协议 channel。Actor 的 [checkSessionsTimeout()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1431) 最终会删除超过 `transport.sessions.inactivity_timeout` 的快照并向旧 nodeId 发 close notification，但不会补发 `DISCONNECT_EVENT`。新连接必须生成新 session UUID；默认 max sessions 为 1 时新 OPEN 会淘汰旧 snapshot。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类与职责
+
+```mermaid
+flowchart LR
+    P["Protocol handler"] --> SIC["SessionInfoCreator"]
+    SIC --> DTS["DefaultTransportService"]
+    DTS --> AAM["AbstractActivityManager"]
+    AAM --> TAM["TransportActivityManager"]
+    DTS --> Q["TbCore queue producer"]
+    Q --> CCS["DefaultTbCoreConsumerService"]
+    CCS --> APP["App, Tenant and Device Actors"]
+    APP --> DAMP["DeviceActorMessageProcessor"]
+    DAMP --> DCACHE["DeviceSessionCacheService"]
+    DAMP --> DSS["DefaultDeviceStateService"]
+    DSS --> SUB["TelemetrySubscriptionService"]
+    DSS --> RE["TbClusterService to Rule Engine"]
+```
+
+| 全限定类名 | 关键源码职责 |
+|---|---|
+| `org.thingsboard.server.common.transport.auth.SessionInfoCreator` | 从认证快照创建完整 `SessionInfoProto` |
+| `org.thingsboard.server.common.transport.service.DefaultTransportService` | 本地 listener 注册、限流、活动记录、Core/RE producer 与 transport notification consumer |
+| `org.thingsboard.server.common.transport.activity.AbstractActivityManager` | 按策略聚合每 session 活动、维护 last recorded/reported |
+| `org.thingsboard.server.common.transport.service.TransportActivityManager` | session expiry、gateway overwrite、`SubscriptionInfoProto` report |
+| `org.thingsboard.server.service.queue.DefaultTbCoreConsumerService` | Core topic poll、pack callback、Actor/State 分派、commit |
+| `org.thingsboard.server.actors.device.DeviceActorMessageProcessor` | 每设备 session 上限、订阅 maps、首开末关、cache dump/restore、Actor timeout |
+| `org.thingsboard.server.service.session.DefaultDeviceSessionCacheService` | `DeviceId -> DeviceSessionsCacheEntry` 的 Caffeine/Redis 抽象 |
+| `org.thingsboard.server.service.state.DefaultDeviceStateService` | partition-owned state、active/inactive 判定、状态持久化与事件推送 |
+| `org.thingsboard.server.service.state.DefaultRuleEngineDeviceStateManager` | Device State rule node 的本地直调或跨 Core Queue 路由 |
+
+### 7.2 active 与 connect 为什么拆开
+
+[DeviceState](../../../application/src/main/java/org/thingsboard/server/service/state/DeviceState.java#L35) 只有一个 boolean：`active`。`lastConnectTime` 和 `lastDisconnectTime` 是事件时间，不是当前连接布尔值。`isActive(long, DeviceState)` 的公式在 [DefaultDeviceStateService](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L774)：`now < lastActivityTime + inactivityTimeout`。
+
+这项设计让 HTTP/CoAP one-shot 设备也能表现为 active，而无需长连接；代价是 active 不能回答“MQTT channel 此刻是否存在”。生产系统若要严格连接态，应从 transport metrics/session diagnostics 补充观察，不能在数据库中寻找不存在的 `online` 字段。
+
+### 7.3 inactivityTimeout 动态更新
+
+`inactivityTimeout` 是 SERVER_SCOPE attribute，值单位毫秒。 [DefaultSubscriptionManagerService.updateDeviceInactivityTimeout(TenantId, EntityId, List)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L421) 在 attribute 更新通知中调用 state service；删除属性时 [deleteDeviceInactivityTimeout(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L437) 传 0，使服务恢复默认值。
+
+[onDeviceInactivityTimeoutUpdate(TenantId, DeviceId, long)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L430) 只更新内存 timeout 并立即 `checkAndUpdateState`；属性本身已经由 attribute 流程持久化，因此这里不再次 `save(INACTIVITY_TIMEOUT, ...)`。telemetry 模式恢复状态时，若 timeseries 未提供自定义值，仍回退读取 SERVER_SCOPE `inactivityTimeout`，见 [transformInactivityTimeout(...)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L910)。
+
+### 7.4 手工架构图
+
+[点击新窗口打开原始 SVG](../../assets/architecture/29-session-device-state.svg)
+
+<a class="static-svg-thumbnail" href="../../assets/architecture/29-session-device-state.svg" target="_blank" rel="noopener noreferrer"><img src="../../assets/architecture/29-session-device-state.svg" alt="ThingsBoard Session 与 Device State 架构图"></a>
+
+---
+
+## 八、Actor 分析
+
+```mermaid
+flowchart TB
+    APP["AppActor receives transport wrapper"] --> TENANT["TenantActor selected by tenantId"]
+    TENANT --> DEVICE["DeviceActor selected by deviceId"]
+    DEVICE --> PROC["DeviceActorMessageProcessor"]
+    PROC --> SESS{"Session event"}
+    SESS -->|"OPEN first"| CONN["reportSessionOpen"]
+    SESS -->|"OPEN every new session"| ACT["onDeviceActivity"]
+    SESS -->|"CLOSED"| REMOVE["Remove session and two subscriptions"]
+    REMOVE --> EMPTY{"sessions empty"}
+    EMPTY -->|"yes"| DISC["reportSessionClose"]
+    PROC --> INFO["SubscriptionInfo activity report"]
+    INFO --> DS["DeviceStateService.onDeviceActivity"]
+    TIMER["AppActor periodic SessionTimeoutCheckMsg"] --> TENANT
+    TENANT --> DEVICE
+    DEVICE --> EXPIRE["checkSessionsTimeout removes stale Actor sessions"]
+```
+
+Device Actor 是按设备串行处理的 owner，因此 `sessions` 使用普通 `LinkedHashMapRemoveEldest` 而不是 concurrent map。构造器在 [DeviceActorMessageProcessor(TenantId, DeviceId)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L175) 注入 `maxConcurrentSessionsPerDevice` 和 eldest-removal callback。默认 1 意味着第二个 ASYNC session 会关闭最早 session；提高配置才真正允许多连接并存。
+
+Actor 侧没有独立的 `SessionManager` Java 类。所谓 session manager 是 `DeviceActorMessageProcessor` 内的三张 map、`SessionInfo/SessionInfoMetaData` 和 `DeviceSessionCacheService` 的组合。 [SessionInfo](../../../application/src/main/java/org/thingsboard/server/actors/device/SessionInfo.java#L34) 只保存 type 与 nodeId；[SessionInfoMetaData](../../../application/src/main/java/org/thingsboard/server/actors/device/SessionInfoMetaData.java#L33) 增加 last activity 和订阅 flags。
+
+Actor timeout 的调度链是 [AppActor.init(TbActorCtx)](../../../application/src/main/java/org/thingsboard/server/actors/app/AppActor.java#L94) 每 `sessionReportTimeout` 广播 `SessionTimeoutCheckMsg`，Tenant Actor 再广播给所有已存在 Device Actor。它只检查已实例化 Actor；未实例化设备的 state inactivity 由独立 `DefaultDeviceStateService` scheduler 覆盖。
+
+Actor callback 到达 `DeviceActorMessageProcessor.process(...)` 末尾才 `callback.onSuccess()`；但 Core consumer 仍不等待 state 持久化 future。Actor session map 更新与数据库状态键之间不是一个原子事务。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 topic、逻辑 partition 与 consumer group
+
+```mermaid
+flowchart LR
+    SESSION["OPEN, CLOSED or SubscriptionInfo"] --> HASH["murmur3_128 hash of device UUID"]
+    HASH --> IDX["Logical Core partition zero through nine"]
+    IDX --> TOPIC["Kafka topic tb_core.index"]
+    TOPIC --> GROUP["Consumer group tb-core-node"]
+    GROUP --> OWNER["Core service owning that logical partition"]
+    OWNER --> ACTOR["One Device Actor mailbox"]
+    ACTOR --> ORDER["Per-device order follows one logical topic path"]
+    DOWN["Actor downlink ToTransportMsg"] --> NTOPIC["tb_transport.notifications.serviceId"]
+    NTOPIC --> NGROUP["transport-node-serviceId"]
+    NGROUP --> LISTENER["Local SessionMsgListener"]
+```
+
+默认 `queue.core.topic=tb_core`、`queue.core.partitions=10`。 [TopicPartitionInfo](../../../common/message/src/main/java/org/thingsboard/server/common/msg/queue/TopicPartitionInfo.java#L68) 把逻辑 partition 追加到 full topic name，因此默认是十个独立 topic 后缀；Kafka 的 `queue.kafka.topic-properties.core` 默认每个 topic 自身 `partitions:1`。不要把 ThingsBoard 的 10 个逻辑分片误读成一个 `tb_core` topic 的 10 个 Kafka partitions。
+
+[KafkaTbCoreQueueFactory.createToCoreMsgConsumer()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L247) 使用 group `tb-core-node`；Transport 侧 producer 由 [KafkaTbTransportQueueFactory.createTbCoreMsgProducer()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbTransportQueueFactory.java#L189) 创建。partition change 时 [DefaultTbCoreConsumerService.onTbApplicationEvent(PartitionChangeEvent)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L316) 订阅 owner 对应的一组 full topics。
+
+下行不是 Core 主 topic 的反向 record。Actor 用 session 的 `nodeId` 调 `TbCoreToTransportService`，记录进入 `tb_transport.notifications.<serviceId>`；Transport consumer group 是 `transport-node-<serviceId>`，见 [KafkaTbTransportQueueFactory.createTransportNotificationsConsumer()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbTransportQueueFactory.java#L219)。
+
+### 9.2 retry、commit 与重复语义
+
+```mermaid
+flowchart TB
+    P["Kafka producer"] --> PA["acks equals all and retries equals one by default"]
+    PA --> DUP["Idempotence is not explicitly enabled by ThingsBoard settings"]
+    DUP --> C["Core consumer with auto commit disabled"]
+    C --> PACK["Process pack with callbacks up to 2000 milliseconds"]
+    PACK --> FAIL{"callback failure or timeout"}
+    FAIL -->|"either result"| COMMIT["commitSync after pack"]
+    COMMIT --> LOST["No application redelivery for that committed record"]
+    DUP --> MONO["Timestamp monotonic checks suppress stale state updates"]
+```
+
+[TbKafkaSettings.toProducerProps()](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaSettings.java#L288) 设置 `acks=all`、`retries=1`，但不显式设置 `enable.idempotence`；运维可通过 `queue.kafka.other-inline` 覆盖额外属性。consumer 在 [toConsumerProps(String)](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaSettings.java#L264) 禁用 auto commit，实际 [TbKafkaConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerTemplate.java#L161) 使用 `commitSync()`。
+
+状态处理不是 exactly-once。connect/disconnect/inactivity 对负数和旧 timestamp 做拒绝；activity 只接受更大的 `lastReportedActivity`。这使重复 record 大多幂等，但 `CLOSED` 的时间是在 Actor 调用 `System.currentTimeMillis()` 时生成，重复 CLOSED 可能形成更新的 disconnect event；Rule Engine 和 notification trigger 也没有全局去重事务。
+
+生产排障应同时看：`tb_core.<n>` lag、`tb-core-node` group、Transport producer error、Core pack timeout/failedMap、`tb_transport.notifications.<serviceId>` lag，以及设备 UUID 是否稳定落到预期 owner。只看 Kafka 主 topic 不足以定位 listener 下行问题。
+
+---
+
+## 十、数据库分析
+
+```mermaid
+flowchart TB
+    CHANGE["Device State key change"] --> MODE{"persistToTelemetry"}
+    MODE -->|"false"| ATTRAPI["saveAttrAndNotify with SERVER_SCOPE"]
+    ATTRAPI --> ATTRDB["attribute_kv primary key by entity, scope and key"]
+    MODE -->|"true"| TSAPI["saveAndNotifyInternal with current server timestamp"]
+    TSAPI --> HISTORY["ts_kv history"]
+    TSAPI --> LATEST["ts_kv_latest latest value"]
+    ATTRDB --> VIEWA["device_info_active_attribute_view"]
+    LATEST --> VIEWT["device_info_active_ts_view"]
+    VIEWA --> VIEW["device_info_view default"]
+    VIEWT --> VIEW
+    SESSION["Transport and Actor session snapshots"] --> NODB["No PostgreSQL session table in this flow"]
+    SESSION --> CACHE["Caffeine or Redis sessions cache"]
+```
+
+### 10.1 六个状态键
+
+`DefaultDeviceStateService` 的常量和持久化 key list 位于 [DefaultDeviceStateService.java](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L130)：
+
+| key | 类型 | 更新条件 | 含义 |
+|---|---|---|---|
+| `active` | boolean | 首次活动、inactivity 到期、设备创建初始化 | 活动窗口状态，不是 socket boolean |
+| `lastConnectTime` | long | Actor 第一条 session OPEN | Core 处理时钟值 |
+| `lastActivityTime` | long | 更大的 Transport activity report | Transport 记录 uplink 的时钟值 |
+| `lastDisconnectTime` | long | Actor 最后一条 session CLOSED | Core 处理时钟值 |
+| `inactivityAlarmTime` | long | 转 inactive；特定重新激活条件下清零 | 防止同一活动窗口重复发 inactivity |
+| `inactivityTimeout` | long | 默认值或 SERVER_SCOPE 覆盖 | 毫秒 |
+
+默认 attribute 模式调用 [save(DeviceId, String, long)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L1219) 或 boolean overload，把值写入 `SERVER_SCOPE`。PostgreSQL 表定义在 [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L105)，主键是 entity type/id、attribute type、attribute key，因此每 key 保留最新一行。
+
+telemetry 模式调用 `saveAndNotifyInternal`，timestamp 使用 state service 当前时间而不是 event value。SQL history 表见 [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L17)，latest 表见 [schema-ts-latest-psql.sql](../../../dao/src/main/resources/sql/schema-ts-latest-psql.sql#L17)；Cassandra/Timescale 后端沿各自 TimeseriesService 实现保存。状态 telemetry TTL 只在该模式生效。
+
+### 10.2 device_info_view 与切换风险
+
+[schema-views-and-functions.sql](../../../dao/src/main/resources/sql/schema-views-and-functions.sql#L17) 同时创建 attribute 与 latest telemetry 两个 active view，默认 `device_info_view` 指向 attribute view。把 `state.persistToTelemetry` 从 false 改 true 只会改变后续写入，不会自动迁移历史数据或自动保证 view 指向正确来源；配置注释要求手工 `CREATE OR REPLACE VIEW device_info_view AS SELECT * FROM device_info_active_ts_view`，反向切换亦然。
+
+### 10.3 非事务边界
+
+`updateActivityState` 对 `lastActivityTime`、`inactivityAlarmTime` 和 `active` 可能发起多次独立 async save；随后立即推 Rule Engine event 和 notification trigger。没有把这些写操作包装成一个数据库事务，也没有等待前一 key 落库。崩溃或单项 DAO failure 可留下部分状态；重启时 `fetchDeviceState` 从持久化值恢复，再由 `checkAndUpdateState` 用墙钟校正 active。
+
+Session listener 和 Transport activity state 从不写 PostgreSQL。Actor session snapshot 只走 `DeviceSessionCacheService`；Caffeine 是当前进程 cache，Redis 是外部 cache。数据库中找不到 session row 是符合设计的。
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败与恢复矩阵
+
+```mermaid
+flowchart TB
+    E["Session or activity operation"] --> LIMIT{"Transport rate limit passes"}
+    LIMIT -->|"no"| RL["Callback receives TbRateLimitsException"]
+    LIMIT -->|"yes"| Q{"Core Queue producer succeeds"}
+    Q -->|"no"| QE["Protocol error when callback exists, otherwise stats and log only"]
+    Q -->|"yes"| C{"Core consumer and Actor processing"}
+    C -->|"exception"| CF["Pack callback failure is logged"]
+    C -->|"success"| S{"Asynchronous state save"}
+    CF --> COMMIT["Pack is still committed after wait boundary"]
+    S -->|"failure"| WARN["TelemetrySaveCallback warning"]
+    S -->|"success"| DB["Persistent state updated"]
+    WARN --> MEMORY["In-memory state and emitted event are not rolled back"]
+```
+
+| 失败点 | 源码行为 | 重试/一致性语义 |
+|---|---|---|
+| OPEN producer error | MQTT 返回 server unavailable 并关闭；其他协议依 callback 实现 | Kafka producer 默认最多重试 1 次；未入 broker 则 Actor 无 session |
+| CLOSED producer error | 常见调用传 `null` callback | 本地 listener 已 deregister，但 Actor 可能保留 session，靠 Actor timeout 清理 |
+| activity producer error | `ActivityReportCallback.onFailure` 不推进 lastReportedTime | 下个周期在仍有更新/状态时可能重报；无无限 durable retry 日志 |
+| SYNC timeout | listener 收到 close notification，本地 future 注销 | 已提交下游工作继续执行，晚到 notification 找不到 session 而被忽略 |
+| Transport crash | socket/listener/activity maps 丢失，无法主动发 CLOSED | Actor snapshot 可能残留；Actor timeout 删除但不补 disconnect |
+| Core restart with Caffeine | Actor restore 直接跳过 | session/订阅不恢复，设备必须重连/重订阅 |
+| Core restart with Redis | 恢复 ASYNC snapshot | 只恢复 Actor 路由元数据，不恢复 Transport channel |
+| partition rebalance | 非 owner 的 state event 先 cleanup；新 owner批量 fetch DB | 窗口内事件按 Core topic owner 路由；外部分区调用被跳过或失败 |
+| state DB save failure | callback 记录 warn | 不回滚内存、Rule Engine event 或 notification trigger |
+| 旧/负时间戳 | connect/disconnect/inactivity 拒绝；activity 只收更大值 | 抑制乱序回退，但无法提供跨副作用 exactly-once |
+
+### 11.2 session timeout 与 inactivity 的边界条件
+
+Transport expiry 判断是 `(now - sessionInactivityTimeout) > lastRecordedTime`，等号时尚未过期；Device State active 判断是 `now < lastActivityTime + inactivityTimeout`，等号时已经 inactive。再叠加 3 秒 session report 周期与 60 秒 state check fixed delay，界面状态变化允许存在扫描延迟。
+
+Device inactivity 还要求 `deviceCreationTime + inactivityTimeout <= now`，避免从未活动的新设备立即报 inactivity；并要求 `lastInactivityAlarmTime == 0` 或不晚于当前 last activity，避免重复事件。对应实现和测试在 [updateInactivityStateIfExpired(...)](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L732) 与 [DefaultDeviceStateServiceTest](../../../application/src/test/java/org/thingsboard/server/service/state/DefaultDeviceStateServiceTest.java#L567)。
+
+### 11.3 生产排障顺序
+
+先确认协议 channel/PING/uplink 是否调用 `recordActivity`，再查 Transport `sessions` 数量与 activity producer errors；随后用 device UUID 计算或从 trace 获取 `tb_core.<n>`，检查 `tb-core-node` lag 和 owner；再看 Device Actor 的 duplicate OPEN、max-session eviction、session timeout 日志；最后检查 `deviceStates` owner、state save warning、Rule Engine event、`attribute_kv` 或 `ts_kv_latest` 以及 `device_info_view` 指向。不要用单一 `lastDisconnectTime` 判断 active，也不要用 active=false 直接断言 MQTT socket 已关闭。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    A["queue.proto session and state messages"] --> B["SessionInfoCreator"]
+    B --> C["Protocol register and deregister caller"]
+    C --> D["DefaultTransportService process overloads"]
+    D --> E["AbstractActivityManager"]
+    E --> F["TransportActivityManager"]
+    F --> G["HashPartitionService and Kafka queue factories"]
+    G --> H["DefaultTbCoreConsumerService"]
+    H --> I["App, Tenant and Device Actors"]
+    I --> J["DeviceActorMessageProcessor session maps"]
+    J --> K["DeviceSessionCacheService"]
+    J --> L["DefaultDeviceStateService"]
+    L --> M["SQL schema, views and tests"]
+```
+
+建议按以下顺序阅读，避免一开始掉进协议细节：
+
+1. [queue.proto SessionInfoProto](../../../common/proto/src/main/proto/queue.proto#L82) 和 [TransportToDeviceActorMsg](../../../common/proto/src/main/proto/queue.proto#L602)：先固定跨层数据契约。
+2. [SessionInfoCreator](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/auth/SessionInfoCreator.java#L34)：确认 nodeId、sessionId 与 entity ids 从哪里来。
+3. MQTT [onValidateDeviceResponse(...)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1586) 和 [doDisconnect()](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1559)：观察显式 OPEN/CLOSED 与 register/deregister 的顺序。
+4. [DefaultTransportService.registerAsyncSession(...)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L408)、[registerSyncSession(...)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1223) 与 [deregisterSession(...)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1246)：理解本地 listener 边界。
+5. [AbstractActivityManager](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/activity/AbstractActivityManager.java#L42) 和 [TransportActivityManager](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/TransportActivityManager.java#L43)：跟踪 activity 聚合、gateway overwrite 与 expiry。
+6. [HashPartitionService.resolve(...)](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L376) 与 [KafkaTbCoreQueueFactory](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L247)：核对 topic、partition、group。
+7. [DefaultTbCoreConsumerService.launchMainConsumers()](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L334)：看清 pack callback 与 commit 边界。
+8. [DeviceActorMessageProcessor.processSessionStateMsgs(...)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L998)、[handleSessionActivity(...)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1067) 与 [checkSessionsTimeout()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1431)：掌握 Actor session manager 的实际实现。
+9. [DefaultDeviceStateService](../../../application/src/main/java/org/thingsboard/server/service/state/DefaultDeviceStateService.java#L125)：依次读 connect、activity、disconnect、scheduler、save 和 fetch。
+10. [TransportActivityManagerTest](../../../common/transport/transport-api/src/test/java/org/thingsboard/server/common/transport/service/TransportActivityManagerTest.java#L90)、[DefaultDeviceStateServiceTest](../../../application/src/test/java/org/thingsboard/server/service/state/DefaultDeviceStateServiceTest.java#L181) 与 [DefaultTbCoreConsumerServiceTest](../../../application/src/test/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerServiceTest.java#L121)：用测试确认缺失 session、乱序 timestamp、分区和 callback 行为。
+
+---
+
+## 十三、常见面试题
+
+### 1. `registerAsyncSession` 会自动向 Device Actor 发送 `OPEN` 吗？
+
+不会。它只对 Transport 本地 `sessions.computeIfAbsent(sessionId, ...)`，保存 `SessionMetaData` 和 listener。MQTT、CoAP、LwM2M 等协议代码必须另行调用 `process(sessionInfo, SessionEventMsg OPEN, callback)`；两步顺序也由协议实现决定。
+
+### 2. `deregisterSession` 会自动产生 `DISCONNECT_EVENT` 吗？
+
+不会。它只取消 SYNC scheduled future 并删除本地 session。只有显式 `CLOSED` 到达 Device Actor，且删除后 Actor session map 为空，才调用 Device State 的 `onDeviceDisconnect`，进而产生 `DISCONNECT_EVENT`。
+
+### 3. SYNC 与 ASYNC session 的本质区别是什么？
+
+SYNC 用于一次性 request/response，注册时自带 timeout，收到任一 transport notification 后 `processToTransportMsg` 自动 deregister；ASYNC 用于 MQTT、LwM2M、CoAP Observe 等长生命周期 listener，不会因一条下行消息自动注销，并参与 OPEN/CLOSED 与订阅快照。
+
+### 4. `SessionInfoProto.nodeId` 为什么不可缺少？
+
+Device Actor 的 attribute/RPC/close notification 要路由回创建 session 的 Transport 实例。Actor 只持有 nodeId 和 sessionId，不持有 Netty channel 或 CoAP relation；Core to Transport service 用 nodeId 选择实例 notification topic，Transport 再用 sessionId 找本地 listener。
+
+### 5. 无本地 session 的 HTTP telemetry 如何刷新 active？
+
+`process(PostTelemetryMsg)` 仍调用 `recordActivityInternal`。报告周期结束时 `updateState` 发现本地 session 不存在，会移除 activity state，但 `AbstractActivityManager` 仍上报最后一次 `SubscriptionInfoProto`；Actor 即使找不到 session metadata，也总会调用 `DeviceStateService.onDeviceActivity`。
+
+### 6. 默认 `LAST` activity strategy 有什么作用？
+
+它在每次 activity 时只更新内存 lastRecordedTime，不立即生产 Core record；每 3 秒报告周期末发送该周期最后时间。这样把高频 telemetry/PING 合并为低频状态更新，同时仍以最新活动时间计算 inactivity。
+
+### 7. activity report 的成功回调代表数据库写入成功吗？
+
+不代表。回调来自 `tbCoreMsgProducer.send`，只确认 Queue producer。Core consumer、Device Actor、`saveAttrAndNotify`/`saveAndNotifyInternal`、Rule Engine event 都在后面独立执行。
+
+### 8. `active=true` 是否等价于 MQTT 在线？
+
+不等价。active 公式仅为 `now < lastActivityTime + inactivityTimeout`。HTTP one-shot 设备没有长连接也可 active；MQTT 刚断开后在超时窗口内仍 active。通用 Device State 没有持久化 `online` boolean。
+
+### 9. CONNECT/DISCONNECT 与 ACTIVITY/INACTIVITY 的区别是什么？
+
+前者由 Device Actor 第一条 session OPEN 和最后一条 session CLOSED 触发，记录连接生命周期；后者由活动时间窗口触发，描述设备近期是否有 uplink。四类事件可以在时间上错开，并分别进入 Rule Engine。
+
+### 10. 多 session 时何时写 `lastDisconnectTime`？
+
+只有 CLOSED 后 `sessions.isEmpty()` 时。关闭其中一条 session 只删除该 session 的 attribute/RPC subscriptions，不报告 disconnect。默认上限为 1；把上限调高后才会看到真正的“最后一条关闭”语义。
+
+### 11. 超过每设备最大 session 数会怎样？
+
+Actor 的 insertion-order `LinkedHashMapRemoveEldest` 淘汰最早 session，并向其 nodeId/sessionId 发送 close notification，消息为 `max concurrent sessions limit reached per device!`。旧 Transport listener 收到后关闭协议连接；新 session 留在 Actor map。
+
+### 12. Transport session inactivity 和 Device inactivity 为什么要配置成相近值？
+
+前者关闭陈旧 listener/订阅，后者切换 active。若 session timeout 远小于 device timeout，连接已被清理但 active 长时间为 true；若 device timeout 更小，仍有 session 的设备可能先显示 inactive。配置注释建议 session timeout 大于或等于 device timeout。
+
+### 13. 两种 timeout 的单位分别是什么？
+
+`transport.sessions.inactivity_timeout` 是毫秒，默认 600000；`state.defaultInactivityTimeoutInSec` 是秒，默认 600。设备 SERVER_SCOPE `inactivityTimeout` 覆盖值又是毫秒，这是最常见的配置误区之一。
+
+### 14. Transport 和 Device Actor 为什么都检查 session timeout？
+
+Transport 检查能关闭真实 socket/relation并发送 CLOSED；Actor 检查是 Core 侧防御性清理，可处理 Transport 崩溃或 CLOSED 丢失造成的陈旧订阅。Actor timeout 只删除 map 并通知旧 Transport，不调用 reportSessionClose，因此不是完整 disconnect 补偿。
+
+### 15. Core/Transport 重启后 session 能自动恢复吗？
+
+Transport 不能，socket、listener、SYNC timer 和 activity map 都是本地内存。Core 默认 Caffeine 模式也不 restore Actor session；Redis 模式可恢复 ASYNC nodeId/lastActivity/subscription 快照，但不能重建网络连接，设备仍需重连或重订阅。
+
+### 16. session 数据会写 PostgreSQL 吗？
+
+不会。Transport session 在本地 map，Actor snapshot 在 Caffeine 或 Redis `sessions` cache。PostgreSQL/Timeseries 只保存 Device State 的 active 和时间键等业务状态；源码没有本流程对应的 session table。
+
+### 17. Device State 默认写 attribute 还是 telemetry？
+
+默认 `state.persistToTelemetry=false`，写 `attribute_kv` 的 `SERVER_SCOPE`。开启后写 timeseries history/latest，并可应用 `state.telemetryTtl`；SERVER_SCOPE 的自定义 inactivityTimeout 仍是覆盖来源。
+
+### 18. 切换 `persistToTelemetry` 后为什么设备列表 active 可能不对？
+
+`device_info_view` 默认指向 attribute active view。配置注释要求切到 telemetry 时重建为 `device_info_active_ts_view`，反向亦然；源码不会自动迁移已有六个状态键，切换窗口还可能同时存在两套旧值。
+
+### 19. Device State 更新是否在一个数据库事务中？
+
+不是。`lastActivityTime`、`inactivityAlarmTime`、`active` 等分别发起 async save，Rule Engine event 和 notification trigger 也独立提交。某一 save 失败只记录 warning，不回滚内存状态或其他副作用。
+
+### 20. Kafka Core topic 如何保证同一设备路由一致？
+
+`HashPartitionService` 对 device UUID 使用配置 hash，取模 `queue.core.partitions`，并把 logical partition 追加为 `tb_core.<index>`。同一 deviceId 稳定进入同一路径，再由 owner Core 的 Device Actor mailbox 串行处理。
+
+### 21. Core consumer 失败后会自动重放当前 record 吗？
+
+不能依赖这一点。consumer 禁用 auto commit，但主循环在 pack wait 后无论 ack/failed/timeout map 内容都会调用 commit。进程在 commit 前崩溃可能重放；应用 callback 已失败但随后 commit 则不会自动重放，所以语义不是 exactly-once 或统一 at-least-once。
+
+### 22. 乱序 activity/connect/disconnect 如何处理？
+
+activity 只接受大于当前 lastActivityTime 的正值；connect/disconnect 拒绝负数和小于等于当前对应时间的值；inactivity 还必须晚于当前 activity 与上次 alarm。这些单调检查避免旧 record 回退状态，但无法去重所有 Rule Engine/notification 副作用。
+
+### 23. gateway 的 `overwriteActivityTime` 做什么？
+
+当 gateway session 开启该标记时，子设备 activity state 在报告周期会取 `max(childLastRecordedTime, gatewayLastRecordedTime)`。它适用于由 gateway uplink 代表子设备在线的模型；默认 false，且只影响 activity time，不替代子设备 session identity。
+
+### 24. 为什么 disconnect 后 `active` 不立即变 false？
+
+源码把连接态与活动态拆开。`onDeviceDisconnect` 只保存 lastDisconnectTime 和发送 DISCONNECT event；inactivity scheduler 等 `lastActivityTime + inactivityTimeout` 到期才保存 active=false 和发送 INACTIVITY event，避免短暂重连或 one-shot 协议造成状态抖动。
+
+### 25. 排查“设备持续上报但 active=false”应按什么顺序？
+
+先确认协议 handler 是否进入 `recordActivity`，检查 `transport.activity.reporting_strategy` 与 3 秒 report 周期；再查 Core producer error、`tb_core.<partition>` 和 `tb-core-node` lag；随后看 Actor `handleSessionActivity`、partition owner 与旧 timestamp 丢弃；最后检查 state save warning、`attribute_kv`/`ts_kv_latest`、`device_info_view` 指向以及自定义 inactivityTimeout 的单位和值。
+
+---
+
+[上一篇：28 Device Claim 流程](../28-device-claim/README.md) | [HTML 版](index.html) | [返回全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/29-session-device-state.svg) | [下一篇：30 Telemetry 查询流程](../30-telemetry-query/README.md)

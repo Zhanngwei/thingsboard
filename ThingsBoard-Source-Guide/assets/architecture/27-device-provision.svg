@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1320" viewBox="0 0 1840 1320" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard release-3.6 Device Provision 架构</title>
+  <desc id="desc">高对比展示 HTTP、MQTT、CoAP Provision 统一消息、Transport API Queue、Profile 策略、设备与凭据事务、缓存、Rule Engine 和响应边界。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#1f2937"/></marker>
+    <marker id="arrowRed" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#9f1239"/></marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:700 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .tiny{font:14px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:700 14px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8}
+      .band{fill:#f8fafc;stroke:#334155;stroke-width:2.5}
+      .blue{fill:#e8f5fb;stroke:#0369a1;stroke-width:3}
+      .green{fill:#eafbf2;stroke:#047857;stroke-width:3}
+      .amber{fill:#fff7df;stroke:#a16207;stroke-width:3}
+      .rose{fill:#fff1f2;stroke:#be123c;stroke-width:3}
+      .gray{fill:#f3f4f6;stroke:#374151;stroke-width:3}
+      .white{fill:#ffffff;stroke:#334155;stroke-width:3}
+      .line{fill:none;stroke:#1f2937;stroke-width:3;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#475569;stroke-width:2.5;stroke-dasharray:9 7;marker-end:url(#arrow)}
+      .risk{fill:none;stroke:#9f1239;stroke-width:3;stroke-dasharray:8 6;marker-end:url(#arrowRed)}
+      .divider{stroke:#64748b;stroke-width:2;stroke-dasharray:7 7}
+    </style>
+  </defs>
+
+  <rect width="1840" height="1320" fill="#ffffff"/>
+  <text x="920" y="52" text-anchor="middle" class="title">ThingsBoard release-3.6 Device Provision：统一控制面、事务与确认边界</text>
+
+  <rect x="30" y="85" width="405" height="1090" rx="6" class="band"/>
+  <text x="232" y="125" text-anchor="middle" class="section">协议入口</text>
+
+  <rect x="70" y="160" width="325" height="145" rx="5" class="blue"/>
+  <text x="232" y="198" text-anchor="middle" class="label">HTTP</text>
+  <text x="232" y="230" text-anchor="middle" class="small">POST /api/v1/provision</text>
+  <text x="232" y="258" text-anchor="middle" class="small">仅 JSON · DeferredResult</text>
+  <text x="232" y="286" text-anchor="middle" class="small">业务 status 仍返回 HTTP 200</text>
+
+  <rect x="70" y="350" width="325" height="185" rx="5" class="green"/>
+  <text x="232" y="388" text-anchor="middle" class="label">MQTT</text>
+  <text x="232" y="420" text-anchor="middle" class="small">clientId 或 username = provision</text>
+  <text x="232" y="448" text-anchor="middle" class="small">PUBLISH /provision/request</text>
+  <text x="232" y="476" text-anchor="middle" class="small">JSON parse error 才回退 Protobuf</text>
+  <text x="232" y="504" text-anchor="middle" class="small">/provision/response · 60 秒后关闭</text>
+
+  <rect x="70" y="580" width="325" height="165" rx="5" class="amber"/>
+  <text x="232" y="618" text-anchor="middle" class="label">CoAP</text>
+  <text x="232" y="650" text-anchor="middle" class="small">POST /api/v1/provision</text>
+  <text x="232" y="678" text-anchor="middle" class="small">JSON 或 Protobuf</text>
+  <text x="232" y="706" text-anchor="middle" class="small">SUCCESS 2.01 · 业务失败 4.00</text>
+
+  <rect x="70" y="790" width="325" height="160" rx="5" class="gray"/>
+  <text x="232" y="828" text-anchor="middle" class="label">不是设备 Session</text>
+  <text x="232" y="860" text-anchor="middle" class="small">没有 SessionInfoProto</text>
+  <text x="232" y="888" text-anchor="middle" class="small">没有 SessionEvent OPEN/CLOSE</text>
+  <text x="232" y="916" text-anchor="middle" class="small">没有 Device Actor 路由</text>
+
+  <rect x="70" y="995" width="325" height="130" rx="5" class="rose"/>
+  <text x="232" y="1033" text-anchor="middle" class="label">安全边界</text>
+  <text x="232" y="1065" text-anchor="middle" class="small">key + secret 是未认证入口的授权材料</text>
+  <text x="232" y="1093" text-anchor="middle" class="small">生产使用 HTTPS / MQTTS / DTLS</text>
+
+  <rect x="470" y="85" width="420" height="1090" rx="6" class="band"/>
+  <text x="680" y="125" text-anchor="middle" class="section">Transport 控制面</text>
+
+  <rect x="510" y="160" width="340" height="185" rx="5" class="blue"/>
+  <text x="680" y="198" text-anchor="middle" class="label">统一 Proto</text>
+  <text x="680" y="230" text-anchor="middle" class="small">ProvisionDeviceRequestMsg</text>
+  <text x="680" y="258" text-anchor="middle" class="small">deviceName · credentialsType</text>
+  <text x="680" y="286" text-anchor="middle" class="small">provisionDeviceKey · secret</text>
+  <text x="680" y="314" text-anchor="middle" class="small">token · Basic MQTT · X.509 value</text>
+
+  <rect x="510" y="390" width="340" height="200" rx="5" class="green"/>
+  <text x="680" y="428" text-anchor="middle" class="label">DefaultTransportService</text>
+  <text x="680" y="460" text-anchor="middle" class="small">process(requestMsg, callback)</text>
+  <text x="680" y="488" text-anchor="middle" class="small">TransportApiRequestMsg</text>
+  <text x="680" y="516" text-anchor="middle" class="small">不进入 Core Queue / Rule Engine 主链</text>
+  <text x="680" y="544" text-anchor="middle" class="small">callback executor 返回协议层</text>
+
+  <rect x="510" y="635" width="340" height="230" rx="5" class="amber"/>
+  <text x="680" y="673" text-anchor="middle" class="label">Transport API Request Template</text>
+  <text x="680" y="705" text-anchor="middle" class="small">requestId · responseTopic · expireTs</text>
+  <text x="680" y="733" text-anchor="middle" class="small">pendingRequests 上限 10000</text>
+  <text x="680" y="761" text-anchor="middle" class="small">默认 timeout 10000 ms</text>
+  <text x="680" y="789" text-anchor="middle" class="small">request/response poll 25 ms</text>
+  <text x="680" y="817" text-anchor="middle" class="small">pending Future 只存在 Transport 内存</text>
+
+  <rect x="510" y="910" width="340" height="215" rx="5" class="white"/>
+  <text x="680" y="948" text-anchor="middle" class="label">Kafka 或 In-Memory Queue</text>
+  <text x="680" y="980" text-anchor="middle" class="small">tb_transport.api.requests</text>
+  <text x="680" y="1008" text-anchor="middle" class="small">默认 10 partitions</text>
+  <text x="680" y="1036" text-anchor="middle" class="small">Core group: tb-core-transport-api-consumer</text>
+  <text x="680" y="1064" text-anchor="middle" class="small">responses.{serviceId}</text>
+  <text x="680" y="1092" text-anchor="middle" class="small">Transport group: transport-node-{serviceId}</text>
+
+  <rect x="925" y="85" width="420" height="1090" rx="6" class="band"/>
+  <text x="1135" y="125" text-anchor="middle" class="section">Core 策略与凭据</text>
+
+  <rect x="965" y="160" width="340" height="155" rx="5" class="blue"/>
+  <text x="1135" y="198" text-anchor="middle" class="label">DefaultTransportApiService</text>
+  <text x="1135" y="230" text-anchor="middle" class="small">Proto 转 ProvisionRequest</text>
+  <text x="1135" y="258" text-anchor="middle" class="small">异常名称转 ResponseStatus</text>
+  <text x="1135" y="286" text-anchor="middle" class="small">credentials 转统一 response</text>
+
+  <rect x="965" y="360" width="340" height="180" rx="5" class="green"/>
+  <text x="1135" y="398" text-anchor="middle" class="label">Profile 授权</text>
+  <text x="1135" y="430" text-anchor="middle" class="small">provision key cache -> device_profile</text>
+  <text x="1135" y="458" text-anchor="middle" class="small">secret 等值比较</text>
+  <text x="1135" y="486" text-anchor="middle" class="small">key 全表唯一，不是 tenant-scoped</text>
+  <text x="1135" y="514" text-anchor="middle" class="small">默认 Caffeine TTL 1440 min</text>
+
+  <rect x="965" y="585" width="340" height="230" rx="5" class="amber"/>
+  <text x="1135" y="623" text-anchor="middle" class="label">DeviceProvisionServiceImpl</text>
+  <text x="1135" y="655" text-anchor="middle" class="small">ALLOW_CREATE_NEW_DEVICES</text>
+  <text x="1135" y="683" text-anchor="middle" class="small">同名存在即 FAILURE，不是 upsert</text>
+  <line x1="995" y1="708" x2="1275" y2="708" class="divider"/>
+  <text x="1135" y="741" text-anchor="middle" class="small">CHECK_PRE_PROVISIONED_DEVICES</text>
+  <text x="1135" y="769" text-anchor="middle" class="small">同 tenant/name 且 Profile id 相同</text>
+  <text x="1135" y="797" text-anchor="middle" class="small">返回现有 credentials，不采用请求新值</text>
+
+  <rect x="965" y="860" width="340" height="265" rx="5" class="rose"/>
+  <text x="1135" y="898" text-anchor="middle" class="label">最终凭据</text>
+  <text x="1135" y="930" text-anchor="middle" class="small">空输入：20 位随机 ACCESS_TOKEN</text>
+  <text x="1135" y="958" text-anchor="middle" class="small">指定 token：credentialsId = token</text>
+  <text x="1135" y="986" text-anchor="middle" class="small">MQTT_BASIC：value 为 JSON</text>
+  <text x="1135" y="1014" text-anchor="middle" class="small">Basic credentialsId 由 clientId/username 派生</text>
+  <text x="1135" y="1042" text-anchor="middle" class="small">X.509：规范证书值并计算 SHA3 id</text>
+  <text x="1135" y="1078" text-anchor="middle" class="tiny">证书链自动注册使用另一条 ValidateOrCreate 消息</text>
+
+  <rect x="1380" y="85" width="430" height="1090" rx="6" class="band"/>
+  <text x="1595" y="125" text-anchor="middle" class="section">数据、事件与恢复</text>
+
+  <rect x="1420" y="160" width="350" height="245" rx="5" class="green"/>
+  <text x="1595" y="198" text-anchor="middle" class="label">主创建事务</text>
+  <text x="1595" y="230" text-anchor="middle" class="small">DeviceServiceImpl @Transactional</text>
+  <text x="1595" y="258" text-anchor="middle" class="small">INSERT device</text>
+  <text x="1595" y="286" text-anchor="middle" class="small">INSERT / UPDATE device_credentials</text>
+  <text x="1595" y="314" text-anchor="middle" class="small">name、credentialsId、deviceId 唯一约束</text>
+  <text x="1595" y="342" text-anchor="middle" class="small">任一凭据异常 -> 整体 rollback</text>
+  <text x="1595" y="370" text-anchor="middle" class="small">事务提交后才进入下方副作用</text>
+
+  <rect x="1420" y="450" width="350" height="190" rx="5" class="amber"/>
+  <text x="1595" y="488" text-anchor="middle" class="label">独立属性写</text>
+  <text x="1595" y="520" text-anchor="middle" class="small">attribute_kv · SERVER_SCOPE</text>
+  <text x="1595" y="548" text-anchor="middle" class="small">provisionState = provisioned</text>
+  <text x="1595" y="576" text-anchor="middle" class="small">响应同步等待 Future.get()</text>
+  <text x="1595" y="604" text-anchor="middle" class="small">失败不回滚已提交 device/credentials</text>
+
+  <rect x="1420" y="685" width="350" height="190" rx="5" class="blue"/>
+  <text x="1595" y="723" text-anchor="middle" class="label">事务外副作用</text>
+  <text x="1595" y="755" text-anchor="middle" class="small">cluster onDeviceUpdated</text>
+  <text x="1595" y="783" text-anchor="middle" class="small">ENTITY_CREATED</text>
+  <text x="1595" y="811" text-anchor="middle" class="small">PROVISION_SUCCESS / FAILURE</text>
+  <text x="1595" y="839" text-anchor="middle" class="small">audit_log · Rule Engine callback 不等待</text>
+
+  <rect x="1420" y="920" width="350" height="205" rx="5" class="rose"/>
+  <text x="1595" y="958" text-anchor="middle" class="label">超时、重试与部分成功</text>
+  <text x="1595" y="990" text-anchor="middle" class="small">Transport timeout 不撤销 Core 事务</text>
+  <text x="1595" y="1018" text-anchor="middle" class="small">create 响应丢失后重试通常同名冲突</text>
+  <text x="1595" y="1046" text-anchor="middle" class="small">属性失败可留下已创建但响应 FAILURE 的设备</text>
+  <text x="1595" y="1074" text-anchor="middle" class="small">没有补偿删除、outbox 或幂等 requestId</text>
+
+  <path d="M395 230 H510" class="line"/><text x="452" y="216" text-anchor="middle" class="edge">JSON</text>
+  <path d="M395 445 H510" class="line"/><text x="452" y="431" text-anchor="middle" class="edge">JSON / Proto</text>
+  <path d="M395 660 H510" class="line"/><text x="452" y="646" text-anchor="middle" class="edge">JSON / Proto</text>
+  <path d="M850 490 H965" class="line"/><text x="907" y="476" text-anchor="middle" class="edge">request</text>
+  <path d="M850 760 H925" class="dash"/><text x="887" y="746" text-anchor="middle" class="edge">Queue</text>
+  <path d="M1305 245 H1420" class="line"/><text x="1362" y="231" text-anchor="middle" class="edge">DAO</text>
+  <path d="M1305 700 H1380" class="dash"/><text x="1342" y="686" text-anchor="middle" class="edge">strategy</text>
+  <path d="M1595 405 V450" class="line"/><text x="1662" y="432" text-anchor="middle" class="edge">after commit</text>
+  <path d="M1595 640 V685" class="dash"/><text x="1662" y="668" text-anchor="middle" class="edge">events</text>
+  <path d="M1420 1020 C1330 1020 1330 810 1305 810" class="risk"/><text x="1350" y="997" text-anchor="middle" class="edge">retry</text>
+  <path d="M1420 780 C1365 780 1365 1110 850 1110" class="dash"/><text x="1190" y="1096" text-anchor="middle" class="edge">response does not wait for Rule Engine</text>
+
+  <rect x="75" y="1210" width="1690" height="76" rx="5" class="gray"/>
+  <text x="920" y="1240" text-anchor="middle" class="label">关键确认边界</text>
+  <text x="920" y="1269" text-anchor="middle" class="small">SUCCESS = device/credentials 主事务与 provisionState 写成功；不等于 Rule Engine、Actor、审计持久化或设备下一次认证已完成。</text>
+</svg>

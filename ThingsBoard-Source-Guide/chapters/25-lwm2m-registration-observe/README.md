@@ -1,0 +1,864 @@
+# 25 LwM2M 注册与观测流程
+
+> 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`（`release-3.6`）。本章只分析 Leshan 驱动的 LwM2M Bootstrap、Registration、Read/Observe/Cancel Observation 及其进入 ThingsBoard 的路径；原生 CoAP Device API 已在上一章单独分析。
+
+[上一篇：24 CoAP 消息流程](../24-coap-message-flow/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/25-lwm2m-registration-observe.svg) | [下一篇：26 MQTT Gateway 流程](../26-mqtt-gateway/README.md)
+
+---
+
+## 一、流程目标
+
+LwM2M Transport 把设备端的对象树和生命周期协议接入 ThingsBoard。它先由 Eclipse Leshan 处理 Bootstrap、`/rd` Registration、Update、Deregister 和 Observe，再把对象、实例、资源值按 Device Profile 映射为 Client Attributes 或 Telemetry，最终复用 `DefaultTransportService -> Rule Engine Queue -> Rule Chain -> DAO`。RPC 和 OTA 则沿反方向复用 Device Actor、Transport session 和 Leshan 下行请求。
+
+```mermaid
+flowchart TB
+    DEV["LwM2M Client"] --> BS["Leshan Bootstrap Server<br/>CoAP 5687 / DTLS 5688"]
+    DEV --> MAIN["Leshan LwM2M Server<br/>CoAP 5685 / DTLS 5686"]
+    BS --> AUTH["Server security store<br/>Core credential validation"]
+    MAIN --> AUTH
+    MAIN --> REG["Registration / Update / Deregister listeners"]
+    REG --> SESSION["LwM2mClient registry<br/>ASYNC Transport session"]
+    SESSION --> INIT["Profile-driven Read / Observe / Write Attributes"]
+    INIT --> MODEL["Object / Instance / Resource model"]
+    MODEL --> MAP["keyName + attribute + telemetry mapping"]
+    MAP --> REQ["PostAttributeMsg / PostTelemetryMsg"]
+    REQ --> RE["Rule Engine Queue"]
+    RE --> DB[("attribute_kv / ts_kv / ts_kv_latest")]
+    SESSION --> ACTOR["Core Queue / Device Actor<br/>session + attributes + RPC subscriptions"]
+    ACTOR --> RPC["Read / Observe / Cancel / Write / Execute RPC"]
+    RPC --> MAIN
+```
+
+本章要回答六个边界问题：
+
+1. Bootstrap Server 与业务 LwM2M Server 是两个独立的 Leshan Server，端口、security store、config store 和 session manager 都不同。
+2. Registration 成功回调会异步创建 ThingsBoard session；Leshan 的注册响应不等待 Read、Observe、Actor 或数据库完成。
+3. Observe notification 先更新 Transport 侧对象缓存，再按 Device Profile 映射；没有映射的资源不会自动成为平台遥测。
+4. Attributes/Telemetry 直接进入 Rule Engine Queue，不先经过 Device Actor；Actor 主要维护 session、属性订阅和 RPC 订阅。
+5. 默认 `queue.type=in-memory`、`cache.type=caffeine`；Kafka 和 Redis 都是可选部署分支，不可当作源码默认事实。
+6. LwM2M 虽然以 CoAP/DTLS 为承载，但不使用原生 CoAP 的 `/api/v1/{token}` 资源、access token adaptor 或 CoAP session state。
+
+```mermaid
+flowchart LR
+    RAW["原生 CoAP Device API"] --> RAWPATH["/api/v1/{accessToken}/telemetry<br/>/attributes /rpc /claim"]
+    RAWPATH --> RAWENTRY["CoapTransportResource"]
+    LWM["LwM2M"] --> LWMPATH["Bootstrap + /rd Registration<br/>Update / Deregister / Observe"]
+    LWMPATH --> LESHAN["LeshanBootstrapServer / LeshanServer"]
+    RAWENTRY --> COMMON["DefaultTransportService + Queue"]
+    LESHAN --> COMMON
+```
+
+源码依据是 [DefaultLwM2mTransportService.getLhServer()](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportService.java#L169) 构造 Leshan Server，而上一章的原生 CoAP 入口是 `CoapTransportResource`。两者只在更下游复用 Transport/Queue/Rule Engine，不共享协议入口。
+
+---
+
+## 二、入口
+
+### 2.1 服务启动入口
+
+主服务的 Spring 生命周期入口是 [org.thingsboard.server.transport.lwm2m.server.DefaultLwM2mTransportService.init()](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportService.java#L117)。它创建 `LeshanServer`、挂载 OTA CoAP resource、把 server 写入 `LwM2mTransportContext`，随后启动并注册 Registration、Presence、Observation、Send 四类 listener。`LwM2mTransportContext` 只是在通用 `TransportContext` 上增加 [setServer(LeshanServer)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mTransportContext.java#L41)，不存在另一套平台消息总线。
+
+Bootstrap 的入口是 [org.thingsboard.server.transport.lwm2m.bootstrap.LwM2MTransportBootstrapService.init()](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java#L92)，由独立的 `LeshanBootstrapServerBuilder` 注入 bootstrap config store、bootstrap security store、task provider 和 session manager。
+
+```mermaid
+flowchart TB
+    SPRING["Spring startup"] --> BSE{"Bootstrap enabled"}
+    BSE -->|"true"| BSS["LwM2MTransportBootstrapService.init()"]
+    BSS --> BSP["5687 CoAP / 5688 DTLS"]
+    SPRING --> LMS["DefaultLwM2mTransportService.init()"]
+    LMS --> LMP["5685 CoAP / 5686 DTLS"]
+    LMP --> LSN["Registration + Presence + Observation + Send listeners"]
+    LMS --> OTA["/fw resource for temporary OTA URL"]
+```
+
+### 2.2 默认配置
+
+默认值来自 [application/src/main/resources/thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L1052)，不是 Leshan 的假定值。
+
+| 配置 | 环境变量 | 默认值 | 语义 |
+|---|---|---:|---|
+| `transport.lwm2m.enabled` | `LWM2M_ENABLED` | `true` | 启用 LwM2M Transport |
+| Main bind port | `LWM2M_BIND_PORT` | `5685` | 非安全 CoAP |
+| Main secure port | `LWM2M_SECURITY_BIND_PORT` | `5686` | DTLS |
+| Bootstrap enabled | `LWM2M_ENABLED_BS` | `true` | 启动独立 Bootstrap Server |
+| Bootstrap bind port | `LWM2M_BS_BIND_PORT` | `5687` | Bootstrap CoAP |
+| Bootstrap secure port | `LWM2M_BS_SECURITY_BIND_PORT` | `5688` | Bootstrap DTLS |
+| Request timeout | `LWM2M_TIMEOUT` | `120000 ms` | credential、初始化 Read/Observe 和下行超时 |
+| Uplink/Downlink/OTA pool | 对应 `*_POOL_SIZE` | `10/10/10` | 三类 executor 大小 |
+| DTLS retransmission | `LWM2M_DTLS_RETRANSMISSION_TIMEOUT_MS` | `9000 ms` | Californium DTLS 初始重传超时 |
+| DTLS connection ID | `LWM2M_DTLS_CONNECTION_ID_LENGTH` | `6` | connection ID 长度 |
+| Server credentials | `LWM2M_SERVER_CREDENTIALS_ENABLED` | `false` | 默认不加载服务端证书 |
+| Recommended ciphers/groups | `LWM2M_RECOMMENDED_CIPHERS` / `LWM2M_RECOMMENDED_SUPPORTED_GROUPS` | `false/true` | DTLS 算法限制 |
+| PSM/paging window | `LWM2M_PSM_ACTIVITY_TIMER` / `LWM2M_PAGING_TRANSMISSION_WINDOW` | `10000/10000 ms` | 下行允许窗口 |
+
+[LwM2MNetworkConfig.getCoapConfig(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2MNetworkConfig.java#L47) 还设置 block size `1024`、最大 body `256 MiB`、response matching `RELAXED`、`MAX_RETRANSMIT=10`。这些是网络层 CoAP 重传参数，不等于 ThingsBoard Queue 业务重试。
+
+### 2.3 安全入口
+
+LwM2M 凭据模式枚举固定为 [PSK、RPK、X509、NO_SEC](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/credentials/lwm2m/LwM2MSecurityMode.java#L27)。Leshan security store cache miss 时，[TbLwM2mSecurityStore.fetchAndPutSecurityInfo(String)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mSecurityStore.java#L127) 调用 validator；validator 发送 [ValidateDeviceLwM2MCredentialsRequestMsg](../../../common/proto/src/main/proto/queue.proto#L348)，Core 按 `LWM2M_CREDENTIALS` 查询设备凭据。
+
+```mermaid
+flowchart TB
+    HELLO["Client endpoint / PSK identity / certificate"] --> STORE["TbLwM2mSecurityStore"]
+    STORE --> HIT{"Security cache hit"}
+    HIT -->|"yes"| INFO["Leshan SecurityInfo"]
+    HIT -->|"no"| VALID["LwM2mCredentialsSecurityInfoValidator"]
+    VALID --> API["tb_transport.api.requests"]
+    API --> CORE["DefaultTransportApiService"]
+    CORE --> CRED[("device_credentials<br/>LWM2M_CREDENTIALS")]
+    CRED --> MODE{"PSK / RPK / X.509 / NO_SEC"}
+    MODE --> INFO
+```
+
+重要限制：当 server credentials 未配置时，[DefaultLwM2mTransportService.setServerWithCredentials(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportService.java#L213) 只安装 `PSK_CIPHER_SUITES`。因此“枚举支持 RPK/X.509”不代表默认部署已启用相应 cipher suite；RPK/X.509 需要服务端 key/certificate 配置。
+
+---
+
+## 三、完整调用链
+
+### 3.1 Main Server 构造链
+
+| 顺序 | 全限定类名与精确方法 | 输入与输出 | 职责、设计原因与边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.lwm2m.server.DefaultLwM2mTransportService.init()`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportService.java#L117) | 无参数；无返回 | Spring startup 后构建、保存并启动 Leshan Server；协议服务生命周期不混入普通 Controller。 |
+| 2 | [`org.thingsboard.server.transport.lwm2m.server.DefaultLwM2mTransportService.getLhServer()`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportService.java#L169) | 无参数；返回 `LeshanServer` | 注入 decoder、encoder、model provider、security store、registration store 和 DTLS config。此处是对象模型与会话存储的装配边界。 |
+| 3 | [`org.thingsboard.server.transport.lwm2m.server.DefaultLwM2mTransportService.startLhServer()`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportService.java#L137) | 无参数；无返回 | `server.start()` 后挂 Registration/Presence/Observation/Send listeners；后续业务处理由 listener 解耦。 |
+
+### 3.2 Registration 到 Observe 初始化链
+
+| 顺序 | 全限定类名与精确方法 | 输入与输出 | 职责、设计原因、确认/事务边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.lwm2m.server.LwM2mServerListener.registrationListener.registered(Registration registration, Registration previousReg, Collection<Observation> previousObservations)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mServerListener.java#L71) | Leshan Registration、旧注册、旧 observations；无返回 | Leshan 已接受 `/rd` 后的通知入口。这里只转交 handler，不开启数据库事务。 |
+| 2 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.onRegistered(Registration registration, Collection<Observation> previousObservations)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L264) | Registration 与旧 observations；立即返回 | 把完整 ThingsBoard 初始化提交到 uplink executor。Leshan Register response 不等待这段异步工作。`previousObservations` 在此方法中未被消费。 |
+| 3 | [`org.thingsboard.server.transport.lwm2m.server.client.LwM2mClientContextImpl.getClientByEndpoint(String endpoint)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContextImpl.java#L142) | endpoint；返回 `LwM2mClient` | endpoint 本地 map `computeIfAbsent`，Redis client store 启用时可恢复 client；默认 dummy store 只能新建。 |
+| 4 | [`org.thingsboard.server.transport.lwm2m.server.client.LwM2mClientContextImpl.register(LwM2mClient client, Registration registration)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContextImpl.java#L187) | client、Registration；返回旧 `SessionInfoProto` 的 `Optional` | 加 client lock，读取已认证 security info，初始化随机 session UUID、绑定 device/profile，写 registrationId 索引并置 `REGISTERED`。锁是内存临界区，不是 SQL 事务。 |
+| 5 | [`org.thingsboard.server.transport.lwm2m.server.session.DefaultLwM2MSessionManager.deregister(SessionInfoProto sessionInfo)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/session/DefaultLwM2MSessionManager.java#L103) | 旧 session；无返回 | 若重新注册已有旧 session，先向 Actor 发 `CLOSED` 并移除 Transport 本地 session，避免两个 session 同时收下行。 |
+| 6 | [`org.thingsboard.server.transport.lwm2m.server.session.DefaultLwM2MSessionManager.register(SessionInfoProto sessionInfo)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/session/DefaultLwM2MSessionManager.java#L85) | 新 session；无返回 | 注册 `ASYNC` listener，一次产生 `OPEN + SubscribeToAttributes + SubscribeToRPC`。Queue callback 传 `null`，不等待 Actor 确认。 |
+| 7 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.initClientTelemetry(LwM2mClient client)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L614) | client；无返回 | 读取 Device Profile 和 Registration supported objects，按顺序执行 Read、Observe、Write Attributes。 |
+| 8 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.sendReadRequests(LwM2mClient client, Lwm2mDeviceProfileTransportConfiguration profile, Set<String> supportedObjects)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L634) | 映射与支持对象；无返回 | 对 attribute/telemetry 中未 Observe 的 path 先 Read；`CountDownLatch` 最多等待全局 timeout。 |
+| 9 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.sendObserveRequests(LwM2mClient client, Lwm2mDeviceProfileTransportConfiguration profile, Set<String> supportedObjects)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L661) | Observe path 集合；无返回 | 只对设备 Registration 声明支持的 object/version 发 Observe，并同步等待初始响应回调。 |
+| 10 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.sendWriteAttributeRequests(LwM2mClient client, Lwm2mDeviceProfileTransportConfiguration profile, Set<String> supportedObjects)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L687) | `attributeLwm2m` map；无返回 | 把 `pmin/pmax/gt/lt/st/dim` 写到设备，控制服务端通知节奏；这是 LwM2M Write Attributes，不是 ThingsBoard attribute 写库。 |
+| 11 | [`org.thingsboard.server.transport.lwm2m.server.ota.DefaultLwM2MOtaUpdateService.init(LwM2mClient client)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/ota/DefaultLwM2MOtaUpdateService.java#L250) | client；无返回 | 初始化 `/5` firmware 与 `/9` software 状态，读取 OTA shared attributes；OTA 是注册后的附加流程，不参与 Registration 协议确认。 |
+
+```mermaid
+sequenceDiagram
+    participant D as "LwM2M Client"
+    participant L as "Leshan RegistrationService"
+    participant U as "DefaultLwM2mUplinkMsgHandler"
+    participant C as "LwM2mClientContextImpl"
+    participant S as "DefaultLwM2MSessionManager"
+    participant A as "Core Queue / Device Actor"
+    participant X as "Leshan Downlink"
+    D->>L: "POST /rd with endpoint and object links"
+    L-->>D: "2.01 Created with registration location"
+    L->>U: "onRegistered(registration, previousObservations)"
+    Note over U: "uplink executor async boundary"
+    U->>C: "getClientByEndpoint(endpoint)"
+    U->>C: "register(client, registration)"
+    C-->>U: "optional old SessionInfoProto"
+    U->>S: "deregister(oldSession) when present"
+    U->>S: "register(newSession)"
+    S->>A: "OPEN + attribute/RPC subscriptions"
+    U->>X: "Read mapped non-observed paths"
+    U->>X: "Observe configured paths"
+    U->>X: "Write Attributes parameters"
+```
+
+### 3.3 Observe notification 到数据库候选链
+
+| 顺序 | 全限定类名与精确方法 | 输入与输出 | 职责、设计原因、确认/事务边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.lwm2m.server.LwM2mServerListener.observationListener.onResponse(SingleObservation observation, Registration registration, ObserveResponse response)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mServerListener.java#L120) | 单 path observation、registration、response；无返回 | Leshan 收到通知后的入口，把无版本 path 转为 Registration 对应的 versioned path。Composite 回调不是此链。 |
+| 2 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.onUpdateValueAfterReadResponse(Registration registration, String path, ReadResponse response)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L402) | registration、versioned path、Read/Observe response；无返回 | 检查 model，按 `LwM2mObject`、`LwM2mObjectInstance`、`LwM2mResource` 三层展开。ObserveResponse 继承可复用该读取处理。 |
+| 3 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.updateObjectResourceValue(LwM2mClient client, LwM2mObject object, String path, int code)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L780) | Object node；无返回 | 枚举 instance，补 `/object/instance` path 后继续展开。 |
+| 4 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.updateObjectInstanceResourceValue(LwM2mClient client, LwM2mObjectInstance instance, String path, int code)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L797) | Instance node；无返回 | 枚举 resource，形成完整 path。 |
+| 5 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.updateResourcesValue(LwM2mClient client, LwM2mResource resource, String path, Mode mode, int code)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L826) | resource、path、更新模式、CoAP code；无返回 | 写 client resource cache，驱动 OTA 状态机；成功响应再触发 profile 映射。 |
+| 6 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.getParametersFromProfile(Registration registration, Set<String> paths)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L957) | changed paths；返回 `ResultsAddKeyValueProto` | 只有 path 同时出现在 `attribute` 或 `telemetry` 集合时才输出平台 KV。 |
+| 7 | [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.getKvToThingsBoard(String pathIdVer, Registration registration)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L997) | versioned path；返回 `KeyValueProto` 或 `null` | `keyName` 改名，多实例值转 JSON，按 `ResourceModel.Type` 转平台类型。 |
+| 8 | [`org.thingsboard.server.transport.lwm2m.server.LwM2mTransportServerHelper.sendParametersOnThingsboardAttribute(List<KeyValueProto> result, SessionInfoProto sessionInfo)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mTransportServerHelper.java#L76) | KV list、session；无返回 | 组装 `PostAttributeMsg`，以 `TransportServiceCallback.EMPTY` 发送。没有向设备传播 Queue 错误。 |
+| 9 | [`org.thingsboard.server.transport.lwm2m.server.LwM2mTransportServerHelper.sendParametersOnThingsboardTelemetry(List<KeyValueProto> kvList, SessionInfoProto sessionInfo, Map<String, AtomicLong> keyTsLatestMap)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mTransportServerHelper.java#L102) | KV list、session、可选 last-ts map；无返回 | 组装 `PostTelemetryMsg`，同样使用空 callback。 |
+| 10 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto sessionInfo, PostTelemetryMsg msg, TbMsgMetaData md, TransportServiceCallback<Void> callback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L839) | session、telemetry、metadata、callback；无返回 | 检查限额、记录 activity、构造 `POST_TELEMETRY_REQUEST` 并投递 Rule Engine partition。 |
+| 11 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto sessionInfo, PostAttributeMsg msg, TbMsgMetaData md, TransportServiceCallback<Void> callback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L884) | session、attributes、metadata、callback；无返回 | 构造 `POST_ATTRIBUTES_REQUEST` 并投递 Rule Engine partition。 |
+| 12 | [`org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode.onMsg(TbContext ctx, TbMsg msg)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgTimeseriesNode.java#L122) / [`org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode.onMsg(TbContext ctx, TbMsg msg)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgAttributesNode.java#L116) | Rule Engine `TbMsg`；异步 callback | 只有规则链实际经过 Save Timeseries/Attributes node 才调用 telemetry service 持久化；数据库事务在 DAO 层，早于此处的 Observe/Queue 边界都不是 DB commit。 |
+
+```mermaid
+flowchart LR
+    N["Observe notification"] --> LISTEN["ObservationListener.onResponse()"]
+    LISTEN --> TREE{"Payload node type"}
+    TREE -->|"Object"| INST["expand instances"]
+    TREE -->|"Instance"| RES["expand resources"]
+    TREE -->|"Resource"| CACHE["saveResourceValue()"]
+    INST --> RES
+    RES --> CACHE
+    CACHE --> PROFILE{"Path mapped in profile"}
+    PROFILE -->|"attribute"| ATTR["PostAttributeMsg"]
+    PROFILE -->|"telemetry"| TEL["PostTelemetryMsg"]
+    PROFILE -->|"neither"| ONLY["Transport cache only"]
+    ATTR --> RE["Rule Engine Queue"]
+    TEL --> RE
+    RE --> NODE["Save node when present in Rule Chain"]
+    NODE --> DB[("Database commit")]
+```
+
+### 3.4 Update、Deregister 与 RPC 精确入口
+
+- Update：[`org.thingsboard.server.transport.lwm2m.server.LwM2mServerListener.registrationListener.updated(RegistrationUpdate update, Registration updatedRegistration, Registration previousRegistration)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mServerListener.java#L81) -> [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.updatedReg(Registration registration)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L311) -> [`org.thingsboard.server.transport.lwm2m.server.client.LwM2mClientContextImpl.updateRegistration(LwM2mClient client, Registration registration)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContextImpl.java#L303) -> [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.reportActivityAndRegister(SessionInfoProto sessionInfo)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L1299)。它刷新 address/lifetime/binding 等 registration 状态；不会重跑全部 profile 初始化，除非 client 状态异常而回退到 `onRegistered(...)`。
+- Deregister/expire：[`org.thingsboard.server.transport.lwm2m.server.LwM2mServerListener.registrationListener.unregistered(Registration registration, Collection<Observation> observations, boolean expired, Registration newReg)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mServerListener.java#L90) -> [`org.thingsboard.server.transport.lwm2m.server.uplink.DefaultLwM2mUplinkMsgHandler.unReg(Registration registration, Collection<Observation> observations)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L343) -> [`org.thingsboard.server.transport.lwm2m.server.client.LwM2mClientContextImpl.unregister(LwM2mClient client, Registration registration)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContextImpl.java#L326) -> [`org.thingsboard.server.transport.lwm2m.server.session.DefaultLwM2MSessionManager.deregister(SessionInfoProto sessionInfo)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/session/DefaultLwM2MSessionManager.java#L103) -> `TbLwM2MDtlsSessionStore.remove(String endpoint)`。
+- RPC：[`org.thingsboard.server.transport.lwm2m.server.rpc.DefaultLwM2MRpcRequestHandler.onToDeviceRpcRequest(ToDeviceRpcRequestMsg rpcRequest, SessionInfoProto sessionInfo)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/rpc/DefaultLwM2MRpcRequestHandler.java#L119) 按 `methodName` 分派；Read、Observe、Cancel 分别进入 [`sendReadRequest(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/rpc/DefaultLwM2MRpcRequestHandler.java#L231)、[`sendObserveRequest(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/rpc/DefaultLwM2MRpcRequestHandler.java#L262)、[`sendCancelObserveRequest(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/rpc/DefaultLwM2MRpcRequestHandler.java#L483)。RPC response 通过 `transportService.process(sessionInfo, ToDeviceRpcResponseMsg, ...)` 回到 Device Actor。
+
+```mermaid
+stateDiagram-v2
+    [*] --> "Leshan registration stored": "POST /rd"
+    "Leshan registration stored" --> "ThingsBoard REGISTERED": "async onRegistered"
+    "ThingsBoard REGISTERED" --> "ThingsBoard REGISTERED": "Update + activity"
+    "ThingsBoard REGISTERED" --> "Leshan observations active": "profile Observe"
+    "Leshan observations active" --> "ThingsBoard REGISTERED": "Cancel one / all"
+    "ThingsBoard REGISTERED" --> "UNREGISTERED": "DELETE / expiry"
+    "UNREGISTERED" --> [*]: "Actor CLOSED + local/Redis cleanup"
+```
+
+---
+
+## 四、消息流
+
+### 4.1 Bootstrap 消息流
+
+Bootstrap Server 不是“自动创建设备”的捷径。它先按 endpoint/identity 调 Core 校验已有 `LWM2M_CREDENTIALS`，再由 [LwM2MBootstrapConfigStoreTaskProvider.getTasks(BootstrapSession, List<LwM2mResponse>)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java#L112) 生成分阶段任务：Discover、Read `/1`、Delete 旧 Security/Server instance、Write `/0` 和 `/1`，最后 Bootstrap Finish。Device Profile 与 device credentials 中的 bootstrap security mode 必须匹配，检查位于 [LwM2MBootstrapSecurityStore](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapSecurityStore.java#L174)。
+
+```mermaid
+sequenceDiagram
+    participant D as "LwM2M Client"
+    participant B as "Leshan Bootstrap Server"
+    participant S as "LwM2MBootstrapSecurityStore"
+    participant C as "Core credential service"
+    participant T as "Bootstrap task provider"
+    D->>B: "Bootstrap Request with endpoint"
+    B->>S: "get security/config by endpoint or identity"
+    S->>C: "ValidateDeviceLwM2MCredentialsRequestMsg"
+    C-->>S: "Device Profile + credentials"
+    S-->>B: "Bootstrap config"
+    B->>T: "getTasks(session, previousResponses)"
+    B->>D: "Discover"
+    B->>D: "Read /1"
+    B->>D: "Delete old /0 and /1 instances"
+    B->>D: "Write Security /0 and Server /1"
+    B->>D: "Bootstrap Finish"
+    D-->>B: "Changed endpoint then connects to Main Server"
+```
+
+[LwM2mDefaultBootstrapSessionManager.onResponseError(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/secure/LwM2mDefaultBootstrapSessionManager.java#L277) 对非 Finish 请求的错误仍 `continueWith(nextRequest)`；Bootstrap Finish 出错才按失败结束。这是“尽量完成任务列表”的策略，不应误写为每一步失败立即回滚。设备端 `/0`、`/1` 写入也没有跨请求事务。
+
+### 4.2 Registration、Update、Deregister
+
+```mermaid
+flowchart TB
+    R["Register: POST /rd"] --> LS["Leshan RegistrationStore add"]
+    LS --> CREATED["2.01 Created + registration location"]
+    LS --> CB["registered(...) listener"]
+    CB --> TB["ASYNC ThingsBoard session + subscriptions"]
+    U["Update: POST registration location"] --> LU["RegistrationStore update indexes/lifetime"]
+    LU --> UCB["updated(...) listener"]
+    UCB --> ACT["refresh client registration + report activity"]
+    D["Deregister: DELETE registration location"] --> LD["RegistrationStore remove + observations"]
+    LD --> DCB["unregistered(...) listener"]
+    DCB --> CLOSE["Actor CLOSED + session/DTLS cleanup"]
+```
+
+Registration 的 `lifetime` 过期也进入 `unregistered(..., expired=true, ...)` listener；ThingsBoard handler 没有按 `expired` 分支，显式 DELETE 与过期最终都关闭 session。Redis store 使用 expiration sorted set 清理，默认内存 store 则使用配置的 `clean_period_in_sec`。
+
+### 4.3 Read、Observe、Cancel Observation
+
+Profile 初始化先计算两个集合：
+
+- `Read = (attribute union telemetry) - observe`，避免对 Observe path 再做一次初始化 Read。
+- `Observe = profile.observe intersect registration.supportedObjects`，不向设备不支持的 object/version 发请求。
+- `Write Attributes = profile.attributeLwm2m intersect supportedObjects`，参数来自 `ObjectAttributes` 的 `dim/pmin/pmax/gt/lt/st`。
+
+```mermaid
+flowchart LR
+    PROFILE["Device Profile paths"] --> CALC{"Path classification"}
+    CALC -->|"mapped but not observed"| READ["ReadRequest"]
+    CALC -->|"observe"| OBS["ObserveRequest"]
+    CALC -->|"attributeLwm2m"| WA["WriteAttributesRequest"]
+    READ --> SEND["LeshanServer.send()"]
+    OBS --> DEDUP{"Existing SingleObservation path"}
+    DEDUP -->|"no"| SEND
+    DEDUP -->|"yes"| ERR["Validation error: already registered"]
+    WA --> SEND
+    CANCEL["Cancel one / all"] --> SERVICE["Leshan ObservationService.cancelObservations()"]
+```
+
+下行构造点分别是 [sendReadRequest(LwM2mClient, TbLwM2MReadRequest, callback)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DefaultLwM2mDownlinkMsgHandler.java#L192)、[sendObserveRequest(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DefaultLwM2mDownlinkMsgHandler.java#L227)、[sendCancelObserveRequest(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DefaultLwM2mDownlinkMsgHandler.java#L350) 和 [sendCancelAllRequest(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DefaultLwM2mDownlinkMsgHandler.java#L365)。Observe 支持 Object、Object Instance、Resource 三种 path；Cancel 直接操作 server observation service，不向平台数据库写“取消记录”。
+
+### 4.4 RPC 与 OTA 的关系
+
+RPC 是手工触发同一套 Leshan 下行能力，支持 `READ`、`OBSERVE`、`OBSERVE_CANCEL`、`OBSERVE_CANCEL_ALL`，以及 Discover、Execute、Write Attributes、Write Update/Replace、Create、Delete 和部分 Composite 操作。请求参数可用 `id` 或 profile `key`；[`getIdsFromParameters(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/rpc/DefaultLwM2MRpcRequestHandler.java#L545) 将 key 反查为 versioned path。
+
+OTA 在 Registration 后读取 shared attributes，并通过标准对象触发：Firmware 使用 `/5`，Software 使用 `/9`，设备信息版本还会读取 `/3`。二进制/临时 URL 策略最终仍是 Write Replace 和 Execute，不是 Registration 的一部分。
+
+```mermaid
+flowchart TB
+    SHARED["Shared attributes<br/>fw_title/fw_version or sw_title/sw_version"] --> OTA["DefaultLwM2MOtaUpdateService"]
+    OTA --> KIND{"Firmware / Software"}
+    KIND -->|"Firmware binary"| FWB["Write /5/0/0 or /19/0/0"]
+    KIND -->|"Firmware URL"| FWU["Write /5/0/1"]
+    KIND -->|"Software binary"| SWB["Write /9/0/2"]
+    KIND -->|"Software URL"| SWU["Write /9/0/3"]
+    FWB --> FWE["Execute /5/0/2"]
+    FWU --> FWE
+    SWB --> SWE["Execute /9/0/4"]
+    SWU --> SWE
+    STATUS["Observe /5 state/result or /9 state/result"] --> TEL["OTA status telemetry"]
+```
+
+源码中 [`DefaultLwM2MOtaUpdateService.startUpdateUsingBinary(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/ota/DefaultLwM2MOtaUpdateService.java#L748) 先向 Core 请求 OTA package，再选择 `/5`、`/19` 或临时 URL；状态/结果由 [`updateResourcesValue(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L826) 分派回 OTA service，并以 `fw_state/sw_state` 与日志遥测上报。
+
+---
+
+## 五、时序图
+
+完整 PlantUML 图覆盖 Bootstrap、凭据认证、Registration、Read/Observe、平台 Queue/DB、RPC/OTA 和 Deregister。
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="ThingsBoard LwM2M 注册与观测完整时序图"></a>
+
+下图专门标出最容易混淆的确认边界：
+
+```mermaid
+sequenceDiagram
+    participant D as "LwM2M Client"
+    participant L as "Leshan Server"
+    participant T as "ThingsBoard Transport"
+    participant Q as "Rule Engine Queue"
+    participant R as "Rule Chain"
+    participant DB as "Database"
+    D->>L: "Registration POST /rd"
+    L-->>D: "2.01 Created"
+    Note over D,L: "Registration protocol confirmation"
+    L->>T: "async registered callback"
+    D->>L: "Observe notification with CoAP response semantics"
+    L->>T: "ObservationListener.onResponse"
+    T->>Q: "send TbMsg with EMPTY callback"
+    Note over T,Q: "Transport does not observe producer failure here"
+    Q->>R: "consumer poll"
+    R->>DB: "Save node asynchronous DAO call"
+    DB-->>R: "persistence callback"
+    Note over L,DB: "No end-to-end transaction spans these boundaries"
+```
+
+因此不能从“设备 Registration 成功”推出 Observe 已建立，也不能从“设备通知被 CoAP ACK”推出 Kafka/Rule Engine/数据库成功。反向也一样：数据库保存失败不会撤销 Leshan 已接受的 notification。
+
+---
+
+## 六、数据变化
+
+### 6.1 内存、Redis、Actor 与数据库状态
+
+| 阶段 | 状态载体 | 关键变化 | 默认持久性 |
+|---|---|---|---|
+| Security lookup | `TbEditableSecurityStore` | endpoint/identity -> `TbLwM2MSecurityInfo` | 默认内存；`cache.type=redis` 时 Redis |
+| Leshan Registration | `CaliforniumRegistrationStore` | registration、endpoint/id/address/identity indexes、expiration、observations | 默认内存；Redis 可选 |
+| ThingsBoard client | `LwM2mClientContextImpl` maps + `TbLwM2MClientStore` | endpoint、registrationId、session、state、profile、resource cache | 默认本进程；Redis 可选 |
+| Transport session | `DefaultTransportService.sessions` | random UUID -> `ASYNC SessionMetaData` | 当前 Transport 进程 |
+| Device Actor session | Actor state/session cache | OPEN、attributes/RPC subscription、CLOSED | Actor 内存；非本地 cache 可 dump/restore |
+| Object value | `LwM2mClient.resources` | versioned path -> value + `ResourceModel` | 随 client store；默认本进程 |
+| Platform telemetry/attribute | Rule Engine `TbMsg` | mapped key/value | 先 Queue，是否写 DB 取决于 Rule Chain |
+
+```mermaid
+flowchart TB
+    subgraph PROTO["Protocol state"]
+        SEC["Security store"]
+        REG["Registration store"]
+        OBS["Observation token/index"]
+        DTLS["DTLS session store"]
+    end
+    subgraph TRANS["Transport state"]
+        CLIENT["LwM2mClient registry"]
+        RESOURCE["Resource value cache"]
+        SESSION["ASYNC session map"]
+    end
+    subgraph PLATFORM["Platform state"]
+        ACTOR["Device Actor session/subscriptions"]
+        QUEUE["Core / Rule Engine Queue"]
+        DB[("PostgreSQL / TimescaleDB / Cassandra")]
+    end
+    SEC --> CLIENT
+    REG --> CLIENT
+    OBS --> RESOURCE
+    CLIENT --> SESSION
+    SESSION --> ACTOR
+    RESOURCE --> QUEUE
+    QUEUE --> DB
+```
+
+### 6.2 Redis registration key 空间
+
+当 `cache.type=redis` 时，[TbLwM2mStoreFactory](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mStoreFactory.java#L60) 才选择 Redis registration/security/client/model/OTA/DTLS stores。默认 `CACHE_TYPE=caffeine` 时使用 `InMemoryRegistrationStore`、in-memory security 和多个 dummy store。
+
+[TbLwM2mRedisRegistrationStore](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mRedisRegistrationStore.java#L90) 的主要 key 是：
+
+| Key/prefix | 作用 |
+|---|---|
+| `REG:EP:{endpoint}` | endpoint -> serialized Registration |
+| `EP:REGID:{registrationId}` | registration id -> endpoint |
+| `EP:ADDR:{socketAddress}` | address -> endpoint |
+| `EP:IDENTITY:{identity}` | secure identity -> endpoint |
+| `OBS:TKN:{token}` | token -> serialized Observation |
+| `TKNS:REGID:{registrationId}` | registration -> observation tokens |
+| `EXP:EP` | expiration timestamp sorted set |
+
+```mermaid
+flowchart LR
+    ADD["addRegistration(registration)"] --> REGE["REG:EP:endpoint"]
+    ADD --> RID["EP:REGID:id"]
+    ADD --> ADDR["EP:ADDR:address"]
+    ADD --> IDENT["EP:IDENTITY:identity"]
+    ADD --> EXP["EXP:EP score=expiration"]
+    OBSADD["addObservation(registrationId, observation)"] --> TOKEN["OBS:TKN:token"]
+    OBSADD --> TOKENS["TKNS:REGID:registrationId"]
+    CLEAN["expiration cleaner"] --> EXP
+    EXP --> REMOVE["remove registration + indexes + observations"]
+```
+
+增、改、删入口分别是 [`addRegistration(Registration)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mRedisRegistrationStore.java#L266)、[`updateRegistration(RegistrationUpdate)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mRedisRegistrationStore.java#L322)、[`removeRegistration(String)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mRedisRegistrationStore.java#L486)。一个容易忽略的默认差异是：YAML 的 `clean_period_in_sec=2` 只传给 in-memory 构造器；factory 对 Redis 调用单参数构造器，而 [Redis store 默认 clean period 是 60 秒](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mRedisRegistrationStore.java#L155)。
+
+### 6.3 对象、实例、资源变化
+
+```mermaid
+flowchart TB
+    O["Object<br/>example: Device /3"] --> I0["Object Instance<br/>/3/0"]
+    I0 --> R0["Single Resource<br/>/3/0/13 Current Time"]
+    I0 --> RM["Multi-instance Resource<br/>/3/0/{resource}/{instance}"]
+    R0 --> LOCAL["LwM2mClient.resources"]
+    RM --> JSON["JSON string KeyValueProto"]
+    LOCAL --> MODEL["ResourceModel type + operations"]
+    MODEL --> MAP["Device Profile versioned path mapping"]
+```
+
+`LwM2mClient.saveResourceValue(...)` 在 [LwM2mClient.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClient.java#L385) 保存资源值和 `ResourceModel`。`getObjectModel(...)` 会核对 path version 与 Registration supported object version；版本不一致返回 `null`，不会按“最接近版本”猜测解析。
+
+---
+
+## 七、源码分析
+
+### 7.1 Device Profile 是协议对象到平台 key 的契约
+
+[Lwm2mDeviceProfileTransportConfiguration](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/Lwm2mDeviceProfileTransportConfiguration.java#L36) 保存 `observeAttr`、bootstrap 配置和 client LwM2M settings；其中 [TelemetryMappingConfiguration](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/lwm2m/TelemetryMappingConfiguration.java#L38) 的五组核心字段决定观测行为：
+
+| 字段 | 类型 | 作用 |
+|---|---|---|
+| `keyName` | `Map<String,String>` | versioned path -> ThingsBoard key |
+| `observe` | `Set<String>` | 注册后创建 Leshan Observation |
+| `attribute` | `Set<String>` | path 值输出为 Client Attribute |
+| `telemetry` | `Set<String>` | path 值输出为 Telemetry |
+| `attributeLwm2m` | `Map<String,ObjectAttributes>` | 写回设备的 LwM2M notification attributes |
+
+同一路径可以同时在 `observe` 与 `telemetry` 中：前者决定如何获得后续值，后者决定值进入平台的消息类型。`keyName` 只负责改名；path 未进入 `attribute/telemetry` 时，即使有 `keyName` 也不会发送平台消息。
+
+```mermaid
+flowchart LR
+    PATH["Versioned path<br/>/3303_1.1/0/5700"] --> SUP{"Registration supports object/version"}
+    SUP -->|"no"| SKIP["Skip request or model lookup fails"]
+    SUP -->|"yes"| OBS{"In observe set"}
+    OBS -->|"yes"| OREQ["ObserveRequest"]
+    OBS -->|"no but mapped"| RREQ["ReadRequest"]
+    OREQ --> VALUE["LwM2mResource value"]
+    RREQ --> VALUE
+    VALUE --> NAME["keyName path -> platform key"]
+    NAME --> TARGET{"attribute / telemetry membership"}
+    TARGET -->|"attribute"| A["PostAttributeMsg"]
+    TARGET -->|"telemetry"| T["PostTelemetryMsg"]
+```
+
+### 7.2 类型转换与多实例资源
+
+[`LwM2mTransportServerHelper.getKvAttrTelemetryToThingsboard(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mTransportServerHelper.java#L274) 的转换是显式的：
+
+| LwM2M `ResourceModel.Type` | ThingsBoard `KeyValueType` |
+|---|---|
+| `BOOLEAN` | `BOOLEAN_V` |
+| `STRING`、`TIME`、`OPAQUE`、`OBJLNK` | `STRING_V` |
+| `INTEGER` | `LONG_V` |
+| `FLOAT` | `DOUBLE_V` |
+| multi-instance resource | `JSON_V`，实例 id 为 JSON key |
+
+Opaque 在 converter 中先变成字符串再进入 proto；多实例资源在 [`getKvToThingsBoard(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L997) 逐实例转换并序列化为一个 JSON 字符串，不会拆成多个 telemetry key。
+
+### 7.3 对象模型来源与版本选择
+
+[LwM2mVersionedModelProvider](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mVersionedModelProvider.java#L57) 先根据 Registration 的 supported objects 形成 `objectId_version` key；标准模型可由 Leshan provider 提供，租户自定义模型则通过 [TransportResourceCache 读取 `LWM2M_MODEL`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mVersionedModelProvider.java#L248) 并解析 XML。平台 `resource` 表保存 XML 资源，不保存设备当前对象树。
+
+```mermaid
+flowchart TB
+    REG["Registration supported objects<br/>object id + version"] --> KEY["objectId_version key"]
+    KEY --> TENANT{"Tenant custom model cached"}
+    TENANT -->|"yes"| XML["resource table<br/>ResourceType.LWM2M_MODEL XML"]
+    TENANT -->|"no"| STD["Leshan standard object models"]
+    XML --> OM["ObjectModel"]
+    STD --> OM
+    OM --> RM["ResourceModel<br/>type + operations + multiplicity"]
+    RM --> VALID["Read/Observe/Write validation and conversion"]
+```
+
+### 7.4 安全模式的实际分支
+
+[LwM2mCredentialsSecurityInfoValidator.createSecurityInfo(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/secure/LwM2mCredentialsSecurityInfoValidator.java#L129) 将 JSON credentials 转为 Leshan `SecurityInfo`：PSK 使用 identity/key，RPK 使用 EC public key，X.509 生成 certificate security info，NO_SEC 的 `securityInfo` 为 `null` 但保留 mode。X.509 另由 [TbLwM2MDtlsCertificateVerifier.verifyCertificate(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/secure/TbLwM2MDtlsCertificateVerifier.java#L140) 可选验证 trust chain，并按 certificate CN 或 SHA3 标识查询 ThingsBoard credentials，校验证书内容后写 DTLS session store。
+
+```mermaid
+flowchart TB
+    MODE{"Configured client security mode"}
+    MODE -->|"NO_SEC"| PLAIN["CoAP port 5685<br/>endpoint lookup"]
+    MODE -->|"PSK"| PSK["DTLS identity + pre-shared key"]
+    MODE -->|"RPK"| RPK["DTLS raw EC public key"]
+    MODE -->|"X.509"| X["DTLS certificate chain/public key"]
+    PSK --> CORE["Core LWM2M_CREDENTIALS validation"]
+    RPK --> CERTREQ{"Server credentials/cipher suite enabled"}
+    X --> CERTREQ
+    CERTREQ --> CORE
+    PLAIN --> CORE
+```
+
+Validator 在 [`getEndpointSecurityInfoByCredentialsId(String, LwM2mTypeServer)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/secure/LwM2mCredentialsSecurityInfoValidator.java#L81) 用 `CountDownLatch` 同步等待 Transport API response，默认最多 `120000 ms`。这条等待发生在 security lookup/握手路径，不是异步 Registration handler。
+
+### 7.5 RPC 与 Observe 共用下行实现
+
+RPC handler 只是参数解析、去重和 callback 适配层。实际网络发送统一落在 [`DefaultLwM2mDownlinkMsgHandler.sendRequest(...)`](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DefaultLwM2mDownlinkMsgHandler.java#L659)，调用 `context.getServer().send(registration, request, timeout, success, error)`。这保证 profile 初始化、RPC、OTA 都服从同一 Registration、PSM/eDRX 和 timeout 规则。
+
+RPC 的 `lastSentRpcId` 只抑制与客户端记录的最后一个 UUID 相同的请求；它不是持久化幂等表。Observe Composite 的 listener 回调在 [LwM2mServerListener.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mServerListener.java#L127) 直接抛 `RuntimeException("Not implemented yet!")`，所以不能把 Read/Write Composite 的存在推导成 Composite Observe 已支持。
+
+---
+
+## 八、Actor 分析
+
+LwM2M 每次成功注册都会创建随机 UUID 的 `SessionInfoProto`，然后在 [`DefaultTransportService.registerAsyncSession(...)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L408) 注册为 `SessionType.ASYNC`。Transport 本地 `sessions` map 负责把 Core/Actor 的下行 notification 分派给 `LwM2mSessionMsgListener`；Device Actor 则维护平台会话语义，不持有 Leshan Registration 或 Observation token。
+
+```mermaid
+sequenceDiagram
+    participant L as "LwM2M Transport"
+    participant C as "Core Queue"
+    participant A as "DeviceActorMessageProcessor"
+    participant N as "Transport notification"
+    participant S as "LwM2mSessionMsgListener"
+    L->>L: "registerAsyncSession(random UUID, listener)"
+    L->>C: "TransportToDeviceActorMsg"
+    Note over L,C: "OPEN + SubscribeToAttributes + SubscribeToRPC"
+    C->>A: "process(wrapper)"
+    A->>A: "processSessionStateMsgs(OPEN)"
+    A->>A: "processSubscriptionCommands(attributes/RPC)"
+    A->>N: "shared attribute update or ToDeviceRpcRequest"
+    N->>S: "route by serviceId + sessionId"
+    S->>L: "attribute/RPC handler"
+    L->>C: "CLOSED on deregistration"
+```
+
+Actor 的精确分派入口是 [DeviceActorMessageProcessor.process(TransportToDeviceActorMsgWrapper)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L569)：
+
+- [`processSessionStateMsgs(SessionInfoProto, SessionEventMsg)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L998) 处理 OPEN/CLOSED。
+- [`processSubscriptionCommands(SessionInfoProto, SubscribeToAttributeUpdatesMsg)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L938) 维护属性订阅。
+- [`processSubscriptionCommands(SessionInfoProto, SubscribeToRPCMsg)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L972) 维护 RPC 订阅并处理 pending RPC。
+- 非本地 cache 配置下，Actor session 可由 [`dumpSessions()`/`restoreSessions()` 相关逻辑](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1328) 写入 session cache；这不等于恢复 Leshan Observation，设备仍需有效 registration/observation。
+
+Telemetry 和 Client Attributes 不经过 Device Actor。它们在 `DefaultTransportService.process(PostTelemetryMsg/PostAttributeMsg)` 直接构造 Rule Engine 消息；把 Actor 放进这条上行数据链会误判瓶颈。Actor 参与的是 session 生命周期、属性下发、server-side RPC 和 pending persistent RPC。
+
+```mermaid
+flowchart TB
+    INPUT{"LwM2M-derived platform message"}
+    INPUT -->|"Telemetry / Client Attributes"| RE["Rule Engine partition<br/>no Device Actor hop"]
+    INPUT -->|"Session OPEN/CLOSED"| CORE["Core partition"]
+    INPUT -->|"Attribute/RPC subscribe"| CORE
+    CORE --> ACTOR["Device Actor"]
+    ACTOR --> NOTIFY["ToTransport notification"]
+    NOTIFY --> LISTENER["LwM2mSessionMsgListener"]
+```
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 默认不是 Kafka
+
+[thingsboard.yml 的 queue.type](../../../application/src/main/resources/thingsboard.yml#L1324) 默认是 `in-memory`。只有显式配置 `TB_QUEUE_TYPE=kafka` 时，下表才对应 Kafka topic/group；源码中的 Topic 名不能被描述为每个默认安装都存在的 broker 资源。
+
+### 9.2 Topic、partition、routing key 与 consumer group
+
+| 用途 | Topic/partition | record key / 路由 | Consumer group | 源码证据 |
+|---|---|---|---|---|
+| LwM2M credential validation | request `tb_transport.api.requests`；response `tb_transport.api.responses.{serviceId}` | request template correlation UUID | Core: `tb-core-transport-api-consumer`；Transport response: `transport-node-{serviceId}` | [KafkaTbTransportQueueFactory.java#L141](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbTransportQueueFactory.java#L141)、[KafkaTbCoreQueueFactory.java#L283](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L283) |
+| Session/attribute/RPC message | logical Core topic `tb_core`，配置 `queue.core.partitions=10` | tenant/device 解析 partition；session routing key | `tb-core-node` | [DefaultTransportService.sendToCore(...)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1615)、[thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L1556) |
+| Mapped telemetry/attribute | 默认 main RE topic `tb_rule_engine.main`，系统数据 `partitions=10` | queue name + tenant + originator/device | `re-main-consumer`；隔离租户追加 `-isolated-{tenantId}` | [system-data.sql](../../../dao/src/test/resources/sql/system-data.sql#L56)、[KafkaTbRuleEngineQueueFactory.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbRuleEngineQueueFactory.java#L239) |
+| Actor 下行到 LwM2M Transport | `tb_transport.notifications.{serviceId}` | session/device correlation | `transport-node-{serviceId}` | [thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L1625)、[KafkaTbTransportQueueFactory.java](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbTransportQueueFactory.java#L219) |
+
+```mermaid
+flowchart LR
+    LWM["LwM2M Transport serviceId=A"] -->|"credential request UUID"| TA["tb_transport.api.requests"]
+    TA --> CREDG["group: tb-core-transport-api-consumer"]
+    CREDG --> RESP["tb_transport.api.responses.A"]
+    RESP --> TRG["group: transport-node-A"]
+    LWM -->|"device routing"| CORE["tb_core logical partitions"]
+    CORE --> CG["group: tb-core-node"]
+    LWM -->|"tenant + device + queue"| RE["tb_rule_engine.main logical partitions"]
+    RE --> REG["group: re-main-consumer"]
+    CG --> NOTIFY["tb_transport.notifications.A"]
+    NOTIFY --> TRG
+```
+
+`DefaultTransportService` 用 [`partitionService.resolve(ServiceType.TB_CORE, tenantId, entityId)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1616) 和 [`resolve(ServiceType.TB_RULE_ENGINE, queueName, tenantId, originator)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1637) 保证同设备消息落到稳定逻辑 partition。YAML 的 Kafka topic property 中 Core `partitions:1` 是单个物理 topic 的 broker partition 属性，而 `queue.core.partitions=10` 是 ThingsBoard 的逻辑 partition 数，两个配置层次不能混写。
+
+### 9.3 确认、消费与重试
+
+Observe 转换使用 [`TransportServiceCallback.EMPTY`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportServiceCallback.java#L32)，它的 `onSuccess/onError` 都为空。即使 Kafka producer 最终回调失败，LwM2M handler 也不会向设备重发 notification 或回滚 resource cache。
+
+默认 Main Rule Engine queue 的 processing strategy 在 [system-data.sql](../../../dao/src/test/resources/sql/system-data.sql#L56) 配置 `SKIP_ALL_FAILURES`、`retries=3`、pause `3`；这是 Rule Engine message pack 处理重试，不是 LwM2M Observe 重试。设备重复 notification、CoAP 层重传和 RE pack retry 可能造成规则链副作用重复，外部调用节点仍需业务幂等。
+
+---
+
+## 十、数据库分析
+
+LwM2M transport 模块源码没有 DAO、Repository 或 JDBC 调用；协议状态由 Leshan stores 和 `LwM2mClient` 管理。数据库只通过 Core credential/profile/resource 服务和 Rule Engine save nodes 间接访问。
+
+```mermaid
+flowchart TB
+    CRED["LwM2M credential validation"] --> DC[("device_credentials")]
+    DC --> DEV[("device + device_data")]
+    DEV --> DP[("device_profile + profile_data")]
+    MODEL["Custom object model lookup"] --> RES[("resource<br/>LWM2M_MODEL XML")]
+    REG["Registration / Update / Observation tokens"] --> STORE["Leshan in-memory or Redis stores"]
+    REG -.-> NONE["No direct SQL write / no registration table"]
+    MAP["Mapped Client Attributes"] --> REA["Save Attributes node"]
+    REA --> AKV[("attribute_kv")]
+    TEL["Mapped Telemetry"] --> RET["Save Timeseries node"]
+    RET --> HIST[("ts_kv / TimescaleDB / Cassandra")]
+    RET --> LATEST[("ts_kv_latest")]
+    RPC["Persistent server-side RPC only"] --> RPCT[("rpc")]
+```
+
+| 数据 | 表/后端 | 何时变化 | 不应误解为 |
+|---|---|---|---|
+| Device Profile LwM2M mapping/bootstrap/OTA settings | `device_profile.profile_data`，schema [schema-entities.sql#L277](../../../dao/src/main/resources/sql/schema-entities.sql#L277) | 用户保存 profile | 每次 Registration 都复制一份 profile |
+| LwM2M credentials | `device_credentials.credentials_id/type/value`，[schema-entities.sql#L349](../../../dao/src/main/resources/sql/schema-entities.sql#L349) | 创建设备凭据或修改凭据 | Leshan Registration row |
+| Power mode、PSM/eDRX 参数等设备 transport data | `device.device_data`，[schema-entities.sql#L328](../../../dao/src/main/resources/sql/schema-entities.sql#L328) | 设备配置变化 | 实时 Presence 表 |
+| 自定义 LwM2M XML model | `resource` with `resource_type=LWM2M_MODEL`，[schema-entities.sql#L710](../../../dao/src/main/resources/sql/schema-entities.sql#L710) | 上传/更新 model resource | 设备对象当前值 |
+| Client Attributes | `attribute_kv`，[schema-entities.sql#L105](../../../dao/src/main/resources/sql/schema-entities.sql#L105) | Rule Chain 经过 Save Attributes node | notification 一到 Transport 就已提交 |
+| Telemetry history/latest | `ts_kv` / `ts_kv_latest` 或 Cassandra，[schema-ts-psql.sql#L17](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L17)、[schema-ts-latest-psql.sql#L17](../../../dao/src/main/resources/sql/schema-ts-latest-psql.sql#L17) | Rule Chain 经过 Save Timeseries node | Observe protocol状态 |
+| Persistent RPC | `rpc`，[schema-entities.sql#L760](../../../dao/src/main/resources/sql/schema-entities.sql#L760) | 平台创建持久化 server-side RPC | 所有 LwM2M RPC 都落表 |
+
+[`TbMsgTimeseriesNode.onMsg(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgTimeseriesNode.java#L122) 根据配置调用 `saveWithoutLatestAndNotify` 或 `saveAndNotify`；[`TbMsgAttributesNode.saveAttr(...)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgAttributesNode.java#L157) 调用 telemetry service 保存 attribute。Registration、Update、Deregister 没有对应业务表，也不会直接产生这两个 save node 调用。
+
+---
+
+## 十一、异常处理
+
+### 11.1 错误、重试和不可回滚边界
+
+| 失败点 | 源码行为 | 自动重试 | 已发生状态是否回滚 |
+|---|---|---|---|
+| Security/Core credential timeout | validator 最多等待 `config.timeout`；无有效 security mode 则认证失败 | Transport API request template 自身超时机制；无 LwM2M 业务循环 | 不创建 ThingsBoard session |
+| Registration 后 client 正处于 `UNREGISTERED` race | 记录日志并重新调用 `onRegistered` | 每 `1 s` 一次，最多 `5` 次 | Leshan Registration 已成功，不回滚 |
+| 其他 Registration 初始化异常 | catch `Throwable` 并写 telemetry log | 无 | Leshan Registration 可保留，但 session/Observe 可能不完整 |
+| 初始化 Read/Observe timeout | latch 等到 `120000 ms`，记录错误后继续后续步骤 | 无通用自动重发 | 已成功的部分 request/observation 保留 |
+| 重复 Observe path | callback validation error `Observation is already registered!` | 无 | 已有 observation 保留 |
+| Composite Observe notification | listener 抛 `RuntimeException("Not implemented yet!")` | 无 | Single observations 不受事务保护 |
+| sleeping client 下行 | `isDownlinkAllowed=false` 时直接忽略 request | 无即时重试；唤醒路径处理 pending RPC/属性/OTA | 不创建新的 observation |
+| Leshan timeout/`ClientSleepingException` | 标记 client asleep，调用 request callback error | 无通用业务重发 | 之前的 registration/resource cache 不回滚 |
+| Queue producer failure | Observe 路径使用 EMPTY callback，错误不传播 | Queue/RE 自己的策略可能重试 | resource cache 已更新，不回滚 |
+| Bootstrap 非 Finish request 错误 | 记录日志并继续下一 task | 继续任务，不重发同 task | 设备上已成功写入的对象不回滚 |
+| Deregister cleanup 异常 | 捕获并记录 | 无 | 可能出现 Leshan 已删而 TB 本地状态残留，待重连/过期清理 |
+
+```mermaid
+flowchart TB
+    EVENT["Registration / Read / Observe / notification"] --> AUTH{"Credentials valid"}
+    AUTH -->|"no"| DENY["Handshake or registration denied"]
+    AUTH -->|"yes"| REG{"ThingsBoard client register succeeds"}
+    REG -->|"UNREGISTERED race"| RETRY["Retry after 1 second<br/>maximum 5"]
+    REG -->|"other error"| PARTIAL["Leshan registration may remain partial"]
+    REG -->|"yes"| DOWN{"Client downlink allowed"}
+    DOWN -->|"sleeping"| DROP["Ignore now<br/>no generic resend"]
+    DOWN -->|"yes"| RESP{"Leshan response success"}
+    RESP -->|"timeout/sleeping exception"| ASLEEP["Mark client asleep"]
+    RESP -->|"notification mapped"| QUEUE["Send with EMPTY callback"]
+    QUEUE --> QERR["Queue failure cannot reach device"]
+```
+
+注册 race 的实现位于 [DefaultLwM2mUplinkMsgHandler.java#L281](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L281)；统一下行错误处理位于 [DefaultLwM2mDownlinkMsgHandler.handleDownlinkError(...)](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DefaultLwM2mDownlinkMsgHandler.java#L733)。不要把 Californium 的 CoAP `MAX_RETRANSMIT=10` 当作应用级的 Read/Observe/RPC 重试次数。
+
+### 11.2 生产排障顺序
+
+```mermaid
+flowchart LR
+    P1["1. UDP/DTLS port and cipher"] --> P2["2. endpoint/identity/certificate credentials"]
+    P2 --> P3["3. Leshan registration + lifetime/address"]
+    P3 --> P4["4. TB LwM2mClient state + session OPEN"]
+    P4 --> P5["5. Profile versioned paths + supported objects"]
+    P5 --> P6["6. ObservationService entries + notifications"]
+    P6 --> P7["7. mapping output + Queue lag"]
+    P7 --> P8["8. Rule Chain save nodes + database"]
+```
+
+具体检查：
+
+1. 先区分设备连的是 `5685/5686` 还是原生 CoAP `5683/5684`，Bootstrap 则是 `5687/5688`。
+2. PSK 看 identity/key；RPK/X.509 同时检查 server credentials 是否启用、cipher suites、证书有效期/trust 和 ThingsBoard credentials 内容。
+3. 查看 Leshan Registration 的 endpoint、registration id、socket address、lifetime、binding/queue mode；NAT 地址变化应由 Update 刷新。
+4. 查看 `Client registered`、`Closing old session`、`OPEN/CLOSED` 和 transport notification consumer；session 未建成时 Observe 值无法构造有效 `SessionInfoProto`。
+5. 对照 Device Profile 中带版本 path 与 Registration supported objects。常见错误是 profile 用 `/3303_1.1/...`，设备只声明 `1.0`。
+6. 检查 observation 是否重复、是否被 cancel、pmin/pmax 是否让设备尚未达到通知时间；Transport 只支持 SingleObservation notification。
+7. 检查 `tb_rule_engine.main` lag、consumer group、Rule Chain 绑定及 Save node。由于 EMPTY callback，不能期待设备日志出现 Queue 错误。
+8. 最后核对 `attribute_kv`、history/latest 后端和 DAO queue；Registration store 的 Redis key 与业务 DB 是两套状态。
+
+---
+
+## 十二、源码阅读路线
+
+建议按“装配 -> 生命周期 -> 对象映射 -> 平台边界 -> 可选存储/安全 -> 测试”顺序阅读，避免一开始陷入 Leshan callback 细节。
+
+```mermaid
+flowchart TB
+    A["1. DefaultLwM2mTransportService<br/>server builder + listeners"] --> B["2. LwM2mServerListener<br/>protocol callbacks"]
+    B --> C["3. DefaultLwM2mUplinkMsgHandler<br/>register + object expansion + mapping"]
+    C --> D["4. LwM2mClientContextImpl + LwM2mClient<br/>state/session/resource cache"]
+    D --> E["5. DefaultLwM2mDownlinkMsgHandler<br/>Read/Observe/Cancel/send/error"]
+    E --> F["6. LwM2mTransportServerHelper + DefaultTransportService<br/>Queue boundary"]
+    F --> G["7. DeviceActorMessageProcessor + save nodes"]
+    G --> H["8. Redis stores + Bootstrap + security + RPC/OTA"]
+    H --> I["9. Unit and integration tests"]
+```
+
+第一轮主链：
+
+1. [DefaultLwM2mTransportService.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportService.java#L117)：确认端口、stores、model provider、DTLS 和 listener 装配。
+2. [LwM2mServerListener.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mServerListener.java#L66)：把 Leshan callback 与 handler 方法一一对应。
+3. [DefaultLwM2mUplinkMsgHandler.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/uplink/DefaultLwM2mUplinkMsgHandler.java#L264)：从 Registration 顺读到初始化，再从 `onUpdateValueAfterReadResponse` 顺读到平台 KV。
+4. [DefaultLwM2mDownlinkMsgHandler.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/downlink/DefaultLwM2mDownlinkMsgHandler.java#L192)：核对 path 校验、Observe 去重、Cancel 和统一发送/错误逻辑。
+5. [LwM2mClient.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClient.java#L246) 与 [LwM2mClientContextImpl.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientContextImpl.java#L187)：理解 endpoint/registration/session/resource 索引。
+
+第二轮平台与可选分支：
+
+1. [DefaultLwM2MSessionManager.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/session/DefaultLwM2MSessionManager.java#L85)、[LwM2mSessionMsgListener.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mSessionMsgListener.java#L90)：Actor session、属性、RPC 与 resource update notification。
+2. [LwM2mVersionedModelProvider.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/LwM2mVersionedModelProvider.java#L103)、[TelemetryMappingConfiguration.java](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/lwm2m/TelemetryMappingConfiguration.java#L38)：对象版本和 profile mapping。
+3. [TbLwM2mStoreFactory.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mStoreFactory.java#L60)、[TbLwM2mRedisRegistrationStore.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mRedisRegistrationStore.java#L266)：默认内存与 Redis 分支。
+4. [LwM2MTransportBootstrapService.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapService.java#L91)、[LwM2MBootstrapConfigStoreTaskProvider.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/bootstrap/store/LwM2MBootstrapConfigStoreTaskProvider.java#L112)：Bootstrap server 和任务状态机。
+5. [DefaultLwM2MRpcRequestHandler.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/rpc/DefaultLwM2MRpcRequestHandler.java#L119)、[DefaultLwM2MOtaUpdateService.java](../../../common/transport/lwm2m/src/main/java/org/thingsboard/server/transport/lwm2m/server/ota/DefaultLwM2MOtaUpdateService.java#L250)：手工下行和注册后 OTA。
+
+测试证据建议直接运行或断点阅读：
+
+| 测试 | 重点 |
+|---|---|
+| [DefaultLwM2mTransportServiceTest](../../../common/transport/lwm2m/src/test/java/org/thingsboard/server/transport/lwm2m/server/DefaultLwM2mTransportServiceTest.java#L102) | DTLS connection ID builder 分支 |
+| [LwM2MTransportBootstrapServiceTest](../../../common/transport/lwm2m/src/test/java/org/thingsboard/server/transport/lwm2m/bootstrap/LwM2MTransportBootstrapServiceTest.java#L92) | Bootstrap DTLS builder 分支 |
+| [LwM2mClientTest](../../../common/transport/lwm2m/src/test/java/org/thingsboard/server/transport/lwm2m/server/client/LwM2mClientTest.java#L42) | Registration 设置与 client 状态 |
+| [TbLwM2mRedisRegistrationStoreTest](../../../common/transport/lwm2m/src/test/java/org/thingsboard/server/transport/lwm2m/server/store/TbLwM2mRedisRegistrationStoreTest.java#L104) | add/update/index cleanup 和 identity/address |
+| [RpcLwm2mIntegrationObserveTest](../../../application/src/test/java/org/thingsboard/server/transport/lwm2m/rpc/sql/RpcLwm2mIntegrationObserveTest.java#L56) | Observe、重复、版本错误、Cancel |
+| [OtaLwM2MIntegrationTest](../../../application/src/test/java/org/thingsboard/server/transport/lwm2m/ota/sql/OtaLwM2MIntegrationTest.java#L113) | `/5` firmware、`/9` software、profile 缺失 |
+| [NoSecLwM2MIntegrationTest](../../../application/src/test/java/org/thingsboard/server/transport/lwm2m/security/sql/NoSecLwM2MIntegrationTest.java#L46) | NO_SEC 注册与遥测观测 |
+| [PskLwm2mIntegrationTest](../../../application/src/test/java/org/thingsboard/server/transport/lwm2m/security/sql/PskLwm2mIntegrationTest.java#L56) | PSK、坏 key、Bootstrap 到 Main Server |
+| [RpkLwM2MIntegrationTest](../../../application/src/test/java/org/thingsboard/server/transport/lwm2m/security/sql/RpkLwM2MIntegrationTest.java#L58) | RPK 与 key 格式校验 |
+| [X509_NoTrustLwM2MIntegrationTest](../../../application/src/test/java/org/thingsboard/server/transport/lwm2m/security/sql/X509_NoTrustLwM2MIntegrationTest.java#L58) | X.509 无 trust chain 模式及凭据内容校验 |
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard 的 LwM2M 与原生 CoAP Device API 有什么根本区别？
+
+原生 CoAP 由 `CoapTransportResource` 处理 `/api/v1/{accessToken}/...`，资源语义是 ThingsBoard 自定义 telemetry/attributes/RPC API。LwM2M 由 Leshan Server 处理 Bootstrap、`/rd`、Update、Deregister、Object/Instance/Resource 和 Observe；两者只在 `DefaultTransportService` 之后复用 Queue、Actor 和 Rule Engine。
+
+### 2. 为什么 Bootstrap Server 和 Main LwM2M Server 必须分开理解？
+
+源码创建了两个独立 Leshan server：Bootstrap 默认监听 `5687/5688`，Main Server 默认监听 `5685/5686`。Bootstrap 有自己的 security/config store、task provider 和 session manager，负责给设备写 `/0`、`/1`；完成后设备才连接 Main Server 做 Registration 和 Observe。
+
+### 3. Registration 的协议成功是否代表 ThingsBoard session 已建立？
+
+不代表。Leshan 先完成 `/rd` 并触发 listener，`onRegistered(...)` 随即把 ThingsBoard 初始化提交给 uplink executor；session、Actor subscription、Read/Observe 和 OTA 都发生在异步边界之后，失败不会撤销已发给设备的 Registration response。
+
+### 4. `onRegistered(...)` 的关键执行顺序是什么？
+
+按 endpoint 取/建 `LwM2mClient`，调用 `clientContext.register` 绑定 credentials/profile/Registration，关闭旧 session，注册新 ASYNC session，然后依次初始化 Read、Observe、Write Attributes、平台 attributes 和 OTA。先关闭旧 session 是为了避免重注册期间两个 session 同时接收 Actor 下行。
+
+### 5. LwM2M session 为什么是 ASYNC，它存在哪里？
+
+设备需要长期接收 shared attribute 与 server-side RPC，下行不是一次请求内完成，所以 `DefaultLwM2MSessionManager` 调用 `registerAsyncSession`。本地 `DefaultTransportService.sessions` 保存 session listener；Device Actor 另存 OPEN/CLOSED 和订阅语义，两者不是同一份状态。
+
+### 6. Registration Update 会重新创建 Observe 吗？
+
+正常 Update 只调用 `clientContext.updateRegistration(...)` 并上报 activity，更新 address、lifetime、binding 等 Leshan Registration 信息，不重跑全部 `initClientTelemetry`。只有 client 状态异常、无法按当前 registration 更新时，handler 才回退到 `onRegistered(...)`。
+
+### 7. Deregister 和 lifetime 过期有什么共同结果？
+
+两者都进入 Leshan `unregistered(...)` listener，ThingsBoard handler 没有按 `expired` 做不同业务分支。它删除 client registration 索引/store，向 Actor 发 CLOSED，移除 Transport session 和 DTLS session；Registration/Observation store 也会清理对应状态。
+
+### 8. 注册后为什么有些 path 发 Read，有些发 Observe？
+
+源码计算 `(attribute union telemetry) - observe` 作为初始化 Read 集合，用一次读取获得不需要持续观测的映射值；`observe` 集合则建立长期通知。两类集合都与设备 Registration 的 supported object/version 求交，避免请求设备未声明的模型。
+
+### 9. Device Profile 的五个关键 mapping 字段分别做什么？
+
+`keyName` 把 versioned path 改成平台 key，`observe` 决定建立 Observation，`attribute` 与 `telemetry` 决定输出平台消息类型，`attributeLwm2m` 保存写回设备的 pmin/pmax/gt/lt/st/dim。只有 `keyName` 而没有 attribute/telemetry membership 不会上报平台数据。
+
+### 10. 为什么 path 中的对象版本不能省略后随意匹配？
+
+`LwM2mClient.getObjectModel(...)` 会把 path version 与 Registration supported object version 比较，匹配才返回 `ObjectModel`。类型、操作权限和 multiplicity 都依赖具体版本；自动回退到其他版本可能把 payload 按错误类型解析，所以源码选择失败而不是猜测。
+
+### 11. Object、Instance、Resource notification 如何展开？
+
+Object response 先遍历 instances，Instance 再遍历 resources，最终每个完整 path 调 `saveResourceValue`。单资源按模型类型转 proto；multi-instance resource 被聚合成一个 JSON object，实例 id 是 JSON key。
+
+### 12. Observe notification 被设备侧 CoAP 确认后，能否认为数据库已成功？
+
+不能。Leshan/CoAP 确认、Transport producer、Rule Engine consumer 和 DAO commit 是分离的阶段；LwM2M helper 还使用 `TransportServiceCallback.EMPTY`，Queue producer 错误不会返回设备。只有规则链经过 Save node 且 DAO callback 成功，相关表才完成持久化。
+
+### 13. Device Actor 是否处理 LwM2M telemetry？
+
+不处理这条主链。Mapped Telemetry 和 Client Attributes 由 `DefaultTransportService` 直接投递 Rule Engine Queue；Device Actor 负责 session OPEN/CLOSED、attribute/RPC subscription、shared attribute 下发以及 server-side/persistent RPC。
+
+### 14. ThingsBoard 3.6 默认使用 Kafka 保存 LwM2M 消息吗？
+
+不是，`queue.type` 默认是 `in-memory`。配置 `TB_QUEUE_TYPE=kafka` 后才使用 `tb_core`、`tb_rule_engine.main`、Transport API 和 notification topics；Kafka 是统一平台 Queue 的实现选择，不是 LwM2M 模块直接依赖。
+
+### 15. Kafka 部署下 LwM2M 相关的主要 consumer group 是什么？
+
+Credential request 由 `tb-core-transport-api-consumer` 消费，response 与 notification 由目标实例的 `transport-node-{serviceId}` 消费；Core 消息组是 `tb-core-node`，默认 Rule Engine Main queue 是 `re-main-consumer`。Core 和 RE 按 tenant/device/originator 做稳定逻辑 partition 路由。
+
+### 16. 默认 Registration/Observation 会存 Redis 吗？
+
+不会。默认 `cache.type=caffeine`，factory 选择 `InMemoryRegistrationStore`、in-memory security 和 dummy client/model/OTA stores；只有 `cache.type=redis` 使 `TBRedisCacheConfiguration` 存在时才切换 Redis 实现。
+
+### 17. Redis registration store 的清理周期为何可能不是 YAML 中的 2 秒？
+
+Factory 对 in-memory store 传入 `config.getCleanPeriodInSec()`，所以默认是 2 秒；对 Redis store 调用单参数构造器，该构造器使用 `DEFAULT_CLEAN_PERIOD=60` 秒。生产排查过期 registration 时必须按实际 store 分支判断。
+
+### 18. 四种安全模式都在默认部署中可直接使用吗？
+
+数据模型支持 PSK、RPK、X.509、NO_SEC，但默认 server credentials disabled 时 Main Server 只设置 PSK cipher suites。RPK/X.509 需要配置服务端私钥/证书并启用对应 credential loader；X.509 还涉及 trust chain 选项和 ThingsBoard 证书凭据匹配。
+
+### 19. LwM2M security store 如何访问平台设备凭据？
+
+Cache miss 时 validator 构造 `ValidateDeviceLwM2MCredentialsRequestMsg`，经 Transport API request/reply 到 Core；`DefaultTransportApiService` 按 `DeviceCredentialsType.LWM2M_CREDENTIALS` 查询，并返回 Device、Profile 与 credentials body。validator 同步等待该异步 response，默认 timeout 是 120 秒。
+
+### 20. Bootstrap 的任务顺序和错误策略是什么？
+
+任务 provider 依次组织 Discover、Read `/1`、Delete 旧 `/0`/`/1`、Write 新 Security/Server instances，最后 Bootstrap Finish。非 Finish task 返回错误时 session manager 记录日志后继续下一 task；Finish 错误才结束为失败，已写入设备的前序对象没有跨请求回滚。
+
+### 21. Observe 去重和 Cancel 是如何实现的？
+
+发送 Observe 前读取 Leshan `ObservationService` 的现有 observations，并按 `SingleObservation.path` 去重，重复 path 返回 validation error。Cancel one/all 直接调用 `cancelObservations(registration, path)` 或 `cancelObservations(registration)`，返回取消数量，不写业务数据库。
+
+### 22. LwM2M 有哪些自动重试，哪些没有？
+
+Californium 有 CoAP/DTLS 协议重传；ThingsBoard 额外只对 `UNREGISTERED` race 做 1 秒间隔、最多 5 次的 Registration handler 重试。Read/Observe/RPC timeout、Queue producer error和一般初始化异常没有通用 LwM2M 业务重发；Rule Engine pack retry属于下游 Queue 策略。
+
+### 23. PSM/eDRX sleeping 对 Read、Observe、RPC 有什么影响？
+
+统一下行 handler 在 `isDownlinkAllowed` 为 false 时直接忽略当前请求，timeout 或 `ClientSleepingException` 会把 client 标记 asleep。设备后续 uplink 唤醒时，context 可发送 model updates、重新初始化 attributes/OTA，并请求 Actor 发送 pending persistent RPC；普通被忽略的 Observe 不会自动排队重发。
+
+### 24. RPC、OTA 与 Registration/Observe 的关系是什么？
+
+RPC 复用已经注册的 `LwM2mClient`、session、Registration 和 `DefaultLwM2mDownlinkMsgHandler`，可手工发 Read/Observe/Cancel/Write/Execute。OTA 是注册后的附加状态机：读取 shared attributes，通过 `/5`、`/9`、可选 `/19` 写 package/URL并 Execute，再从被读取或观测的 state/result resources 生成 OTA telemetry。
+
+### 25. 设备已注册但平台没有遥测，应如何分层排查？
+
+先确认连接的是 LwM2M Main 端口且 security/Registration 有效，再核对 ThingsBoard client state 与 ASYNC session OPEN。随后比对 Registration supported object/version、Profile observe/telemetry/keyName、Leshan observation 和 pmin/pmax；最后检查映射日志、RE topic lag、Rule Chain Save Timeseries node 与 history/latest 数据库，不能只看 `/rd` 成功。
+
+---
+
+[上一篇：24 CoAP 消息流程](../24-coap-message-flow/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/25-lwm2m-registration-observe.svg) | [下一篇：26 MQTT Gateway 流程](../26-mqtt-gateway/README.md)

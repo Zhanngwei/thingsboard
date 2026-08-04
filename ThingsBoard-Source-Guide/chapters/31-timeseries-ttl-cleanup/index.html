@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>31 Timeseries TTL 清理流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航"><a href="README.md">Markdown</a><a href="../../index.html">全书目录</a><a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>31 Timeseries TTL 清理流程</strong>
+      <a href="#一-流程目标">一、流程目标</a><a href="#二-入口">二、入口</a><a href="#三-完整调用链">三、完整调用链</a><a href="#四-消息流">四、消息流</a><a href="#五-时序图">五、时序图</a><a href="#六-数据变化">六、数据变化</a><a href="#七-源码分析">七、源码分析</a><a href="#八-actor-分析">八、Actor 分析</a><a href="#九-kafka-分析">九、Kafka 分析</a><a href="#十-数据库分析">十、数据库分析</a><a href="#十一-异常处理">十一、异常处理</a><a href="#十二-源码阅读路线">十二、源码阅读路线</a><a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <script id="markdown-source" type="text/plain"># 31 Timeseries TTL 清理流程
+
+> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章分析遥测历史数据如何在 PostgreSQL、TimescaleDB 与 Cassandra 三种后端中过期，重点区分 SQL 定时清理、租户/客户 `TTL` 属性、写入请求 TTL 与租户配置 `defaultStorageTtlDays`。结论只依据当前源码与安装 SQL，不把新版 ThingsBoard 或 TimescaleDB 的通用能力反推到 3.6。
+
+[上一篇：30 Telemetry 查询流程](../30-telemetry-query/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/31-timeseries-ttl-cleanup.svg) | [下一篇：32 Redis 与本地缓存流程](../../SUMMARY.md#chapter-32)
+
+---
+
+## 一、流程目标
+
+Timeseries TTL 要解决的不是“给一行 PostgreSQL 数据设置过期时间”，而是限制遥测历史数据持续增长。ThingsBoard 3.6 对三类时序后端使用了三种实现：普通 PostgreSQL 先按系统 TTL 删除完整分区，再按租户/客户 TTL 删除行；TimescaleDB 只执行同一套按实体归属的行删除过程；Cassandra 在写入 `ts_kv_cf` 时把有效 TTL 写进 cell，定时 `cleanup(long)` 本身为空。
+
+[架构图 SVG：Timeseries TTL 的调度、策略与三种后端](../../assets/architecture/31-timeseries-ttl-cleanup.svg)
+
+[![Timeseries TTL 清理架构图](../../assets/architecture/31-timeseries-ttl-cleanup.svg)](../../assets/architecture/31-timeseries-ttl-cleanup.svg)
+
+```mermaid
+flowchart TB
+    CONFIG["sql.ttl.ts.enabled, interval and system TTL"] --> SCHED["TimeseriesCleanUpService.cleanUp"]
+    OWNER{"Current node owns SYS tenant Core partition"}
+    SCHED --> OWNER
+    OWNER -->|"no"| SKIP["Skip this execution"]
+    OWNER -->|"yes"| SERVICE["BaseTimeseriesService.cleanup"]
+    SERVICE --> DAO{"database.ts.type selects TimeseriesDao"}
+    DAO -->|"sql"| PG["JpaSqlTimeseriesDao"]
+    DAO -->|"timescale"| TS["TimescaleTimeseriesDao"]
+    DAO -->|"cassandra"| CASS["CassandraBaseTimeseriesDao.cleanup is empty"]
+    PG --> DROP["DROP complete old ts_kv partitions"]
+    PG --> ROWS["DELETE rows by tenant and customer TTL"]
+    TS --> ROWS
+    CASS --> NATIVE["History cells already carry CQL USING TTL"]
+    DROP --> HISTORY["History only"]
+    ROWS --> HISTORY
+    NATIVE --> HISTORY
+    LATEST["ts_kv_latest or ts_kv_latest_cf"] --> KEEP["Not touched by scheduled TTL cleanup"]
+```
+
+阅读本章前必须固定八条源码事实：
+
+1. `@Scheduled` 入口只存在于 TB Core 的 `TimeseriesCleanUpService`，默认首次执行和后续 fixed delay 都是 24 小时。
+2. 集群只让 SYS tenant Core partition 的当前 owner 执行；这里没有额外数据库锁或 Redis 分布式锁。
+3. `BaseTimeseriesService.cleanup(long)` 只调用 `TimeseriesDao`，不调用 `TimeseriesLatestDao`。
+4. 普通 PostgreSQL 的系统 TTL 是完整旧分区的硬上限；租户/客户 `TTL` 属性再对剩余分区做行删除。
+5. TimescaleDB 3.6 的清理源码没有 `drop_chunks`、retention policy 或 Continuous Aggregate，只执行 `DELETE FROM ts_kv`。
+6. Cassandra 的 TTL 从数据库写入时开始倒计时，不从遥测事件的 `ts` 开始；历史回灌也得到一个新的完整 TTL。
+7. Rule Node/REST 传入的 TTL 在 SQL/Timescale 保存链路中只用于 datapoint-days 计费计算，TTL 值没有写入 `ts_kv`，后续清理由系统配置和 `attribute_kv` 决定。
+8. 历史过期不会自动删除 latest；因此“24 小时曲线已空、最新温度仍存在”是允许出现的存储状态。
+
+```mermaid
+flowchart LR
+    WRITE["Telemetry write"] --> HISTORY["History store"]
+    WRITE --> LATEST["Latest store"]
+    CLEAN["TTL lifecycle"] --> HISTORY
+    CLEAN -. "scheduled cleanup does not call latest DAO" .-> LATEST
+    HISTORY -->|"expired"| EMPTY["Range query may be empty"]
+    LATEST -->|"retained"| VALUE["Latest query may still return a value"]
+```
+
+---
+
+## 二、入口
+
+### 2.1 唯一的定时清理入口
+
+[org.thingsboard.server.service.ttl.TimeseriesCleanUpService](../../../application/src/main/java/org/thingsboard/server/service/ttl/TimeseriesCleanUpService.java#L38) 是 SQL TTL 的调度入口。其 [cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/TimeseriesCleanUpService.java#L74) 同时检查功能开关和 SYS tenant partition 所有权，再同步调用 `timeseriesService.cleanup(systemTtl)`。
+
+| 配置 | release-3.6 默认值 | 作用 | 精确边界 |
+|---|---:|---|---|
+| `sql.ttl.ts.enabled` | `true` | 是否进入 SQL/Timescale 定时清理 | 对 Cassandra history 的原生过期没有决定作用 |
+| `sql.ttl.ts.execution_interval_ms` | `86400000` | initial delay 与每次完成后的 fixed delay | 不是 cron；上次执行越久，下次开始越晚 |
+| `sql.ttl.ts.ts_key_value_ttl` | `0` 秒 | SQL procedure 的 system default；普通 PG 还用于分区删除 | `0` 表示系统级无限期，不代表租户/客户属性一定为 0 |
+
+配置定义位于 [thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L377)。与 Event cleanup 使用随机初始延迟不同，Timeseries cleanup 的 `initialDelayString` 直接等于执行间隔，集群重启后 owner 通常要等完整一个周期。
+
+```mermaid
+sequenceDiagram
+    participant Spring as Spring Scheduler
+    participant TTL as TimeseriesCleanUpService
+    participant Part as PartitionService
+    participant Svc as TimeseriesService
+    Spring->>TTL: cleanUp() after initial delay
+    TTL->>TTL: check sql.ttl.ts.enabled
+    TTL->>Part: resolve(TB_CORE, SYS_TENANT_ID, SYS_TENANT_ID)
+    Part-->>TTL: ServiceInfo.isMyPartition()
+    alt enabled and owner
+        TTL->>Svc: cleanup(systemTtl)
+        Svc-->>TTL: synchronous return
+    else disabled or non-owner
+        TTL-->>Spring: return without database call
+    end
+    Note over Spring,TTL: fixedDelay starts after the previous invocation returns
+```
+
+### 2.2 四类名为 TTL 的输入不是同一个策略
+
+| TTL 来源 | 读取位置 | 单位 | SQL/Timescale 行清理 | Cassandra history |
+|---|---|---:|---|---|
+| `sql.ttl.ts.ts_key_value_ttl` | Scheduler/DAO 配置 | 秒 | procedure 默认值；普通 PG 还 DROP 分区 | 不使用 |
+| `cassandra.query.ts_key_value_ttl` | Cassandra DAO 配置 | 秒 | 不使用 | 写入 TTL 的全局上限/默认值 |
+| tenant/customer 的 `attribute_kv` key=`TTL` | SQL procedure | 秒 | 替代该归属范围的 system default | 不读取 |
+| request metadata、Rule Node `defaultTTL`、tenant profile `defaultStorageTtlDays` | 写入链路 | 秒/天转秒 | 不持久化 TTL，只影响 datapoint-days | 参与每个 history cell 的 TTL |
+
+Rule Engine 的优先级来自 [org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode.onMsg(TbContext, TbMsg)](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgTimeseriesNode.java#L122)：metadata `TTL` 优先，其次 node `defaultTTL`，仍为 0 时使用 tenant profile 的 `defaultStorageTtlDays`。REST 保存入口在 [org.thingsboard.server.controller.TelemetryController.saveTelemetry(TenantId, EntityId, String, long)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L887) 中也会把显式 0 替换为 tenant profile 默认值。
+
+```mermaid
+flowchart TB
+    META{"TbMsg metadata TTL is present"}
+    META -->|"yes"| REQUEST["request TTL"]
+    META -->|"no"| NODE["Rule Node defaultTTL"]
+    NODE --> ZERO{"value is zero"}
+    ZERO -->|"yes"| PROFILE["tenant profile defaultStorageTtlDays times 86400"]
+    ZERO -->|"no"| EFFECTIVE["write-call TTL"]
+    REQUEST --> EFFECTIVE
+    PROFILE --> EFFECTIVE
+    EFFECTIVE --> BACKEND{"History backend"}
+    BACKEND -->|"Cassandra"| CQL["compute min with Cassandra system TTL and bind USING TTL"]
+    BACKEND -->|"SQL or Timescale"| BILL["compute datapoint-days only"]
+    BILL --> LOST["TTL is not a ts_kv column"]
+    ATTR["tenant or customer attribute TTL"] --> PROC["later SQL cleanup procedure"]
+    CONFIG["SQL system TTL"] --> PROC
+```
+
+### 2.3 不存在的入口
+
+这一流程没有 REST “立即执行全局 TTL” API，没有 Actor 消息类型，没有 Kafka consumer，也没有 Timescale background policy。管理员修改属性或配置后，真正删除仍等待下一次 owner 节点调度；Cassandra 新 TTL 只影响之后的写入，已写 cell 的 TTL 不会被后台 Java 任务批量重写。
+
+---
+
+## 三、完整调用链
+
+### 3.1 Scheduler 到存储实现
+
+```mermaid
+flowchart TB
+    A["@Scheduled TimeseriesCleanUpService.cleanUp()"] --> B{"ttlTaskExecutionEnabled"}
+    B -->|"false"| END["return"]
+    B -->|"true"| C["AbstractCleanUpService.isSystemTenantPartitionMine()"]
+    C --> D["PartitionService.resolve(TB_CORE, SYS, SYS)"]
+    D --> E{"isMyPartition"}
+    E -->|"false"| END
+    E -->|"true"| F["BaseTimeseriesService.cleanup(systemTtl)"]
+    F --> G["TimeseriesDao.cleanup(systemTtl)"]
+    G --> H{"Spring conditional DAO"}
+    H -->|"sql"| I["JpaSqlTimeseriesDao.cleanup"]
+    H -->|"timescale"| J["TimescaleTimeseriesDao.cleanup"]
+    H -->|"cassandra"| K["CassandraBaseTimeseriesDao.cleanup"]
+```
+
+| 顺序 | 类与精确方法 | 职责 | 输入 | 输出 | 为什么这样设计 |
+|---:|---|---|---|---|---|
+| 1 | `org.thingsboard.server.service.ttl.TimeseriesCleanUpService.cleanUp()` | 接收 Spring 调度，检查开关与 owner | 注入的配置 | `void` | 避免每个 Core 实例同时清理 |
+| 2 | `org.thingsboard.server.service.ttl.AbstractCleanUpService.isSystemTenantPartitionMine()` | 把 SYS tenant 映射到 Core partition | 无显式参数 | boolean | 复用队列分区所有权作为单节点职责 |
+| 3 | `org.thingsboard.server.queue.discovery.PartitionService.resolve(ServiceType, TenantId, EntityId)` | 找到 SYS tenant 对应服务信息 | `TB_CORE/SYS/SYS` | `ServiceInfo` | 与集群拓扑变化保持一致 |
+| 4 | `org.thingsboard.server.dao.timeseries.BaseTimeseriesService.cleanup(long)` | 从业务服务进入 history DAO | system TTL 秒 | `void` | 上层不依赖 SQL/Cassandra |
+| 5 | `org.thingsboard.server.dao.timeseries.TimeseriesDao.cleanup(long)` | 后端统一契约 | system TTL 秒 | `void` | 条件装配决定实际存储 |
+| 6a | `org.thingsboard.server.dao.sqlts.sql.JpaSqlTimeseriesDao.cleanup(long)` | 先 DROP 旧完整分区，再调用公共行清理 | system TTL 秒 | 日志统计 | 对全局过期数据使用低成本分区 DDL |
+| 6b | `org.thingsboard.server.dao.sqlts.timescale.TimescaleTimeseriesDao.cleanup(long)` | 直接进入公共行清理 | system TTL 秒 | 日志统计 | 3.6 没有接入 Timescale retention API |
+| 6c | `org.thingsboard.server.dao.timeseries.CassandraBaseTimeseriesDao.cleanup(long)` | 空实现 | system TTL 秒 | 立即返回 | 过期由写入 cell TTL 和 Cassandra 引擎完成 |
+
+### 3.2 普通 PostgreSQL 的两段式执行
+
+[org.thingsboard.server.dao.sqlts.sql.JpaSqlTimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/sql/JpaSqlTimeseriesDao.java#L139) 先在 `systemTtl > 0` 时调用 `drop_partitions_by_system_ttl`，然后无条件调用父类。父类 [org.thingsboard.server.dao.sqlts.AbstractSqlTimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractSqlTimeseriesDao.java#L111) 再调用 `cleanup_timeseries_by_ttl`。两段 JDBC 各自获取连接、设置一小时 statement timeout，并各自 catch `SQLException`；分区删除失败不会阻止后续行清理。
+
+```mermaid
+sequenceDiagram
+    participant DAO as JpaSqlTimeseriesDao
+    participant DS as DataSource
+    participant PG as PostgreSQL
+    DAO->>DAO: cleanup(systemTtl)
+    alt systemTtl is greater than zero
+        DAO->>DS: getConnection()
+        DAO->>PG: CALL drop_partitions_by_system_ttl(partitioning, systemTtl, 0)
+        PG->>PG: identify cutoff partition
+        PG->>PG: DROP older complete partitions
+        PG-->>DAO: deleted partition count
+    end
+    DAO->>DAO: super.cleanup(systemTtl)
+    DAO->>DS: getConnection()
+    DAO->>PG: CALL cleanup_timeseries_by_ttl(NULL_UUID, systemTtl, 0)
+    PG->>PG: tenant/customer loops and DELETE rows
+    PG-->>DAO: deleted row count
+```
+
+### 3.3 TimescaleDB 与 Cassandra 分支
+
+Timescale 的 [cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L258) 只调用父类，所以它执行 `cleanup_timeseries_by_ttl` 的 `DELETE`。Cassandra 的 [cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L425) 明确为空；真正链路在 [save(TenantId, EntityId, TsKvEntry, long)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L255) 中计算 TTL、选择带 TTL 的 prepared statement，然后交给 Cassandra。
+
+```mermaid
+flowchart LR
+    CALL["TimeseriesDao.cleanup(systemTtl)"] --> TYPE{"implementation"}
+    TYPE -->|"TimescaleTimeseriesDao"| PROC["CALL cleanup_timeseries_by_ttl"]
+    PROC --> DELETE["DELETE matching rows across chunks"]
+    TYPE -->|"CassandraBaseTimeseriesDao"| NOOP["empty cleanup method"]
+    SAVE["Cassandra save(entry, requestTtl)"] --> MIN["computeTtl"]
+    MIN --> STMT{"effective TTL is zero"}
+    STMT -->|"yes"| NORMAL["INSERT without TTL"]
+    STMT -->|"no"| TTL["INSERT USING TTL effectiveTtl"]
+```
+
+---
+
+## 四、消息流
+
+### 4.1 调度所有权流
+
+[AbstractCleanUpService.isSystemTenantPartitionMine()](../../../application/src/main/java/org/thingsboard/server/service/ttl/AbstractCleanUpService.java#L48) 通过 `partitionService.resolve(ServiceType.TB_CORE, SYS_TENANT_ID, SYS_TENANT_ID).isMyPartition()` 判断 owner。它保证正常拓扑下只有一个 Core 实例执行，但这不是数据库互斥协议：owner 切换、旧执行长时间未结束或手工调用都可能形成重叠，因此数据库锁等待仍需监控。
+
+```mermaid
+flowchart TB
+    NODES["Core nodes A, B and C receive local scheduler tick"] --> PA["A resolves SYS partition"]
+    NODES --> PB["B resolves SYS partition"]
+    NODES --> PC["C resolves SYS partition"]
+    PA --> OA{"owner"}
+    PB --> OB{"owner"}
+    PC --> OC{"owner"}
+    OA -->|"yes"| RUN["one node calls synchronous DAO cleanup"]
+    OB -->|"no"| SKIPB["return"]
+    OC -->|"no"| SKIPC["return"]
+    TOPO["partition reassignment"] --> PA
+    TOPO --> PB
+    TOPO --> PC
+```
+
+### 4.2 PostgreSQL 分区生命周期
+
+安装时 [org.thingsboard.server.service.install.SqlTsDatabaseSchemaService.createDatabaseSchema()](../../../application/src/main/java/org/thingsboard/server/service/install/SqlTsDatabaseSchemaService.java#L58) 创建 `ts_kv_indefinite` DEFAULT partition。系统 TTL procedure 在 [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L37) 中根据 DAYS/MONTHS/YEARS 生成 cutoff partition 名，只删除比它更老的完整分区，并排除 `ts_kv_latest`、`ts_kv_dictionary`、`ts_kv_indefinite` 和 cutoff partition。
+
+```mermaid
+flowchart LR
+    OLD2["ts_kv_2026_01"] -->|"older than cutoff partition"| DROP1["DROP TABLE"]
+    OLD1["ts_kv_2026_02"] -->|"older than cutoff partition"| DROP2["DROP TABLE"]
+    CUT["ts_kv_2026_03 cutoff partition"] --> KEEP1["keep whole partition then row cleanup may trim"]
+    NEW["ts_kv_2026_04 and newer"] --> KEEP2["keep"]
+    DEF["ts_kv_indefinite default"] --> KEEP3["always excluded from partition DROP"]
+    LATEST["ts_kv_latest"] --> KEEP4["separate table and excluded"]
+```
+
+`get_partition_by_system_ttl_date` 在 [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L192) 要求 cutoff 对应的物理分区已经存在；若不存在就返回 NULL，外层 procedure 不删除任何旧分区。这意味着分区缺口不是无害细节，生产排查必须同时查看 cutoff 分区名和 `pg_tables`。
+
+### 4.3 行级租户/客户流
+
+普通 SQL 与 Timescale 的 `cleanup_timeseries_by_ttl` 逻辑相同，分别位于 [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L255) 与 [schema-timescale.sql](../../../dao/src/main/resources/sql/schema-timescale.sql#L87)。它遍历所有 tenant，读取 tenant `TTL`；清理未分配给 customer 的 Device/Asset；再遍历 tenant 的 customers，读取/继承 customer TTL，清理 Customer 自身及已分配 Device/Asset。
+
+```mermaid
+flowchart TB
+    START["Open cursor over tenant table"] --> TENANT["Fetch tenant"]
+    TENANT --> TATTR["SELECT attribute_kv.long_v where entity_id=tenant and key=TTL"]
+    TATTR --> TFALL["null means system TTL"]
+    TFALL --> TPOS{"tenant TTL greater than zero"}
+    TPOS -->|"yes"| UNASSIGNED["DELETE old telemetry for unassigned devices and assets"]
+    TPOS -->|"no"| CUSTOMERS["iterate customers"]
+    UNASSIGNED --> CUSTOMERS
+    CUSTOMERS --> CATTR["SELECT customer TTL"]
+    CATTR --> INHERIT["null means tenant cutoff timestamp"]
+    INHERIT --> CPOS{"customer cutoff is non-null and positive"}
+    CPOS -->|"yes"| ASSIGNED["DELETE customer, assigned device and assigned asset telemetry"]
+    CPOS -->|"no"| NEXTC["next customer"]
+    ASSIGNED --> NEXTC
+    NEXTC --> MOREC{"more customers"}
+    MOREC -->|"yes"| CATTR
+    MOREC -->|"no"| MORET{"more tenants"}
+    MORET -->|"yes"| TENANT
+    MORET -->|"no"| END["return deleted row count"]
+```
+
+---
+
+## 五、时序图
+
+[PlantUML 源文件](sequence.puml) | [新窗口查看时序图 SVG](sequence.svg)
+
+[![Timeseries TTL 完整时序图](sequence.svg)](sequence.svg)
+
+时序图把一次 scheduler tick、PostgreSQL 两段清理、Timescale 行删除、Cassandra 写入时 TTL 与异常边界放在同一张图中。SVG 保留原始 viewBox，HTML 只显示缩略图；点击后浏览器直接打开矢量文件。
+
+```mermaid
+sequenceDiagram
+    participant Tick as Scheduler tick
+    participant Owner as SYS partition owner
+    participant History as History TimeseriesDao
+    participant Latest as TimeseriesLatestDao
+    participant DB as Selected backend
+    Tick->>Owner: enabled and isMyPartition
+    Owner->>History: cleanup(systemTtl)
+    History->>DB: DROP partition, DELETE rows or no-op
+    DB-->>History: synchronous completion or logged SQL error
+    History-->>Owner: return
+    Note over Tick,Latest: No cleanup call reaches TimeseriesLatestDao
+```
+
+---
+
+## 六、数据变化
+
+### 6.1 对象、数据库、缓存与运行时状态
+
+| 类型 | 变化 | 不变化 | 依据 |
+|---|---|---|---|
+| Java 领域对象 | 无领域对象保存；只有局部计数与 TTL cutoff | Device、Asset、Customer 对象本身 | cleanup 直接调用 stored procedure |
+| PostgreSQL history | 旧 `ts_kv_*` 分区可能被 DROP；`ts_kv` 行可能 DELETE | `ts_kv_latest`、`ts_kv_dictionary` | procedure 排除表且 service 不调用 latest DAO |
+| Timescale history | hypertable 的匹配行被 DELETE | chunk 本身通常仍存在 | 无 `drop_chunks` 调用 |
+| Cassandra history | cell 到期后变 tombstone，读时不可见 | 物理 SSTable 不会在到期瞬间缩小 | 空 cleanup，CQL TTL + compaction |
+| Latest 存储 | 无自动 TTL 变化 | SQL `ts_kv_latest`、Cassandra `ts_kv_latest_cf` | latest save 不带 TTL，cleanup 不路由到 latest |
+| `attribute_kv` | procedure 只读 tenant/customer key `TTL` | 属性本身不被删除 | 动态 SELECT |
+| Caffeine cache | SQL partition name set 和 Cassandra partition registry cache 均不因 cleanup 主动失效 | 缓存条目可能继续存在 | cleanup 没有 invalidate |
+| Actor/session | 无变化 | Device Actor、transport session | 定时 DAO 流程不经过 Actor |
+| Kafka topic | 无 produce/consume | Core/Rule Engine topics | 同步本地调用 |
+
+```mermaid
+flowchart TB
+    CLEAN["TTL cleanup"] --> H{"History backend"}
+    H -->|"PostgreSQL"| P1["DROP old partitions"]
+    H -->|"PostgreSQL or Timescale"| P2["DELETE old rows"]
+    H -->|"Cassandra scheduler"| P3["no data mutation"]
+    P1 --> DISK1["partition files become removable after transaction/locks"]
+    P2 --> WAL["WAL plus dead tuples"]
+    WAL --> VAC["VACUUM reclaims reusable space"]
+    P3 --> CELL["native cell TTL independently expires"]
+    CELL --> TOMB["tombstone"]
+    TOMB --> COMP["compaction eventually reclaims disk"]
+```
+
+### 6.2 history 与 latest 的生命周期分叉
+
+```mermaid
+stateDiagram-v2
+    [*] --> Written
+    Written --> HistoryVisible: save history
+    Written --> LatestVisible: save latest
+    HistoryVisible --> HistoryExpired: DROP, DELETE or CQL TTL
+    LatestVisible --> LatestVisible: scheduled TTL does not touch latest
+    LatestVisible --> LatestDeleted: explicit telemetry delete or entity lifecycle
+    HistoryExpired --> [*]
+    LatestDeleted --> [*]
+```
+
+TTL cleanup 也不删除 `ts_kv_dictionary`。字典 key 数量通常远小于 history 行数，但动态且无界的 telemetry key 仍可能让字典持续增长。删除实体后如果历史行尚存，SQL procedure 又依赖当前 `device/asset/customer` 表做子查询，这些 orphan history 不会再匹配按归属删除逻辑。
+
+### 6.3 PostgreSQL MVCC、WAL 与 VACUUM
+
+`DELETE` 不是立即覆盖 heap tuple。它为删除生成 WAL，并把旧 tuple 标记为对新 snapshot 不可见；VACUUM 在不再被任何旧 snapshot 需要后回收可复用空间。`DROP TABLE` 删除完整分区的成本通常远低于逐行删除，但会取得更强 DDL lock；长事务、备份或查询可能延长锁等待。
+
+```mermaid
+flowchart LR
+    DEL["DELETE old ts_kv rows"] --> WAL["generate WAL records"]
+    DEL --> DEAD["dead tuples remain in heap/chunks"]
+    SNAP["old snapshots"] --> DEAD
+    DEAD --> VACUUM{"VACUUM can remove tuple versions"}
+    VACUUM -->|"old snapshot still needs them"| WAIT["wait for later vacuum"]
+    VACUUM -->|"safe"| FSM["space reusable through free space map"]
+    FSM --> SIZE["table file usually does not shrink"]
+    DROP["DROP old partition"] --> LOCK["DDL lock and catalog/WAL work"]
+    LOCK --> REMOVE["whole partition storage removed"]
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 接口与实现关系
+
+```mermaid
+classDiagram
+    class TimeseriesService {
+      <<interface>>
+      +cleanup(long systemTtl)
+    }
+    class BaseTimeseriesService {
+      -TimeseriesDao timeseriesDao
+      -TimeseriesLatestDao timeseriesLatestDao
+      +cleanup(long systemTtl)
+    }
+    class TimeseriesDao {
+      <<interface>>
+      +cleanup(long systemTtl)
+      +save(TenantId, EntityId, TsKvEntry, long)
+    }
+    class AbstractSqlTimeseriesDao {
+      +cleanup(long systemTtl)
+      #computeTtl(long ttl)
+    }
+    class JpaSqlTimeseriesDao {
+      +cleanup(long systemTtl)
+    }
+    class TimescaleTimeseriesDao {
+      +cleanup(long systemTtl)
+    }
+    class CassandraBaseTimeseriesDao {
+      +cleanup(long systemTtl)
+      -computeTtl(long ttl)
+    }
+    TimeseriesService <|.. BaseTimeseriesService
+    BaseTimeseriesService --> TimeseriesDao
+    BaseTimeseriesService --> TimeseriesLatestDao
+    TimeseriesDao <|.. AbstractSqlTimeseriesDao
+    AbstractSqlTimeseriesDao <|-- JpaSqlTimeseriesDao
+    AbstractSqlTimeseriesDao <|-- TimescaleTimeseriesDao
+    TimeseriesDao <|.. CassandraBaseTimeseriesDao
+```
+
+关键源码：
+
+- [org.thingsboard.server.dao.timeseries.TimeseriesService.cleanup(long)](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/timeseries/TimeseriesService.java#L200)：服务契约。
+- [org.thingsboard.server.dao.timeseries.BaseTimeseriesService.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L259)：只委派给 `timeseriesDao`。
+- [org.thingsboard.server.dao.timeseries.TimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/TimeseriesDao.java#L90)：后端契约。
+- [org.thingsboard.server.dao.sqlts.AbstractSqlTimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractSqlTimeseriesDao.java#L111)：公共 SQL procedure 调用。
+- [org.thingsboard.server.dao.sqlts.sql.JpaSqlTimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/sql/JpaSqlTimeseriesDao.java#L139)：普通 PG 分区删除扩展。
+- [org.thingsboard.server.dao.sqlts.timescale.TimescaleTimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L258)：Timescale 仅复用行清理。
+- [org.thingsboard.server.dao.timeseries.CassandraBaseTimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L425)：原生 TTL 后端的空实现。
+
+### 7.2 SQL 写入 TTL 为何不会控制 SQL 行过期
+
+[AbstractSqlTimeseriesDao.computeTtl(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractSqlTimeseriesDao.java#L161) 会把 request TTL 与 SQL system TTL 取默认值或最小值，但它的结果只传给 [getDataPointDays(TsKvEntry, long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractSqlTimeseriesDao.java#L179)。普通 PG [save(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/sql/JpaSqlTimeseriesDao.java#L114) 和 Timescale [save(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L163) 构造的实体只有 `entity_id/key/ts` 与值列，没有 TTL 或 expire_at。
+
+```mermaid
+flowchart LR
+    REQ["save(entry, requestTtl)"] --> COMPUTE["computeTtl"]
+    COMPUTE --> DAYS["getDataPointDays"]
+    DAYS --> USAGE["return usage accounting integer"]
+    REQ --> ENTITY["build TsKvEntity"]
+    ENTITY --> COLS["entity_id, key, ts and typed value"]
+    COLS --> SQL["INSERT or batch upsert"]
+    COMPUTE -. "not stored" .-> SQL
+    LATER["scheduled procedure"] --> ATTR["reads system config plus attribute_kv TTL"]
+    ATTR --> SQL
+```
+
+因此不要把 tenant profile 的 `defaultStorageTtlDays` 当成 SQL 逐点过期配置。若业务要求“同一租户内每条点不同过期时间”，release-3.6 的 SQL 表结构和 cleanup procedure 都不支持这一语义。
+
+### 7.3 SQL procedure 的实体覆盖范围
+
+三个 delete function 分别在 [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L225)、[L235](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L235)、[L245](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L245) 按当前 Device、Asset、Customer 表匹配 entity ID。没有 Tenant、User、Dashboard、Entity View 或其他 entity type 分支。
+
+```mermaid
+flowchart TB
+    ROW["one ts_kv row"] --> MATCH{"entity_id currently appears in"}
+    MATCH -->|"device table"| DEVICE["eligible through tenant/customer assignment"]
+    MATCH -->|"asset table"| ASSET["eligible through tenant/customer assignment"]
+    MATCH -->|"customer table"| CUSTOMER["eligible through customer TTL"]
+    MATCH -->|"tenant or other entity table"| OTHER["not selected by row procedure"]
+    MATCH -->|"entity already deleted"| ORPHAN["orphan row is not selected"]
+    DEVICE --> DELETE["DELETE when ts is older than cutoff"]
+    ASSET --> DELETE
+    CUSTOMER --> DELETE
+```
+
+普通 PostgreSQL 的完整分区 DROP 是全局物理操作，所以旧分区中的所有 entity types 都会一起消失；Timescale 没有这层硬上限，未覆盖 entity type 或 orphan 数据可能长期保留。
+
+### 7.4 release-3.6 procedure 的状态残留风险
+
+`tenant_ttl_ts` 与 `customer_ttl_ts` 在 procedure `DECLARE` 区只声明一次，在每轮 loop 开头没有赋 NULL。若某 tenant TTL 为 `0`，`tenant_ttl_ts` 不会重新赋值；若某 customer TTL 为 `0`，`customer_ttl_ts` 也不会重新赋值。后续分支可能继续使用上一轮 tenant/customer 的 cutoff。对应源码是 [schema-ts-psql.sql L267-L304](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L267)，Timescale 版本同样位于 [schema-timescale.sql L99-L136](../../../dao/src/main/resources/sql/schema-timescale.sql#L99)。
+
+```mermaid
+flowchart TB
+    PREV["previous tenant sets tenant_ttl_ts to a positive cutoff"] --> NEXT["next tenant TTL equals zero"]
+    NEXT --> NOSET["IF tenant_ttl greater than zero is false"]
+    NOSET --> STALE["tenant_ttl_ts still holds previous cutoff"]
+    STALE --> CNULL["customer TTL is null"]
+    CNULL --> COPY["customer_ttl_ts equals stale tenant_ttl_ts"]
+    COPY --> DELETE["customer/device/asset rows may be deleted with prior tenant cutoff"]
+    C0["explicit customer TTL equals zero"] --> NOCLEAR["customer_ttl_ts is not cleared"]
+    NOCLEAR --> DELETE2["prior customer cutoff may be reused"]
+```
+
+这是 release-3.6 源码级风险，不是仅凭配置可以消除的抽象问题。生产使用 tenant/customer `TTL=0` 表示无限期前，应在副本数据上验证 procedure，并考虑将两个 cutoff 变量在每轮显式置 NULL、让 `0` 分支明确禁用删除、为属性查询加 scope 条件。由于 cursor 没有 `ORDER BY`，错误结果还可能随迭代顺序变化。
+
+### 7.5 `attribute_kv` 选择条件不完整
+
+procedure 的动态 SQL 只过滤 `entity_id` 和 `attribute_key='TTL'`，没有过滤 `entity_type` 或 `attribute_type`，且只读取 `long_v`。而 `attribute_kv` 的主键包含实体类型、实体 ID、属性 scope 和 key，见 [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L105)。同一实体不同 scope 存在多个 `TTL` 时，未排序的 `SELECT ... INTO` 取哪一行没有稳定保证；若值保存在 `str_v`，它会被视为 NULL 并回退。
+
+### 7.6 普通 PostgreSQL 分区 cache 与迟到写入
+
+`JpaSqlTimeseriesDao` 在 JVM 内维护已经创建过的分区集合，save 会先执行 `savePartitionIfNotExist(ts)`。TTL procedure 从数据库侧 DROP 分区时没有回调失效该集合。一个落入已删除旧时间段的迟到点，可能因 JVM 仍认为分区存在而不重建分区，最终由 PostgreSQL 路由到 `ts_kv_indefinite`；进程重启后集合为空，同一旧分区又可能被重新创建，直到下一轮 cleanup。
+
+```mermaid
+sequenceDiagram
+    participant Cache as JpaSqlTimeseriesDao partition set
+    participant Cleanup as TTL procedure
+    participant PG as PostgreSQL partitions
+    participant Late as late telemetry write
+    Cache->>Cache: remembers old partition name
+    Cleanup->>PG: DROP old partition
+    Note over Cleanup,Cache: no cache invalidation callback
+    Late->>Cache: savePartitionIfNotExist(old event ts)
+    Cache-->>Late: already known, skip CREATE
+    Late->>PG: INSERT into parent ts_kv
+    PG->>PG: route to ts_kv_indefinite DEFAULT
+```
+
+这不是推荐依赖的归档行为。应限制过旧事件写入、监控 DEFAULT partition、在修改 procedure 后处理 DAO cache 一致性，并验证重启后的旧分区重建行为。
+
+### 7.7 Cassandra effective TTL 与 partition registry
+
+[CassandraBaseTimeseriesDao.computeTtl(long)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L751) 的规则是：
+
+```text
+cassandra system TTL = 0  -> request TTL
+system TTL > 0, request TTL = 0 -> system TTL
+system TTL > 0, request TTL > 0 -> min(system TTL, request TTL)
+```
+
+历史写入选择 `INSERT ... USING TTL ?` 的语句见 [getPreparedStatementQueryWithTtl(DataType)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L933)。latest 的 [saveLatest(TenantId, EntityId, TsKvEntry)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesLatestDao.java#L194) 没有 TTL 参数。
+
+分区注册表 `ts_kv_partitions_cf` 不使用 custom TTL，而用 [savePartition(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L306) 中的 system TTL。`CassandraTsPartitionsCache` 只有 maximum size，没有时间过期，见 [构造器](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraTsPartitionsCache.java#L45)。缓存命中时不会刷新注册表 TTL，因而有限 system TTL 下，注册行可能先于同 partition 内后写的 history cell 消失。
+
+```mermaid
+flowchart TB
+    FIRST["first write for entity, key and partition"] --> REG["insert ts_kv_partitions_cf USING system TTL"]
+    FIRST --> CELL1["insert history cell USING effective TTL"]
+    CACHE["Caffeine cache records registry key"] --> LATER["later write in same partition"]
+    LATER --> HIT{"cache hit"}
+    HIT -->|"yes"| SKIP["skip registry upsert and TTL refresh"]
+    LATER --> CELL2["history cell gets a fresh TTL"]
+    REG --> EXPREG["registry row may expire"]
+    CELL2 --> ALIVE["later history cell may still be alive"]
+    EXPREG --> READ{"partition discovery on read"}
+    READ -->|"registry enabled"| MISS["live row can be omitted"]
+    READ -->|"calculate ranges directly"| FOUND["query calculated partitions"]
+```
+
+[getPartitionsFuture(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L580) 在 `use_ts_key_value_partitioning_on_read=true` 时读取注册表；设为 false 会直接计算范围，避免注册行缺失造成漏读，但会查询不存在的 partitions，增加空读成本。
+
+---
+
+## 八、Actor 分析
+
+本流程不创建 Actor，也不向 Tenant Actor、Device Actor 或 Rule Chain Actor 发送消息。`TimeseriesCleanUpService` 是普通 Spring singleton，`@Scheduled` 在线程池线程上同步运行；“只执行一次”的依据来自 queue partition ownership，而不是 Actor mailbox 的串行语义。
+
+```mermaid
+flowchart LR
+    SCHED["Spring scheduled bean"] --> PART["PartitionService ownership lookup"]
+    PART --> DAO["synchronous DAO cleanup"]
+    ACTOR["Actor system"] -. "no tell, ask or mailbox" .-> DAO
+    DEVICE["Device Actor state"] --> UNCHANGED["unchanged"]
+    SESSION["Transport session"] --> UNCHANGED
+```
+
+不用 Actor 的原因是清理是全局、低频、数据库主导的后台作业，不以单个实体消息为工作单位。反过来，这也意味着它不享受 Actor mailbox 的逐实体背压、重试和顺序保证；大规模 DELETE 的控制必须由 SQL、调度窗口和数据库运维承担。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 Producer、Topic 与 Consumer
+
+这一流程没有 Producer、Topic、Partition、Consumer 或 Consumer Group。scheduler owner 直接调用本 JVM 的 `TimeseriesService`，DAO 使用 JDBC/Cassandra driver 与数据库交互。
+
+```mermaid
+flowchart LR
+    TICK["Scheduler tick"] --> JAVA["local Java call"]
+    JAVA --> DB["JDBC or Cassandra driver"]
+    KAFKA["Kafka"] -. "not on cleanup path" .-> JAVA
+    RETRY["next fixed-delay tick"] --> TICK
+```
+
+### 9.2 为什么没有 Kafka
+
+TTL 清理不需要把每个过期点转换为业务消息，否则十亿级历史删除会制造同量级队列流量。代价是没有 offset、ack、dead-letter 或消息级重放：SQL exception 被 DAO 记录后返回，下一次完整重试只能等待 fixed delay；Cassandra 则完全依赖原生 TTL/compaction。
+
+如果业务规则必须获知“某 telemetry point 已过期”，当前 TTL 实现不提供事件。应单独设计可审计的生命周期任务，不能通过监听此 procedure 或期待 Rule Engine 收到删除消息实现。
+
+---
+
+## 十、数据库分析
+
+### 10.1 普通 PostgreSQL：DROP 分区是硬上限
+
+`ts_kv` 在 [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L17) 中按 `ts` RANGE 分区。系统 TTL > 0 时，`drop_partitions_by_system_ttl` 先删 cutoff partition 之前的完整分区。它不关心 tenant/customer/entity type，所以全局 system TTL 对完整旧分区形成硬上限：租户配置更长 TTL 也无法恢复已 DROP 的数据。
+
+工程检查：
+
+```sql
+SELECT tablename
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename LIKE 'ts_kv_%'
+ORDER BY tablename;
+
+SELECT tableoid::regclass AS physical_partition, count(*)
+FROM ts_kv
+GROUP BY tableoid
+ORDER BY tableoid::regclass::text;
+
+SELECT count(*) AS indefinite_rows,
+       min(ts) AS oldest_ts,
+       max(ts) AS newest_ts
+FROM ts_kv_indefinite;
+```
+
+分区删除计数是表数量，不是行数。系统 TTL 越小、分区粒度越粗，保留误差越大；cutoff partition 仍需行删除才能精确到秒。
+
+### 10.2 SQL 行清理：归属关系决定删除范围
+
+procedure 使用 `DELETE ... WHERE entity_id IN (SELECT ...) AND ts < cutoff RETURNING *` 再 count。`RETURNING *` 会把每条删除行送进 CTE 计数，删除量巨大时会增加 executor 与 WAL 压力；所有 tenant/customer 在一次 procedure call 中串行处理，没有 batch size、每租户 commit 或 sleep。
+
+诊断查询：
+
+```sql
+SELECT entity_id, attribute_type, attribute_key, long_v, str_v, last_update_ts
+FROM attribute_kv
+WHERE attribute_key = 'TTL'
+ORDER BY entity_id, attribute_type;
+
+SELECT n_dead_tup, n_live_tup, last_autovacuum, autovacuum_count
+FROM pg_stat_user_tables
+WHERE relname = 'ts_kv'
+   OR relname LIKE '_hyper_%'
+   OR relname LIKE 'ts_kv_%'
+ORDER BY n_dead_tup DESC;
+
+SELECT pid, age(clock_timestamp(), query_start) AS age, wait_event_type, wait_event, query
+FROM pg_stat_activity
+WHERE query ILIKE '%cleanup_timeseries_by_ttl%'
+   OR query ILIKE '%drop_partitions_by_system_ttl%';
+```
+
+生产上应先在副本或脱敏数据集测量每次删除量、WAL 增长、replica lag、dead tuple、autovacuum 时长与锁等待。仅把 interval 从 24 小时改短会降低单次积压，但也提高扫描和调度频率。
+
+### 10.3 TimescaleDB：行 DELETE 不等于 retention policy
+
+Timescale 安装 SQL在 [schema-timescale.sql](../../../dao/src/main/resources/sql/schema-timescale.sql#L17) 建扩展和 `ts_kv` 表；hypertable 由安装服务按 `sql.timescale.chunk_time_interval` 创建。release-3.6 cleanup 逐实体 DELETE，可能跨很多 chunks：
+
+```mermaid
+flowchart TB
+    HYPER["ts_kv hypertable"] --> C1["old chunk A"]
+    HYPER --> C2["old chunk B"]
+    HYPER --> C3["cutoff chunk C"]
+    PROC["cleanup_timeseries_by_ttl"] --> D1["DELETE selected entity rows in A"]
+    PROC --> D2["DELETE selected entity rows in B"]
+    PROC --> D3["DELETE rows older than cutoff in C"]
+    D1 --> E1["chunk A may remain allocated"]
+    D2 --> E2["chunk B may remain allocated"]
+    D3 --> E3["chunk C remains"]
+    POLICY["drop_chunks or retention policy"] -. "not called by 3.6 source" .-> HYPER
+```
+
+不要仅凭“使用 TimescaleDB”就认为旧 chunk 会自动 DROP。`DELETE` 产生 PostgreSQL MVCC dead tuples 和 WAL；若自行添加 Timescale retention policy，还必须确认它与 tenant/customer 差异化 TTL 的语义冲突：drop whole chunk 无法保留同一 chunk 中长 TTL tenant 的行。
+
+可用 Timescale 视图核对：
+
+```sql
+SELECT hypertable_schema, hypertable_name, chunk_name, range_start, range_end
+FROM timescaledb_information.chunks
+WHERE hypertable_name = 'ts_kv'
+ORDER BY range_start;
+
+SELECT hypertable_schema, hypertable_name, num_chunks, compression_enabled
+FROM timescaledb_information.hypertables
+WHERE hypertable_name = 'ts_kv';
+
+SELECT *
+FROM hypertable_detailed_size('ts_kv'::regclass);
+```
+
+第二条返回形状取决于实际 TimescaleDB 扩展版本，执行前应以部署版本文档和 `\df hypertable_detailed_size` 为准。
+
+### 10.4 Cassandra：逻辑过期、tombstone 与磁盘回收
+
+```mermaid
+stateDiagram-v2
+    [*] --> LiveCell: INSERT USING TTL at database write time
+    LiveCell --> ExpiredCell: TTL seconds elapsed
+    ExpiredCell --> Tombstone: reads treat value as deleted
+    Tombstone --> SSTableStillExists: before eligible compaction
+    SSTableStillExists --> Reclaimed: compaction after safety conditions
+    Reclaimed --> [*]
+```
+
+TTL 到期后读不可见不等于磁盘立即释放。大量短 TTL 会产生 tombstone；分区设计、compaction strategy、`gc_grace_seconds`、repair 与 read path 共同决定物理回收和 tombstone scan 风险。ThingsBoard Java `cleanup()` 不会触发 compaction，也不会等待空间回收。
+
+关键运维观测应包括 table-level tombstone、SSTable 数量、compaction pending、读延迟、partition size，以及 `ts_kv_partitions_cf` 与 `ts_kv_cf` 的注册/数据一致性。CQL 可用 `TTL(value_column)` 检查单列剩余 TTL，但一行的不同 value column 可能有不同 writetime/TTL。
+
+### 10.5 三种后端语义对比
+
+| 维度 | PostgreSQL partitioned | TimescaleDB | Cassandra |
+|---|---|---|---|
+| 过期触发 | 每日 scheduler | 每日 scheduler | 每次写入绑定 TTL，数据库时钟推进 |
+| system TTL | 完整分区硬删除 + procedure 默认 | procedure 默认，可被 tenant/customer 属性替代 | request TTL 的默认/上限 |
+| request TTL | 不存储，只影响 usage accounting | 不存储，只影响 usage accounting | 存进 history cell |
+| tenant/customer `TTL` 属性 | 行 DELETE | 行 DELETE | 不读取 |
+| 依据时间 | procedure 用当前时间减 TTL，与 row `ts` 比较 | 同左 | database write time 起算 |
+| 整块清理 | `DROP TABLE` old partitions | 3.6 未调用 `drop_chunks` | compaction 回收 SSTable 内容 |
+| latest 自动过期 | 否 | 否 | 否 |
+| 主要风险 | DDL lock、cutoff 分区缺失、DEFAULT late rows | 跨 chunk DELETE、WAL、bloat | tombstone、registry 先过期、backfill 新 TTL |
+
+```mermaid
+flowchart TB
+    REQUIRE["Retention requirement"] --> SAME{"Must every tenant share one hard maximum"}
+    SAME -->|"yes and plain PostgreSQL"| PART["partition DROP is efficient for fully old ranges"]
+    SAME -->|"yes and Timescale"| CUSTOM["3.6 still uses DELETE; custom retention requires explicit design"]
+    SAME -->|"no, per tenant/customer"| ROW["SQL procedure row DELETE"]
+    REQUIRE --> POINT{"Need per-write TTL"}
+    POINT -->|"yes"| CASS["Cassandra supports cell TTL in current implementation"]
+    POINT -->|"yes on SQL"| GAP["not represented by 3.6 schema"]
+    REQUIRE --> LATEST{"Should latest expire too"}
+    LATEST -->|"yes"| APP["requires separate business policy; scheduled cleanup does not do it"]
+```
+
+### 10.6 生产容量与执行窗口
+
+对于每天十亿点的部署，不能让 cleanup 首次启用时一次删除数月积压。先按物理后端评估：
+
+1. 普通 PG：优先确认分区命名连续、cutoff 分区存在、DEFAULT partition 无积压，再利用整分区删除；对 cutoff 和租户差异部分分批预清。
+2. Timescale：计算每轮 DELETE 涉及 chunks 与行数，观察 WAL/replica lag/autovacuum；若业务允许统一 retention，再单独评估 chunk drop 方案及与租户 TTL 的冲突。
+3. Cassandra：在写入前确定 TTL 与 compaction 策略，避免后期靠 Java cleanup 补救；验证回灌数据的过期语义和 registry TTL。
+4. 三者都要明确 latest 的独立生命周期，不能用 history TTL 推断 dashboard 最新值何时消失。
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败矩阵
+
+| 失败点 | 当前源码行为 | 是否自动重试 | 数据状态 | 排障重点 |
+|---|---|---|---|---|
+| 非 owner 节点 | 直接 return | 下次 scheduler tick 重判 | 无变化 | partition ownership 是否稳定 |
+| partition DROP SQLException | catch 并 log | 本次不重试 | 部分或全部旧分区保留 | SQLState、DDL lock、cutoff partition |
+| row cleanup SQLException | catch 并 log | 本次不重试 | 事务失败则该 call 回滚；此前独立 DROP call 可能已提交 | procedure warning/error、WAL、timeout |
+| 超过一小时 statement timeout | JDBC SQLException | 等下一 fixed delay | 依 PostgreSQL 事务结果 | 删除规模、锁等待、statement 日志 |
+| process 在执行中退出 | JDBC connection 中断 | 新 owner 下次 tick | 已提交的前段与未提交后段可能不同 | 两段调用不是一个 Java 事务 |
+| Cassandra write 失败 | save Future 失败 | 由上游遥测链路策略决定 | cell 未写或不确定 | consistency、driver error、重试幂等 |
+| Cassandra cell 到期 | 数据库自动变不可见 | 不需要 Java retry | tombstone 保留到 compaction | tombstone/compaction |
+| latest 未过期 | 不是异常 | 无 | history/latest 分叉 | 查询接口与业务预期 |
+
+```mermaid
+flowchart TB
+    RUN["scheduled cleanup"] --> DROP["partition procedure"]
+    DROP --> DOK{"success"}
+    DOK -->|"yes"| ROW["row procedure"]
+    DOK -->|"no, SQLException caught"| ROW
+    ROW --> ROK{"success"}
+    ROK -->|"yes"| DONE["log counts and return"]
+    ROK -->|"no, SQLException caught"| LOG["log and return"]
+    LOG --> WAIT["wait until next fixed-delay execution"]
+    CRASH["node/process crash"] --> OWNER["partition reassignment"]
+    OWNER --> WAIT
+```
+
+### 11.2 事务边界
+
+两个 JDBC `CALL` 各自使用不同 connection，且 Java 方法没有 `@Transactional` 包裹二者。默认 auto-commit 下，分区过程成功后可以独立提交，即使后续行过程失败也不会整体回滚。procedure 内一次 call 则是一个数据库事务；它遍历所有 tenants，因此后段错误可能撤销该 call 已完成的行删除。
+
+### 11.3 恢复顺序
+
+1. 先确认当前 owner、开关和最近一次 `cleanUp()` 日志，避免把“非 owner 正常跳过”误判为失效。
+2. 再确认 DAO 类型：`database.ts.type` 决定你应该看到 partition procedure、Timescale DELETE 还是 Cassandra no-op。
+3. SQL 后端检查 active query、lock、cutoff partition、procedure notice、WAL 与 replica lag。
+4. Cassandra 检查实际 cell TTL、写入时间、tombstone 和 partition registry，不要等待 Java scheduler 删除。
+5. 最后分别查询 history 与 latest，明确是清理失败还是预期生命周期分叉。
+
+---
+
+## 十二、源码阅读路线
+
+建议按下面顺序阅读，每一步只回答一个问题：
+
+1. [TimeseriesCleanUpService.cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/TimeseriesCleanUpService.java#L74)：任务何时进入、两个 gate 是什么。
+2. [AbstractCleanUpService.isSystemTenantPartitionMine()](../../../application/src/main/java/org/thingsboard/server/service/ttl/AbstractCleanUpService.java#L48)：集群为什么通常只有一个执行者。
+3. [BaseTimeseriesService.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L259)：为什么 latest 被排除。
+4. [JpaSqlTimeseriesDao.cleanup(long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/sql/JpaSqlTimeseriesDao.java#L139)：普通 PG 为什么先 DROP 后 DELETE。
+5. [drop_partitions_by_system_ttl](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L37)：cutoff partition、排除表与粒度误差。
+6. [get_partition_by_system_ttl_date](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L192)：cutoff 分区不存在时为什么整段跳过。
+7. [cleanup_timeseries_by_ttl](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L255)：tenant/customer 游标、实体覆盖与状态变量。
+8. [Timescale cleanup procedure](../../../dao/src/main/resources/sql/schema-timescale.sql#L87)：确认它是 DELETE，而不是 Timescale retention policy。
+9. [CassandraBaseTimeseriesDao.save(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L255)：effective TTL 如何进入 CQL。
+10. [CassandraBaseTimeseriesDao.savePartition(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L306)：registry 为什么只用 system TTL。
+11. [CassandraBaseTimeseriesDao.getPartitionsFuture(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L580)：registry lookup 与直接计算 range 的权衡。
+12. [CassandraBaseTimeseriesLatestDao.saveLatest(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesLatestDao.java#L194)：确认 latest 没有 TTL。
+13. [TbMsgTimeseriesNode.onMsg(...)](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgTimeseriesNode.java#L122)：请求 TTL 来源。
+14. [AbstractSqlTimeseriesDao.computeTtl(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractSqlTimeseriesDao.java#L161)：理解 SQL request TTL 只进入计费计算的事实。
+15. 下一章阅读 Redis/Caffeine 的 cache-aside 与跨节点失效，继续区分“数据库生命周期”与“缓存生命周期”。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard 3.6 的 Timeseries TTL 是否由一套统一机制实现？
+
+不是。普通 PostgreSQL 使用 scheduler 驱动的 partition DROP 加行 DELETE；TimescaleDB 使用 scheduler 驱动的行 DELETE；Cassandra 在写入时使用原生 CQL TTL，Java `cleanup` 为空。
+
+### 2. 为什么集群中不会每个 Core 节点都执行 SQL cleanup？
+
+每个节点虽都有本地 scheduler，但 `cleanUp()` 只有在 `PartitionService` 判断本节点拥有 SYS tenant 的 TB Core partition 时才调用 DAO。它是所有权 gate，不是额外分布式锁。
+
+### 3. `fixedDelay` 与 cron/fixedRate 的差别是什么？
+
+下一次延迟从上一次方法返回后开始计算。清理执行两小时且 interval 为 24 小时时，两次开始时间约相隔 26 小时，不会按墙钟时间固定触发。
+
+### 4. `sql.ttl.ts.ts_key_value_ttl=0` 是否关闭整个清理任务？
+
+不是。开关由 `sql.ttl.ts.enabled` 控制。system TTL 为 0 时普通 PG 不 DROP 分区，但公共 procedure 仍执行，tenant/customer `TTL` 属性仍可能触发行 DELETE。
+
+### 5. SQL/Timescale 写入请求携带 TTL 后，这一行会按该 TTL 自动消失吗？
+
+不会。3.6 SQL schema 没有 TTL/expire_at 列，request TTL 只参与 datapoint-days 计算；后续 procedure 读取 system TTL 和 tenant/customer 属性。
+
+### 6. Cassandra effective TTL 如何计算？
+
+system TTL 为 0 时使用 request TTL；system 大于 0 且 request 为 0 时用 system；两者都大于 0 时取最小值。
+
+### 7. Cassandra TTL 从 telemetry 事件时间戳开始计算吗？
+
+不是。CQL TTL 从数据库写入时间开始倒计时，所以一年前的 backfill 点今天写入后仍获得完整 TTL。
+
+### 8. 为什么 history 已过期，latest 仍能返回值？
+
+cleanup 只调用 `TimeseriesDao`，不调用 `TimeseriesLatestDao`；Cassandra latest 写入也没有 `USING TTL`。两者是独立生命周期。
+
+### 9. 普通 PostgreSQL 为什么先 DROP partition 再 DELETE rows？
+
+完整过期时间段整表 DROP 比逐行 MVCC DELETE 更高效；cutoff partition 和租户差异化范围仍需行级删除。
+
+### 10. cutoff partition 本身会被 system TTL procedure DROP 吗？
+
+不会。procedure 显式排除 cutoff partition，只删除更老的完整 partitions，以免删掉同一分区中尚未过期的数据。
+
+### 11. cutoff 对应分区不存在会怎样？
+
+`get_partition_by_system_ttl_date` 返回 NULL，外层 partition procedure 不扫描并删除旧分区。这是必须监控的分区缺口行为。
+
+### 12. 普通 PG 的 tenant TTL 能否长于 system TTL？
+
+行 procedure 中 tenant 属性可以产生更老 cutoff，但完整旧分区已经被 system TTL 先 DROP，因此 system TTL 对普通 PG 是不可突破的硬上限。
+
+### 13. TimescaleDB 的 tenant TTL 能否长于 system TTL？
+
+当前 procedure 在 tenant 属性存在时以该值替代 system default，且没有全局 `drop_chunks`；所以显式更长值可以保留超过 system TTL 的已覆盖实体数据，但还要注意 procedure 状态变量缺陷。
+
+### 14. ThingsBoard 3.6 是否自动创建 Timescale retention policy？
+
+本章检查的安装 SQL与 DAO cleanup 没有 `add_retention_policy` 或 `drop_chunks` 调用。当前实现是对 hypertable 执行普通 DELETE。
+
+### 15. SQL cleanup 覆盖所有 entity type 吗？
+
+行 procedure 只覆盖 Device、Asset、Customer。普通 PG 的分区 DROP 会物理删除旧分区中所有类型；Timescale 行清理则可能遗留其他类型。
+
+### 16. 已删除 Device 的 orphan telemetry 会被行 procedure 清掉吗？
+
+不会再通过 `device` 子查询匹配。普通 PG 最终可能靠系统 TTL 分区 DROP 清掉；Timescale 当前 procedure 没有这一兜底。
+
+### 17. tenant/customer 的 `TTL` 应保存为什么类型？
+
+procedure 只读 `attribute_kv.long_v`。字符串值不会按数字解析，而会表现为未获得 long TTL。
+
+### 18. 同一实体多个 attribute scope 都有 `TTL` 有什么风险？
+
+procedure 没有按 `attribute_type` 过滤，也没有 ORDER BY；动态 `SELECT INTO` 选中的值不稳定。生产应约束 scope 或加明确条件。
+
+### 19. release-3.6 SQL procedure 中最危险的状态问题是什么？
+
+`tenant_ttl_ts` 与 `customer_ttl_ts` 在 loop 开头不清空。TTL 为 0 时可能沿用上一轮 cutoff，导致迭代顺序相关的误删除。
+
+### 20. 大量 SQL DELETE 后为什么磁盘没有立即缩小？
+
+PostgreSQL MVCC 先产生 dead tuples；VACUUM 通常只把空间标记为可复用，不收缩文件。还会产生 WAL，并可能造成 replica lag。
+
+### 21. Cassandra TTL 到期后磁盘为何不立即释放？
+
+到期 cell 先作为 tombstone 对读取不可见，物理空间要等 compaction 且满足安全条件后才回收。
+
+### 22. `ts_kv_partitions_cf` 为什么可能先于有效 history cell 消失？
+
+注册行只使用 system TTL，且 JVM cache 命中时不刷新；同 partition 的后续 history cell 获得新的写入 TTL，注册行却可能按首次写入时钟先到期。
+
+### 23. `use_ts_key_value_partitioning_on_read=false` 能解决什么问题，代价是什么？
+
+它直接计算查询范围内的 partitions，不依赖可能过期的 registry，因此避免漏掉活跃 cell；代价是会请求不存在的 partitions，增加空读。
+
+### 24. SQL partition DROP 与行 DELETE 失败是否在同一个 Java 事务里回滚？
+
+不是。两次 procedure call 各自获取 connection 且方法没有包住二者的 `@Transactional`；前者成功提交后，后者失败不会把已 DROP partition 恢复。
+
+### 25. 排查“TTL 没生效”的最短路径是什么？
+
+先确认 `database.ts.type`，再确认 owner/开关/最近调度日志；SQL 检查 system 与属性 TTL、cutoff partition、procedure 和 locks，Cassandra 检查 cell TTL/写入时刻/registry；最后分开查询 history 与 latest，避免把 latest 保留误判为 history 未清理。
+
+---
+
+[上一篇：30 Telemetry 查询流程](../30-telemetry-query/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/31-timeseries-ttl-cleanup.svg) | [下一篇：32 Redis 与本地缓存流程](../../SUMMARY.md#chapter-32)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

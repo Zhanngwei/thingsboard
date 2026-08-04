@@ -1,0 +1,278 @@
+@startuml
+title ThingsBoard release-3.6 LwM2M: Bootstrap, Registration, Observe, Queue and Deregistration
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #1F2937
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #1F2937
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam actorBorderColor #1F2937
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorFontColor #111827
+skinparam databaseBorderColor #1F2937
+skinparam databaseBackgroundColor #F0FDF4
+skinparam databaseFontColor #111827
+skinparam collectionsBorderColor #1F2937
+skinparam collectionsBackgroundColor #EFF6FF
+skinparam collectionsFontColor #111827
+skinparam noteBackgroundColor #FFF7D6
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam groupFontColor #111827
+skinparam ArrowThickness 1.4
+skinparam maxMessageSize 220
+hide footbox
+
+actor "LwM2M Client" as Device
+participant "Leshan Bootstrap Server\n5687 / DTLS 5688" as Bootstrap
+participant "Bootstrap Security Store\nand Task Provider" as BsStore
+participant "Leshan Main Server\n5685 / DTLS 5686" as Leshan
+participant "Main Security Store\nand Credential Validator" as Security
+participant "Transport API\nRequest Template" as Api
+participant "Core Credential Service" as CoreAuth
+database "device / profile /\ncredentials / resource" as ControlDb
+participant "LwM2mServerListener" as Listener
+participant "DefaultLwM2mUplinkMsgHandler" as Uplink
+collections "Registration / Observation /\nDTLS Stores" as ProtocolStore
+collections "LwM2mClient Registry /\nResource Cache" as ClientStore
+participant "DefaultLwM2MSessionManager" as SessionMgr
+participant "DefaultTransportService" as Transport
+participant "Core Queue / Device Actor" as Actor
+participant "DefaultLwM2mDownlinkMsgHandler" as Downlink
+participant "Rule Engine Queue" as ReQueue
+participant "Rule Engine Save Nodes" as RuleChain
+database "attribute_kv / ts_kv /\nts_kv_latest" as DataDb
+participant "RPC / OTA Services" as RpcOta
+
+== Server lifecycle ==
+Bootstrap -> Bootstrap : init() builds independent LeshanBootstrapServer
+Bootstrap -> BsStore : set config store, security store,\ntask provider and session manager
+Leshan -> Leshan : init() -> getLhServer()
+Leshan -> Security : setSecurityStore(...)
+Leshan -> ProtocolStore : setRegistrationStore(...)
+Leshan -> Leshan : setObjectModelProvider(...)
+Leshan -> Leshan : start()
+Leshan -> Listener : register Registration, Presence,\nObservation and Send listeners
+note over Bootstrap,Leshan
+  Bootstrap and Main are separate servers.
+  LwM2M does not enter CoapTransportResource /api/v1.
+end note
+
+== Optional Bootstrap ==
+opt Device starts with Bootstrap Server
+  Device -> Bootstrap : Bootstrap Request(endpoint, identity)
+  Bootstrap -> BsStore : get security/config by endpoint or identity
+  BsStore -> Api : ValidateDeviceLwM2MCredentialsRequestMsg
+  Api -> CoreAuth : tb_transport.api.requests
+  CoreAuth -> ControlDb : find LWM2M_CREDENTIALS and Device Profile
+  ControlDb --> CoreAuth : device, profile, credentials body
+  CoreAuth --> Api : correlated TransportApiResponseMsg
+  Api --> BsStore : security and bootstrap configuration
+  BsStore --> Bootstrap : task list
+  Bootstrap -> Device : Bootstrap Discover
+  Bootstrap -> Device : Bootstrap Read /1
+  Bootstrap -> Device : Bootstrap Delete old /0 and /1
+  Bootstrap -> Device : Bootstrap Write Security /0
+  Bootstrap -> Device : Bootstrap Write Server /1
+  Bootstrap -> Device : Bootstrap Finish
+  note over Bootstrap,Device
+    Non-Finish response errors continue with the next task.
+    A Finish error fails the bootstrap session.
+  end note
+end
+
+== Main security lookup ==
+Device -> Leshan : CoAP or DTLS connection
+alt NO_SEC endpoint lookup
+  Leshan -> Security : getByEndpoint(endpoint)
+else PSK identity lookup
+  Leshan -> Security : getByIdentity(pskIdentity)
+else RPK or X.509 handshake
+  Leshan -> Security : verify public key or certificate
+end
+alt security cache miss
+  Security -> Api : ValidateDeviceLwM2MCredentialsRequestMsg(credentialsId)
+  Api -> CoreAuth : request by correlation UUID
+  CoreAuth -> ControlDb : validate LWM2M_CREDENTIALS
+  ControlDb --> CoreAuth : credentials + Device + DeviceProfile
+  CoreAuth --> Api : response
+  Api --> Security : ValidateDeviceCredentialsResponse
+  Security -> Security : build PSK / RPK / X.509 / NO_SEC SecurityInfo
+else security cache hit
+  Security -> Security : reuse cached TbLwM2MSecurityInfo
+end
+note over Security,CoreAuth
+  Credential validation waits synchronously up to LWM2M_TIMEOUT,
+  default 120000 ms. This is not a SQL transaction.
+end note
+
+== Registration and ThingsBoard session ==
+Device -> Leshan : POST /rd?ep=... with object links
+Leshan -> ProtocolStore : add Registration and indexes
+Leshan --> Device : 2.01 Created + registration location
+Leshan -> Listener : registered(registration, previousReg, previousObservations)
+Listener -> Uplink : onRegistered(registration, previousObservations)
+note over Listener,Uplink
+  Uplink work is submitted to its executor.
+  The protocol response does not wait for platform initialization.
+end note
+Uplink -> ClientStore : getClientByEndpoint(endpoint)
+Uplink -> ClientStore : register(client, registration)
+ClientStore -> Security : getTbLwM2MSecurityInfoByEndpoint(endpoint)
+Security --> ClientStore : device/profile credentials snapshot
+ClientStore -> ClientStore : create random SessionInfoProto,\nset Registration and REGISTERED state
+ClientStore --> Uplink : optional old SessionInfoProto
+opt old session exists
+  Uplink -> SessionMgr : deregister(oldSession)
+  SessionMgr -> Transport : SessionEvent CLOSED
+  SessionMgr -> Transport : deregisterSession(oldSession)
+end
+Uplink -> SessionMgr : register(newSession)
+SessionMgr -> Transport : registerAsyncSession(session, LwM2mSessionMsgListener)
+SessionMgr -> Transport : OPEN + SubscribeToAttributes + SubscribeToRPC
+Transport -> Actor : Core partition by tenant/device
+Actor -> Actor : store session and subscriptions
+
+== Profile-driven initialization ==
+Uplink -> ClientStore : load Device Profile and supported object versions
+group Read mapped paths that are not observed
+  Uplink -> Downlink : sendReadRequest(client, versionedPath, callback)
+  Downlink -> Downlink : validate version/model and build ReadRequest
+  Downlink -> Leshan : send(registration, request, timeout, callbacks)
+  Leshan -> Device : LwM2M Read
+  Device --> Leshan : ReadResponse(Object / Instance / Resource)
+  Leshan --> Downlink : success callback
+  Downlink --> Uplink : TbLwM2MReadCallback
+end
+group Create configured observations
+  Uplink -> Downlink : sendObserveRequest(client, versionedPath, callback)
+  Downlink -> ProtocolStore : check existing SingleObservation path
+  alt observation is new
+    Downlink -> Leshan : send ObserveRequest(Object / Instance / Resource)
+    Leshan -> Device : LwM2M Observe
+    Device --> Leshan : initial ObserveResponse
+    Leshan -> ProtocolStore : save observation token and registration index
+    Leshan --> Downlink : success callback
+  else duplicate path
+    Downlink --> Uplink : validation error already registered
+  end
+end
+group Configure notification attributes
+  Uplink -> Downlink : WriteAttributesRequest(pmin,pmax,gt,lt,st,dim)
+  Downlink -> Leshan : send(registration, request, timeout, callbacks)
+  Leshan -> Device : LwM2M Write Attributes
+end
+Uplink -> RpcOta : init(client), fetch OTA shared attributes
+RpcOta -> Actor : shared attribute request through session/transport
+
+== Observe notification to platform data ==
+Device -> Leshan : Observe notification(path, value)
+Leshan -> ProtocolStore : resolve observation token and Registration
+Leshan -> Listener : onResponse(SingleObservation, Registration, ObserveResponse)
+Listener -> Uplink : onUpdateValueAfterReadResponse(registration, versionedPath, response)
+Uplink -> ClientStore : expand Object -> Instance -> Resource
+Uplink -> ClientStore : saveResourceValue(path, value, ResourceModel)
+opt path is firmware /5 or software /9 state
+  Uplink -> RpcOta : update OTA state/result
+end
+Uplink -> ClientStore : map path using keyName + attribute/telemetry sets
+alt mapped as Client Attribute
+  Uplink -> Transport : process(session, PostAttributeMsg, EMPTY callback)
+  Transport -> ReQueue : POST_ATTRIBUTES_REQUEST by RE partition
+else mapped as Telemetry
+  Uplink -> Transport : process(session, PostTelemetryMsg, EMPTY callback)
+  Transport -> ReQueue : POST_TELEMETRY_REQUEST by RE partition
+else path is not mapped
+  Uplink -> ClientStore : keep value only in resource cache
+end
+ReQueue -> RuleChain : consumer poll and process TbMsg
+opt Rule Chain contains matching Save node
+  RuleChain -> DataDb : save attributes or history/latest telemetry
+  DataDb --> RuleChain : asynchronous DAO callback
+end
+note over Device,DataDb
+  CoAP notification acknowledgement, Queue production,
+  Rule Engine processing and database commit are separate boundaries.
+  EMPTY callback prevents Queue errors from reaching the device.
+end note
+
+== Registration Update ==
+Device -> Leshan : POST registration location
+Leshan -> ProtocolStore : update lifetime/address/binding indexes
+Leshan --> Device : Update response
+Leshan -> Listener : updated(update, updatedRegistration, previousRegistration)
+Listener -> Uplink : updatedReg(updatedRegistration)
+Uplink -> ClientStore : updateRegistration(client, registration)
+Uplink -> Transport : report activity and re-register missing local session
+
+== RPC Read / Observe / Cancel ==
+Actor -> Transport : ToDeviceRpcRequestMsg(methodName, params)
+Transport -> RpcOta : LwM2mSessionMsgListener -> onToDeviceRpcRequest(...)
+RpcOta -> RpcOta : parse operation, resolve id or profile key,\nreject duplicate last RPC UUID
+alt Read or Observe
+  RpcOta -> Downlink : sendReadRequest or sendObserveRequest
+  Downlink -> Leshan : send(registration, request, timeout, callbacks)
+  Leshan -> Device : LwM2M downlink
+  Device --> Leshan : LwM2M response
+  Downlink --> RpcOta : response callback
+else Cancel one or all observations
+  RpcOta -> Downlink : sendCancelObserveRequest or sendCancelAllRequest
+  Downlink -> ProtocolStore : cancelObservations(registration, optional path)
+  ProtocolStore --> Downlink : cancelled count
+  Downlink --> RpcOta : success callback
+end
+RpcOta -> Transport : ToDeviceRpcResponseMsg
+Transport -> Actor : Core partition response
+
+== OTA relationship ==
+Actor -> Transport : shared fw/sw target attributes
+Transport -> RpcOta : onTargetFirmwareUpdate or onTargetSoftwareUpdate
+alt package URL is configured
+  RpcOta -> Downlink : Write Replace /5/0/1 or /9/0/3
+else package binary is requested from Core
+  RpcOta -> Transport : GetOtaPackageRequestMsg
+  Transport -> Actor : Core OTA package request
+  Actor --> Transport : GetOtaPackageResponseMsg
+  Transport --> RpcOta : package id/data available
+  RpcOta -> Downlink : Write Replace /5/0/0, /19/0/0 or /9/0/2
+end
+Downlink -> Leshan : send Write/Execute using current Registration
+Leshan -> Device : Firmware / Software Update operations
+
+== Downlink timeout or sleeping client ==
+alt PSM/eDRX window is closed before send
+  Downlink -> Downlink : isDownlinkAllowed=false; ignore current request
+else Leshan reports TimeoutException or ClientSleepingException
+  Leshan --> Downlink : error callback
+  Downlink -> ClientStore : mark client asleep
+  Downlink --> RpcOta : callback error
+end
+note over Downlink,ClientStore
+  There is no generic LwM2M business retry.
+  Registration UNREGISTERED race alone retries after 1 second, at most 5 times.
+end note
+
+== Deregistration or expiration ==
+alt explicit client shutdown
+  Device -> Leshan : DELETE registration location
+else lifetime expires
+  ProtocolStore -> Leshan : expiration cleaner removes Registration
+end
+Leshan -> ProtocolStore : remove observations and indexes
+Leshan -> Listener : unregistered(registration, observations, expired, newReg)
+Listener -> Uplink : unReg(registration, observations)
+Uplink -> ClientStore : unregister(client, registration)
+Uplink -> SessionMgr : deregister(session)
+SessionMgr -> Transport : SessionEvent CLOSED
+Transport -> Actor : Core partition
+Actor -> Actor : remove session/subscriptions
+SessionMgr -> Transport : deregisterSession(session)
+Uplink -> ProtocolStore : remove DTLS session(endpoint)
+
+@enduml

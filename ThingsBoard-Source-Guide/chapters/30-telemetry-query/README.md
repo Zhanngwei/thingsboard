@@ -1,0 +1,778 @@
+# 30 Telemetry 查询流程
+
+> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章分析平台 REST API 与 Rule Engine 节点如何读取 latest、原始区间和聚合遥测，并比较 PostgreSQL、TimescaleDB、Cassandra 三种后端；WebSocket 实时订阅只说明边界，完整流程留给第 33 章。
+
+[上一篇：29 Session 与 Device State 流程](../29-session-device-state/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/30-telemetry-query.svg) | [下一篇：31 Timeseries TTL 清理流程](../31-timeseries-ttl-cleanup/README.md)
+
+---
+
+## 一、流程目标
+
+Telemetry 查询解决三个不同问题：有哪些时序 key、每个 key 当前最新值是什么、给定时间范围内有哪些原始值或聚合值。ThingsBoard 3.6 没有让 Controller 直接拼 SQL，而是先把 HTTP 参数转换为每 key 一个 `ReadTsKvQuery`，再由 `TimeseriesService` 把请求路由到独立可配置的 history 与 latest DAO。这样同一套 REST 契约可以运行在 PostgreSQL、TimescaleDB、Cassandra 或混合部署上，但不同后端的查询成本和边界行为并不相同。
+
+[架构图 SVG：Telemetry 查询分层与三种后端](../../assets/architecture/30-telemetry-query.svg)
+
+[![Telemetry 查询架构图](../../assets/architecture/30-telemetry-query.svg)](../../assets/architecture/30-telemetry-query.svg)
+
+```mermaid
+flowchart TB
+    CLIENT["Dashboard, REST client or Rule Engine node"] --> ENTRY{"Query entry"}
+    ENTRY -->|"REST"| CTRL["TelemetryController"]
+    ENTRY -->|"Rule Engine"| NODE["TbGetTelemetryNode"]
+    CTRL --> ACCESS["AccessValidator and READ_TELEMETRY"]
+    ACCESS --> SERVICE["BaseTimeseriesService"]
+    NODE --> SERVICE
+    SERVICE --> TYPE{"Query kind"}
+    TYPE -->|"keys or latest"| LATEST["TimeseriesLatestDao"]
+    TYPE -->|"raw or aggregation"| HISTORY["TimeseriesDao"]
+    LATEST --> LDB{"database.ts_latest.type"}
+    HISTORY --> HDB{"database.ts.type"}
+    LDB --> SQLLATEST["SQL ts_kv_latest"]
+    LDB --> CASSLATEST["Cassandra ts_kv_latest_cf"]
+    HDB --> PG["PostgreSQL partitioned ts_kv"]
+    HDB --> TS["TimescaleDB hypertable ts_kv"]
+    HDB --> CASS["Cassandra ts_kv_cf partitions"]
+```
+
+阅读本章必须先固定六条源码事实：
+
+1. REST 查询是 Spring MVC `DeferredResult` 异步请求，但不经过 Device Actor、Core Queue、Rule Engine Queue 或 Kafka。
+2. `database.ts.type` 与 `database.ts_latest.type` 独立装配；history 和 latest 可以读取不同数据库。
+3. keys 接口读取 latest 存储后提取 key，不扫描 history；只存在于历史表中的 key 不会被列出。
+4. raw 查询使用半开区间 `[startTs, endTs)`，`limit` 按 key 生效，接口没有 offset 或 cursor，不能当成完整分页 API。
+5. 聚合结果时间戳是 bucket 起止时间的中点，不是第一条、最后一条或自然周期开始时间。
+6. ThingsBoard 3.6 的 Timescale 查询使用运行时 `time_bucket`；源码没有建立 Continuous Aggregate。
+
+---
+
+## 二、入口
+
+### 2.1 REST API 入口
+
+[org.thingsboard.server.controller.TelemetryController](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L158) 的类级前缀来自 [org.thingsboard.server.controller.TbUrlConstants.TELEMETRY_URL_PREFIX](../../../application/src/main/java/org/thingsboard/server/controller/TbUrlConstants.java#L34)，值为 `/api/plugins/telemetry`。同一个 values 路径通过 Spring MVC 的必需参数条件区分 latest 与 range：
+
+| 场景 | HTTP 入口 | 精确 Java 方法 | 输入 | 输出 |
+|---|---|---|---|---|
+| key 列表 | `GET /api/plugins/telemetry/{entityType}/{entityId}/keys/timeseries` | [org.thingsboard.server.controller.TelemetryController.getTimeseriesKeys(String, String)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L341) | entity type/id | JSON string array；来源是 latest 行 |
+| latest 全量或指定 key | `GET /api/plugins/telemetry/{entityType}/{entityId}/values/timeseries?keys=...` | [org.thingsboard.server.controller.TelemetryController.getLatestTimeseries(String, String, String, Boolean)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L374) | 可选 `keys`、`useStrictDataTypes` | `key -> [{ts,value}]` |
+| 原始区间 | 同一路径且必须包含 `keys,startTs,endTs`，默认 `agg=NONE` | [org.thingsboard.server.controller.TelemetryController.getTimeseries(String, String, String, Long, Long, IntervalType, Long, String, Integer, String, String, Boolean)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L408) | key、毫秒时间范围、limit、order | 每 key 独立截断的原始点 |
+| 聚合区间 | range 入口加 `agg` 和 `interval` 或 calendar interval | 同上 | `MIN/MAX/AVG/SUM/COUNT` | 非空 bucket 的聚合点 |
+
+三个入口都要求 `SYS_ADMIN`、`TENANT_ADMIN` 或 `CUSTOMER_USER` authority，并通过 [org.thingsboard.server.service.security.AccessValidator.validateEntityAndCallback(SecurityUser, Operation, EntityId, ThreeConsumer, BiConsumer)](../../../application/src/main/java/org/thingsboard/server/service/security/AccessValidator.java#L301) 校验 `Operation.READ_TELEMETRY`。该方法先创建无显式 timeout 的 `DeferredResult`，权限成功后才调用 DAO callback；全局默认异步超时是 [thingsboard.yml 的 `spring.mvc.async.request-timeout=30000`](../../../application/src/main/resources/thingsboard.yml#L696)。
+
+```mermaid
+flowchart LR
+    GET["GET values/timeseries"] --> PARAMS{"Has keys, startTs and endTs"}
+    PARAMS -->|"no"| LATEST["getLatestTimeseries"]
+    PARAMS -->|"yes"| RANGE["getTimeseries"]
+    LATEST --> AUTH["READ_TELEMETRY validation"]
+    RANGE --> AUTH
+    AUTH -->|"denied or missing"| HTTPERR["HTTP error result"]
+    AUTH -->|"allowed"| DAO["Asynchronous TimeseriesService call"]
+    DAO --> CALLBACK["FutureCallback builds HTTP response"]
+```
+
+### 2.2 range 参数如何变成查询对象
+
+Controller 在 [getTimeseries(...)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L435) 中使用大小写敏感的 `Aggregation.valueOf(aggStr)`。`agg=AVG&interval=0` 不报错，而是构造 `AggregationParams.none()`，实际退化为 raw 查询；calendar 模式由 `WEEK`、`WEEK_ISO`、`MONTH`、`QUARTER` 与时区构造。无效时区在 [org.thingsboard.server.common.data.kv.AggregationParams.getZoneId(String)](../../../common/data/src/main/java/org/thingsboard/server/common/data/kv/AggregationParams.java#L150) 中只记录 warning 并回退到 JVM 默认时区。
+
+[org.thingsboard.server.common.data.kv.BaseReadTsKvQuery](../../../common/data/src/main/java/org/thingsboard/server/common/data/kv/BaseReadTsKvQuery.java#L34) 固定携带 `key/startTs/endTs`、`AggregationParams`、`limit` 与字符串 `order`。逗号分隔的每个 key 都创建一个独立 query，因此请求 key 数量会线性放大后端查询数和结果内存。
+
+```mermaid
+flowchart TB
+    HTTP["HTTP query parameters"] --> AGG["Aggregation.valueOf"]
+    AGG --> MODE{"Aggregation mode"}
+    MODE -->|"NONE"| NONE["AggregationParams.none"]
+    MODE -->|"MILLISECONDS with interval greater than zero"| MS["AggregationParams.milliseconds"]
+    MODE -->|"Calendar interval"| CAL["AggregationParams.calendar"]
+    MODE -->|"MILLISECONDS with interval zero"| NONE
+    NONE --> KEYS["Split comma-separated keys"]
+    MS --> KEYS
+    CAL --> KEYS
+    KEYS --> Q1["BaseReadTsKvQuery key 1"]
+    KEYS --> Q2["BaseReadTsKvQuery key 2"]
+    KEYS --> QN["BaseReadTsKvQuery key N"]
+```
+
+### 2.3 Rule Engine 内部入口
+
+[org.thingsboard.rule.engine.metadata.TbGetTelemetryNode.onMsg(TbContext, TbMsg)](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/metadata/TbGetTelemetryNode.java#L147) 是另一类调用者。消息已经位于 Rule Engine worker 中时，该节点直接调用 `ctx.getTimeseriesService().findAll(...)`，没有再发一跳 Kafka。其 [org.thingsboard.rule.engine.metadata.TbGetTelemetryNodeConfiguration](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/metadata/TbGetTelemetryNodeConfiguration.java#L39) 支持 `FIRST/LAST/ALL`、相对时间窗口、聚合和 metadata 输出；`ALL` 默认 limit 由配置决定，源码校验上限为 1000。数据库 Future 成功后继续 `Success` relation，异常后继续 `Failure` relation。
+
+### 2.4 不属于本章的入口
+
+Dashboard 的实时曲线通常还会建立 WebSocket subscription。订阅服务会先取 initial data，再接收保存链路发布的更新；这条路径涉及 WebSocket session、subscription command、实体查询和通知背压，属于第 33 章。本章只分析显式 REST/Rule Node 发起的数据库读取，不用 WebSocket 行为推断 REST 行为。
+
+---
+
+## 三、完整调用链
+
+### 3.1 REST 到服务层
+
+```mermaid
+flowchart TB
+    A["HTTP request"] --> B["Spring Security authority check"]
+    B --> C["TelemetryController method mapping"]
+    C --> D["AccessValidator.validateEntityAndCallback"]
+    D --> E["Entity lookup and accessControlService.checkPermission"]
+    E --> F["BaseTimeseriesService"]
+    F --> G{"keys, latest or history"}
+    G -->|"keys"| H["findAllLatest then extract keys"]
+    G -->|"latest"| I["findAllLatest or findLatest per key"]
+    G -->|"history"| J["findAllByQueries and validate each query"]
+    J --> K["TimeseriesDao.findAllAsync"]
+    H --> L["TimeseriesLatestDao"]
+    I --> L
+    K --> M["Backend-specific read"]
+    L --> M
+    M --> N["FutureCallback"]
+    N --> O["LinkedHashMap key to TsData list"]
+    O --> P["DeferredResult ResponseEntity 200"]
+```
+
+| 顺序 | 类与方法 | 职责 | 输入 | 输出 | 设计原因 |
+|---:|---|---|---|---|---|
+| 1 | `org.thingsboard.server.controller.TelemetryController.getTimeseriesKeys(String, String)` / `getLatestTimeseries(...)` / `getTimeseries(...)` | 选择 API 语义并解析 HTTP 参数 | path/query 参数、当前用户 | DAO callback | Controller 只承担协议适配，不绑定存储实现 |
+| 2 | `org.thingsboard.server.service.security.AccessValidator.validateEntityAndCallback(...)` | 解析实体、异步校验 `READ_TELEMETRY` | `SecurityUser`、`EntityId` | 允许后执行 three-consumer | 防止在业务 callback 前泄露跨租户数据 |
+| 3 | `org.thingsboard.server.dao.timeseries.BaseTimeseriesService.findAllLatest(TenantId, EntityId)` | 查询全部 latest | tenant/entity | `ListenableFuture<List<TsKvEntry>>` | keys 和 latest 全量复用同一读取 |
+| 4 | `org.thingsboard.server.dao.timeseries.BaseTimeseriesService.findLatest(TenantId, EntityId, Collection<String>)` | 每 key 启动一个 latest Future，再 `Futures.allAsList` | keys | 与 key 顺序一致的 entry 列表 | 统一 SQL/Cassandra latest 接口 |
+| 5 | `org.thingsboard.server.dao.timeseries.BaseTimeseriesService.findAllByQueries(TenantId, EntityId, List<ReadTsKvQuery>)` | 校验 query；Entity View 时过滤 key、映射 origin entity 并裁剪时间 | 每 key query | 带 query id 的结果列表 | 把视图语义和 DAO 实现解耦 |
+| 6 | `org.thingsboard.server.dao.timeseries.TimeseriesDao.findAllAsync(...)` | history 存储抽象 | tenant/entity/query | `ReadTsKvQueryResult` | 由条件注解选择 SQL、Timescale 或 Cassandra |
+| 7 | `org.thingsboard.server.dao.timeseries.TimeseriesLatestDao.findLatest/findAllLatest(...)` | latest 存储抽象 | tenant/entity/key | latest entry | latest 可与 history 独立部署 |
+| 8 | `org.thingsboard.server.controller.TelemetryController.getTsKvListCallback(DeferredResult, Boolean)` | 按 key 分组并决定 strict type | flat `TsKvEntry` | JSON response | 保持 REST response 与后端无关 |
+
+### 3.2 keys 与 latest 的分支
+
+keys 接口在 [getTimeseriesKeys(...)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L341) 调用 `tsService.findAllLatest` 后只提取 entry key。它不是 `SELECT DISTINCT key FROM ts_kv`，因此不会扫描海量历史表，但删除 latest、仅保留 history 后，该 key 也不会出现在 keys API。
+
+latest 不带 `keys` 时同样只发一个 `findAllLatest`；带 keys 时，[BaseTimeseriesService.findLatest(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L186) 为每个 key 调用一次 DAO 并等待全部 Future。SQL 与 Cassandra 在指定 key 不存在时都返回“当前服务器时间戳 + null string value”的 `BasicTsKvEntry`，所以 REST 返回 key 对应的 null 点，而不是省略 key；测试在 [TelemetryControllerTest.testDeleteAllTelemetryWithLatest()](../../../application/src/test/java/org/thingsboard/server/controller/TelemetryControllerTest.java#L140) 验证了这一行为。
+
+```mermaid
+flowchart TB
+    REQUEST{"Latest request has keys"}
+    REQUEST -->|"no"| ALL["findAllLatest once"]
+    REQUEST -->|"yes"| SPLIT["One findLatest Future per key"]
+    SPLIT --> WAIT["Futures.allAsList waits for all keys"]
+    ALL --> ROWS["Existing latest rows"]
+    WAIT --> EXISTS{"Requested key exists"}
+    EXISTS -->|"yes"| VALUE["Stored ts and typed value"]
+    EXISTS -->|"no"| NULL["Current server ts and null value"]
+    ROWS --> RESPONSE["Group entries by key"]
+    VALUE --> RESPONSE
+    NULL --> RESPONSE
+```
+
+### 3.3 history 与 Entity View 分支
+
+[BaseTimeseriesService.findAllByQueries(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L128) 先校验每个 query。普通实体直接下发给 `TimeseriesDao`；`ENTITY_VIEW` 则加载 view，按 `EntityView.keys.timeseries` 过滤 key，把实体 ID 替换为 origin entity ID，并用 [updateQueriesForEntityView(EntityView, List<ReadTsKvQuery>)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L401) 将请求范围裁剪到 view 的 start/end。
+
+这个映射只存在于 history `findAllByQueries`。latest 与 keys 方法直接访问传入的 Entity View ID，而 telemetry 保存服务又不允许直接把数据写到 Entity View，因此 Entity View 的 history 可以有结果，keys/latest 却可能为空。这是接口实现的不对称，不应靠 UI 假设掩盖。
+
+```mermaid
+flowchart LR
+    Q["History queries"] --> TYPE{"Entity type is ENTITY_VIEW"}
+    TYPE -->|"no"| DIRECT["Query requested entity id"]
+    TYPE -->|"yes"| LOAD["Load EntityView"]
+    LOAD --> FILTER["Keep configured timeseries keys"]
+    FILTER --> CLAMP["Clamp startTs and endTs to view window"]
+    CLAMP --> ORIGIN["Query EntityView origin entity id"]
+    DIRECT --> DAO["TimeseriesDao.findAllAsync"]
+    ORIGIN --> DAO
+```
+
+### 3.4 后端执行分支
+
+```mermaid
+flowchart TB
+    QUERY["One ReadTsKvQuery"] --> AGG{"Aggregation is NONE"}
+    AGG -->|"yes"| RAW["Raw range, order and per-key limit"]
+    AGG -->|"no"| BACKEND{"History backend"}
+    BACKEND -->|"PostgreSQL"| PG["One SQL query per bucket"]
+    BACKEND -->|"TimescaleDB milliseconds"| TS["One time_bucket query per key plus partial tail"]
+    BACKEND -->|"TimescaleDB calendar"| TSCAL["Loop periods and query each bucket"]
+    BACKEND -->|"Cassandra"| CASS["One bucket, many partition reads, then merge"]
+    RAW --> STORE{"History backend"}
+    STORE -->|"SQL or Timescale"| SQLRAW["Index/range scan ts_kv"]
+    STORE -->|"Cassandra"| CASSRAW["Discover partitions and read sequentially"]
+```
+
+普通 PostgreSQL 的 [org.thingsboard.server.dao.sqlts.AbstractChunkedAggregationTimeseriesDao.findAllAsync(TenantId, EntityId, ReadTsKvQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractChunkedAggregationTimeseriesDao.java#L188) 为每个 bucket 提交一个 Future/SQL；Timescale 的 [org.thingsboard.server.dao.sqlts.timescale.TimescaleTimeseriesDao.findAllAsync(TenantId, EntityId, ReadTsKvQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L225) 对固定毫秒 interval 使用 `time_bucket` 一次返回多个 bucket，对 calendar interval 仍循环查询；Cassandra 的 [org.thingsboard.server.dao.timeseries.CassandraBaseTimeseriesDao.findAllAsync(TenantId, EntityId, ReadTsKvQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L371) 每 bucket 并发读取涉及的 Cassandra partitions，再在 Java 中合并 partial aggregate。
+
+---
+
+## 四、消息流
+
+本章的“消息流”是 HTTP request、Java Future 与数据库 driver callback 的流动，不是 ThingsBoard Queue message。REST 线程在返回 `DeferredResult` 后释放，DAO executor/driver 完成读取，Guava callback 再设置响应。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client
+    participant MVC as Spring MVC
+    participant Controller as TelemetryController
+    participant Access as AccessValidator
+    participant Service as BaseTimeseriesService
+    participant DAO as History or Latest DAO
+    participant DB as PostgreSQL Timescale or Cassandra
+    Client->>MVC: GET telemetry query
+    MVC->>Controller: mapped method
+    Controller->>Access: validateEntityAndCallback READ_TELEMETRY
+    Access-->>Controller: DeferredResult returned
+    Access->>Access: async entity and permission validation
+    Access->>Service: invoke success callback
+    Service->>DAO: findAllAsync or findLatest
+    DAO->>DB: asynchronous or executor-backed read
+    DB-->>DAO: rows or failure
+    DAO-->>Service: ListenableFuture completion
+    Service-->>Controller: List of TsKvEntry
+    Controller->>Controller: group by key and convert value type
+    Controller-->>MVC: DeferredResult.setResult
+    MVC-->>Client: JSON ResponseEntity
+```
+
+### 4.1 返回 JSON 的稳定边界
+
+[TelemetryController.getTsKvListCallback(...)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L1103) 使用 `LinkedHashMap<String, List<TsData>>`，遍历 flat entries 并按 key 分组：
+
+```json
+{
+  "temperature": [
+    {"ts": 1710000000000, "value": "23.7"}
+  ],
+  "enabled": [
+    {"ts": 1710000005000, "value": "true"}
+  ]
+}
+```
+
+`useStrictDataTypes=false` 时所有 value 通过 `getValueAsString()` 转为字符串；`true` 时保留 Boolean、Long、Double、JSON 或 String。map 保留第一次遇到各 key 的顺序，但多个 key 的结果只是分组，不存在跨 key 的全局时间排序。raw 的 `orderBy` 在每个 key 内生效；聚合 DAO 都按 bucket 正序生成结果，`orderBy` 对聚合路径没有实际排序作用。
+
+```mermaid
+flowchart LR
+    FLAT["Flat List of TsKvEntry"] --> LOOP["Iterate in DAO result order"]
+    LOOP --> STRICT{"useStrictDataTypes"}
+    STRICT -->|"false"| STRING["entry.getValueAsString"]
+    STRICT -->|"true"| TYPED["Boolean Long Double JSON or String"]
+    STRING --> GROUP["LinkedHashMap computeIfAbsent by key"]
+    TYPED --> GROUP
+    GROUP --> JSON["key to ordered list of ts and value"]
+```
+
+---
+
+## 五、时序图
+
+PlantUML 源文件：[sequence.puml](sequence.puml)。浏览器默认显示可点击缩略图；点击后直接打开不受页面宽度限制的 SVG。
+
+[![Telemetry 查询时序图](sequence.svg)](sequence.svg)
+
+时序图同时展示五条路径：keys、latest、raw、SQL/Timescale/Cassandra aggregation，以及 Rule Engine 内部调用。需要特别区分三个完成点：权限 callback 成功只代表允许发起读取；DAO Future 成功代表后端结果已转换；`DeferredResult.setResult` 才把 HTTP 响应交还 Spring MVC。这里没有 Kafka acknowledgement 或 Actor mailbox acknowledgement。
+
+---
+
+## 六、数据变化
+
+Telemetry 查询总体是读取流程，不修改 `ts_kv`、`ts_kv_latest`、Cassandra telemetry 表、Actor、session 或 topic。但 SQL/Timescale 的指定 key 查询有一个容易忽略的副作用：raw、aggregation 以及指定 key latest 都调用 [org.thingsboard.server.dao.sqlts.BaseAbstractSqlTimeseriesDao.getOrSaveKeyId(String)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/BaseAbstractSqlTimeseriesDao.java#L69)。若请求 key 从未出现，查询会尝试向 `ts_kv_dictionary` 插入新行并写入 JVM map。
+
+```mermaid
+flowchart TB
+    READ["Telemetry read request"] --> BACKEND{"Backend and query form"}
+    BACKEND -->|"SQL or Timescale with named key"| DICT["getOrSaveKeyId"]
+    DICT --> HIT{"Dictionary key exists"}
+    HIT -->|"yes"| CACHE["Populate or reuse local dictionary map"]
+    HIT -->|"no"| INSERT["Insert ts_kv_dictionary row"]
+    BACKEND -->|"findAllLatest without named keys"| NODICT["Join and read existing rows only"]
+    BACKEND -->|"Cassandra"| CASS["Use text key directly"]
+    CACHE --> QUERY["Read telemetry"]
+    INSERT --> QUERY
+    NODICT --> QUERY
+    CASS --> QUERY
+```
+
+| 状态类别 | 是否变化 | 精确行为 |
+|---|---|---|
+| PostgreSQL/Timescale history `ts_kv` | 否 | raw/aggregation 只读 |
+| SQL latest `ts_kv_latest` | 否 | latest 只读 |
+| `ts_kv_dictionary` | 条件变化 | 请求未知 key 时 `getOrSaveKeyId` 可能插入；并更新进程内 `tsKvDictionaryMap` |
+| Cassandra `ts_kv_cf` / `ts_kv_latest_cf` / `ts_kv_partitions_cf` | 否 | 只读；key 本身是 text，无 SQL dictionary |
+| Caffeine/Redis 业务缓存 | 否 | 本 REST 主线不使用 telemetry result cache |
+| HTTP session / WebSocket session | 否 | JWT 安全上下文用于鉴权，不创建 WebSocket subscription |
+| Device/Tenant Actor | 否 | 不投递 Actor message，不改变 mailbox/state |
+| Kafka topic | 否 | 不生产、不消费任何 Core/Rule Engine/Transport topic |
+| Rule Engine message | 仅 Rule Node 分支变化 | `TbGetTelemetryNode` 把查询结果写入现有 `TbMsg` metadata，并继续 Success/Failure relation |
+
+这个“读请求可能写字典”意味着只读数据库账号并不能完整支持 SQL/Timescale 指定未知 key 的查询，也意味着公开查询入口需要限制 key 数量与合法 key 集合，避免恶意构造大量无用 dictionary rows。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心接口与实现关系
+
+```mermaid
+classDiagram
+    class TimeseriesService
+    class BaseTimeseriesService
+    class TimeseriesDao
+    class TimeseriesLatestDao
+    class AbstractSqlTimeseriesDao
+    class AbstractChunkedAggregationTimeseriesDao
+    class JpaSqlTimeseriesDao
+    class TimescaleTimeseriesDao
+    class CassandraBaseTimeseriesDao
+    class SqlTimeseriesLatestDao
+    class CassandraBaseTimeseriesLatestDao
+    TimeseriesService <|.. BaseTimeseriesService
+    BaseTimeseriesService --> TimeseriesDao
+    BaseTimeseriesService --> TimeseriesLatestDao
+    TimeseriesDao <|.. JpaSqlTimeseriesDao
+    TimeseriesDao <|.. TimescaleTimeseriesDao
+    TimeseriesDao <|.. CassandraBaseTimeseriesDao
+    AbstractSqlTimeseriesDao <|-- AbstractChunkedAggregationTimeseriesDao
+    AbstractChunkedAggregationTimeseriesDao <|-- JpaSqlTimeseriesDao
+    AbstractSqlTimeseriesDao <|-- TimescaleTimeseriesDao
+    TimeseriesLatestDao <|.. SqlTimeseriesLatestDao
+    TimeseriesLatestDao <|.. CassandraBaseTimeseriesLatestDao
+```
+
+Spring 通过条件注解而不是运行时 `if databaseType` 选择 bean：
+
+| 配置 | history bean | latest bean | 条件注解 |
+|---|---|---|---|
+| `database.ts.type=sql` | `org.thingsboard.server.dao.sqlts.sql.JpaSqlTimeseriesDao` | 由 latest 配置决定 | [org.thingsboard.server.dao.util.SqlTsDao](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/util/SqlTsDao.java#L24) |
+| `database.ts.type=timescale` | `org.thingsboard.server.dao.sqlts.timescale.TimescaleTimeseriesDao` | 由 latest 配置决定 | [org.thingsboard.server.dao.util.TimescaleDBTsDao](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/util/TimescaleDBTsDao.java#L24) |
+| `database.ts.type=cassandra` | `org.thingsboard.server.dao.timeseries.CassandraBaseTimeseriesDao` | 由 latest 配置决定 | [org.thingsboard.server.dao.util.NoSqlTsDao](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/util/NoSqlTsDao.java#L24) |
+| `database.ts_latest.type=sql/timescale` | 与 history 独立 | `org.thingsboard.server.dao.sqlts.SqlTimeseriesLatestDao` | [org.thingsboard.server.dao.util.SqlTsLatestAnyDao](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/util/SqlTsLatestAnyDao.java#L24) |
+| `database.ts_latest.type=cassandra` | 与 history 独立 | `org.thingsboard.server.dao.timeseries.CassandraBaseTimeseriesLatestDao` | [org.thingsboard.server.dao.util.NoSqlTsLatestDao](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/util/NoSqlTsLatestDao.java#L24) |
+
+默认配置在 [thingsboard.yml 的 database 段](../../../application/src/main/resources/thingsboard.yml#L199) 中 history/latest 都是 Cassandra。所谓 hybrid 不是查询时同时读两个数据库并合并，而是两个接口分别被装配到指定实现；迁移期间必须保证写入链路同步维护对应 latest/history，否则相同实体的 latest 与 range 会不一致。
+
+### 7.2 query 校验与 700 intervals 的真实含义
+
+[BaseTimeseriesService.validate(ReadTsKvQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L510) 只在聚合时执行：
+
+```java
+long step = Math.max(query.getInterval(), 1000);
+long intervalCounts = (query.getEndTs() - query.getStartTs()) / step;
+```
+
+默认 [database.ts_max_intervals=700](../../../application/src/main/resources/thingsboard.yml#L200)。配置注释说它限制单 API 产生的 DB queries，但实际语义因后端而异：
+
+```mermaid
+flowchart TB
+    Q["Aggregation query"] --> V["Validation step max interval and 1000 ms"]
+    V --> OK{"interval count between 0 and 700"}
+    OK -->|"no"| REJECT["IncorrectParameterException"]
+    OK -->|"yes"| B{"Backend"}
+    B -->|"Plain PostgreSQL"| PG["Uses original interval and may create one SQL Future per bucket"]
+    B -->|"TimescaleDB"| TS["Uses original time_bucket and may return many rows"]
+    B -->|"Cassandra"| CASS["Floors milliseconds interval to 1000 ms"]
+```
+
+这是明确的源码不一致：例如 700 秒范围、`interval=1ms` 通过校验，因为 validator 按 1000ms 计算 700；普通 PostgreSQL 随后可能构造约 700000 个 bucket Future，Timescale 可能让一个 `time_bucket(1)` 查询返回约 700000 行，只有 Cassandra 把步长提升到 1000ms。生产入口应额外禁止亚秒聚合，或在网关/Controller 层按真实 bucket 数限制，而不能只依赖 `ts_max_intervals`。
+
+### 7.3 plain PostgreSQL 聚合
+
+[AbstractChunkedAggregationTimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractChunkedAggregationTimeseriesDao.java#L71) 从 start 到 end 逐 bucket 循环，每个 bucket 调用 `findAndAggregateAsync`，最后 `Futures.allAsList`。结果 timestamp 是 `start + (end-start)/2`；空 bucket 被 `Optional.empty()` 过滤。
+
+`AVG/MAX/MIN/SUM/COUNT` 最终由 [org.thingsboard.server.dao.sqlts.ts.TsKvRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/ts/TsKvRepository.java#L39) 的 JPQL/native queries 执行。`MAX/MIN` 先尝试 numeric 聚合，numeric 为空才回退 string；`AVG/SUM` 只处理 long/double；`COUNT` 按唯一非 null typed column 计数。Boolean/JSON 不支持 AVG/SUM，空 bucket 不自动补零。
+
+### 7.4 TimescaleDB 聚合
+
+[org.thingsboard.server.dao.sqlts.timescale.AggregationRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/AggregationRepository.java#L38) 的 named native SQL 使用：
+
+```sql
+time_bucket(:timeBucket, tskv.ts, :startTs)
+WHERE entity_id = :entityId
+  AND key = :entityKey
+  AND ts >= :startTs
+  AND ts < :endTs
+GROUP BY entity_id, key, tsBucket
+ORDER BY entity_id, key, tsBucket
+```
+
+固定毫秒 interval 通常每 key 一次 query；总范围不能整除 interval 时，[TimescaleTimeseriesDao.findAllAndAggregateAsync(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L294) 将完整区间与最后一个 partial bucket 分开查询。Calendar interval 路径有源码 TODO，仍用 `TimeUtils.calculateIntervalEnd` 逐周期调用聚合 SQL。Timescale 安装服务 [org.thingsboard.server.service.install.TimescaleTsDatabaseSchemaService.createDatabaseSchema()](../../../application/src/main/java/org/thingsboard/server/service/install/TimescaleTsDatabaseSchemaService.java#L60) 只把 `ts_kv` 转成 hypertable；没有创建 Continuous Aggregate。
+
+### 7.5 Cassandra raw 与 aggregation
+
+raw 先根据 `[startTs,endTs]` 计算 partition 范围，读取 `ts_kv_partitions_cf` 或在固定分区模式直接生成 partitions，然后 [findAllAsyncSequentiallyWithLimit(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L484) 按 ASC/DESC 顺序逐分区查询，直到 per-key cursor 达到 limit。这样不会一次把月跨越范围的全部 partition 并发拉回，但请求很多 key 时仍有多条独立 cursor。
+
+aggregation 则相反：每个逻辑 bucket 调用 [getFetchChunksAsyncFunction(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L638)，对该 bucket 涉及的 partitions 并发发 CQL，随后 [org.thingsboard.server.dao.timeseries.AggregatePartitionsFunction.apply(List<TbResultSet>)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/AggregatePartitionsFunction.java#L121) 合并 count、sum、min、max 和最新源数据时间。默认 partition 为 MONTHS、read consistency 为 ONE、driver page size 为 2000、socket read timeout 为 20000ms、query permit 最大等待 120000ms，配置见 [thingsboard.yml Cassandra query 段](../../../application/src/main/resources/thingsboard.yml#L281)。
+
+### 7.6 Rule Engine 节点结果语义
+
+`TbGetTelemetryNode` 的 FIRST 使用 ASC + limit 1，LAST 使用 DESC + limit 1，ALL 使用配置 order/limit。聚合模式把整个配置时间范围作为一个 interval，因此它通常返回每 key 一个聚合点，而不是 dashboard 式多 bucket 曲线。Future callback 把值写入 message metadata；同名 metadata key 的覆盖行为应结合 node 配置阅读，不能把 REST JSON response 结构套到 Rule Engine message 上。
+
+---
+
+## 八、Actor 分析
+
+Telemetry REST 查询不需要 Actor。Actor 的价值是串行化设备状态、会话和规则链相关消息；纯数据库读取没有 per-device mutable state 要维护，让 HTTP 查询进入 Device Actor mailbox 反而会把 dashboard 慢查询与设备 uplink 串行化，增加 mailbox 延迟。
+
+```mermaid
+flowchart LR
+    REST["Telemetry REST query"] --> SERVICE["TimeseriesService"]
+    SERVICE --> DB["Database DAO"]
+    DEVICE["Device telemetry uplink"] --> QUEUE["Core Queue"]
+    QUEUE --> ACTOR["Device Actor"]
+    ACTOR --> RULE["Rule Engine and save path"]
+    RULE --> DB
+    REST -. "does not enter" .-> ACTOR
+```
+
+| Actor 问题 | 本流程结论 |
+|---|---|
+| Actor 是否创建 | 否；查询不会创建 App/Tenant/Device Actor |
+| mailbox 是否参与 | 否；DAO Future 不经过 actor message queue |
+| Actor state 是否读取/修改 | 否；查询只读持久化 telemetry，不读 session/subscription map |
+| 为什么 latest 不从 Actor 内存读 | latest 是跨重启、跨节点、跨实体的持久化查询契约；Device Actor 不维护全量 telemetry latest map |
+| Rule Node 是否使用 Actor | 节点本身已由 Rule Engine runtime 调用，但它读取数据库时直接用 service；数据库 callback 后继续 relation |
+
+因此“设备正在 Actor 中活跃”不保证刚写入的数据已经能被 REST 查询看见。保存链路有 Queue、Rule Engine、DAO batch 与 latest/history 双写确认边界；查询只看到对应后端在读取时已经可见的状态。
+
+---
+
+## 九、Kafka 分析
+
+REST 读路径没有 Producer、Topic、Partition、Consumer 或 Consumer Group。Kafka 参与 telemetry 写入和实时通知，不参与本章的 request/response 读取。即使部署 `queue.type=kafka`，`TelemetryController -> TimeseriesService -> DAO` 的路径也不会因此多一跳 broker。
+
+```mermaid
+flowchart TB
+    REST["REST range or latest query"] --> DAO["Direct service and DAO read"]
+    DAO --> DB["Telemetry database"]
+    UPLINK["Telemetry uplink"] --> CORE["Core Queue or transport path"]
+    CORE --> REQ["Rule Engine Queue"]
+    REQ --> SAVE["Telemetry save DAO"]
+    SAVE --> DB
+    SAVE --> SUB["Subscription update path"]
+    REST -. "no producer or consumer" .-> CORE
+    REST -. "no producer or consumer" .-> REQ
+```
+
+这带来两个排障结论：
+
+1. REST history 慢而 Kafka lag 正常，优先查 SQL/CQL、连接池、partition/chunk pruning、bucket 数和返回体，不要先调 Kafka。
+2. 新数据尚未出现在查询中而旧数据查询正常，才需要沿写链路检查 Rule Engine lag、DAO batch、history/latest 独立后端和保存 callback；查询端本身不会消费待写消息做 read-your-writes 合并。
+
+Rule Engine 的 `TbGetTelemetryNode` 已在 Kafka consumer 驱动的规则消息上下文内运行，但 node 调用数据库时没有新 producer/topic/consumer。数据库 callback 慢会占用该规则消息的异步处理时长并影响 Rule Engine throughput，这与 REST 路径的 HTTP timeout 是不同压力面。
+
+---
+
+## 十、数据库分析
+
+### 10.1 逻辑表与索引键
+
+```mermaid
+erDiagram
+    TS_KV_DICTIONARY ||--o{ TS_KV : "key_id"
+    TS_KV_DICTIONARY ||--o{ TS_KV_LATEST : "key_id"
+    ENTITY ||--o{ TS_KV : "entity_id"
+    ENTITY ||--o{ TS_KV_LATEST : "entity_id"
+    TS_KV_DICTIONARY {
+      varchar key PK
+      serial key_id UK
+    }
+    TS_KV {
+      uuid entity_id PK
+      int key PK
+      bigint ts PK
+      boolean bool_v
+      varchar str_v
+      bigint long_v
+      double dbl_v
+      json json_v
+    }
+    TS_KV_LATEST {
+      uuid entity_id PK
+      int key PK
+      bigint ts
+      typed value_columns
+    }
+```
+
+SQL history schema 在 [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L17)：主键 `(entity_id,key,ts)`，父表按 `ts` RANGE partition；latest schema 在 [schema-ts-latest-psql.sql](../../../dao/src/main/resources/sql/schema-ts-latest-psql.sql#L17)：主键 `(entity_id,key)`。Timescale schema 使用相同列和主键，在 [schema-timescale.sql](../../../dao/src/main/resources/sql/schema-timescale.sql#L17) 安装 extension，再由安装服务执行 `create_hypertable('ts_kv','ts',chunk_time_interval=>...)`。默认 chunk interval 是 [604800000ms，即 7 天](../../../application/src/main/resources/thingsboard.yml#L373)。
+
+`entity_id` 没有外键，因为 telemetry 可以属于多种 EntityType，SQL 表只存 UUID，不存 entity type。UUID 在全平台内承担实体定位；删除实体时由 service/schema cleanup 流程清理，而不是依赖单一实体表的 FK cascade。
+
+### 10.2 raw SQL 与查询形状
+
+[TsKvRepository.findAllWithLimit(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/ts/TsKvRepository.java#L58) 和 [TsKvTimescaleRepository.findAllWithLimit(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TsKvTimescaleRepository.java#L53) 都执行等价条件：
+
+```sql
+SELECT *
+FROM ts_kv
+WHERE entity_id = :entityId
+  AND key = :entityKey
+  AND ts >= :startTs
+  AND ts < :endTs
+ORDER BY ts ASC | DESC
+LIMIT :limit;
+```
+
+这个形状与主键前缀完全匹配。PostgreSQL 的时间 partition 和 Timescale chunk 都可根据 `ts` 范围裁剪；单 key 窄范围通常走局部 B-tree 索引。不要删除 `entity_id,key,ts` 主键，也不要只建 `(ts)` 索引期待改善单设备单 key 查询。宽范围、多 key 请求仍是 N 个独立 index/range scan，不会自动合并为一次 `key IN (...)`。
+
+### 10.3 Timescale chunk 与 runtime aggregation
+
+```mermaid
+flowchart LR
+    RANGE["Query startTs to endTs"] --> PRUNE["Timescale planner prunes chunks by ts"]
+    PRUNE --> C1["Chunk week 1"]
+    PRUNE --> C2["Chunk week 2"]
+    PRUNE --> C3["Chunk week 3"]
+    C1 --> BUCKET["time_bucket anchored at request startTs"]
+    C2 --> BUCKET
+    C3 --> BUCKET
+    BUCKET --> AGG["SUM AVG MIN MAX or COUNT per bucket"]
+    AGG --> MID["Return bucket midpoint timestamp"]
+```
+
+这里的 chunk 是物理分片，bucket 是查询时逻辑分组，两者不要求对齐。7 天 chunk 不代表只能按 7 天聚合；1 小时 bucket 可以跨多个 chunk，planner 先裁剪 chunk，aggregate 再分组。反过来，查询范围越过很多 chunk 仍要访问每个相关 chunk。ThingsBoard 3.6 没有 continuous aggregate，因此 7 天平均温度每次都从 raw chunks 计算，是否需要自建汇总层必须结合升级兼容、写入流程和 retention 一起设计，不能假设产品已自动维护。
+
+### 10.4 PostgreSQL 与 Timescale 聚合成本差异
+
+| 维度 | PostgreSQL `JpaSqlTimeseriesDao` | Timescale `TimescaleTimeseriesDao` |
+|---|---|---|
+| raw | 每 key 一条带 limit 的 range query | 同样每 key 一条，Timescale 负责 chunk pruning |
+| 固定 interval 聚合 | 每 key × 每 bucket 一条 SQL/Future | 通常每 key 一条 `time_bucket` query；尾部 partial bucket 可能再一条 |
+| calendar 聚合 | 每 key × calendar bucket 一条 SQL | 当前源码同样逐 calendar bucket 查询，有 TODO |
+| bucket timestamp | Java 设置区间中点 | entity mapping 将 `tsBucket + interval/2` 作为点时间 |
+| 空 bucket | 省略 | 省略；没有 gapfill |
+| Continuous Aggregate | 无 | ThingsBoard 3.6 未配置 |
+
+普通 PostgreSQL 的问题不只是数据库 query 数，还包括 Java 创建 Future 列表、DAO executor 排队和 `Futures.allAsList` 等待。Timescale 固定 interval 降低 round trip，但过小 interval 会产生巨大结果集和 aggregate 内存压力。两者都要限制 key 数、时间跨度、bucket 数和最终 response bytes。
+
+### 10.5 Cassandra 分区模型
+
+```mermaid
+flowchart TB
+    ENTITY["entity_type and entity_id"] --> KEY["text telemetry key"]
+    KEY --> PM["MONTH partition marker"]
+    PM --> P1["ts_kv_cf partition month 1"]
+    PM --> P2["ts_kv_cf partition month 2"]
+    PM --> P3["ts_kv_cf partition month 3"]
+    P1 --> ROWS1["Rows clustered by ts"]
+    P2 --> ROWS2["Rows clustered by ts"]
+    P3 --> ROWS3["Rows clustered by ts"]
+    LATEST["ts_kv_latest_cf partitioned by entity type and id"] --> LKEY["Rows clustered by key"]
+```
+
+[schema-ts.cql](../../../dao/src/main/resources/cassandra/schema-ts.cql#L17) 的 history partition key 是 `((entity_type,entity_id,key,partition),ts)`，`ts` 是 clustering column；[schema-ts-latest.cql](../../../dao/src/main/resources/cassandra/schema-ts-latest.cql#L17) 的 latest partition key 是 `(entity_type,entity_id)`，key 为 clustering column。raw 按月顺序读取可利用 clustering order 和 per-partition limit；跨多年范围会增加 partition discovery 与 round trips。latest 全量对单实体是单 partition 读，但设备 key 极多时 partition 会变宽。
+
+Cassandra 的 `findAllKeysByDeviceProfileId` 与 `findAllKeysByEntityIds` 在 [CassandraBaseTimeseriesLatestDao](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesLatestDao.java#L169) 中直接返回空列表；这不影响单实体 keys REST，因为它使用 `findAllLatest`，但会影响依赖批量 key discovery 的其他服务能力。
+
+### 10.6 latest/history 一致性
+
+```mermaid
+flowchart LR
+    SAVE["Telemetry save request"] --> HISTORY["History backend write"]
+    SAVE --> LATEST["Latest backend write"]
+    HISTORY --> RANGE["REST range query"]
+    LATEST --> LAST["REST latest and keys query"]
+    HISTORY -. "no read-time merge" .-> LATEST
+    LATEST -. "no transaction across backends" .-> HISTORY
+```
+
+查询层不比较 history 最大 timestamp 与 latest timestamp，也不做读时修复。指定 key latest 缺失时返回 null；它不会自动扫描 history 找最后一点。删除流程可选择是否删除/rewrite latest，测试在 [TelemetryControllerTest](../../../application/src/test/java/org/thingsboard/server/controller/TelemetryControllerTest.java#L140) 明确覆盖了 history 已空而 latest 保留、或两者同时删除的差异。混合部署必须监控两套写入成功率和数据时间戳漂移。
+
+### 10.7 生产查询与诊断建议
+
+| 症状 | PostgreSQL/Timescale 检查 | Cassandra 检查 | 应用层检查 |
+|---|---|---|---|
+| 单设备单 key 很慢 | `EXPLAIN (ANALYZE, BUFFERS)` 是否裁剪 partition/chunk并走 PK；表膨胀与统计信息 | partition 数、read latency、tombstone、consistency | 时间范围、limit、order、response size |
+| 聚合突然打满 CPU | bucket 数、相关 chunks、aggregate spill、并发查询 | bucket × partition fan-out、callback executor | key 数、亚秒 interval、`ts_max_intervals` 漏洞 |
+| latest 快、range 慢 | history 表/chunk、连接池 | `ts_kv_cf` partitions | history/latest 是否配置不同后端 |
+| keys 缺少历史 key | 检查 `ts_kv_latest` | 检查 `ts_kv_latest_cf` | keys 本来就不扫描 history |
+| latest 返回 null 点 | latest row 是否存在，dictionary 是否被新建 | latest partition/key 是否存在 | 指定 key 缺失是接口契约 |
+| 30 秒左右超时 | SQL pool/statement 与 Spring async timeout | driver 20s read timeout、permit 120s、未完成 Future | `DeferredResult` 无局部 timeout，默认 30s |
+
+Timescale 可用 `_timescaledb_catalog`/`timescaledb_information.chunks` 核对相关 chunks，但生产 SQL 优化仍应从实际绑定的 `entity_id/key/startTs/endTs` 做 `EXPLAIN (ANALYZE, BUFFERS)`。不要只在全表 count 上判断 telemetry 查询性能，也不要用 latest 的性能代表 history。
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败矩阵
+
+```mermaid
+flowchart TB
+    REQ["Telemetry query"] --> PARSE{"Parameter parsing succeeds"}
+    PARSE -->|"no"| BAD["Spring or controller returns client error"]
+    PARSE -->|"yes"| ACCESS{"Entity and permission valid"}
+    ACCESS -->|"no"| DENY["Not found or access denied"]
+    ACCESS -->|"yes"| VALID{"Query validation succeeds"}
+    VALID -->|"no"| INVALID["IncorrectParameterException"]
+    VALID -->|"yes"| DB{"DAO Future completes"}
+    DB -->|"success"| RESP["Set HTTP 200 result"]
+    DB -->|"failure"| ERR["Log and AccessValidator.handleError 500"]
+    DB -->|"never completed"| TIMEOUT["Spring MVC async timeout"]
+```
+
+| 失败点 | 源码行为 | 事务/重试 | 客户端表现与风险 |
+|---|---|---|---|
+| `agg` 大小写错误 | `Aggregation.valueOf` 抛异常 | 无事务、无重试 | 参数错误；应使用大写枚举 |
+| 无效 `orderBy` | SQL `Direction.fromString` 或 Cassandra order 分支抛异常 | 无重试 | Future/HTTP 失败 |
+| `limit<=0` | SQL PageRequest 或 cursor 可能拒绝 | 无重试 | Controller 未先做强校验 |
+| 聚合区间数过大/负范围 | `BaseTimeseriesService.validate` 抛 `IncorrectParameterException` | DB 未执行 | 提示增大 interval 或缩短范围 |
+| 无效 timeZone | warning 后用 JVM default zone | 不失败 | 集群 JVM 默认时区不一致时结果边界可能不同 |
+| SQL dictionary 并发创建 | lock 后 insert；唯一键冲突时重新查询 | 局部恢复 | 查询仍可继续；读账号必须允许该写入 |
+| SQL/Timescale DAO Future 失败 | `getTsKvListCallback.onFailure` 记录 error 并 `handleError(...,500)` | 本流程无应用重试 | HTTP 500 |
+| Cassandra raw partition fetch/read 失败 | 某些 `onFailure` 分支只记录日志，未 `setException` 或完成 `resultFuture` | 无自动恢复 | Future 可能悬空，最终受 Spring 30s async timeout 控制 |
+| 多 key 中一个 Future 失败 | `Futures.allAsList` 整体失败 | 已完成结果不返回 partial response | 整个 HTTP 请求失败 |
+| 客户端断开 | 后端 Future 没有显式取消传播 | 查询可能继续占用数据库 | 需由 DB/driver timeout 和网关限流约束 |
+
+### 11.2 Cassandra 未完成 Future 风险
+
+[CassandraBaseTimeseriesDao.findAllAsyncWithLimit(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L437) 的 partition-list failure callback 只 log；[findAllAsyncSequentiallyWithLimit(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L484) 的 execute/read failure 也只 log，没有给 `SimpleListenableFuture` 设置异常。这意味着某些 driver failure 不是立即返回 500，而可能等待 MVC async timeout。定位“稳定约 30 秒”的请求时，应同时比对 Cassandra 20 秒 socket read timeout、120 秒 permit wait 与 Spring 30 秒 request timeout，不要只看 Controller error log。
+
+### 11.3 一致性与重试边界
+
+本流程没有写 history/latest 的数据库事务；唯一潜在写操作是 SQL dictionary key 创建，其事务由 repository 调用控制。REST 层没有自动重试数据库查询。客户端盲目重试大聚合会叠加负载；生产网关应配置 request timeout、并发限制和重试退避，并优先缩小 key/时间/bucket 数。对 Rule Engine node，Failure relation 可以显式设计降级，但不能在高并发规则链中无上限立即重试。
+
+### 11.4 排障顺序
+
+1. 记录完整 path 与 `keys/startTs/endTs/agg/interval/intervalType/timeZone/limit/orderBy`，先算每 key bucket 数和总预期点数。
+2. 确认 `database.ts.type` 与 `database.ts_latest.type`，不要在错误数据库上查表。
+3. latest/keys 问题查 latest 表；range/aggregation 问题查 history 表、partition/chunk 与 DAO 实现。
+4. SQL/Timescale 检查连接池等待、slow query log、`EXPLAIN (ANALYZE, BUFFERS)`、partition/chunk pruning 和返回行数。
+5. Cassandra 检查 permit queue、driver read timeout、partition discovery、跨月 partition 数、tombstone 和 callback executor。
+6. 最后比对 Spring async 30 秒边界、客户端反向代理 timeout，以及是否因客户端重试形成放大。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    A["TelemetryController endpoints"] --> B["AccessValidator DeferredResult boundary"]
+    B --> C["AggregationParams and BaseReadTsKvQuery"]
+    C --> D["BaseTimeseriesService"]
+    D --> E["TimeseriesDao and TimeseriesLatestDao interfaces"]
+    E --> F["SQL latest and raw repositories"]
+    F --> G["Plain PostgreSQL bucket loop"]
+    G --> H["Timescale time_bucket path"]
+    H --> I["Cassandra partition cursor and aggregate merge"]
+    I --> J["Entity View and Rule Node callers"]
+    J --> K["Schema, configuration and tests"]
+```
+
+建议按以下顺序阅读：
+
+1. [TelemetryController.getTimeseriesKeys(...)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L341)、[getLatestTimeseries(...)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L374)、[getTimeseries(...)](../../../application/src/main/java/org/thingsboard/server/controller/TelemetryController.java#L408)：先固定三个 REST 契约和 mapping 条件。
+2. [AccessValidator.validateEntityAndCallback(...)](../../../application/src/main/java/org/thingsboard/server/service/security/AccessValidator.java#L301)：理解 `DeferredResult`、权限 callback 和线程释放边界。
+3. [AggregationParams](../../../common/data/src/main/java/org/thingsboard/server/common/data/kv/AggregationParams.java#L41)、[BaseReadTsKvQuery](../../../common/data/src/main/java/org/thingsboard/server/common/data/kv/BaseReadTsKvQuery.java#L34)、[ReadTsKvQueryResult](../../../common/data/src/main/java/org/thingsboard/server/common/data/kv/ReadTsKvQueryResult.java#L34)：掌握跨 DAO query/result 契约。
+4. [BaseTimeseriesService.findAllByQueries(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L128)、[findLatest(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L186) 与 [validate(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L510)：看清 Entity View、per-key Future 和 700 interval 限制。
+5. [TimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/TimeseriesDao.java#L41) 与 [TimeseriesLatestDao](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/TimeseriesLatestDao.java#L42)：先读稳定接口，再进入实现。
+6. [SqlTimeseriesLatestDao.doFindLatest(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/SqlTimeseriesLatestDao.java#L350) 和 [SearchTsKvLatestRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/latest/SearchTsKvLatestRepository.java#L38)：核对单 key 与全量 latest 的 dictionary/join 差异。
+7. [AbstractChunkedAggregationTimeseriesDao.findAllAsync(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/AbstractChunkedAggregationTimeseriesDao.java#L188) 与 [TsKvRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/ts/TsKvRepository.java#L39)：理解 plain SQL 的 one-query-per-bucket。
+8. [TimescaleTimeseriesDao.findAllAsync(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L225)、[AggregationRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/AggregationRepository.java#L38) 与 [TimescaleTsKvEntity](../../../dao/src/main/java/org/thingsboard/server/dao/model/sqlts/timescale/ts/TimescaleTsKvEntity.java#L55)：追踪 `time_bucket` 到 entity mapping。
+9. [CassandraBaseTimeseriesDao.findAllAsync(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L371)、[findAllAsyncSequentiallyWithLimit(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L484) 与 [AggregatePartitionsFunction.apply(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/AggregatePartitionsFunction.java#L121)：区分 raw 顺序读和 aggregation 并发 fan-out。
+10. [TbGetTelemetryNode.onMsg(...)](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/metadata/TbGetTelemetryNode.java#L147)、[TelemetryControllerTest](../../../application/src/test/java/org/thingsboard/server/controller/TelemetryControllerTest.java#L79) 与 [EntityViewControllerTest](../../../application/src/test/java/org/thingsboard/server/controller/EntityViewControllerTest.java#L828)：用内部调用和测试反证自己的理解。
+
+下一章建议阅读 Timeseries TTL 清理。查询性能与 retention 直接相关：PostgreSQL drop partition、Timescale delete/chunk、Cassandra native TTL 会改变可扫描数据量，也会影响 latest/history 不一致和删除后的查询语义。
+
+---
+
+## 十三、常见面试题
+
+### 1. Telemetry latest 与 range 为什么使用同一个 URL？
+
+Spring MVC 通过 mapping 条件区分：range 方法要求请求同时存在 `keys,startTs,endTs`；缺少这组三个必需参数时走 latest 方法。它们只共享 path，不共享后端语义。
+
+### 2. keys API 会扫描 `ts_kv` 找 distinct key 吗？
+
+不会。`getTimeseriesKeys` 调用 `findAllLatest`，再从 latest entries 提取 key。这样避免历史全表扫描，但只有 history、没有 latest 的 key 不会返回。
+
+### 3. `database.ts.type` 与 `database.ts_latest.type` 有什么区别？
+
+前者装配 history `TimeseriesDao`，服务 raw 与 aggregation；后者装配 `TimeseriesLatestDao`，服务 latest 和 keys。两者可指向不同数据库，查询层不做结果合并或一致性修复。
+
+### 4. REST Telemetry 查询会经过 Device Actor 吗？
+
+不会。路径是 Controller、AccessValidator、TimeseriesService、DAO、database。Actor 用于设备状态和消息串行处理，不参与持久化遥测的直接读取。
+
+### 5. REST 查询会经过 Kafka 吗？
+
+不会。Kafka 参与上报、规则处理和实时通知等写侧路径；REST 读取直接调用 DAO。调整 Kafka partition 不能修复纯 history SQL 慢查询。
+
+### 6. raw 查询的时间边界是什么？
+
+半开区间 `[startTs,endTs)`：SQL 和 CQL 都使用 `ts >= startTs AND ts < endTs`。相邻窗口可用前一窗口 end 作为下一窗口 start，避免边界点重复。
+
+### 7. `limit=100` 是全请求最多 100 点吗？
+
+不是。Controller 为每个 key 创建一个 query，limit 按 key 生效。10 个 key 最多返回约 1000 个 raw 点，再加 JSON 开销；它也没有 offset/cursor，不能完成全历史翻页。
+
+### 8. `orderBy` 对聚合结果生效吗？
+
+实际 DAO 聚合路径按 bucket 从 start 向 end 生成，Timescale SQL也按 `tsBucket` 正序。`orderBy`主要作用于 `Aggregation.NONE` raw 路径，不能依赖它把聚合结果倒序。
+
+### 9. 聚合点的 timestamp 表示什么？
+
+表示 bucket 中点 `start + (end-start)/2`。它不是原始点时间、最后源记录时间或自然周期开始；`ReadTsKvQueryResult.lastEntryTs` 另行记录聚合涉及的最大源 ts。
+
+### 10. `agg=AVG&interval=0` 会怎样？
+
+Controller 构造 `AggregationParams.none()`，退化为 raw 查询，而不是返回单 bucket AVG。调用者必须传正 interval，或使用 calendar interval type。
+
+### 11. `agg=avg` 是否有效？
+
+无效。源码直接调用大小写敏感的 `Aggregation.valueOf(aggStr)`，必须使用 `AVG`、`SUM` 等枚举大写值。
+
+### 12. 无效时区会立即报错吗？
+
+不会。`AggregationParams.getZoneId` 记录 warning 后回退 JVM 默认 ZoneId。多节点默认时区不同会造成 calendar bucket 边界不稳定，生产应显式传标准 IANA timezone 并统一 JVM timezone。
+
+### 13. PostgreSQL 与 Timescale 固定 interval 聚合的根本成本差异是什么？
+
+plain PostgreSQL 为每 key 每 bucket 发一条聚合 SQL；Timescale 固定 interval 用 `time_bucket` 通常每 key 一条 SQL返回多个 bucket。前者 round trip/Future 多，后者单 query 返回行数和 aggregate 压力可能很大。
+
+### 14. Timescale chunk 与查询 bucket 是同一个概念吗？
+
+不是。chunk 是 hypertable 的物理时间分片，默认 7 天；bucket 是一次查询的逻辑聚合窗口，可为分钟、小时或其他长度。planner 先裁剪 chunks，SQL 再在相关 rows 上分 bucket。
+
+### 15. ThingsBoard 3.6 是否使用 Timescale Continuous Aggregate？
+
+没有。安装源码只建 extension、表和 hypertable；查询源码直接执行 runtime `time_bucket`。需要预聚合时必须单独设计，并评估升级、retention 和写入一致性。
+
+### 16. Cassandra raw 查询为什么顺序读取 partitions？
+
+它要保持 ASC/DESC 语义并尽早达到 per-key limit。一次并发读取全部月份会浪费 IO；cursor 按方向逐 partition 读取，满 limit 后停止。
+
+### 17. Cassandra aggregation 为什么又并发读取 partitions？
+
+一个 bucket 可能跨 partition，需要每个 partition 的 partial aggregate 才能得到全局结果。DAO并发发出该 bucket 的 partition CQL，再由 `AggregatePartitionsFunction` 合并 count/sum/min/max。
+
+### 18. `database.ts_max_intervals=700` 能完全阻止超大聚合吗？
+
+不能。validator 用 `max(interval,1000)` 计数，plain SQL和 Timescale 随后仍使用原始亚秒 interval；700 秒、1ms interval 可通过校验却生成约 700000 buckets。还必须限制真实 bucket 数、key 数和 response size。
+
+### 19. 查询未知 SQL telemetry key 为什么可能写数据库？
+
+SQL/Timescale DAO 用 `getOrSaveKeyId` 把字符串 key 转换为 dictionary integer ID。key 不存在时会插入 `ts_kv_dictionary`，所以指定 key 的读请求不是严格只读，恶意 key 还可能污染字典。
+
+### 20. latest 指定 key 不存在时为什么仍返回一个点？
+
+`TimeseriesLatestDao.findLatest` 的契约返回当前服务器 timestamp 和 null StringDataEntry；Controller 按 key 分组后得到 `[{ts: now, value: null}]`。`findLatestOpt` 才使用 `Optional.empty()` 语义。
+
+### 21. Entity View 的 history 与 latest 为什么可能不同？
+
+history 的 `findAllByQueries` 会映射到 origin entity、过滤配置 key 并裁剪时间；latest/keys 直接查 Entity View 自身 ID，没有这段映射。Entity View 通常没有直接 telemetry rows，因此 latest/keys 可能为空。
+
+### 22. 多 key 请求中一个 DAO Future 失败会返回其他 key 的 partial data 吗？
+
+不会。latest 使用 `Futures.allAsList`，SQL history 也汇总 per-key Futures；任一失败会使组合 Future 失败，Controller 返回错误，不构造 partial JSON。
+
+### 23. 为什么 Cassandra 异常可能表现为约 30 秒 HTTP timeout？
+
+raw 查询若 partition fetch 或 row read 失败，部分 callback 只 log 而没有完成 `SimpleListenableFuture`。Controller 的 DeferredResult 继续等待，最终受到 Spring MVC 默认 30000ms async timeout，而不是立即进入 onFailure 返回 500。
+
+### 24. Rule Engine `TbGetTelemetryNode` 与 REST range 查询有什么主要区别？
+
+它直接从规则上下文调用同一个 TimeseriesService，把结果写入现有消息 metadata，并通过 Success/Failure relation 继续；FIRST/LAST limit 1，ALL上限1000，聚合通常覆盖整个配置范围。它不产生 REST JSON，也不新增 Kafka hop。
+
+### 25. 排查“latest 正常但最近 24 小时曲线为空”应从哪里开始？
+
+先确认 history/latest 是否配置到不同后端，再查写入链路对 history DAO 的成功回调；随后用相同 entity UUID、dictionary key ID 和半开时间范围直接查 `ts_kv`/`ts_kv_cf`，检查 partition/chunk pruning与时区毫秒参数。latest 正常只证明 latest backend 有行，不证明 history 已写成功。
+
+---
+
+[上一篇：29 Session 与 Device State 流程](../29-session-device-state/README.md) | [HTML 版](index.html) | [返回全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/30-telemetry-query.svg) | [下一篇：31 Timeseries TTL 清理流程](../31-timeseries-ttl-cleanup/README.md)

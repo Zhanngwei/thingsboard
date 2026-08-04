@@ -1,0 +1,209 @@
+@startuml
+title ThingsBoard 3.6 Session 与 Device State：OPEN、activity、CLOSED 与 inactivity
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #1F2937
+skinparam sequenceLifeLineBorderColor #374151
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #1F2937
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam actorBorderColor #1F2937
+skinparam actorBackgroundColor #EAF7FB
+skinparam noteBackgroundColor #FFF7D6
+skinparam noteBorderColor #92400E
+skinparam noteFontColor #111827
+skinparam groupBorderColor #374151
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam groupFontColor #111827
+skinparam databaseBorderColor #1F2937
+skinparam databaseBackgroundColor #ECFDF5
+skinparam collectionsBorderColor #1F2937
+skinparam collectionsBackgroundColor #EFF6FF
+skinparam ArrowThickness 1.6
+skinparam maxMessageSize 230
+hide footbox
+
+actor "Device" as Device
+participant "Protocol Handler\nMQTT / CoAP / HTTP / LwM2M" as Protocol
+participant "DefaultTransportService" as Transport
+collections "Transport sessions\nand activity states" as LocalState
+queue "Core Queue\ntb_core.<partition>" as CoreQueue
+participant "DefaultTbCoreConsumerService" as CoreConsumer
+participant "App / Tenant Actors" as ParentActors
+participant "DeviceActorMessageProcessor" as DeviceActor
+collections "Device Session Cache\nCaffeine / Redis" as SessionCache
+participant "DefaultDeviceStateService" as DeviceState
+database "SERVER_SCOPE attributes\nor state telemetry" as StateStore
+queue "Rule Engine Queue" as RuleQueue
+participant "Rule Chain" as RuleChain
+queue "Transport notification\nper serviceId" as NotifyQueue
+
+== ASYNC session OPEN ==
+Device -> Protocol : network connect or long-lived observation
+Protocol -> Protocol : authenticate and create SessionInfoProto
+Protocol -> Transport : process(sessionInfo, ASYNC OPEN, callback)
+Transport -> Transport : checkLimits()
+Transport -> LocalState : onActivity(sessionId, now)
+Transport -> Transport : resolve TB_CORE by deviceId hash
+Transport -> CoreQueue : ToCoreMsg(toDeviceActorMsg.sessionEvent=OPEN)
+alt producer callback succeeds
+  CoreQueue --> Transport : broker/provider acknowledgement
+  Transport --> Protocol : callback.onSuccess()
+  Protocol -> Transport : registerAsyncSession(sessionInfo, listener)
+  Transport -> LocalState : sessions.computeIfAbsent(sessionId)
+  Protocol --> Device : protocol success, for example MQTT CONNACK
+else producer callback fails
+  CoreQueue --> Transport : callback error
+  Transport --> Protocol : callback.onError(error)
+  Protocol --> Device : server unavailable and connection close
+end
+note over Device,CoreQueue
+  Protocol success confirms Queue production only.
+  Core consumption and state persistence happen later.
+end note
+
+CoreQueue -> CoreConsumer : poll ToCoreMsg pack
+CoreConsumer -> ParentActors : TransportToDeviceActorMsgWrapper(callback)
+ParentActors -> DeviceActor : route by tenantId and deviceId
+DeviceActor -> DeviceActor : processSessionStateMsgs(sessionInfo, OPEN)
+alt duplicate sessionId
+  DeviceActor -> DeviceActor : ignore duplicate OPEN
+else first session for device
+  DeviceActor -> DeviceActor : sessions.put(sessionId, metadata)
+  DeviceActor -> DeviceState : onDeviceConnect(tenantId, deviceId, now)
+  DeviceState -> StateStore : async save lastConnectTime
+  DeviceState -> RuleQueue : CONNECT_EVENT
+  DeviceActor -> DeviceState : onDeviceActivity(tenantId, deviceId, now)
+else additional session
+  DeviceActor -> DeviceActor : sessions.put(sessionId, metadata)
+  DeviceActor -> DeviceState : onDeviceActivity(tenantId, deviceId, now)
+end
+DeviceActor -> SessionCache : dump ASYNC session snapshot if cache is non-local
+DeviceActor --> ParentActors : callback.onSuccess()
+ParentActors --> CoreConsumer : pack callback acknowledged
+CoreConsumer -> CoreQueue : commit after pack wait boundary
+note over DeviceState,StateStore
+  State save is asynchronous. Its callback only logs.
+  No transaction spans Actor state, state keys and Rule Engine event.
+end note
+RuleQueue -> RuleChain : consume CONNECT_EVENT later
+
+== Uplink activity aggregation ==
+loop telemetry, attributes, RPC, PING or other accepted uplink
+  Device -> Protocol : uplink
+  Protocol -> Transport : process(...) or recordActivity(sessionInfo)
+  Transport -> LocalState : lastRecordedTime = max(old, now)
+end
+... default report period 3000 ms ...
+Transport -> LocalState : AbstractActivityManager.onReportingPeriodEnd()
+LocalState --> Transport : session metadata or previous SessionInfoProto
+Transport -> CoreQueue : SubscriptionInfoProto(lastActivityTime, subscriptions)
+CoreQueue --> Transport : producer acknowledgement
+CoreQueue -> CoreConsumer : poll activity report later
+CoreConsumer -> ParentActors : wrapper
+ParentActors -> DeviceActor : route by deviceId
+DeviceActor -> DeviceActor : handleSessionActivity()
+opt Actor still has this session
+  DeviceActor -> DeviceActor : refresh last activity and subscription maps
+  DeviceActor -> SessionCache : dump updated snapshot for Redis mode
+end
+DeviceActor -> DeviceState : onDeviceActivity(tenantId, deviceId, reportedTime)
+alt reportedTime is newer and state was inactive
+  DeviceState -> StateStore : async save lastActivityTime
+  DeviceState -> StateStore : async save active=true
+  DeviceState -> RuleQueue : ACTIVITY_EVENT
+else reportedTime is newer and state already active
+  DeviceState -> StateStore : async save lastActivityTime
+else stale or non-positive report
+  DeviceState -> DeviceState : ignore
+end
+
+== Explicit CLOSED and multi-session boundary ==
+Device -> Protocol : disconnect or unsubscribe
+Protocol -> Transport : process(sessionInfo, ASYNC CLOSED, null)
+Protocol -> Transport : deregisterSession(sessionInfo)
+Transport -> LocalState : cancel SYNC timer if present and remove listener
+Transport -> CoreQueue : ToCoreMsg(sessionEvent=CLOSED)
+CoreQueue -> CoreConsumer : poll later
+CoreConsumer -> ParentActors : wrapper
+ParentActors -> DeviceActor : process CLOSED
+DeviceActor -> DeviceActor : remove session and attribute/RPC subscriptions
+alt another Actor session remains
+  DeviceActor -> SessionCache : dump remaining sessions
+else last Actor session closed
+  DeviceActor -> DeviceState : onDeviceDisconnect(tenantId, deviceId, now)
+  DeviceState -> StateStore : async save lastDisconnectTime
+  DeviceState -> RuleQueue : DISCONNECT_EVENT
+  note over DeviceState
+    Disconnect does not force active=false.
+    Activity status waits for its own timeout.
+  end note
+end
+
+== SYNC request timeout ==
+Device -> Protocol : one-shot GET Attributes or client RPC
+Protocol -> Transport : registerSyncSession(sessionInfo, listener, timeout)
+Transport -> LocalState : sessions.putIfAbsent and schedule future
+Protocol -> Transport : process one-shot request
+alt notification arrives first
+  NotifyQueue -> Transport : ToTransportMsg(sessionId)
+  Transport -> Protocol : listener callback
+  Transport -> LocalState : auto deregister SYNC session and cancel future
+  Protocol --> Device : response
+else local timer fires first
+  LocalState -> Protocol : onRemoteSessionCloseCommand("session timeout!")
+  LocalState -> Transport : deregisterSession(sessionInfo)
+  Protocol --> Device : protocol timeout response
+  note over Transport,CoreQueue
+    Timeout does not cancel a Core Queue record or continuing Actor work.
+    A late notification is ignored because the listener is gone.
+  end note
+end
+
+== Session inactivity protection ==
+... no uplink for transport.sessions.inactivity_timeout ...
+Transport -> LocalState : reporting-period expiry scan
+LocalState -> Transport : session expired
+Transport -> Transport : deregisterSession(sessionInfo)
+Transport -> CoreQueue : ASYNC CLOSED
+Transport -> Protocol : remote close command
+Protocol --> Device : close socket or relation
+
+... AppActor broadcasts SessionTimeoutCheckMsg every report period ...
+ParentActors -> DeviceActor : checkSessionsTimeout()
+DeviceActor -> DeviceActor : remove Actor sessions older than threshold
+DeviceActor -> NotifyQueue : close notification to original nodeId
+DeviceActor -> SessionCache : dump remaining snapshot
+note over DeviceActor,DeviceState
+  Actor-side timeout is defensive cleanup.
+  It does not call onDeviceDisconnect and does not write lastDisconnectTime.
+end note
+
+== Device inactivity scheduler ==
+... fixed-delay state scan, default 60 seconds ...
+DeviceState -> DeviceState : checkStates() on owned Core partitions
+DeviceState -> DeviceState : now >= lastActivityTime + inactivityTimeout
+alt not already alarmed for this activity window
+  DeviceState -> StateStore : async save inactivityAlarmTime=now
+  DeviceState -> StateStore : async save active=false
+  DeviceState -> RuleQueue : INACTIVITY_EVENT
+  RuleQueue -> RuleChain : consume later
+else already inactive or too new
+  DeviceState -> DeviceState : no state transition
+end
+
+== Restart and routing ==
+note over LocalState,SessionCache
+  Transport restart always loses protocol listeners and activity states.
+  Core restart skips restore for default Caffeine cache.
+  Redis can restore Actor ASYNC metadata, not the network connection.
+end note
+DeviceActor -> SessionCache : restoreSessions() only for non-local cache
+SessionCache --> DeviceActor : nodeId, sessionId, last activity and subscriptions
+DeviceState -> StateStore : fetch six persistent keys on partition acquisition
+StateStore --> DeviceState : persisted snapshot
+DeviceState -> DeviceState : checkAndUpdateState using current wall clock
+
+@enduml

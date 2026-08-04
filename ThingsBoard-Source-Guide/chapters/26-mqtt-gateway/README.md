@@ -1,0 +1,903 @@
+# 26 MQTT Gateway 流程
+
+> 源码基线：ThingsBoard `3.6.4`（`release-3.6`，业务源码提交 `0cb411fc90`）；本章源码链接行号按当前工作区 `69124284c2` 标注。这里只分析 ThingsBoard MQTT Gateway API `v1/gateway/**`，不把普通 MQTT Device API 或 Sparkplug B 流程混入主链。
+
+[上一篇：25 LwM2M 注册与观测流程](../25-lwm2m-registration-observe/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/26-mqtt-gateway.svg) | [下一篇：27 Device Provision 流程](../27-device-provision/README.md)
+
+---
+
+## 一、流程目标
+
+MQTT Gateway API 让一条经过认证的 MQTT 连接代理多个虚拟设备。物理网关先以自己的 Device Credentials 完成 MQTT CONNECT；只有该设备 `additionalInfo.gateway=true` 时，[org.thingsboard.server.transport.mqtt.MqttTransportHandler.checkGatewaySession(SessionMetaData)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1477) 才创建 `GatewaySessionHandler`。此后 `v1/gateway/connect`、`telemetry`、`attributes`、`attributes/request`、`rpc` 和 `disconnect` 才进入 Gateway 专用分支。
+
+Gateway 不是把设备名塞进普通 MQTT payload 后继续使用网关身份。每个虚拟设备都会获得自己的 `DeviceId`、`DeviceProfile`、随机 `sessionId` 和 [SessionInfoProto](../../../common/proto/src/main/proto/queue.proto#L82)；其中 `gwSessionIdMSB/LSB` 指向物理 MQTT session。Telemetry/Client Attributes 以虚拟设备为 originator 进入 Rule Engine，GET Attributes、Shared Attributes、RPC 和 Session Event 则以虚拟设备为 routing key 进入 Core Queue 与 Device Actor。
+
+```mermaid
+flowchart TB
+    GW["Physical MQTT Gateway"] --> TCP["Netty TCP or TLS endpoint"]
+    TCP --> AUTH["Gateway device credential validation"]
+    AUTH --> FLAG{"additionalInfo.gateway equals true"}
+    FLAG -->|"no"| NORMAL["Ordinary MQTT Device API only"]
+    FLAG -->|"yes"| GSH["GatewaySessionHandler"]
+    GSH --> V1["Virtual Device A SessionInfo"]
+    GSH --> V2["Virtual Device B SessionInfo"]
+    V1 --> RE["Rule Engine Queue for telemetry and client attributes"]
+    V2 --> RE
+    V1 --> CORE["Core Queue for session, attributes and RPC"]
+    V2 --> CORE
+    CORE --> ACTOR["Device Actor per virtual DeviceId"]
+    ACTOR --> NOTIFY["Service-specific transport notification"]
+    NOTIFY --> GSH
+    RE --> DB[("Telemetry and attribute storage")]
+```
+
+四个必须先建立的边界：
+
+1. 认证主体是物理网关设备；虚拟设备不在 MQTT CONNECT 上逐个提交 credentials。
+2. `devices`、`deviceFutures`、Netty channel 和 Transport listener 是持有连接的 MQTT Transport 实例本地状态，不是共享 `connectedDevices` 数据库表。
+3. Gateway telemetry/attributes 的 PUBACK 最多确认对应 Queue producer callback，不确认 Rule Chain 或数据库事务。
+4. Shared Attributes 与 server-side RPC 下行依靠虚拟设备的 `sessionId + nodeId` 返回持有 channel 的服务，不靠 `lastConnectedGateway` 字段查网络连接。
+
+---
+
+## 二、入口
+
+### 2.1 网络与认证入口
+
+[org.thingsboard.server.transport.mqtt.MqttTransportService.init()](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportService.java#L129) 创建 Netty TCP endpoint，并可选创建 TLS endpoint。[org.thingsboard.server.transport.mqtt.MqttTransportServerInitializer.initChannel(SocketChannel)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportServerInitializer.java#L67) 按顺序安装 Proxy/IP filter、TLS、`MqttDecoder`、`MqttEncoder` 和 `MqttTransportHandler`。
+
+[org.thingsboard.server.transport.mqtt.MqttTransportHandler.processConnect(ChannelHandlerContext,MqttConnectMessage)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1230) 支持三类物理连接身份：
+
+- Access Token：通常放在 MQTT username；Core 的 `validateUserNameCredentials(...)` 查 `credentials_id`，接受 `ACCESS_TOKEN`。
+- MQTT Basic：组合 clientId/username/password 按凭据内容校验。
+- X.509：TLS peer certificate 规范化后计算 SHA3 hash，再查 X.509 credentials。
+
+认证成功还不等于 Gateway API 可用。[checkGatewaySession(SessionMetaData)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1477) 只读取物理设备的 `additionalInfo.gateway`；普通 MQTT 设备发布 `v1/gateway/**` 时 `gatewaySessionHandler` 仍为 `null`，不会被当成 Gateway。
+
+```mermaid
+sequenceDiagram
+    participant G as "Physical Gateway"
+    participant H as "MqttTransportHandler"
+    participant T as "DefaultTransportService"
+    participant A as "Transport API request and reply"
+    participant C as "DefaultTransportApiService"
+    participant D as "Credentials cache or PostgreSQL"
+    G->>H: "MQTT CONNECT with username, password and clientId"
+    H->>T: "process MQTT and ValidateBasicMqttCredRequestMsg"
+    T->>A: "correlated TransportApiRequestMsg"
+    A->>C: "validate basic MQTT credentials"
+    C->>D: "find credentials and device profile"
+    D-->>C: "gateway device snapshot"
+    C-->>T: "ValidateDeviceCredentialsResponse"
+    T-->>H: "auth callback"
+    H->>H: "process SessionEvent OPEN"
+    H->>H: "register physical ASYNC session"
+    H->>H: "check additionalInfo gateway flag"
+    H-->>G: "CONNACK success after Core producer callback"
+```
+
+### 2.2 Gateway Topic 契约
+
+Topic 常量集中在 [org.thingsboard.server.common.data.device.profile.MqttTopics](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/MqttTopics.java#L150)，入口 switch 是 [MqttTransportHandler.handleGatewayPublishMsg(ChannelHandlerContext,String,int,MqttPublishMessage)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L490)。
+
+| Topic | 方向 | JSON 关键形状 | 平台消息 / 结果 |
+|---|---|---|---|
+| `v1/gateway/connect` | 上行 | `{"device":"A","type":"sensor"}` | get-or-create Device，OPEN session，订阅 attributes/RPC |
+| `v1/gateway/disconnect` | 上行 | `{"device":"A"}` | 注销本地 listener，发送 CLOSED |
+| `v1/gateway/telemetry` | 上行 | `{"A":[{"ts":1,"values":{"k":1}}]}` | `PostTelemetryMsg` -> RE Queue |
+| `v1/gateway/attributes` | 双向 | 上行 `{"A":{"k":1}}`；下行 `{"device":"A","data":{...}}` | Client Attributes 上行；Shared Attributes update 下行 |
+| `v1/gateway/attributes/request` | 上行 | `{"id":1,"device":"A","client":false,"keys":["k"]}` | `GetAttributeRequestMsg` -> Core Queue |
+| `v1/gateway/attributes/response` | 下行 | `{"id":1,"device":"A","value":...}` 或 `values` | Device Actor 查询结果 |
+| `v1/gateway/rpc` | 双向 | 下行 `{"device":"A","data":{"id":1,"method":"m","params":{}}}`；上行 response 含 `device/id/data` | server-side RPC request/response |
+| `v1/gateway/claim` | 上行 | 设备名到 claim body 的 map | `ClaimDeviceMsg` -> Device Actor |
+
+```mermaid
+flowchart LR
+    BASE["v1/gateway"] --> CONNECT["connect"]
+    BASE --> DISCONNECT["disconnect"]
+    BASE --> TELEMETRY["telemetry"]
+    BASE --> ATTR["attributes"]
+    ATTR --> REQUEST["request"]
+    ATTR --> RESPONSE["response"]
+    BASE --> RPC["rpc"]
+    BASE --> CLAIM["claim"]
+    CONNECT --> CORE["Transport API and Core Queue"]
+    DISCONNECT --> CORE
+    REQUEST --> CORE
+    RPC --> CORE
+    CLAIM --> CORE
+    TELEMETRY --> RE["Rule Engine Queue"]
+    ATTR --> RE
+```
+
+Gateway 下行 Topic 在 MQTT SUBSCRIBE 时只登记请求 QoS；[MqttTransportHandler.processSubscribe(ChannelHandlerContext,MqttSubscribeMessage)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L971) 对三个 Gateway 下行 Topic 不再向 Actor 发送订阅消息，因为虚拟设备在创建 session 时已经同时订阅 attributes 与 RPC。取消 MQTT Topic 也只移除 QoS map，不关闭虚拟设备 Actor 订阅；真正的取消发生在 `gateway/disconnect` 或物理连接关闭。
+
+### 2.3 配置默认值
+
+独立 MQTT Transport 配置见 [tb-mqtt-transport.yml](../../../transport/mqtt/src/main/resources/tb-mqtt-transport.yml#L123)，monolith 的同名配置位于 `application/src/main/resources/thingsboard.yml`。
+
+| 配置 | release-3.6 默认值 | 对 Gateway 的影响 |
+|---|---:|---|
+| `transport.mqtt.bind_port` | `1883` | 明文 MQTT TCP |
+| `transport.mqtt.ssl.enabled` | `false` | 默认不开 TLS |
+| `transport.mqtt.ssl.bind_port` | `8883` | TLS endpoint |
+| `transport.mqtt.netty.max_payload_size` | `65536` bytes | 整个 Gateway 批量 envelope 同样受限 |
+| `transport.mqtt.msg_queue_size_per_device_limit` | `100` | 物理连接认证完成前的 Netty 消息等待队列上限 |
+| `transport.mqtt.timeout` | `10000 ms` | 普通 MQTT RPC ACK timeout 上界；不是 DB timeout |
+| `transport.sessions.inactivity_timeout` | `600000 ms` | 物理和虚拟 Transport session 失活阈值 |
+| `transport.sessions.report_timeout` | `3000 ms` | activity/subscription 向 Device Actor 汇报周期 |
+| `transport.rate_limits.ip_limits_enabled` | `false` | 默认不启用错误凭据 IP 封禁 |
+| `transport.rate_limits.max_wrong_credentials_per_ip` | `10` | 开启 IP 限流后的错误次数 |
+| `transport.rate_limits.ip_block_timeout` | `60000 ms` | IP block 时间 |
+| `actors.session.max_concurrent_sessions_per_device` | `1` | Device Actor 默认只保留一个 ASYNC session |
+| `cache.type` | `caffeine` | 默认不执行分布式 Actor session dump/restore |
+| `state.persistToTelemetry` | `false` | active/lastActivity 默认存 SERVER_SCOPE attributes |
+| `queue.transport_api.max_requests_timeout` | `10000 ms` | auth 与 get-or-create request/reply timeout |
+| `queue.transport.poll_interval` | `25 ms` | Transport notification poll 间隔 |
+
+租户和设备 Transport message/data-point rate limit 没有一个写死的 Gateway 数值；它来自 Tenant Profile。空配置由 [DefaultTransportRateLimitService.newLimit(String)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java#L375) 解释为 `ALLOW`。Gateway 没有独立的“最多连接多少虚拟设备”配置，新增设备数受 Tenant Profile entity limit 和数据库唯一约束控制。
+
+---
+
+## 三、完整调用链
+
+### 3.1 物理网关认证与 Gateway handler 激活
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出、职责、设计原因与确认边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.channelRead(ChannelHandlerContext,Object)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L251) | Netty 解码后的 `MqttConnectMessage` | retain/release 边界；转 `processMqttMsg` |
+| 2 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.processConnect(ChannelHandlerContext,MqttConnectMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1230) | clientId、username、password 或 TLS cert | 选择 Basic/Token/X.509；虚拟设备不参与此认证 |
+| 3 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.processAuthTokenConnect(ChannelHandlerContext,MqttConnectMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1255) | MQTT CONNECT payload | 组装 `ValidateBasicMqttCredRequestMsg` |
+| 4 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(DeviceTransportType,ValidateBasicMqttCredRequestMsg,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L562) | `DeviceTransportType.MQTT` 与 credentials proto | Transport API correlated request/reply；同时校验 Device Profile transport type |
+| 5 | [`org.thingsboard.server.service.transport.DefaultTransportApiService.validateCredentials(ValidateBasicMqttCredRequestMsg)`](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L311) | Basic MQTT credentials | 查 MQTT Basic hash 或回退 username credentials |
+| 6 | [`org.thingsboard.server.service.transport.DefaultTransportApiService.validateUserNameCredentials(ValidateBasicMqttCredRequestMsg)`](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L379) | username | ACCESS_TOKEN 或 MQTT_BASIC -> device/profile snapshot |
+| 7 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.onValidateDeviceResponse(ValidateDeviceCredentialsResponse,ChannelHandlerContext,MqttConnectMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1586) | auth response | 创建物理 `SessionInfoProto`，发送 OPEN，注册 ASYNC listener |
+| 8 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.checkGatewaySession(SessionMetaData)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1477) | 物理 Device `additionalInfo` | 仅 `gateway=true` 创建 `GatewaySessionHandler`；可设置 `overwriteActivityTime` |
+| 9 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.createMqttConnAckMsg(ReturnCode,MqttConnectMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1346) | `ReturnCode.SUCCESS` 与原始 CONNECT；调用点位于 session OPEN producer callback | 构造并写 CONNACK；不等待 Device Actor 实际处理 OPEN |
+
+设计上先建立物理 session，再激活 Gateway handler：Transport 必须把下行 channel 归属绑定到稳定的 `nodeId + physical sessionId`，同时避免普通设备凭据获得按租户设备名代理任意设备的能力。
+
+### 3.2 虚拟设备 connect 或隐式 get-or-create
+
+```mermaid
+sequenceDiagram
+    participant G as "Physical Gateway"
+    participant H as "MqttTransportHandler"
+    participant S as "AbstractGatewaySessionHandler"
+    participant T as "DefaultTransportService"
+    participant A as "DefaultTransportApiService"
+    participant DB as "device, credentials, profile and relation"
+    participant D as "Virtual Device Actor"
+    G->>H: "PUBLISH v1/gateway/connect with device and type"
+    H->>S: "onDeviceConnect MqttPublishMessage"
+    S->>S: "onDeviceConnect by name and per-name lock"
+    S->>T: "process tenantId and GetOrCreateDeviceFromGatewayRequestMsg"
+    T->>A: "Transport API request"
+    A->>DB: "find device by tenant and name"
+    alt "device is absent"
+        A->>DB: "create profile if needed, device and access-token credentials"
+        A->>DB: "save Created relation separately"
+    else "device already exists"
+        A->>DB: "update lastConnectedGateway when changed"
+    end
+    A-->>S: "deviceInfo and DeviceProfile"
+    S->>S: "create random virtual session and set gwSessionId"
+    S->>T: "registerAsyncSession virtual listener"
+    S->>D: "OPEN plus attributes and RPC subscriptions"
+    S-->>G: "PUBACK after local setup, not Actor handling"
+```
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出、职责、事务/确认边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.handleGatewayPublishMsg(ChannelHandlerContext,String,int,MqttPublishMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L490) | exact Gateway topic | 严格 switch；`startsWith` 只选择 Gateway 大分支，未知子 Topic 返回 invalid topic ACK |
+| 2 | [`org.thingsboard.server.transport.mqtt.session.GatewaySessionHandler.onDeviceConnect(MqttPublishMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/GatewaySessionHandler.java#L56) | JSON 或 fixed Gateway protobuf | 按物理网关 profile 的 payload type 选 parser |
+| 3 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.processOnConnect(MqttPublishMessage,String,String)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L333) | deviceName、deviceType | 异步 get-or-create；成功才 PUBACK |
+| 4 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.onDeviceConnect(String,String)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L356) | normalized name/type | `devices` fast path、弱引用 per-name lock、`deviceFutures` 合并并发创建 |
+| 5 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.getDeviceCreationFuture(String,String)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L383) | missing virtual device | 发送 gatewayId/name/type Transport API request |
+| 6 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(TenantId,GetOrCreateDeviceFromGatewayRequestMsg,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L672) | tenant + request | entity-limit cache，10 秒 request/reply；不是 Core Queue Device Actor 消息 |
+| 7 | [`org.thingsboard.server.service.transport.DefaultTransportApiService.handle(GetOrCreateDeviceFromGatewayRequestMsg)`](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L454) | gateway UUID、name、type | 查询/创建设备、更新 `lastConnectedGateway`、创建 `Created` relation、发 ENTITY_CREATED |
+| 8 | [`org.thingsboard.server.transport.mqtt.session.GatewaySessionHandler.newDeviceSessionCtx(GetOrCreateDeviceFromGatewayResponse)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/GatewaySessionHandler.java#L87) | device/profile snapshot | 创建虚拟 `GatewayDeviceSessionContext` |
+| 9 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewayDeviceSessionContext.AbstractGatewayDeviceSessionContext(AbstractGatewaySessionHandler,TransportDeviceInfo,DeviceProfile,ConcurrentMap,TransportService)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java#L65) | parent、虚拟设备信息 | 随机 `sessionId`，写 tenant/device/customer/profile 和 `gwSessionId` |
+| 10 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.registerAsyncSession(SessionInfoProto,SessionMsgListener)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L408) | virtual SessionInfo/listener | 本地 `sessions` map 注册，下行最终定位到此 listener |
+| 11 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(TransportToDeviceActorMsg,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L798) | OPEN + attributes/RPC subscribe | 一条 Core Queue proto；调用处 callback 为 `null`，Gateway connect PUBACK 不等待 producer callback |
+
+显式 `connect` 不是硬前置条件。[`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.checkDeviceConnected(String)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L1019) 在 telemetry、attributes、request、RPC response 找不到 `devices[name]` 时会以默认 type 调用 `onDeviceConnect`。集成测试 [`org.thingsboard.server.transport.mqtt.mqttv3.telemetry.timeseries.AbstractMqttTimeseriesIntegrationTest.processGatewayTelemetryTest(...)`](../../../application/src/test/java/org/thingsboard/server/transport/mqtt/mqttv3/telemetry/timeseries/AbstractMqttTimeseriesIntegrationTest.java#L254) 未先发布 `gateway/connect`，仍验证两个设备被创建。因此生产协议可以要求显式 connect，但排障时不能假设源码会拒绝隐式设备。
+
+### 3.3 Gateway Telemetry 与 Client Attributes
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出、职责、确认边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.mqtt.session.GatewaySessionHandler.onDeviceTelemetry(MqttPublishMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/GatewaySessionHandler.java#L70) | Gateway JSON map 或 protobuf envelope | 按物理网关 payload type 分派 |
+| 2 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.onDeviceTelemetryJson(int,ByteBuf)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L540) | MQTT packetId + JSON object | 每个 entry 的 key 是 deviceName，value 必须为 telemetry array |
+| 3 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.processPostTelemetryMsg(MqttDeviceAwareSessionContext,PostTelemetryMsg,String,int)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L625) | virtual context、proto、name、packetId | 以虚拟 `SessionInfoProto` 调 TransportService |
+| 4 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto,PostTelemetryMsg,TbMsgMetaData,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L839) | telemetry groups | 计 data points、限流、activity、按 timestamp 生成 TbMsg |
+| 5 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.sendToRuleEngine(TenantId,DeviceId,CustomerId,SessionInfoProto,JsonObject,TbMsgMetaData,TbMsgType,TbQueueCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1659) | virtual DeviceId/profile | 选择 virtual profile 的 default Rule Chain/Queue，producer callback 回 Gateway |
+| 6 | [`org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode.onMsg(TbContext,TbMsg)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgTimeseriesNode.java#L122) | `POST_TELEMETRY_REQUEST` | 规则链实际包含 Save Timeseries Node 时才保存 history/latest |
+| 7 | [`org.thingsboard.server.dao.timeseries.BaseTimeseriesService.save(TenantId,EntityId,List,long)`](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L289) | virtual DeviceId、entries、TTL | history/partition/latest futures；事务晚于 MQTT PUBACK |
+
+Attributes 对应 [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.onDeviceAttributesJson(int,ByteBuf)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L753) -> [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.processPostAttributesMsg(MqttDeviceAwareSessionContext,PostAttributeMsg,String,int)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L835) -> [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto,PostAttributeMsg,TbMsgMetaData,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L884) -> [`org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode.onMsg(TbContext,TbMsg)`](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgAttributesNode.java#L116)。Gateway 上行 `PostAttributeMsg.shared` 默认 false，最终 scope 是 `CLIENT_SCOPE`。
+
+```mermaid
+sequenceDiagram
+    participant G as "Gateway MQTT client"
+    participant S as "GatewaySessionHandler"
+    participant T as "DefaultTransportService"
+    participant R as "Rule Engine producer"
+    participant C as "Rule Engine consumer and actors"
+    participant N as "Save Timeseries or Attributes node"
+    participant DB as "DAO queue and database"
+    G->>S: "PUBLISH gateway telemetry or attributes"
+    S->>S: "split JSON or protobuf by virtual device"
+    S->>S: "get or create virtual session when missing"
+    S->>T: "PostTelemetryMsg or PostAttributeMsg with virtual SessionInfo"
+    T->>T: "rate limits, activity, metadata and profile routing"
+    T->>R: "produce to virtual profile queue"
+    alt "producer callback succeeds"
+        R-->>S: "success"
+        S-->>G: "PUBACK for QoS one"
+    else "producer callback fails"
+        R-->>S: "error"
+        S->>G: "close physical MQTT channel"
+    end
+    R->>C: "consumer poll later"
+    C->>N: "execute configured rule chain"
+    N->>DB: "asynchronous save"
+```
+
+### 3.4 Attributes 请求、Shared Attributes 下行与 response
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出、职责、设计原因与确认边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.onDeviceAttributesRequestJson(MqttPublishMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L845) | Gateway request JSON | 解析 `id/device/client/key|keys`；`client=true` 写 client names，否则写 shared names |
+| 2 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.processGetAttributeRequestMessage(MqttPublishMessage,String,GetAttributeRequestMsg)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L976) | 原 MQTT 消息、deviceName、scope/keys proto | `checkDeviceConnected` 后以虚拟 SessionInfo 调用 TransportService |
+| 3 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto,GetAttributeRequestMsg,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L912) | virtual SessionInfo 与查询请求 | 以 virtual DeviceId 发送 Core Queue；producer callback 触发请求 PUBACK，不等待查询完成 |
+| 4 | [`org.thingsboard.server.actors.device.DeviceActorMessageProcessor.handleGetAttributesRequest(SessionInfoProto,GetAttributeRequestMsg)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L664) | Core consumer 交付的 virtual session 与 keys | 在 Actor 串行上下文读取 CLIENT/SHARED scope；该读取晚于上行 PUBACK |
+| 5 | [`org.thingsboard.server.actors.device.DeviceActorMessageProcessor.sendToTransport(GetAttributeResponseMsg,SessionInfoProto)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1192) | 查询值或错误、原 virtual SessionInfo | 按 `nodeId + sessionId` 构造 service-specific transport notification |
+| 6 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.processToTransportMsg(ToTransportMsg)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1335) | notification consumer 的 `ToTransportMsg` | 用 virtual sessionId 查当前 Transport JVM 的 listener；不存在时只能记录 session 已关闭 |
+| 7 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewayDeviceSessionContext.onGetAttributesResponse(GetAttributeResponseMsg)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java#L120) | Actor 查询响应 | adaptor 生成并直接写 `v1/gateway/attributes/response`；没有虚拟设备业务 ACK 或数据库事务 |
+
+Shared Attributes 更新不需要每次 request。虚拟 session 创建时已经发送 `SubscribeToAttributeUpdatesMsg`；Device Actor 的 attribute subscription 收到更新后，通过 `AttributeUpdateNotificationMsg` 返回 [`org.thingsboard.server.transport.mqtt.session.AbstractGatewayDeviceSessionContext.onAttributeUpdate(UUID,AttributeUpdateNotificationMsg)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java#L136)，最终发布 `v1/gateway/attributes`，JSON body 为 `device + data`。
+
+```mermaid
+sequenceDiagram
+    participant G as "Gateway"
+    participant S as "Virtual Session Listener"
+    participant T as "TransportService"
+    participant Q as "Core Queue"
+    participant D as "Virtual Device Actor"
+    participant A as "Attribute Service"
+    participant N as "Transport notification topic"
+    G->>S: "PUBLISH attributes request with id, device and keys"
+    S->>T: "GetAttributeRequestMsg"
+    T->>Q: "ToCoreMsg keyed by virtual DeviceId"
+    Q->>D: "handle get attributes"
+    D->>A: "read CLIENT_SCOPE or SHARED_SCOPE"
+    A-->>D: "attribute values"
+    D->>N: "GetAttributeResponseMsg to nodeId and sessionId"
+    N->>T: "poll and dispatch"
+    T->>S: "onGetAttributesResponse"
+    S-->>G: "PUBLISH v1/gateway/attributes/response"
+```
+
+### 3.5 Server-side RPC 下行与设备 response
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出、职责、设计原因与确认边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.actors.device.DeviceActorMessageProcessor.processSubscriptionCommands(SessionInfoProto,SubscribeToRPCMsg)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L972) | virtual OPEN 携带的 RPC subscribe | 记录 virtual sessionId/nodeId；该 live subscription 是下行路由依据 |
+| 2 | [`org.thingsboard.server.actors.device.DeviceActorMessageProcessor.sendToTransport(ToDeviceRpcRequestMsg,UUID,String)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1224) | server-side RPC、virtual sessionId、nodeId | 发 service-specific transport notification；不查询 `lastConnectedGateway` |
+| 3 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.processToTransportMsg(ToTransportMsg)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1335) | RPC notification | 在 nodeId 对应 Transport 实例用 virtual sessionId 找 listener |
+| 4 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewayDeviceSessionContext.onToDeviceRpcRequest(UUID,ToDeviceRpcRequestMsg)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java#L153) | virtual sessionId 与 Actor RPC | adaptor 生成 `v1/gateway/rpc` 并写物理 channel；persisted QoS 0 报 DELIVERED，QoS 1 只报 SENT |
+| 5 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.onDeviceRpcResponseJson(int,ByteBuf)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L897) | 上行 packetId 与 `device/id/data` JSON | 校验 device/id 并构造 `ToDeviceRpcResponseMsg`；缺失 virtual session 时可隐式创建 |
+| 6 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.processRpcResponseMsg(MqttDeviceAwareSessionContext,ToDeviceRpcResponseMsg,String,int)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L964) | virtual context、RPC response、deviceName、packetId | 以 virtual SessionInfo 调用 TransportService，沿用 packetId callback |
+| 7 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto,ToDeviceRpcResponseMsg,TransportServiceCallback)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L971) | virtual SessionInfo 与 response proto | 发送 Core Queue；producer callback 成功后才回上行 PUBACK，但不等待 Actor/REST future |
+| 8 | [`org.thingsboard.server.actors.device.DeviceActorMessageProcessor.processRpcResponses(SessionInfoProto,ToDeviceRpcResponseMsg)`](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L829) | Core consumer 交付的 response | 完成 pending REST callback，并按 persisted RPC 模式更新 `rpc` 状态/response；数据库边界晚于 PUBACK |
+
+```mermaid
+sequenceDiagram
+    participant API as "Server RPC caller"
+    participant D as "Virtual Device Actor"
+    participant N as "Transport notification"
+    participant S as "GatewayDeviceSessionContext"
+    participant G as "Physical Gateway"
+    API->>D: "one-way or two-way RPC for virtual DeviceId"
+    D->>N: "ToDeviceRpcRequestMsg to virtual session"
+    N->>S: "onToDeviceRpcRequest"
+    S->>G: "PUBLISH v1/gateway/rpc with device and data"
+    alt "downlink QoS is zero and RPC is persisted"
+        S->>D: "RpcStatus DELIVERED after Netty write"
+    else "downlink QoS is one and RPC is persisted"
+        S->>D: "RpcStatus SENT after Netty write"
+    end
+    G->>S: "PUBLISH v1/gateway/rpc response"
+    S->>D: "ToDeviceRpcResponseMsg through Core Queue"
+    D-->>API: "RPC response payload"
+```
+
+源码缺口必须明确：普通 MQTT device 的 [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.sendToDeviceRpcRequest(MqttMessage,ToDeviceRpcRequestMsg,SessionInfoProto)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1767) 会把 QoS 1 MID 放进 `rpcAwaitingAck`，并在 PUBACK/TIMEOUT 后上报状态；Gateway 虚拟 listener 没有对应 map。它只在 Netty write 成功时对 QoS 1 persisted RPC 报 `SENT`，没有从物理 PUBACK 关联回 virtual session 的实现。因此不能把 Gateway QoS 1 的 `SENT` 描述成已由设备确认，也不能声称 Gateway RPC 有源码实现的 transport-level timeout retry 闭环；真正的业务 response 仍以 `device + id` 为准。
+
+### 3.6 虚拟 disconnect、物理断线与重建
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出、职责、设计原因与确认边界 |
+|---:|---|---|---|
+| 1 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.onDeviceDisconnect(MqttPublishMessage)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L166) | `v1/gateway/disconnect` JSON/Protobuf PUBLISH | 按物理 profile 选择 parser，得到 deviceName |
+| 2 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.processOnDisconnect(MqttPublishMessage,String)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L528) | 原消息与 deviceName | 先注销本地 virtual context，再立即 PUBACK；不等待 CLOSED producer callback |
+| 3 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.deregisterSession(String,MqttDeviceAwareSessionContext)`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L1105) | name 与 virtual context | 从 Transport `sessions` 注销 listener，并以 callback `null` 发送 virtual CLOSED |
+| 4 | [`org.thingsboard.server.transport.mqtt.MqttTransportHandler.doDisconnect()`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1559) | channel close、producer error 或 inactivity | physical CLOSED/deregister 后调用 `onDevicesDisconnect()`，最后 release channel 级资源 |
+| 5 | [`org.thingsboard.server.transport.mqtt.session.AbstractGatewaySessionHandler.onDevicesDisconnect()`](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L241) | 当前 handler 的 `devices` map | 遍历所有 virtual context，注销 listener 并发送 CLOSED；Queue/Actor 消费异步发生 |
+| 6 | [`org.thingsboard.server.common.transport.service.DefaultTransportService.deregisterSession(SessionInfoProto)`](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1246) | physical 或 virtual SessionInfo | 只删除当前 Transport 实例 `sessions` 条目；重连必须创建新 physical/virtual sessionId，不能恢复旧 Netty channel |
+
+---
+
+## 四、消息流
+
+### 4.1 输入、输出与确认点
+
+| 操作 | 输入边界 | 平台输出 | MQTT 确认点 | 不被确认的内容 |
+|---|---|---|---|---|
+| 物理 MQTT CONNECT | gateway credentials | physical OPEN session | Core Queue producer callback 后 CONNACK | Device Actor 已处理、设备状态已落库 |
+| `gateway/connect` | device/type | get-or-create + local virtual session | Transport API response 与本地 setup 后 PUBACK | virtual OPEN 已被 Core producer/Actor 处理；relation 与 ENTITY_CREATED 原子一致 |
+| `gateway/telemetry` | map of device -> telemetry array | 每 timestamp 一个 RE TbMsg | 每个虚拟 entry 的 producer callback | Rule Chain、外部副作用、history/latest commit |
+| `gateway/attributes` 上行 | map of device -> object | RE `POST_ATTRIBUTES_REQUEST` | RE producer callback | `attribute_kv` commit |
+| `gateway/attributes/request` | id/device/scope/keys | Core GET + later response Topic | Core producer callback | 查询已经返回；response 已写到 TCP |
+| Shared Attributes 下行 | Actor notification | direct MQTT PUBLISH | 没有业务应用 ACK | gateway 子设备已应用 |
+| RPC 下行 | Actor `ToDeviceRpcRequestMsg` | Gateway RPC Topic | QoS 0 Netty write；QoS 1 仅 `SENT` | 虚拟设备执行业务成功 |
+| RPC response 上行 | device/id/data | Core RPC response | Core producer callback | REST caller 已消费、persistent RPC 已提交 |
+| `gateway/disconnect` | device | remove local virtual listener + CLOSED | 立即 PUBACK | Core producer/Actor 已处理 CLOSED |
+
+```mermaid
+flowchart TB
+    P["Inbound Gateway PUBLISH"] --> V{"Topic and payload valid"}
+    V -->|"no"| ERR["Negative PUBACK for MQTT five or close channel"]
+    V -->|"yes"| SPLIT["Split by virtual device"]
+    SPLIT --> ENSURE["Ensure local virtual session"]
+    ENSURE --> DEST{"Message destination"}
+    DEST -->|"telemetry or client attributes"| RE["RE producer callback"]
+    DEST -->|"session, get attributes or RPC response"| CORE["Core producer callback"]
+    RE --> ACK["MQTT PUBACK when QoS one"]
+    CORE --> ACK
+    RE -. "consumer later" .-> RULE["Rule Chain and DAO"]
+    CORE -. "consumer later" .-> ACTOR["Device Actor and notification"]
+    RULE --> DB[("Database transaction")]
+    ACTOR --> DOWN["Gateway downlink PUBLISH"]
+```
+
+### 4.2 批量 payload 不是一个平台事务
+
+JSON telemetry/attributes 外层允许多个设备；protobuf 的 `GatewayTelemetryMsg` 和 `GatewayAttributesMsg` 也是 repeated message，定义见 [transport.proto](../../../common/proto/src/main/proto/transport.proto#L48)。源码逐 entry 异步 `checkDeviceConnected`，再分别调用 `TransportService`。没有跨设备 `MsgPackCallback`、数据库事务或原子 rollback。
+
+同一个 QoS 1 MQTT packet 的 `msgId` 被传给每个虚拟 entry 的 `getPubAckCallback(...)`。因此实现没有把多设备 callbacks 聚合成一个“全部成功才 ACK”的确认屏障；生产 Gateway 应把批量上报视为可部分进入 Queue，并对重复 PUBACK、断线和客户端重发后的重复业务副作用做幂等设计。
+
+```mermaid
+flowchart LR
+    B["One MQTT batch packet with packetId seven"] --> A["Device A future"]
+    B --> C["Device B future"]
+    B --> D["Device C future"]
+    A --> QA["Queue callback A"]
+    C --> QC["Queue callback B"]
+    D --> QD["Queue callback C"]
+    QA --> PA["PUBACK packetId seven"]
+    QC --> PB["PUBACK packetId seven"]
+    QD --> PC["PUBACK packetId seven"]
+    A -. "no cross-device rollback" .-> C
+```
+
+---
+
+## 五、时序图
+
+完整 PlantUML 覆盖物理认证、虚拟设备创建、隐式连接、Telemetry/Attributes、Shared Attributes、RPC、断线和重连：
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="ThingsBoard MQTT Gateway 完整时序图"></a>
+
+可直接查看 [PlantUML 源文件](sequence.puml)。
+
+```mermaid
+stateDiagram-v2
+    state "TcpConnected" as TCP
+    state "GatewayAuthenticating" as AUTH
+    state "Rejected" as REJECTED
+    state "OrdinaryMqttSession" as ORDINARY
+    state "PhysicalGatewaySession" as PHYSICAL
+    state "VirtualSessionCreating" as CREATING
+    state "VirtualSessionOpen" as OPEN
+    state "VirtualSessionClosed" as CLOSED
+    state "AllVirtualSessionsClosed" as ALL_CLOSED
+    [*] --> TCP
+    TCP --> AUTH: "MQTT CONNECT"
+    AUTH --> REJECTED: "invalid credentials"
+    AUTH --> ORDINARY: "gateway flag absent"
+    AUTH --> PHYSICAL: "gateway flag true"
+    PHYSICAL --> CREATING: "connect or first virtual uplink"
+    CREATING --> OPEN: "get-or-create response"
+    OPEN --> OPEN: "telemetry, attributes, request or RPC response"
+    OPEN --> CLOSED: "gateway disconnect"
+    PHYSICAL --> ALL_CLOSED: "TCP close or inactivity"
+    CLOSED --> CREATING: "later implicit reconnect"
+    ALL_CLOSED --> AUTH: "new TCP connection"
+    REJECTED --> [*]
+```
+
+PlantUML 中的 ACK 注释严格区分 MQTT PUBACK、Queue producer callback、Actor 消费和数据库 commit；图中的 persisted RPC `SENT` 也没有画成 Gateway PUBACK 后 `DELIVERED`，与实际 Gateway listener 实现一致。
+
+---
+
+## 六、数据变化
+
+### 6.1 Session、cache 与内存状态
+
+| 层 | 数据结构/字段 | 创建 | 清理或恢复 |
+|---|---|---|---|
+| Netty handler | physical `sessionId`、channel、message queue、QoS map | TCP channel 创建 handler | channel close 后 `release()`；不跨进程恢复 |
+| Gateway handler | `devices<String,GatewayDeviceSessionContext>` | 显式 connect 或首条业务消息 | virtual disconnect remove；物理 close 遍历 deregister；handler 随 channel 释放 |
+| Gateway handler | `deviceFutures<String,ListenableFuture>` | 并发 get-or-create | success/error 后 remove |
+| Gateway handler | weak `deviceCreationLockMap<String,Lock>` | 同一进程按 deviceName 串行创建 | key 可被 GC；不是分布式锁 |
+| TransportService | `sessions<UUID,SessionMetaData>` | physical 与每个 virtual 都 register ASYNC | deregister、inactivity、服务重启 |
+| virtual SessionInfo | `sessionId` + `gwSessionId` + virtual entity/profile fields | `AbstractGatewayDeviceSessionContext` constructor | 不写业务表；随 Transport state 消失 |
+| Device Actor | sessions、attributeSubscriptions、rpcSubscriptions | OPEN/subscribe Core 消息 | CLOSED、max sessions eviction、inactivity |
+| Actor session cache | `DeviceSessionsCacheEntry` | 仅非 local cache 时 dump | Redis 可 restore；默认 caffeine 路径直接跳过 dump/restore |
+| profile/credential cache | DeviceProfile 与 credentials snapshot | auth/get-or-create | cache eviction/update notification |
+
+```mermaid
+flowchart TB
+    PHY["Physical session UUID"] --> MAP["DefaultTransportService sessions map"]
+    PHY --> GH["GatewaySessionHandler devices map"]
+    GH --> VA["Virtual A random session UUID"]
+    GH --> VB["Virtual B random session UUID"]
+    VA --> GWA["gwSessionId points to physical UUID"]
+    VB --> GWB["gwSessionId points to physical UUID"]
+    VA --> DA["Device Actor A session state"]
+    VB --> DB["Device Actor B session state"]
+    DA --> CACHE{"cache type"}
+    DB --> CACHE
+    CACHE -->|"caffeine default"| LOCAL["no Actor session dump or restore"]
+    CACHE -->|"redis"| REDIS["DeviceSessionsCacheEntry"]
+```
+
+`overwriteActivityTime` 是可选物理网关配置。若 gateway `additionalInfo` 中该字段为 true，[TransportActivityManager.updateState(UUID,ActivityState)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/TransportActivityManager.java#L104) 对 virtual session 取 `max(virtual lastRecordedTime, physical lastRecordedTime)`，让网关心跳维持虚拟设备活跃；默认未设置时，virtual device 必须靠自身代理消息更新 activity。
+
+### 6.2 数据库变化
+
+首次虚拟设备创建可能产生：
+
+- `device`：tenant/name/type/customer/profile 与 `additional_info.lastConnectedGateway`。
+- `device_credentials`：`DeviceServiceImpl.doSaveDevice(...)` 自动创建随机 20 字符 Access Token；Gateway 代理链不使用这个 token 认证当前虚拟 session。
+- `device_profile`：type 对应 profile 不存在时 `findOrCreateDeviceProfile(...)` 可创建默认 profile。
+- `relation`：只在新建设备时保存 `gateway --Created--> virtual device`；已有同名设备不会为新网关补建该关系。
+- Rule Engine `ENTITY_CREATED` 消息：在 device/relation service 调用之后异步发送，不与两次 DAO 操作构成一个事务。
+
+运行期还可能写 `attribute_kv`、`ts_kv`/Timescale/Cassandra、`ts_kv_latest` 和 persistent `rpc`。OPEN/activity/CLOSED 进入 Device State Service 后，默认 `state.persistToTelemetry=false`，因此 `lastConnectTime`、`lastActivityTime`、`active`、`lastDisconnectTime` 等写 `SERVER_SCOPE attribute_kv`；close 只更新 `lastDisconnectTime`，`active=false` 由 inactivity 判断触发。
+
+```mermaid
+flowchart TB
+    GC["Gateway connect for new name"] --> DEV[("device")]
+    GC --> CRED[("device_credentials")]
+    GC --> PROF[("device_profile when type is new")]
+    GC --> REL[("relation type Created")]
+    GC --> ECREATED["ENTITY_CREATED Rule Engine message"]
+    OPEN["Virtual OPEN and activity"] --> STATE[("attribute_kv SERVER_SCOPE by default")]
+    TEL["Gateway telemetry after Save Timeseries Node"] --> HIST[("ts_kv, TimescaleDB or Cassandra")]
+    TEL --> LATEST[("ts_kv_latest")]
+    ATTR["Gateway client attributes after Save Attributes Node"] --> AKV[("attribute_kv CLIENT_SCOPE")]
+    RPC["Persisted server RPC"] --> RPCT[("rpc")]
+```
+
+### 6.3 创建事务边界
+
+[DefaultTransportApiService.handle(...)](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L454) 本身没有覆盖整段流程的 `@Transactional`。`DeviceServiceImpl.saveDevice(Device)` 在 [line 255](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L255) 有独立事务，包含 device 与自动 credentials；随后 `relationService.saveRelation(...)` 是另一 service 调用，最后才发送 cluster/Rule Engine 消息。因此 device 创建成功而 relation 或后续 Queue 失败时，不存在自动跨边界 rollback。
+
+---
+
+## 七、源码分析
+
+### 7.1 核心类职责
+
+| 类型 | 包路径 | Gateway 专用职责 |
+|---|---|---|
+| `MqttTransportService` | `org.thingsboard.server.transport.mqtt` | Netty 1883/8883 lifecycle |
+| `MqttTransportServerInitializer` | 同上 | decoder/encoder/filter/TLS pipeline |
+| `MqttTransportHandler` | 同上 | 物理 auth/session、Topic switch、SUBACK/PUBACK、channel close |
+| `DeviceSessionCtx` | `.session` | 物理 gateway profile payload type、QoS map、认证前消息队列 |
+| `GatewaySessionHandler` | `.session` | JSON/Protobuf connect 与 telemetry concrete entry |
+| `AbstractGatewaySessionHandler` | `.session` | `devices`/future/lock、所有 Gateway API parsing、virtual lifecycle |
+| `GatewayDeviceSessionContext` | `.session` | 标准 Gateway virtual listener concrete type |
+| `AbstractGatewayDeviceSessionContext` | `.session` | virtual SessionInfo、attributes/RPC downlink adaptor |
+| `JsonMqttAdaptor` | `.adaptors` | Gateway response/update/RPC JSON envelope |
+| `ProtoMqttAdaptor` | `.adaptors` | fixed `TransportApiProtos` Gateway envelopes |
+| `DefaultTransportService` | `org.thingsboard.server.common.transport.service` | limit/activity/session、Core/RE producer 与 notifications consumer |
+| `DefaultTransportApiService` | `org.thingsboard.server.service.transport` | physical credentials 与 virtual get-or-create |
+| `DeviceActorMessageProcessor` | `org.thingsboard.server.actors.device` | virtual session、subscriptions、attribute reads、RPC state |
+
+```mermaid
+classDiagram
+    class MqttTransportHandler {
+        +processConnect(ctx,msg)
+        -handleGatewayPublishMsg(ctx,topic,msgId,msg)
+        -checkGatewaySession(sessionMetaData)
+        +doDisconnect()
+    }
+    class GatewaySessionHandler {
+        +onDeviceConnect(mqttMsg)
+        +onDeviceTelemetry(mqttMsg)
+    }
+    class AbstractGatewaySessionHandler {
+        -devices
+        -deviceFutures
+        -deviceCreationLockMap
+        +onDeviceAttributes(mqttMsg)
+        +onDeviceAttributesRequest(mqttMsg)
+        +onDeviceRpcResponse(mqttMsg)
+        +onDeviceDisconnect(mqttMsg)
+    }
+    class GatewayDeviceSessionContext {
+        +onGetAttributesResponse(response)
+        +onAttributeUpdate(sessionId,notification)
+        +onToDeviceRpcRequest(sessionId,request)
+    }
+    MqttTransportHandler --> GatewaySessionHandler
+    GatewaySessionHandler --|> AbstractGatewaySessionHandler
+    AbstractGatewaySessionHandler --> GatewayDeviceSessionContext
+```
+
+### 7.2 JSON 与 Protobuf 选择
+
+Gateway payload format 由物理网关 Device Profile 决定，而不是每个 virtual device profile。[DeviceSessionCtx.updateDeviceSessionConfiguration(DeviceProfile)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/DeviceSessionCtx.java#L292) 设置 parent payload adaptor；`GatewaySessionHandler.isJsonPayloadType()` 读取的也是 parent `DeviceSessionCtx`。Virtual Device Profile 用于 RE queue/rule chain、rate limits 与设备业务配置，但不会让同一物理 MQTT connection 为不同 virtual device 混用 JSON/Protobuf。
+
+Gateway Protobuf 不是普通设备 profile dynamic telemetry schema直接套壳，而是 [transport.proto](../../../common/proto/src/main/proto/transport.proto#L39) 中固定的 `ConnectMsg`、`GatewayTelemetryMsg`、`GatewayAttributesMsg`、`GatewayAttributesRequestMsg`、`GatewayDeviceRpcRequestMsg` 等 envelope。
+
+```mermaid
+flowchart TB
+    GP["Physical Gateway Device Profile"] --> PT{"MQTT payload type"}
+    PT -->|"JSON"| J["Gateway JSON object parsing"]
+    PT -->|"PROTOBUF"| P["Fixed TransportApiProtos Gateway envelopes"]
+    J --> VC["Virtual DeviceSessionContext"]
+    P --> VC
+    VC --> VP["Virtual Device Profile"]
+    VP --> ROUTE["Default queue and Rule Chain routing"]
+    VP -. "does not select wire payload per virtual device" .-> PT
+```
+
+### 7.3 并发、名称与权限边界
+
+- Transport 本地并发：`ConcurrentHashMap devices`；同 name 用 weak `ReentrantLock` 与 `deviceFutures.putIfAbsent` 合并。
+- Core 本地并发：[DefaultTransportApiService](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L187) 还有按 `deviceName` 的弱引用 lock。
+- 集群并发：以上 lock 都不跨 JVM；Transport API request key 是随机 UUID。最终唯一性依赖 `device(tenant_id,name)` unique constraint。
+- 权限：Core 始终用 gateway tenant 查 `findDeviceByTenantIdAndName`，不能跨 tenant；但同 tenant 下只凭 deviceName 即可取得已有设备并建立 virtual session，不要求已有 `Created` relation。Gateway credentials 应按租户高权限代理凭据保护。
+- 类型：已有设备不会因新的 connect `type` 改 profile/type；只有新建设备按 type find-or-create profile。
+
+### 7.4 源码明确不支持的能力
+
+1. 没有持久化 `connectedDevices` 表；Transport `devices` map 随物理连接/进程消失。
+2. 没有 Gateway client-side RPC request Topic。[AbstractGatewayDeviceSessionContext.onToServerRpcResponse(ToServerRpcResponseMsg)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java#L201) 明确写着该能力尚不支持。
+3. 没有 Gateway virtual RPC QoS 1 PUBACK 到 `DELIVERED` 的关联 map。
+4. 没有 MQTT durable session 恢复实现；源码对 `cleanSession` 只在 [createMqttConnAckMsg(...)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1346) 设置 `sessionPresent`，未保存 subscription/inflight/channel state。
+5. 没有 Gateway 批量消息原子事务或去重表。
+6. `lastConnectedGateway` 不承载实时下行路由；它用于设备元数据和删除通知等业务。[DefaultGatewayNotificationsService](../../../application/src/main/java/org/thingsboard/server/service/gateway_device/DefaultGatewayNotificationsService.java#L137) 读取它向物理 gateway device 发删除 RPC。
+
+---
+
+## 八、Actor 分析
+
+Core consumer 把 `TransportToDeviceActorMsg` 包装后依次经过 App Actor、Tenant Actor 和 virtual Device Actor：[DefaultTbCoreConsumerService.forwardToDeviceActor(TransportToDeviceActorMsg,TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L989) -> [AppActor.onToDeviceActorMsg(TenantAwareMsg,boolean)](../../../application/src/main/java/org/thingsboard/server/actors/app/AppActor.java#L242) -> [TenantActor.onToDeviceActorMsg(DeviceAwareMsg,boolean)](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L288) -> [DeviceActor.doProcess(TbActorMsg)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActor.java#L83) -> [DeviceActorMessageProcessor.process(TransportToDeviceActorMsgWrapper)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L569)。
+
+```mermaid
+flowchart TB
+    TS["Gateway virtual SessionInfo"] --> CQ["tb_core partition for virtual DeviceId"]
+    CQ --> CCS["DefaultTbCoreConsumerService"]
+    CCS --> APP["App Actor"]
+    APP --> TENANT["Tenant Actor"]
+    TENANT --> DEVICE["Virtual Device Actor"]
+    DEVICE --> SESS["sessions and subscriptions"]
+    DEVICE --> ATTR["Attribute Service reads"]
+    DEVICE --> RPC["pending and persisted RPC state"]
+    DEVICE --> DS["Device State Service"]
+    DEVICE --> TN["transport notification for nodeId"]
+    TN --> LISTENER["GatewayDeviceSessionContext listener"]
+```
+
+### 8.1 为什么每个虚拟设备要有独立 Actor session
+
+- Device Actor 以 virtual DeviceId 串行化 session OPEN/CLOSED、attributes subscriptions、RPC requestId 和 persistent RPC status。
+- `sessionId` 让同一设备的多 Transport session 可区分；默认 `max_concurrent_sessions_per_device=1` 时新 session 会挤掉旧 session。
+- `nodeId` 让 Core 把不可序列化的 Netty channel 间接定位回正确 MQTT Transport 实例。
+- `gwSessionId` 只供 Transport activity 关联物理 gateway，不替代 virtual sessionId。
+
+### 8.2 Actor session cache 与重连
+
+[DeviceActorMessageProcessor.dumpSessions()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1370) 与 [restoreSessions()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1328) 只在 cache 非 local 时工作。Redis 可以恢复 Actor 所知的 session/subscription metadata，但恢复不了 Transport JVM 中的 `GatewaySessionHandler.devices`、listener 或 Netty channel。Transport 重启后仍需物理 MQTT reconnect，并通过显式 connect 或首条虚拟 uplink 生成新 virtual session。
+
+OPEN 由 [processSessionStateMsgs(...)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L998) 触发 Device State connect/activity；CLOSED 删除 subscriptions 并在最后一个 session 消失时上报 disconnect。Shared Attribute 和 RPC 都先经过 Device Actor，Telemetry/Client Attributes 则直接走 Rule Engine，不经过 Device Actor 保存路径。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 Topic、partition、key 与 consumer group
+
+| 流 | 默认 Kafka topic | partition / record key | consumer group 源码 |
+|---|---|---|---|
+| physical auth、virtual get-or-create request | `tb_transport.api.requests` | request correlation UUID | Core：`tb-core-transport-api-consumer` |
+| request response | `tb_transport.api.responses.<serviceId>` | correlation UUID | Transport：`transport-node-<serviceId>` |
+| session/get attributes/RPC response | `tb_core` | partition 按 tenant + virtual DeviceId；record key virtual DeviceId UUID | `tb-core-node` |
+| telemetry/client attributes | virtual profile queue topic，默认基名 `tb_rule_engine` | partition 按 queue + tenant + virtual originator；record key TbMsg UUID | `re-<queueName>-consumer` |
+| Shared Attributes/RPC downlink | `tb_transport.notifications.<serviceId>` | virtual sessionId in payload，topic 定向 serviceId | `transport-node-<serviceId>` |
+
+配置默认 Topic 见 [tb-mqtt-transport.yml](../../../transport/mqtt/src/main/resources/tb-mqtt-transport.yml#L386)。具体 Kafka group：Transport API response 与 notifications 在 [KafkaTbTransportQueueFactory](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbTransportQueueFactory.java#L140)、Core 在 [KafkaTbCoreQueueFactory](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L247)、Rule Engine 在 [KafkaTbRuleEngineQueueFactory](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbRuleEngineQueueFactory.java#L239)。monolith 的 group 名不同，但路由语义一致。
+
+```mermaid
+sequenceDiagram
+    participant M as "MQTT Transport service A"
+    participant K as "Kafka broker"
+    participant C as "Core group tb-core-node"
+    participant D as "Virtual Device Actor"
+    participant N as "Notification topic for service A"
+    M->>K: "ToCoreMsg on virtual DeviceId partition"
+    K->>C: "consumer poll"
+    C->>D: "Actor message"
+    D->>K: "ToTransportMsg for nodeId service A"
+    K->>N: "service-specific partition"
+    N->>M: "transport-node service A consumer"
+    M->>M: "lookup virtual sessionId and listener"
+```
+
+### 9.2 Commit、重试与重复
+
+Transport notification consumer 在 [DefaultTransportService.start()](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L338) 中逐 record 调 `processToTransportMsg`，把 listener 工作提交到 callback executor 后即 `commit()`。所以 Kafka offset 提交不等待 Netty PUBLISH 写成功；进程在 executor 执行前崩溃时，普通 Shared Attribute notification 不具备 Gateway 专用重放保证。
+
+Uplink PUBACK 同样只到 producer callback。PUBACK 丢失或 channel 在 callback 后关闭时，Gateway MQTT client 可按 QoS 1 重发；Transport 没有按 `(clientId,packetId)` 去重的持久状态。Telemetry 相同 `(device,key,ts)` 在最终 KV 主键上可能覆盖，但 Rule Chain HTTP/Kafka/告警副作用仍可重复；无显式 ts 时重发还会形成新的 server timestamp。
+
+```mermaid
+flowchart TB
+    U["QoS one Gateway uplink"] --> P["Kafka producer send"]
+    P --> B["Broker record accepted"]
+    B --> ACK["PUBACK sent"]
+    ACK --> LOST{"PUBACK reaches gateway"}
+    LOST -->|"yes"| DONE["client stops retrying"]
+    LOST -->|"no"| RETRY["client retransmits with DUP semantics"]
+    RETRY --> P2["ThingsBoard creates another platform message"]
+    B --> CONSUME["RE or Core consumer later"]
+    P2 --> CONSUME
+    CONSUME --> DUP["possible duplicate Rule Chain side effects"]
+```
+
+### 9.3 集群边界
+
+`devices` map 不能被另一 MQTT Transport 实例读取。集群下行依赖 Device Actor 保存的 `nodeId`，并把 notification 发到该 `serviceId` 专属 topic。物理连接断开后新连接可能落在另一实例；新 virtual session 带新 `nodeId/sessionId`，Actor 默认单 session 限制会清理旧路由。Redis session cache只能辅助 Actor ownership 切换，不能迁移 live channel。
+
+---
+
+## 十、数据库分析
+
+```mermaid
+flowchart LR
+    AUTH["Physical gateway credentials"] --> DC[("device_credentials")]
+    DC --> GD[("gateway device")]
+    NAME["Virtual device name and type"] --> VD[("device with tenant and name unique key")]
+    VD --> VDC[("auto-created device_credentials")]
+    GD --> REL[("relation Created")]
+    VD --> DP[("device_profile")]
+    VD --> SA[("attribute_kv SERVER_SCOPE state")]
+    VD --> CA[("attribute_kv CLIENT_SCOPE")]
+    VD --> TS[("ts_kv history backend")]
+    VD --> TL[("ts_kv_latest")]
+    VD --> RPC[("rpc when persisted")]
+```
+
+### 10.1 Schema 与写入语义
+
+| 表/后端 | Schema 证据 | Gateway 触发 | 事务含义 |
+|---|---|---|---|
+| `device` | [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L328) | 新 name；或已有设备更新 `lastConnectedGateway` | `tenant_id,name` 唯一；saveDevice 独立事务 |
+| `device_credentials` | [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L349) | 新 virtual device 自动随机 token | 与 device save 在 `saveDevice` 事务内 |
+| `relation` | [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L419) | 仅新建 virtual device | 与 device transaction 分离 |
+| `attribute_kv` | [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L105) | Client Attributes、Shared read/update、默认 Device State | 每 key future；不是 Gateway PUBACK 事务 |
+| `ts_kv_latest` | [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L540) | Save Timeseries Node 未 skip latest | 与 history future 并行组合 |
+| `ts_kv` / Timescale / Cassandra | [schema-ts-psql.sql](../../../dao/src/main/resources/sql/schema-ts-psql.sql#L17) | configured Rule Chain 保存 telemetry | backend/DAO queue 自身事务、TTL 语义 |
+| `rpc` | [schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L760) | persisted server RPC | Actor 更新 QUEUED/SENT/SUCCESSFUL/FAILED 等状态 |
+
+### 10.2 为什么 Gateway handler 不直接写库
+
+Telemetry/attributes 复用 Device Profile 的 Rule Chain 与 Queue，允许转换、过滤、告警和选择不保存；Core/Actor 负责按 virtual DeviceId 串行管理 session 与 RPC。代价是 MQTT ACK 与数据库可见性解耦。即使 Gateway 收到 PUBACK，默认 Rule Chain 被修改、Save Node failure、DAO queue backlog 或 DB transaction failure 都可能让数据未落库。
+
+### 10.3 `lastConnectedGateway` 的准确含义
+
+该字段写在 virtual device `additional_info`，新建设备与已有设备都可能更新；它是“最近代理该设备的 gateway DeviceId”元数据。实时 Shared Attributes/RPC 下行不查询此字段，而是用 Device Actor `rpcSubscriptions/attributeSubscriptions` 中的 session nodeId。已有设备连接新 gateway 时字段会变，但旧 `Created` relation 不会在该分支同步重建；查询关系和查询最近网关可能得到不同语义。
+
+---
+
+## 十一、异常处理
+
+### 11.1 错误映射与连接动作
+
+| 失败点 | MQTT 3.x / 5 表现 | 当前 session | 已入 Queue/DB 的工作 |
+|---|---|---|---|
+| physical credentials 无 deviceInfo | CONNACK bad credentials/not authorized | close | 无 Gateway state |
+| 普通设备发布 Gateway Topic | 仅日志 `gatewaySessionHandler is null`，无正常 Gateway 处理 | 保持，客户端可能等不到 PUBACK | 无 |
+| unknown `v1/gateway/**` exact Topic | PUBACK topic invalid（MQTT 5 reason code） | 保持 | 无 |
+| JSON/Protobuf adaptor error | MQTT 5 或 profile 配置允许时发 payload-format-invalid PUBACK；否则 close | 取决于版本/config | 解析前通常无；异步 batch 可能已有部分 entry |
+| RuntimeException in Gateway dispatch | implementation-specific ACK 后 close | close | 其他 batch callbacks 可能继续 |
+| get-or-create entity limit/error | future failure只记录；connect/部分隐式操作可能无 success PUBACK | 通常保持直到 client timeout/后续错误 | device 可能已由并发请求创建 |
+| Transport rate limit | callback error，Gateway `getPubAckCallback` 关闭 channel | close | 被拒消息不发送；同 packet 其他 entry 可能已发送 |
+| RE/Core producer callback error | close physical channel | 所有 virtual sessions随后 CLOSED | broker 是否已接受需结合 producer error 判断 |
+| Attribute query error response | adaptor 因 response error 不发布 response Topic，只 trace | 保持 | query 已失败，原 request PUBACK 可能已发送 |
+| Gateway RPC downlink conversion error | 向 Actor发送 error `ToDeviceRpcResponseMsg` | 保持 | persistent RPC 可记失败 |
+| physical TCP/inactivity close | physical CLOSED，再遍历 virtual CLOSED | local maps/listeners 丢失 | broker records、DB/persistent RPC 保留 |
+
+```mermaid
+flowchart TB
+    R["Gateway packet"] --> G{"Gateway handler exists"}
+    G -->|"no"| NOACK["log error and no Gateway processing"]
+    G -->|"yes"| TOPIC{"Exact Topic supported"}
+    TOPIC -->|"no"| TACK["topic invalid PUBACK"]
+    TOPIC -->|"yes"| PARSE{"payload parses"}
+    PARSE -->|"no"| POLICY{"MQTT five or sendAckOnValidationException"}
+    POLICY -->|"yes"| PACK["payload format invalid PUBACK"]
+    POLICY -->|"no"| CLOSE["close channel"]
+    PARSE -->|"yes"| LIMIT{"Transport limit allows"}
+    LIMIT -->|"no"| CLOSE
+    LIMIT -->|"yes"| SEND{"Queue producer succeeds"}
+    SEND -->|"no"| CLOSE
+    SEND -->|"yes"| OK["success PUBACK when QoS one"]
+    OK -. "consumer and database may fail later" .-> LATE["no ACK revocation"]
+```
+
+### 11.2 重连和恢复语义
+
+物理 close 调用 [MqttTransportHandler.doDisconnect()](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L1559)：先发送 physical CLOSED、注销 physical session，再 `onDevicesDisconnect()` 遍历 virtual contexts，注销 listener 并发送 virtual CLOSED。新 TCP 连接会创建新的 handler/maps；已有 virtual device 保留在 PostgreSQL，重新 connect 或第一条 uplink 只会 get existing device，并生成新 sessionId。
+
+MQTT `cleanSession=false` 不会恢复旧 Gateway `devices`、Topic subscription 或 inflight packet；源码没有相应存储。客户端必须重订阅 `v1/gateway/attributes`、`attributes/response`、`rpc`，并按自身设备清单重发 connect 或允许首条数据隐式建 session。重要 RPC 应使用 persisted RPC 和业务 response，不能依赖 live notification 自动重放。
+
+### 11.3 生产排障顺序
+
+1. TCP/TLS/Proxy：1883/8883、证书、`openConnections`、payload 64 KiB。
+2. physical auth：Transport API request/reply、credentials type、gateway Device Profile transport type。
+3. gateway flag：确认 `additionalInfo.gateway=true`，不要只看 Topic 名。
+4. virtual create：`tb_transport.api.*` lag、entity limit、`device(tenant_id,name)` 冲突、profile 创建、relation failure。
+5. local state：Transport 实例/serviceId、physical sessionId、virtual sessionId、`devices`/`sessions` 是否存在。
+6. uplink：JSON/protobuf envelope、per-entry callback、Transport rate limit、RE/Core producer error。
+7. Queue：virtual DeviceId partition、consumer group lag、notification serviceId 是否指向当前实例。
+8. Actor：session OPEN、attribute/RPC subscription、max concurrent session eviction、pending RPC status。
+9. Rule Engine/DB：virtual profile default queue/rule chain、Save Node、DAO queue、SQL/Cassandra/Timescale error。
+10. ACK 解释：看到 PUBACK 只回到相应 producer/local setup 边界，不跳过后续层。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    A["MqttTopics"] --> B["MqttTransportService and ServerInitializer"]
+    B --> C["MqttTransportHandler processConnect and processPublish"]
+    C --> D["GatewaySessionHandler"]
+    D --> E["AbstractGatewaySessionHandler"]
+    E --> F["AbstractGatewayDeviceSessionContext"]
+    E --> G["transport.proto and queue.proto"]
+    E --> H["DefaultTransportService"]
+    H --> I["DefaultTransportApiService"]
+    H --> J["Core and Rule Engine Kafka factories"]
+    J --> K["DeviceActorMessageProcessor"]
+    K --> L["DAO services and SQL schema"]
+    L --> M["Gateway integration tests"]
+```
+
+建议按以下顺序逐文件阅读：
+
+1. [MqttTopics.java](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/MqttTopics.java#L150)：先固定 Gateway Topic，不把 `v1/devices/me/**` 混入。
+2. [MqttTransportService.java](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportService.java#L129) 与 [MqttTransportServerInitializer.java](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportServerInitializer.java#L67)：确认 Netty、TLS、payload 上限和线程边界。
+3. [MqttTransportHandler.processPublish(...)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L460) 与 `handleGatewayPublishMsg(...)`：确认 gateway handler gate 与 exact Topic switch。
+4. [AbstractGatewaySessionHandler.java](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L138)：重点看 `devices/deviceFutures`、get-or-create、JSON/Proto parsing、ACK callback。
+5. [AbstractGatewayDeviceSessionContext.java](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewayDeviceSessionContext.java#L65)：看 `gwSessionId`、Shared Attributes/RPC downlink 和未支持的 client-side RPC。
+6. [transport.proto](../../../common/proto/src/main/proto/transport.proto#L39) 与 [queue.proto](../../../common/proto/src/main/proto/queue.proto#L82)：固定 Gateway wire envelope 与 SessionInfo contract。
+7. [DefaultTransportService.java](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L798)：继续追限流、activity、Core/RE producer 与 notification consumer。
+8. [DefaultTransportApiService.handle(...)](../../../application/src/main/java/org/thingsboard/server/service/transport/DefaultTransportApiService.java#L454)：核对虚拟 device/profile/credentials/relation 的实际数据库变化。
+9. [DeviceActorMessageProcessor.java](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L569)：理解 session/subscription/RPC 串行状态和 cache。
+10. [MqttGatewayClientTest.java](../../../msa/black-box-tests/src/test/java/org/thingsboard/server/msa/connectivity/MqttGatewayClientTest.java#L147) 与 [AbstractMqttTimeseriesIntegrationTest.java](../../../application/src/test/java/org/thingsboard/server/transport/mqtt/mqttv3/telemetry/timeseries/AbstractMqttTimeseriesIntegrationTest.java#L129)：用可执行契约核对 payload、下行 response 与隐式设备创建。
+
+---
+
+## 十三、常见面试题
+
+### 1. ThingsBoard 如何判断一条 MQTT 连接是 Gateway，而不是普通设备？
+
+先按普通 MQTT credentials 认证物理设备；认证成功后读取该设备 `additionalInfo.gateway`。只有值为 true 才创建 `GatewaySessionHandler`。Topic 以 `v1/gateway` 开头本身不会提升权限。
+
+### 2. Gateway 的虚拟设备需要各自用 access token 登录 MQTT 吗？
+
+不需要。MQTT CONNECT 只认证物理 gateway；虚拟设备由 gateway tenant、deviceName、deviceType 通过 Transport API get-or-create，并获得独立 DeviceId/DeviceProfile/SessionInfo。新建时虽会自动生成 access-token credentials，但当前代理 session 不使用它。
+
+### 3. 虚拟设备 session 与物理 gateway session 如何关联？
+
+虚拟 `SessionInfoProto` 有自己的随机 `sessionIdMSB/LSB`，并把物理 session UUID 写进 `gwSessionIdMSB/LSB`。下行用虚拟 sessionId 定位 listener，activity manager 可用 gwSessionId 继承物理 activity。
+
+### 4. `v1/gateway/connect` 是否是 telemetry 前的强制步骤？
+
+不是源码强制。`checkDeviceConnected(deviceName)` 找不到本地 context 时会按默认 type 隐式 `onDeviceConnect`。集成测试直接发送多设备 gateway telemetry，仍创建并保存设备；显式 connect 的价值是提前指定 type、建立 session 并暴露创建失败。
+
+### 5. Gateway connect 会创建哪些数据库对象？
+
+新 name 可能创建/取得 device profile，写 device、自动 access-token device_credentials、`Created` relation，并异步发 ENTITY_CREATED。device 与 credentials 在 `saveDevice` 事务内；relation 与 Rule Engine 消息不在同一事务。
+
+### 6. 已存在同名设备再次通过 Gateway connect 会怎样？
+
+Core 按 gateway tenant + deviceName 找到原设备，不修改其 type/profile/customer；必要时更新 `additionalInfo.lastConnectedGateway`。该分支不新建 `Created` relation，但 Transport 会为当前连接创建新的虚拟 session。
+
+### 7. Gateway 能代理同租户任意已有设备吗？
+
+从这条源码链看可以按 name 取得同 tenant 设备，未校验现有 relation；跨 tenant 不行，因为查询固定使用 gateway tenant。Gateway credentials 因而是租户内高权限代理凭据，必须比普通 device token 更严格保护。
+
+### 8. Gateway telemetry JSON 为什么要求 deviceName 对应数组？
+
+`onDeviceTelemetryJson` 遍历外层 object，并明确要求每个 value 是 JSON array，再交给 `JsonConverter.convertToTelemetryProto`。数组允许一个设备在同一 packet 携带多个时间戳组；普通对象形状会触发 parse failure。
+
+### 9. Gateway payload 的 JSON/Protobuf 由谁决定？
+
+由物理 gateway 的 Device Profile MQTT payload configuration 决定。所有 virtual devices 共用 parent `DeviceSessionCtx` adaptor；virtual profile 决定 Rule Chain/Queue 等业务路由，不决定该物理 connection 上每台设备的 wire format。
+
+### 10. Gateway Protobuf 是否使用每个 Device Profile 的 dynamic schema？
+
+Gateway envelope 使用 `transport.proto` 固定的 `GatewayTelemetryMsg`、`GatewayAttributesMsg`、`GatewayAttributesRequestMsg`、`GatewayDeviceRpcRequestMsg` 等消息。不能把普通 device dynamic telemetry schema 直接当作 Gateway envelope。
+
+### 11. Gateway telemetry 收到 PUBACK 是否代表数据库已写入？
+
+不代表。PUBACK 来自 RE Queue producer callback；RE consumer、Rule Chain、Save Timeseries Node、history/latest DAO future 和数据库 commit 都在之后。默认 Rule Chain不保存或后续失败时，PUBACK不会撤销。
+
+### 12. 多虚拟设备 telemetry batch 是原子的吗？
+
+不是。每个 outer entry 独立 get-or-create、转换、限流和 produce，没有跨设备事务或 pack callback。部分 entry 可成功而另一部分失败，客户端重试还可能重复已成功 entry 的 Rule Chain 副作用。
+
+### 13. 为什么一个 batch 的 ACK 边界尤其需要谨慎？
+
+每个虚拟 entry 的 callback 都携带同一个 MQTT packetId，并各自调用 PUBACK 创建逻辑；源码没有“所有 entry 成功后只确认一次”的聚合屏障。因此不能把一个 PUBACK解释为 batch 级平台事务，应在 Gateway 侧控制 batch、重试和幂等。
+
+### 14. Gateway 上行 attributes 写哪个 scope？
+
+标准 JSON Gateway attributes 转成 `PostAttributeMsg` 时不是 shared，`DefaultTransportService` 生成 `POST_ATTRIBUTES_REQUEST`，Save Attributes Node 默认写 `CLIENT_SCOPE`。Shared Attributes 通常由平台侧写入，再通过 subscription 下行。
+
+### 15. Attributes request 的 `client` 字段是什么意思？
+
+`client=true` 把 keys 写入 `clientAttributeNames`，否则写 `sharedAttributeNames`。Device Actor 从对应 scope 查询，结果在 `v1/gateway/attributes/response` 返回相同业务 `id` 和 deviceName。
+
+### 16. Gateway 为什么不用 MQTT SUBSCRIBE 才向 Actor 建 Shared Attributes/RPC 订阅？
+
+虚拟 session 创建时用一条 `TransportToDeviceActorMsg` 同时携带 OPEN、SubscribeToAttributes 和 SubscribeToRPC。MQTT SUBSCRIBE 对 Gateway Topic 只登记下行 QoS；取消 Topic 也不会取消 virtual Actor subscription，virtual disconnect/CLOSED 才会清理。
+
+### 17. Shared Attributes 下行如何跨集群找到正确 Gateway？
+
+Device Actor subscription 保存 virtual session 的 nodeId/sessionId。Core 发送 `ToTransportMsg` 到 `tb_transport.notifications.<serviceId>`；目标 Transport consumer 用 sessionId 从本地 `sessions` 找 `GatewayDeviceSessionContext`，再写物理 Netty channel。
+
+### 18. `lastConnectedGateway` 是否用于实时 RPC 路由？
+
+不是。实时 RPC/attributes 下行使用 live Actor subscription 的 nodeId/sessionId。`lastConnectedGateway` 是持久化元数据，可用于设备删除通知等 gateway 业务，但不能恢复或定位当前 Netty channel。
+
+### 19. Gateway server-side RPC 的 JSON request/response 是什么形状？
+
+下行是 `{"device":"name","data":{"id":N,"method":"m","params":...}}`；Gateway 上行 response 是 `{"device":"name","id":N,"data":...}`，Transport 据此构造 `ToDeviceRpcResponseMsg` 回到该 virtual Device Actor。
+
+### 20. Gateway RPC QoS 1 PUBACK 会把 persistent RPC 标成 DELIVERED 吗？
+
+当前 Gateway 源码不会。virtual listener 在 Netty write 成功后对 QoS 1 persistent RPC 报 `SENT`，但没有普通 MQTT handler 那样的 MID -> rpcRequest map 来处理 PUBACK/TIMEOUT。业务 response 仍能把 two-way RPC 完成并更新最终状态。
+
+### 21. Gateway 支持虚拟设备发 client-side RPC 到 Rule Engine 吗？
+
+该 Gateway API 没有对应 request Topic，`AbstractGatewayDeviceSessionContext.onToServerRpcResponse` 也明确标注 TB IoT Gateway 尚不支持这项能力。`v1/gateway/rpc` 在这里用于 server-side RPC 下行和设备 response，不能按普通 device client-side RPC 理解。
+
+### 22. 物理 Gateway 断开时虚拟设备如何离线？
+
+`doDisconnect()` 注销 physical session，并遍历 `devices` 对每个 virtual session 调 deregister 与 CLOSED。各 virtual Device Actor 删除 session/subscriptions；最后一个 session 关闭时 Device State Service记录 disconnect。
+
+### 23. `cleanSession=false` 能恢复 Gateway connectedDevices 吗？
+
+不能。源码没有持久化 MQTT subscription、inflight packet 或 Gateway `devices` map；CONNACK 的 sessionPresent 设置不等于 durable broker session。重连后必须重订阅下行 Topic，并通过 connect 或首条 uplink 重建 virtual sessions。
+
+### 24. Redis session cache 能恢复什么，不能恢复什么？
+
+非 local cache 时，Device Actor 可 dump/restore sessionId、nodeId、lastActivity 与 attributes/RPC subscription metadata。它不能恢复 MQTT Transport JVM 中的 listener、GatewaySessionHandler、QoS map 或 Netty channel，因此仍需 Gateway reconnect；默认 caffeine 下甚至跳过 Actor session dump/restore。
+
+### 25. “Gateway 收到 PUBACK 但平台没有 telemetry”如何排查？
+
+先确认 gateway flag 和 payload envelope，再按 virtual DeviceId 查 RE topic/partition 与 `re-<queue>-consumer` lag；核对 virtual Device Profile 的 default Queue/Rule Chain是否包含 Save Timeseries Node；随后检查 Rule Node error、DAO queue、Timescale/PostgreSQL/Cassandra history 与 latest 写入。PUBACK只证明 producer callback，不能跳过任一后续层。
+
+---
+
+[上一篇：25 LwM2M 注册与观测流程](../25-lwm2m-registration-observe/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/26-mqtt-gateway.svg) | [下一篇：27 Device Provision 流程](../27-device-provision/README.md)

@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1960" height="1500" viewBox="0 0 1960 1500" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Timeseries TTL 清理架构</title>
+  <desc id="desc">高对比展示 Spring 调度与 SYS partition owner、四类 TTL 来源、PostgreSQL 分区与行清理、Timescale 行删除、Cassandra 写入时 TTL，以及 history 与 latest 的生命周期分叉。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#1f2937"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#b91c1c"/>
+    </marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .subtitle{font:600 17px Arial,'Microsoft YaHei',sans-serif;fill:#374151}
+      .section{font:700 23px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:700 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .tiny{font:14px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:700 14px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:7px;stroke-linejoin:round}
+      .band{fill:#f8fafc;stroke:#334155;stroke-width:2.5}
+      .blue{fill:#e8f4fd;stroke:#0369a1;stroke-width:3}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:3}
+      .amber{fill:#fff7e6;stroke:#a16207;stroke-width:3}
+      .red{fill:#fff1f2;stroke:#be123c;stroke-width:3}
+      .gray{fill:#f3f4f6;stroke:#374151;stroke-width:3}
+      .violet{fill:#f5f3ff;stroke:#6d28d9;stroke-width:3}
+      .line{fill:none;stroke:#1f2937;stroke-width:3;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#475569;stroke-width:2.7;stroke-dasharray:9 7;marker-end:url(#arrow)}
+      .redline{fill:none;stroke:#b91c1c;stroke-width:3;stroke-dasharray:10 7;marker-end:url(#arrow-red)}
+    </style>
+  </defs>
+
+  <rect width="1960" height="1500" fill="#ffffff"/>
+  <text x="980" y="48" text-anchor="middle" class="title">ThingsBoard 3.6 Timeseries TTL：同一服务契约，三种过期语义</text>
+  <text x="980" y="78" text-anchor="middle" class="subtitle">源码事实：SQL 定时清理只进入 history DAO；Timescale 未使用 retention policy；Cassandra 在写入时绑定 TTL</text>
+
+  <rect x="30" y="110" width="470" height="790" rx="6" class="band"/>
+  <text x="265" y="150" text-anchor="middle" class="section">调度、所有权与 TTL 输入</text>
+
+  <rect x="70" y="185" width="390" height="130" rx="5" class="blue"/>
+  <text x="265" y="220" text-anchor="middle" class="label">Spring @Scheduled</text>
+  <text x="265" y="250" text-anchor="middle" class="small">initialDelay = fixedDelay = 86400000 ms</text>
+  <text x="265" y="278" text-anchor="middle" class="small">enabled + SQL system TTL</text>
+
+  <rect x="70" y="350" width="390" height="120" rx="5" class="red"/>
+  <text x="265" y="385" text-anchor="middle" class="label">SYS tenant Core partition owner</text>
+  <text x="265" y="415" text-anchor="middle" class="small">PartitionService.resolve(...).isMyPartition()</text>
+  <text x="265" y="443" text-anchor="middle" class="small">非 owner 本轮直接返回；不是数据库锁</text>
+
+  <rect x="70" y="510" width="390" height="330" rx="5" class="amber"/>
+  <text x="265" y="547" text-anchor="middle" class="label">四类 TTL 命名空间</text>
+  <text x="95" y="588" class="small">1. sql.ttl.ts.ts_key_value_ttl（秒）</text>
+  <text x="95" y="624" class="small">2. cassandra.query.ts_key_value_ttl（秒）</text>
+  <text x="95" y="660" class="small">3. tenant/customer attribute_kv: TTL（秒）</text>
+  <text x="95" y="696" class="small">4. metadata/defaultTTL/profile days（写入 TTL）</text>
+  <text x="95" y="744" class="small">SQL：第 4 类只进入 datapoint-days 计算</text>
+  <text x="95" y="780" class="small">Cassandra：第 4 类进入 history cell TTL</text>
+  <text x="95" y="816" class="small">SQL procedure：读取第 1 + 第 3 类</text>
+
+  <rect x="535" y="110" width="400" height="790" rx="6" class="band"/>
+  <text x="735" y="150" text-anchor="middle" class="section">服务路由边界</text>
+
+  <rect x="575" y="185" width="320" height="120" rx="5" class="green"/>
+  <text x="735" y="220" text-anchor="middle" class="label">TimeseriesCleanUpService</text>
+  <text x="735" y="250" text-anchor="middle" class="small">cleanUp()</text>
+  <text x="735" y="278" text-anchor="middle" class="small">同步调用，无 job record</text>
+
+  <rect x="575" y="350" width="320" height="130" rx="5" class="blue"/>
+  <text x="735" y="385" text-anchor="middle" class="label">BaseTimeseriesService</text>
+  <text x="735" y="415" text-anchor="middle" class="small">cleanup(systemTtl)</text>
+  <text x="735" y="445" text-anchor="middle" class="small">只调用 TimeseriesDao</text>
+
+  <rect x="575" y="525" width="320" height="125" rx="5" class="gray"/>
+  <text x="735" y="560" text-anchor="middle" class="label">TimeseriesDao</text>
+  <text x="735" y="590" text-anchor="middle" class="small">database.ts.type 条件装配</text>
+  <text x="735" y="620" text-anchor="middle" class="small">sql / timescale / cassandra</text>
+
+  <rect x="575" y="700" width="320" height="140" rx="5" class="red"/>
+  <text x="735" y="735" text-anchor="middle" class="label">TimeseriesLatestDao</text>
+  <text x="735" y="766" text-anchor="middle" class="small">cleanup 链路不调用</text>
+  <text x="735" y="796" text-anchor="middle" class="small">latest 不随 history 自动过期</text>
+
+  <path d="M460 250 H575" class="line"/>
+  <path d="M460 410 H535 V245 H575" class="line"/>
+  <path d="M735 305 V350" class="line"/>
+  <path d="M735 480 V525" class="line"/>
+  <path d="M735 650 V700" class="redline"/>
+  <text x="790" y="680" class="edge">不调用</text>
+
+  <rect x="970" y="110" width="960" height="790" rx="6" class="band"/>
+  <text x="1450" y="150" text-anchor="middle" class="section">History 后端实现</text>
+
+  <rect x="1010" y="185" width="280" height="650" rx="5" class="blue"/>
+  <text x="1150" y="220" text-anchor="middle" class="label">PostgreSQL partitioned</text>
+  <text x="1150" y="254" text-anchor="middle" class="small">JpaSqlTimeseriesDao.cleanup</text>
+
+  <rect x="1040" y="295" width="220" height="190" rx="4" class="amber"/>
+  <text x="1150" y="327" text-anchor="middle" class="label">阶段 1：DROP</text>
+  <text x="1150" y="360" text-anchor="middle" class="small">system TTL &gt; 0</text>
+  <text x="1150" y="390" text-anchor="middle" class="small">删除 cutoff 之前完整分区</text>
+  <text x="1150" y="420" text-anchor="middle" class="small">排除 cutoff / latest /</text>
+  <text x="1150" y="448" text-anchor="middle" class="small">dictionary / indefinite</text>
+
+  <rect x="1040" y="530" width="220" height="240" rx="4" class="green"/>
+  <text x="1150" y="562" text-anchor="middle" class="label">阶段 2：DELETE</text>
+  <text x="1150" y="596" text-anchor="middle" class="small">tenant/customer TTL</text>
+  <text x="1150" y="626" text-anchor="middle" class="small">Device + Asset + Customer</text>
+  <text x="1150" y="674" text-anchor="middle" class="small">逐行 WAL + dead tuples</text>
+  <text x="1150" y="704" text-anchor="middle" class="small">依赖 VACUUM</text>
+  <text x="1150" y="740" text-anchor="middle" class="tiny">两个 JDBC CALL 独立连接</text>
+
+  <rect x="1320" y="185" width="280" height="650" rx="5" class="green"/>
+  <text x="1460" y="220" text-anchor="middle" class="label">TimescaleDB</text>
+  <text x="1460" y="254" text-anchor="middle" class="small">TimescaleTimeseriesDao.cleanup</text>
+
+  <rect x="1350" y="295" width="220" height="250" rx="4" class="green"/>
+  <text x="1460" y="327" text-anchor="middle" class="label">公共 SQL procedure</text>
+  <text x="1460" y="362" text-anchor="middle" class="small">跨 hypertable chunks</text>
+  <text x="1460" y="392" text-anchor="middle" class="small">按实体归属 DELETE</text>
+  <text x="1460" y="438" text-anchor="middle" class="small">不会自动删除空 chunk</text>
+  <text x="1460" y="474" text-anchor="middle" class="small">产生 WAL / bloat</text>
+  <text x="1460" y="510" text-anchor="middle" class="small">需要 autovacuum</text>
+
+  <rect x="1350" y="600" width="220" height="170" rx="4" class="red"/>
+  <text x="1460" y="634" text-anchor="middle" class="label">3.6 未调用</text>
+  <text x="1460" y="670" text-anchor="middle" class="small">drop_chunks</text>
+  <text x="1460" y="704" text-anchor="middle" class="small">add_retention_policy</text>
+  <text x="1460" y="738" text-anchor="middle" class="small">Continuous Aggregate</text>
+
+  <rect x="1630" y="185" width="260" height="650" rx="5" class="violet"/>
+  <text x="1760" y="220" text-anchor="middle" class="label">Cassandra</text>
+  <text x="1760" y="254" text-anchor="middle" class="small">cleanup(systemTtl) 为空</text>
+
+  <rect x="1660" y="295" width="200" height="210" rx="4" class="amber"/>
+  <text x="1760" y="327" text-anchor="middle" class="label">写入时</text>
+  <text x="1760" y="362" text-anchor="middle" class="small">effective TTL =</text>
+  <text x="1760" y="392" text-anchor="middle" class="small">request / system / min</text>
+  <text x="1760" y="434" text-anchor="middle" class="small">INSERT USING TTL</text>
+  <text x="1760" y="470" text-anchor="middle" class="tiny">从 DB write time 起算</text>
+
+  <rect x="1660" y="550" width="200" height="220" rx="4" class="red"/>
+  <text x="1760" y="582" text-anchor="middle" class="label">到期后</text>
+  <text x="1760" y="618" text-anchor="middle" class="small">读不可见 / tombstone</text>
+  <text x="1760" y="654" text-anchor="middle" class="small">等待 compaction 回收</text>
+  <text x="1760" y="696" text-anchor="middle" class="small">registry 可能先过期</text>
+  <text x="1760" y="732" text-anchor="middle" class="small">latest 写入不带 TTL</text>
+
+  <path d="M895 585 H1010" class="line"/>
+  <path d="M895 585 H945 V510 H1320" class="line"/>
+  <path d="M895 585 H945 V510 H1630" class="line"/>
+  <text x="955" y="492" class="edge">selected implementation</text>
+
+  <rect x="30" y="940" width="1900" height="510" rx="6" class="band"/>
+  <text x="980" y="980" text-anchor="middle" class="section">数据生命周期、源码边界与生产风险</text>
+
+  <rect x="70" y="1025" width="420" height="365" rx="5" class="blue"/>
+  <text x="280" y="1060" text-anchor="middle" class="label">History / Latest 分叉</text>
+  <text x="100" y="1102" class="small">History：DROP / DELETE / CQL TTL</text>
+  <text x="100" y="1138" class="small">Latest：scheduled cleanup 不调用</text>
+  <text x="100" y="1185" class="small">允许出现：</text>
+  <text x="100" y="1220" class="small">• 最近 24 小时曲线为空</text>
+  <text x="100" y="1255" class="small">• 最新温度仍可查询</text>
+  <text x="100" y="1302" class="small">ts_kv_dictionary 也不会自动清理</text>
+  <text x="100" y="1340" class="small">删除实体后的 orphan 行不匹配子查询</text>
+
+  <rect x="530" y="1025" width="420" height="365" rx="5" class="red"/>
+  <text x="740" y="1060" text-anchor="middle" class="label">release-3.6 procedure 风险</text>
+  <text x="560" y="1102" class="small">tenant_ttl_ts / customer_ttl_ts</text>
+  <text x="560" y="1138" class="small">在每轮 loop 开头没有清空</text>
+  <text x="560" y="1185" class="small">TTL = 0 时可能沿用上一轮 cutoff</text>
+  <text x="560" y="1221" class="small">cursor 无 ORDER BY，结果可受顺序影响</text>
+  <text x="560" y="1268" class="small">属性查询仅过滤 entity_id + key</text>
+  <text x="560" y="1304" class="small">不限制 entity_type / attribute_type</text>
+  <text x="560" y="1340" class="small">只读取 long_v</text>
+
+  <rect x="990" y="1025" width="420" height="365" rx="5" class="amber"/>
+  <text x="1200" y="1060" text-anchor="middle" class="label">PostgreSQL / Timescale 代价</text>
+  <text x="1020" y="1102" class="small">DELETE：WAL + dead tuples + replica lag</text>
+  <text x="1020" y="1138" class="small">VACUUM：空间可复用但文件通常不缩小</text>
+  <text x="1020" y="1185" class="small">DROP：强 DDL lock，受长事务/查询影响</text>
+  <text x="1020" y="1221" class="small">单 procedure 遍历全部 tenant/customer</text>
+  <text x="1020" y="1268" class="small">无 batch、无 tenant-level commit</text>
+  <text x="1020" y="1304" class="small">JDBC statement timeout：1 小时</text>
+  <text x="1020" y="1340" class="small">失败只记录日志，等下一 fixed delay</text>
+
+  <rect x="1450" y="1025" width="440" height="365" rx="5" class="violet"/>
+  <text x="1670" y="1060" text-anchor="middle" class="label">Cassandra 生命周期风险</text>
+  <text x="1480" y="1102" class="small">backfill：旧事件今天写入仍获完整 TTL</text>
+  <text x="1480" y="1138" class="small">短 TTL：tombstone 与 compaction 压力</text>
+  <text x="1480" y="1185" class="small">partition registry 只使用 system TTL</text>
+  <text x="1480" y="1221" class="small">Caffeine 命中时不刷新 registry TTL</text>
+  <text x="1480" y="1268" class="small">registry 过期可造成活跃 history 漏读</text>
+  <text x="1480" y="1304" class="small">关闭 registry read 可直接计算 partitions</text>
+  <text x="1480" y="1340" class="small">代价是更多不存在 partition 的空读</text>
+
+  <path d="M490 1200 H530" class="line"/>
+  <path d="M950 1200 H990" class="line"/>
+  <path d="M1410 1200 H1450" class="line"/>
+</svg>

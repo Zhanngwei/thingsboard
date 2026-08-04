@@ -1,0 +1,233 @@
+@startuml
+title ThingsBoard 3.6 MQTT Gateway: auth, virtual sessions, uplink, downlink and reconnect
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #253746
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #334155
+skinparam participantBorderThickness 1.5
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam databaseBorderColor #334155
+skinparam databaseBackgroundColor #F8FAFC
+skinparam databaseFontColor #111827
+skinparam collectionsBorderColor #334155
+skinparam collectionsBackgroundColor #F8FAFC
+skinparam collectionsFontColor #111827
+skinparam noteBackgroundColor #FFF5CC
+skinparam noteBorderColor #8A5A00
+skinparam noteFontColor #111827
+skinparam groupBorderColor #334155
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam ArrowThickness 1.5
+skinparam maxMessageSize 230
+
+actor "Physical MQTT Gateway" as Gateway
+participant "Netty MQTT Pipeline" as Netty
+participant "MqttTransportHandler" as Handler
+participant "Transport API Queue" as ApiQueue
+participant "DefaultTransportApiService" as ApiService
+database "Device, Credentials, Profile\nand Relation DB" as EntityDb
+participant "GatewaySessionHandler" as GwSession
+collections "Transport-local Session Maps\nand Netty Listener" as LocalState
+participant "DefaultTransportService" as Transport
+queue "Core Queue" as CoreQueue
+participant "Virtual Device Actor" as DeviceActor
+queue "Service-specific\nTransport Notification" as Notify
+queue "Rule Engine Queue" as ReQueue
+participant "Rule Engine Actors" as RuleEngine
+database "Attributes, Telemetry\nand Persistent RPC DB" as DataDb
+
+== MQTT endpoint and physical Gateway authentication ==
+Netty -> Handler : new channel with decoder, encoder and handler
+Gateway -> Netty : CONNECT(clientId, username, password or X.509)
+Netty -> Handler : processConnect(ctx, MqttConnectMessage)
+Handler -> Transport : ValidateBasicMqttCredRequestMsg\nor token / X.509 request
+Transport -> ApiQueue : correlated request UUID
+ApiQueue -> ApiService : validate physical device credentials
+ApiService -> EntityDb : credentials, device and DeviceProfile lookup
+EntityDb --> ApiService : authenticated physical gateway snapshot
+ApiService --> ApiQueue : ValidateDeviceCredentialsResponse
+ApiQueue --> Transport : response on service-specific topic
+Transport --> Handler : authentication callback
+Handler -> Transport : physical SessionEvent OPEN
+Transport -> CoreQueue : ToCoreMsg for physical DeviceId
+CoreQueue --> Transport : producer callback success
+Handler -> LocalState : register physical ASYNC SessionInfo/listener
+Handler -> Handler : checkGatewaySession(additionalInfo.gateway)
+alt gateway flag is true
+  Handler -> GwSession : create GatewaySessionHandler
+  Handler --> Gateway : CONNACK SUCCESS
+else flag absent or false
+  Handler --> Gateway : CONNACK SUCCESS as ordinary MQTT device
+  note over Handler,Gateway
+    A v1/gateway/** topic does not grant Gateway capability.
+    gatewaySessionHandler remains null for an ordinary device.
+  end note
+end
+note over Handler,CoreQueue
+  CONNACK follows the Core producer callback.
+  It does not wait for Device Actor OPEN handling or state persistence.
+end note
+
+== MQTT subscriptions and virtual-device session creation ==
+Gateway -> Handler : SUBSCRIBE attributes, attributes/response and rpc
+Handler -> Handler : store requested QoS per Gateway downlink topic
+Handler --> Gateway : SUBACK
+note over Handler,DeviceActor
+  MQTT SUBSCRIBE does not create virtual Actor subscriptions.
+  Each virtual OPEN already carries attributes and RPC subscriptions.
+end note
+
+alt explicit v1/gateway/connect
+  Gateway -> Handler : PUBLISH connect {device, type}
+  Handler -> GwSession : onDeviceConnect(MqttPublishMessage)
+else first telemetry, attributes, request or RPC response for a missing name
+  Gateway -> Handler : PUBLISH Gateway business payload
+  Handler -> GwSession : checkDeviceConnected(deviceName)
+  GwSession -> GwSession : implicit onDeviceConnect(name, defaultType)
+end
+GwSession -> GwSession : devices fast path; per-name lock; deviceFutures
+GwSession -> Transport : GetOrCreateDeviceFromGatewayRequestMsg
+Transport -> ApiQueue : request keyed by correlation UUID
+ApiQueue -> ApiService : handle gatewayId, tenantId, name and type
+ApiService -> EntityDb : find Device by tenantId and name
+alt virtual device does not exist
+  ApiService -> EntityDb : find or create DeviceProfile
+  ApiService -> EntityDb : save Device plus random token credentials
+  note over ApiService,EntityDb
+    Device and credentials share DeviceService.saveDevice transaction.
+  end note
+  ApiService -> EntityDb : save gateway --Created--> virtual relation
+  ApiService -> ReQueue : ENTITY_CREATED after DAO calls
+else same-name device exists
+  ApiService -> EntityDb : update additionalInfo.lastConnectedGateway if changed
+end
+ApiService --> ApiQueue : deviceInfo and DeviceProfile
+ApiQueue --> Transport : GetOrCreateDeviceFromGatewayResponse
+Transport --> GwSession : callback
+GwSession -> GwSession : create random virtual sessionId\nand copy physical ID into gwSessionId
+GwSession -> LocalState : devices[name] and registerAsyncSession(listener)
+GwSession -> Transport : one TransportToDeviceActorMsg\nOPEN + attributes subscription + RPC subscription
+Transport -> CoreQueue : virtual DeviceId partition; callback is null
+opt explicit connect and QoS 1
+  GwSession --> Gateway : PUBACK after local setup
+end
+CoreQueue -> DeviceActor : consume OPEN and subscriptions later
+note over GwSession,DeviceActor
+  No connectedDevices table is written.
+  The connect PUBACK does not wait for Core production or Actor handling.
+end note
+
+== Gateway telemetry and client attributes uplink ==
+Gateway -> Handler : PUBLISH v1/gateway/telemetry or attributes
+Handler -> GwSession : exact-topic dispatch
+GwSession -> GwSession : parse JSON or fixed Gateway protobuf\nand split outer envelope by virtual device
+loop each virtual-device entry
+  GwSession -> GwSession : checkDeviceConnected(name)
+  GwSession -> Transport : PostTelemetryMsg or PostAttributeMsg\nwith virtual SessionInfo
+  Transport -> Transport : data-point limits, activity, metadata\nand virtual-profile queue routing
+  alt rate limit or producer error
+    Transport --> GwSession : callback error
+    GwSession -> Netty : close physical channel
+  else Rule Engine producer callback succeeds
+    Transport -> ReQueue : POST_TELEMETRY_REQUEST\nor POST_ATTRIBUTES_REQUEST
+    ReQueue --> GwSession : producer callback success
+    GwSession --> Gateway : PUBACK(packetId) when QoS 1
+  end
+end
+ReQueue -> RuleEngine : consumer poll later
+RuleEngine -> DataDb : configured Save Timeseries or Save Attributes node
+note over GwSession,DataDb
+  Every outer entry reuses the physical MQTT packetId in its callback.
+  There is no cross-device ACK barrier, rollback, or deduplication table.
+  PUBACK confirms Queue production, not Rule Chain or database commit.
+end note
+
+== Attributes request and Shared Attributes downlink ==
+Gateway -> Handler : PUBLISH attributes/request {id, device, client, keys}
+Handler -> GwSession : onDeviceAttributesRequest
+GwSession -> Transport : GetAttributeRequestMsg with virtual SessionInfo
+Transport -> CoreQueue : ToCoreMsg on virtual DeviceId partition
+CoreQueue --> GwSession : producer callback success
+GwSession --> Gateway : request PUBACK when QoS 1
+CoreQueue -> DeviceActor : handleGetAttributesRequest later
+DeviceActor -> DataDb : read CLIENT_SCOPE or SHARED_SCOPE
+DataDb --> DeviceActor : values
+DeviceActor -> Notify : GetAttributeResponseMsg(nodeId, virtual sessionId)
+Notify -> Transport : service-specific consumer poll
+Transport -> LocalState : find listener by virtual sessionId
+LocalState -> GwSession : onGetAttributesResponse
+GwSession --> Gateway : PUBLISH v1/gateway/attributes/response
+
+DeviceActor -> Notify : AttributeUpdateNotificationMsg for Shared Attributes
+Notify -> Transport : target MQTT Transport serviceId
+Transport -> LocalState : dispatch to virtual listener
+LocalState -> GwSession : onAttributeUpdate
+GwSession --> Gateway : PUBLISH v1/gateway/attributes {device, data}
+note over DeviceActor,GwSession
+  Live downlink uses subscription nodeId + virtual sessionId.
+  additionalInfo.lastConnectedGateway is not a channel-routing lookup.
+end note
+
+== Server-side RPC downlink and Gateway response ==
+DeviceActor -> Notify : ToDeviceRpcRequestMsg(nodeId, virtual sessionId)
+Notify -> Transport : service-specific transport notification
+Transport -> LocalState : listener lookup
+LocalState -> GwSession : onToDeviceRpcRequest
+GwSession --> Gateway : PUBLISH v1/gateway/rpc {device, data}
+alt persisted RPC and downlink QoS 0
+  GwSession -> Transport : RpcStatus DELIVERED after Netty write
+  Transport -> CoreQueue : status update
+else persisted RPC and downlink QoS 1
+  GwSession -> Transport : RpcStatus SENT after Netty write
+  Transport -> CoreQueue : status update
+  note over GwSession,Gateway
+    Gateway virtual sessions have no MID-to-RPC awaiting-ACK map.
+    Physical PUBACK is not correlated back to virtual DELIVERED.
+  end note
+end
+Gateway -> Handler : PUBLISH v1/gateway/rpc response {device, id, data}
+Handler -> GwSession : onDeviceRpcResponse
+GwSession -> Transport : ToDeviceRpcResponseMsg with virtual SessionInfo
+Transport -> CoreQueue : response on virtual DeviceId partition
+CoreQueue --> GwSession : producer callback success
+GwSession --> Gateway : response PUBACK when QoS 1
+CoreQueue -> DeviceActor : processRpcResponses later
+DeviceActor -> DataDb : update persistent RPC state/response when enabled
+note over GwSession,DeviceActor
+  Gateway client-side RPC request is not implemented.
+  The business response, not MQTT PUBACK, completes a two-way RPC.
+end note
+
+== Virtual disconnect, physical close and reconnect ==
+opt v1/gateway/disconnect for one virtual device
+  Gateway -> Handler : PUBLISH disconnect {device}
+  Handler -> GwSession : onDeviceDisconnect
+  GwSession -> LocalState : remove devices[name] and deregister listener
+  GwSession -> Transport : virtual SessionEvent CLOSED; callback is null
+  Transport -> CoreQueue : CLOSED for virtual DeviceId
+  GwSession --> Gateway : immediate PUBACK when QoS 1
+end
+alt TCP close, producer failure or inactivity
+  Netty -> Handler : channelInactive / doDisconnect
+  Handler -> Transport : physical SessionEvent CLOSED
+  Handler -> LocalState : deregister physical listener
+  Handler -> GwSession : onDevicesDisconnect
+  loop every local virtual context
+    GwSession -> LocalState : deregister virtual listener
+    GwSession -> Transport : virtual SessionEvent CLOSED
+    Transport -> CoreQueue : CLOSED on virtual DeviceId partition
+  end
+  Handler -> LocalState : release handler maps and Netty channel
+else a new physical MQTT connection
+  Gateway -> Netty : new TCP/TLS connection and CONNECT
+  note over Gateway,LocalState
+    cleanSession=false does not restore Gateway maps, subscriptions,
+    inflight packets, listeners, or the Netty channel.
+    Redis may restore Actor metadata only; default cache is caffeine.
+  end note
+end
+@enduml

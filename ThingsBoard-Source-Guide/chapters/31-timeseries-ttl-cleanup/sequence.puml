@@ -1,0 +1,179 @@
+@startuml
+title ThingsBoard 3.6 Timeseries TTL 清理完整时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+  ArrowColor #1F2937
+  ActorBorderColor #111827
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+  LifeLineBorderColor #334155
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1F2937
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantFontColor #111827
+  BoxBorderColor #334155
+  BoxBackgroundColor #F8FAFC
+  GroupBorderColor #374151
+  GroupBackgroundColor #F9FAFB
+  GroupHeaderFontColor #111827
+  DividerBorderColor #334155
+  DividerBackgroundColor #E5E7EB
+  DividerFontColor #111827
+  NoteBorderColor #92400E
+  NoteBackgroundColor #FFF7E6
+  NoteFontColor #111827
+}
+
+autonumber
+
+actor "Spring Scheduler" as Scheduler
+participant "TimeseriesCleanUpService" as Cleanup
+participant "PartitionService" as Partition
+participant "BaseTimeseriesService" as Service
+participant "Selected TimeseriesDao" as HistoryDao
+participant "TimeseriesLatestDao" as LatestDao
+database "PostgreSQL / TimescaleDB" as SQLDB
+database "Cassandra" as Cassandra
+
+== Scheduler 与集群 owner gate ==
+Scheduler -> Cleanup : cleanUp()\ninitialDelay=fixedDelay=execution_interval_ms
+Cleanup -> Cleanup : read ttlTaskExecutionEnabled
+alt sql.ttl.ts.enabled is false
+  Cleanup --> Scheduler : return
+else cleanup is enabled
+  Cleanup -> Partition : resolve(TB_CORE, SYS_TENANT_ID, SYS_TENANT_ID)
+  Partition --> Cleanup : ServiceInfo.isMyPartition()
+  alt current node is not owner
+    Cleanup --> Scheduler : return
+  else current node owns SYS Core partition
+    Cleanup -> Service : cleanup(systemTtl)
+    Service -> HistoryDao : cleanup(systemTtl)
+    note over Service,LatestDao
+      BaseTimeseriesService does not call TimeseriesLatestDao.
+      Latest values have a separate lifecycle.
+    end note
+  end
+end
+
+== Plain PostgreSQL backend ==
+alt database.ts.type is sql
+  HistoryDao -> HistoryDao : JpaSqlTimeseriesDao.cleanup(systemTtl)
+  alt systemTtl is greater than zero
+    HistoryDao -> SQLDB : getConnection()\nCALL drop_partitions_by_system_ttl(partitioning, systemTtl, 0)
+    SQLDB -> SQLDB : current_timestamp - systemTtl
+    SQLDB -> SQLDB : get_partition_by_system_ttl_date()
+    alt exact cutoff partition exists
+      loop each ts_kv_* table
+        SQLDB -> SQLDB : exclude latest, dictionary,\nindefinite and cutoff partition
+        alt partition is older than cutoff
+          SQLDB -> SQLDB : DROP TABLE IF EXISTS partition
+        end
+      end
+      SQLDB --> HistoryDao : deleted partition count
+    else cutoff partition is absent
+      SQLDB --> HistoryDao : notice and zero partitions dropped
+    end
+  end
+
+  HistoryDao -> HistoryDao : AbstractSqlTimeseriesDao.cleanup(systemTtl)
+  HistoryDao -> SQLDB : getConnection()\nCALL cleanup_timeseries_by_ttl(NULL_UUID, systemTtl, 0)
+  SQLDB -> SQLDB : open cursor over tenant
+  loop every tenant
+    SQLDB -> SQLDB : SELECT attribute_kv.long_v\nWHERE entity_id=tenant AND key='TTL'
+    SQLDB -> SQLDB : null uses systemTtl
+    alt tenant TTL is positive
+      SQLDB -> SQLDB : DELETE old unassigned Device telemetry
+      SQLDB -> SQLDB : DELETE old unassigned Asset telemetry
+    end
+    loop every customer of tenant
+      SQLDB -> SQLDB : SELECT customer attribute TTL
+      SQLDB -> SQLDB : null inherits tenant cutoff
+      alt customer cutoff is positive
+        SQLDB -> SQLDB : DELETE Customer telemetry
+        SQLDB -> SQLDB : DELETE assigned Device telemetry
+        SQLDB -> SQLDB : DELETE assigned Asset telemetry
+      end
+    end
+  end
+  SQLDB --> HistoryDao : deleted row count
+
+else database.ts.type is timescale
+  HistoryDao -> HistoryDao : TimescaleTimeseriesDao.cleanup(systemTtl)
+  HistoryDao -> HistoryDao : super.cleanup(systemTtl)
+  HistoryDao -> SQLDB : CALL cleanup_timeseries_by_ttl(NULL_UUID, systemTtl, 0)
+  SQLDB -> SQLDB : same tenant/customer cursor and DELETE logic
+  SQLDB --> HistoryDao : deleted rows across hypertable chunks
+  note over HistoryDao,SQLDB
+    release-3.6 does not call drop_chunks
+    and does not install a Timescale retention policy.
+  end note
+
+else database.ts.type is cassandra
+  HistoryDao -> HistoryDao : CassandraBaseTimeseriesDao.cleanup(systemTtl)
+  HistoryDao --> Service : return immediately
+  note over HistoryDao,Cassandra
+    Scheduled cleanup is empty because history expiration
+    is attached to each Cassandra write.
+  end note
+end
+
+Service --> Cleanup : synchronous return
+Cleanup --> Scheduler : invocation completed\nnext fixed delay starts now
+
+== Cassandra 写入时 TTL 生命周期 ==
+participant "Telemetry write caller" as Writer
+Writer -> HistoryDao : save(tenantId, entityId, entry, requestTtl)
+HistoryDao -> HistoryDao : computeTtl(requestTtl)
+alt Cassandra system TTL is zero
+  HistoryDao -> HistoryDao : effective TTL = request TTL
+else system TTL is positive and request TTL is zero
+  HistoryDao -> HistoryDao : effective TTL = system TTL
+else both TTL values are positive
+  HistoryDao -> HistoryDao : effective TTL = min(system TTL, request TTL)
+end
+
+alt effective TTL is zero
+  HistoryDao -> Cassandra : INSERT history cell without TTL
+else effective TTL is positive
+  HistoryDao -> Cassandra : INSERT history cell USING TTL effectiveTtl
+end
+HistoryDao --> Writer : ListenableFuture<Integer> datapoint-days
+
+Writer -> LatestDao : saveLatest(tenantId, entityId, entry)
+LatestDao -> Cassandra : INSERT ts_kv_latest_cf without TTL
+Cassandra --> LatestDao : write result
+LatestDao --> Writer : Future<Void>
+
+... effective TTL seconds after database write ...
+Cassandra -> Cassandra : history cell becomes expired/tombstone
+note over Cassandra
+  Read invisibility is immediate at expiry,
+  but disk reclamation waits for compaction
+  and Cassandra safety conditions.
+end note
+
+== SQL failure and retry boundary ==
+alt partition procedure raises SQLException
+  SQLDB --> HistoryDao : SQLException
+  HistoryDao -> HistoryDao : catch and log
+  HistoryDao -> SQLDB : still call row cleanup on a new connection
+else row procedure raises SQLException or one-hour timeout
+  SQLDB --> HistoryDao : SQLException
+  HistoryDao -> HistoryDao : catch and log, no in-run retry
+  HistoryDao --> Cleanup : return
+  ... wait until next fixed-delay tick ...
+else node exits during execution
+  Cleanup -> Cleanup : process stops and JDBC connection closes
+  Partition -> Partition : SYS partition may move to another Core node
+  note over Cleanup,Partition
+    There is no Kafka offset or cleanup job record.
+    Recovery is a later full scheduler invocation.
+  end note
+end
+
+@enduml

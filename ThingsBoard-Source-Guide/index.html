@@ -14,7 +14,7 @@
   <main class="layout home-layout">
     <article class="content">
       <section class="hero">
-        <p class="status">SOURCE-VERIFIED GUIDE · CHAPTERS 01-16 COMPLETE</p>
+        <p class="status">SOURCE-VERIFIED GUIDE · CHAPTERS 01-30 COMPLETE</p>
         <h1>ThingsBoard release-3.6 源码解析指南</h1>
         <p>从协议入口一路追到 Queue、Actor、Rule Engine、DAO 和数据库。每个流程独立成章，并明确线程边界、确认语义、数据变化和失败路径。</p>
         <div class="meta"><span>版本 3.6.4</span><span>提交 0cb411fc90</span><span>Markdown + HTML</span><span>Mermaid + PlantUML + SVG</span></div>
@@ -159,6 +159,54 @@
         <p><span class="status">已完成</span> · <a href="chapters/23-http-device-api/README.md">Markdown</a> · <a href="chapters/23-http-device-api/sequence.puml">PlantUML</a> · <a href="chapters/23-http-device-api/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/23-http-device-api.svg">架构图 SVG</a></p>
       </div>
 
+      <div class="chapter-card" id="chapter-24">
+        <h3><a href="chapters/24-coap-message-flow/index.html">24 CoAP 消息流程</a></h3>
+        <p>Californium UDP/DTLS、URI token 与 X.509 identity、JSON/Protobuf适配、SYNC/ASYNC session、Observe和PSM/eDRX下行。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/24-coap-message-flow/README.md">Markdown</a> · <a href="chapters/24-coap-message-flow/sequence.puml">PlantUML</a> · <a href="chapters/24-coap-message-flow/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/24-coap-message-flow.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-25">
+        <h3><a href="chapters/25-lwm2m-registration-observe/index.html">25 LwM2M 注册与观测流程</a></h3>
+        <p>Leshan Bootstrap/Main Server、Registration生命周期、对象模型、Read/Observe、Profile映射、RPC/OTA与Redis恢复边界。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/25-lwm2m-registration-observe/README.md">Markdown</a> · <a href="chapters/25-lwm2m-registration-observe/sequence.puml">PlantUML</a> · <a href="chapters/25-lwm2m-registration-observe/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/25-lwm2m-registration-observe.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-26">
+        <h3><a href="chapters/26-mqtt-gateway/index.html">26 MQTT Gateway 流程</a></h3>
+        <p>物理网关认证、虚拟设备隐式连接、Telemetry/Attributes批量拆分、Actor下行、RPC确认与会话重建。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/26-mqtt-gateway/README.md">Markdown</a> · <a href="chapters/26-mqtt-gateway/sequence.puml">PlantUML</a> · <a href="chapters/26-mqtt-gateway/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/26-mqtt-gateway.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-27">
+        <h3><a href="chapters/27-device-provision/index.html">27 Device Provision 流程</a></h3>
+        <p>三协议Provision入口、Profile key/secret、创建与预置策略、凭据事务、X.509 chain旁路和部分成功窗口。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/27-device-provision/README.md">Markdown</a> · <a href="chapters/27-device-provision/sequence.puml">PlantUML</a> · <a href="chapters/27-device-provision/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/27-device-provision.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-28">
+        <h3><a href="chapters/28-device-claim/index.html">28 Device Claim 流程</a></h3>
+        <p>设备登记ClaimData、Customer REST认领、cache/attribute回退、客户归属更新、并发覆盖和Reclaim边界。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/28-device-claim/README.md">Markdown</a> · <a href="chapters/28-device-claim/sequence.puml">PlantUML</a> · <a href="chapters/28-device-claim/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/28-device-claim.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-29">
+        <h3><a href="chapters/29-session-device-state/index.html">29 Session 与 Device State 流程</a></h3>
+        <p>Transport listener、Actor session、OPEN/CLOSED、活动聚合、active/inactive、状态持久化和三类超时。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/29-session-device-state/README.md">Markdown</a> · <a href="chapters/29-session-device-state/sequence.puml">PlantUML</a> · <a href="chapters/29-session-device-state/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/29-session-device-state.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-30">
+        <h3><a href="chapters/30-telemetry-query/index.html">30 Telemetry 查询流程</a></h3>
+        <p>keys/latest/raw/aggregation、Entity View、per-key limit、SQL/Timescale/Cassandra 后端差异、超时与查询放大风险。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/30-telemetry-query/README.md">Markdown</a> · <a href="chapters/30-telemetry-query/sequence.puml">PlantUML</a> · <a href="chapters/30-telemetry-query/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/30-telemetry-query.svg">架构图 SVG</a></p>
+      </div>
+
+      <div class="chapter-card" id="chapter-31">
+        <h3><a href="chapters/31-timeseries-ttl-cleanup/index.html">31 Timeseries TTL 清理流程</a></h3>
+        <p>SYS partition owner 调度、PostgreSQL 分区与行清理、Timescale DELETE、Cassandra cell TTL、latest 分叉和存储回收风险。</p>
+        <p><span class="status">已完成</span> · <a href="chapters/31-timeseries-ttl-cleanup/README.md">Markdown</a> · <a href="chapters/31-timeseries-ttl-cleanup/sequence.puml">PlantUML</a> · <a href="chapters/31-timeseries-ttl-cleanup/sequence.svg">时序图 SVG</a> · <a href="assets/architecture/31-timeseries-ttl-cleanup.svg">架构图 SVG</a></p>
+      </div>
+
       <div class="notice"><strong>源码结论：</strong>3.6.4 中普通 MQTT 遥测不会先进入 Device Actor。Transport 直接投递 Rule Engine Queue，消费者再进入 App/Tenant/RuleChain/RuleNode Actor。MQTT PUBACK 表示队列 producer 写入成功，不表示数据库落库完成。</div>
       <div class="notice"><strong>Device 创建结论：</strong><code>device</code> 与 <code>device_credentials</code> 在一个 PostgreSQL 事务中提交；Cluster、Rule Engine、State 和 Audit 是提交后的异步传播。DEVICE CREATED 生命周期不会预建 Device Actor。</div>
       <div class="notice"><strong>Device 删除结论：</strong>Alarm 与 Device 聚合删除共享外层 PostgreSQL 事务，但运行时 Queue 在 COMMIT 前发送。删除不清理 Attribute、TimescaleDB/Cassandra telemetry 或设备 RPC；DEVICE DELETED 可能临时创建 Device Actor 再停止。</div>
@@ -182,11 +230,16 @@
       <div class="notice"><strong>TimescaleDB 写入结论：</strong>只有 <code>ts_kv</code> 是按 bigint ts 的一维hypertable；history与普通PostgreSQL latest分别合批和提交。3.6未创建Continuous Aggregate、压缩或Timescale retention policy，请求TTL也不写入行；后台procedure按租户策略DELETE history并留下latest。</div>
       <div class="notice"><strong>PostgreSQL 写入结论：</strong>实体CRUD、JDBC batch和PL/pgSQL是三条不同路径；事务要从真实Service代理入口判断，异步queue已经切换事务。SQL telemetry动态创建RANGE分区并保留DEFAULT；每实例Hikari默认16连接由Web、JPA和多组writer共享，积压、WAL、锁、dead tuple和autovacuum必须联合排查。</div>
       <div class="notice"><strong>HTTP 设备 API 结论：</strong>URL access token每次经Transport API交给Core验证，不走用户JWT。Telemetry/Attribute POST的200只等Rule Engine Queue producer；GET Attributes和HTTP RPC使用临时SYNC session、Core Queue和Device Actor。timeout或断连不取消下游工作，URL token必须在网关和日志中脱敏。</div>
+      <div class="notice"><strong>CoAP 结论：</strong>Californium处理UDP/DTLS与Observe；plain token逐请求交给Core，X.509 identity按peer缓存于Transport内存。Telemetry/Attributes的2.01只确认Queue producer；SYNC/ASYNC session、Observe、CON RPC ACK和PSM/eDRX状态不与数据库事务绑定，重启后设备需重订阅。</div>
+      <div class="notice"><strong>LwM2M 结论：</strong>Leshan的Bootstrap与Main Server独立于原生CoAP API。Registration成功早于ThingsBoard session、Read/Observe和数据库；Observe值必须经过Profile映射才进入Rule Engine，默认registration/client状态位于当前进程。</div>
+      <div class="notice"><strong>MQTT Gateway 结论：</strong>物理设备认证后，每个虚拟设备使用独立DeviceId和sessionId；首条业务消息可隐式连接。批量上报无跨设备原子性，下行依赖nodeId与virtual sessionId，QoS 1物理PUBACK不会自动形成虚拟设备DELIVERED。</div>
+      <div class="notice"><strong>Device Provision 结论：</strong>三协议统一进入Provision service且不经过Device Actor。device与credentials同事务，provisionState、Cluster、Rule Engine和Audit不原子；create策略对响应丢失没有幂等重试保障。</div>
+      <div class="notice"><strong>Device Claim 结论：</strong>设备ACK早于Actor写ClaimData，默认Caffeine缓存不跨Core。customer_id更新与Claim数据清理分段提交；并发Customer Claim没有行锁或CAS，Reclaim也存在归属已清空但属性保存失败的窗口。</div>
+      <div class="notice"><strong>Session 与 Device State 结论：</strong>Transport listener、Actor session和Device State是三套状态；register/deregister不会自动发送OPEN/CLOSED。connect/disconnect与active/inactive是独立轴，状态默认写SERVER_SCOPE attributes，切到telemetry必须同步切换device_info_view。</div>
+      <div class="notice"><strong>Telemetry 查询结论：</strong>REST 直接经AccessValidator和TimeseriesService读数据库，不走Actor/Kafka；keys读取latest，raw的limit按key且没有cursor。PostgreSQL按bucket发SQL，Timescale运行时time_bucket，Cassandra跨partition合并；亚秒interval可绕过700区间真实限制，SQL未知key查询还可能写dictionary。</div>
+      <div class="notice"><strong>Timeseries TTL 结论：</strong>调度只进入history DAO，不清latest。普通PostgreSQL先DROP完整旧分区再按tenant/customer TTL删除行；Timescale 3.6只做DELETE；Cassandra在写入时绑定cell TTL。SQL request TTL不存入行，procedure还存在TTL cutoff变量跨loop残留风险。</div>
 
       <h2>全书规划</h2>
-      <div class="catalog">
-        <section class="chapter-card" id="chapter-24"><h3>24 CoAP 消息流程</h3><p class="pending">待分析</p><p>资源匹配、DTLS、会话上下文、适配与响应。</p></section>
-      </div>
       <p>其余协议、查询、缓存、WebSocket、Edge、通知和运行时章节见 <a href="SUMMARY.md">完整目录</a>。</p>
     </article>
   </main>

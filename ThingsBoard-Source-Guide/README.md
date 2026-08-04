@@ -1,8 +1,8 @@
 # ThingsBoard release-3.6 源码解析指南
 
-> 源码基线：ThingsBoard `3.6.4`，工作区提交 `0cb411fc90`。本文档只记录能够从当前工作区源码、配置和建表脚本中核实的行为。
+> 源码基线：ThingsBoard `release-3.6`，工作区提交 `69124284c2`。本文档只记录能够从当前工作区源码、配置和建表脚本中核实的行为。
 
-[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md) | [第 20 章：Cassandra 写入流程](chapters/20-cassandra-write/README.md) | [第 21 章：TimescaleDB 写入流程](chapters/21-timescale-write/README.md) | [第 22 章：PostgreSQL 写入流程](chapters/22-postgresql-write/README.md) | [第 23 章：HTTP 设备 API 流程](chapters/23-http-device-api/README.md)
+[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md) | [第 20 章：Cassandra 写入流程](chapters/20-cassandra-write/README.md) | [第 21 章：TimescaleDB 写入流程](chapters/21-timescale-write/README.md) | [第 22 章：PostgreSQL 写入流程](chapters/22-postgresql-write/README.md) | [第 23 章：HTTP 设备 API 流程](chapters/23-http-device-api/README.md) | [第 24 章：CoAP 消息流程](chapters/24-coap-message-flow/README.md) | [第 25 章：LwM2M 注册与观测流程](chapters/25-lwm2m-registration-observe/README.md) | [第 26 章：MQTT Gateway 流程](chapters/26-mqtt-gateway/README.md) | [第 27 章：Device Provision 流程](chapters/27-device-provision/README.md) | [第 28 章：Device Claim 流程](chapters/28-device-claim/README.md) | [第 29 章：Session 与 Device State 流程](chapters/29-session-device-state/README.md) | [第 30 章：Telemetry 查询流程](chapters/30-telemetry-query/README.md) | [第 31 章：Timeseries TTL 清理流程](chapters/31-timeseries-ttl-cleanup/README.md)
 
 ## 阅读定位
 
@@ -55,6 +55,14 @@
 | 21 | TimescaleDB 写入流程 | 已完成 | [Markdown](chapters/21-timescale-write/README.md) / [HTML](chapters/21-timescale-write/index.html) / [PlantUML](chapters/21-timescale-write/sequence.puml) / [时序图 SVG](chapters/21-timescale-write/sequence.svg) / [架构图 SVG](assets/architecture/21-timescale-write.svg) |
 | 22 | PostgreSQL 写入流程 | 已完成 | [Markdown](chapters/22-postgresql-write/README.md) / [HTML](chapters/22-postgresql-write/index.html) / [PlantUML](chapters/22-postgresql-write/sequence.puml) / [时序图 SVG](chapters/22-postgresql-write/sequence.svg) / [架构图 SVG](assets/architecture/22-postgresql-write.svg) |
 | 23 | HTTP 设备 API 流程 | 已完成 | [Markdown](chapters/23-http-device-api/README.md) / [HTML](chapters/23-http-device-api/index.html) / [PlantUML](chapters/23-http-device-api/sequence.puml) / [时序图 SVG](chapters/23-http-device-api/sequence.svg) / [架构图 SVG](assets/architecture/23-http-device-api.svg) |
+| 24 | CoAP 消息流程 | 已完成 | [Markdown](chapters/24-coap-message-flow/README.md) / [HTML](chapters/24-coap-message-flow/index.html) / [PlantUML](chapters/24-coap-message-flow/sequence.puml) / [时序图 SVG](chapters/24-coap-message-flow/sequence.svg) / [架构图 SVG](assets/architecture/24-coap-message-flow.svg) |
+| 25 | LwM2M 注册与观测流程 | 已完成 | [Markdown](chapters/25-lwm2m-registration-observe/README.md) / [HTML](chapters/25-lwm2m-registration-observe/index.html) / [PlantUML](chapters/25-lwm2m-registration-observe/sequence.puml) / [时序图 SVG](chapters/25-lwm2m-registration-observe/sequence.svg) / [架构图 SVG](assets/architecture/25-lwm2m-registration-observe.svg) |
+| 26 | MQTT Gateway 流程 | 已完成 | [Markdown](chapters/26-mqtt-gateway/README.md) / [HTML](chapters/26-mqtt-gateway/index.html) / [PlantUML](chapters/26-mqtt-gateway/sequence.puml) / [时序图 SVG](chapters/26-mqtt-gateway/sequence.svg) / [架构图 SVG](assets/architecture/26-mqtt-gateway.svg) |
+| 27 | Device Provision 流程 | 已完成 | [Markdown](chapters/27-device-provision/README.md) / [HTML](chapters/27-device-provision/index.html) / [PlantUML](chapters/27-device-provision/sequence.puml) / [时序图 SVG](chapters/27-device-provision/sequence.svg) / [架构图 SVG](assets/architecture/27-device-provision.svg) |
+| 28 | Device Claim 流程 | 已完成 | [Markdown](chapters/28-device-claim/README.md) / [HTML](chapters/28-device-claim/index.html) / [PlantUML](chapters/28-device-claim/sequence.puml) / [时序图 SVG](chapters/28-device-claim/sequence.svg) / [架构图 SVG](assets/architecture/28-device-claim.svg) |
+| 29 | Session 与 Device State 流程 | 已完成 | [Markdown](chapters/29-session-device-state/README.md) / [HTML](chapters/29-session-device-state/index.html) / [PlantUML](chapters/29-session-device-state/sequence.puml) / [时序图 SVG](chapters/29-session-device-state/sequence.svg) / [架构图 SVG](assets/architecture/29-session-device-state.svg) |
+| 30 | Telemetry 查询流程 | 已完成 | [Markdown](chapters/30-telemetry-query/README.md) / [HTML](chapters/30-telemetry-query/index.html) / [PlantUML](chapters/30-telemetry-query/sequence.puml) / [时序图 SVG](chapters/30-telemetry-query/sequence.svg) / [架构图 SVG](assets/architecture/30-telemetry-query.svg) |
+| 31 | Timeseries TTL 清理流程 | 已完成 | [Markdown](chapters/31-timeseries-ttl-cleanup/README.md) / [HTML](chapters/31-timeseries-ttl-cleanup/index.html) / [PlantUML](chapters/31-timeseries-ttl-cleanup/sequence.puml) / [时序图 SVG](chapters/31-timeseries-ttl-cleanup/sequence.svg) / [架构图 SVG](assets/architecture/31-timeseries-ttl-cleanup.svg) |
 
 完整规划见 [SUMMARY.md](SUMMARY.md)。待分析章节只链接到目录锚点，避免产生指向不存在文件的失效链接。
 
@@ -195,6 +203,54 @@ ThingsBoard的PostgreSQL写入不是单一JPA路径：实体CRUD主要走Spring 
 HTTP Device API使用URL path中的Device access token，不走用户JWT；每次请求通过Transport API request/reply交给Core验证credentials、device与profile，再创建随机SessionInfo。Telemetry和Client Attributes直接进入Rule Engine Queue，HTTP 200只等待producer callback，不等待consumer、Rule Node或数据库提交。
 
 GET Attributes、RPC/Attribute长轮询会在持有请求的Transport实例创建一次性SYNC session，经Core Queue和Device Actor路由，response或timeout后注销。默认业务timeout 60秒、Tomcat async上限300秒；客户端断开或HTTP timeout不会取消已发送的Queue/Actor/DB工作。生产必须对URL token做日志脱敏，并按认证、producer、consumer、Rule Chain和DAO逐层排查“200但无数据”。
+
+## 第 24 章关键结论
+
+CoAP 由 Californium 在 UDP 5683 和可选 DTLS 5684 上处理，不经过 Spring MVC。Plain CoAP 从 URI path 取 access token 并逐请求经 Transport API 交给 Core 验证；X.509 DTLS 在握手期用证书 SHA3 hash 查询设备凭据，再把 identity/profile 快照放入当前 Transport 实例的 peer-address 内存缓存。
+
+Telemetry 与 Client Attributes 的 `2.01 CREATED` 只确认 Rule Engine Queue producer callback；GET Attributes 和 client RPC 使用一次性 SYNC session，Attributes/RPC Observe 使用长期 ASYNC session。Observe relation、peer/token 索引、CON RPC 的 MID ACK map 与 PSM/eDRX sleeping 状态都驻留 Transport 内存，进程重启后设备必须重建 Observe；源码中的 sleeping 状态也明确尚未持久化。
+
+## 第 25 章关键结论
+
+LwM2M 由 Eclipse Leshan 管理 Bootstrap、Registration、Update、Deregister 和 Observe，不进入原生 CoAP `/api/v1`。Bootstrap 与 Main Server 是两套独立服务；Leshan 返回 Registration 成功后，ThingsBoard 才异步创建 Transport session、通知 Device Actor，并按 Device Profile 发起 Read、Observe 与 Write Attributes。
+
+Observe 值先写入 Transport 侧对象缓存，只有进入 Profile 的 `attribute` 或 `telemetry` 映射才转换成平台 KV 并直接投递 Rule Engine Queue。协议 ACK、Queue producer、Rule Chain 和数据库没有端到端事务；默认 registration/client 状态留在当前进程，Redis 是集群恢复的可选实现。
+
+## 第 26 章关键结论
+
+MQTT Gateway 先用物理网关凭据认证，并要求 `additionalInfo.gateway=true`。每个虚拟设备拥有独立 `DeviceId`、Profile、随机 sessionId 和 Actor session；`gwSessionId` 只把它关联到物理连接，Transport 本地 map 才是实时下行 listener，数据库不存在 connectedDevices 表。
+
+显式 `gateway/connect` 不是源码硬前置，首条遥测、属性、查询或 RPC response 可以隐式创建虚拟设备。批量上报会拆成独立 Queue callbacks，没有跨设备原子性；下行依赖 `nodeId + virtual sessionId`，Gateway QoS 1 RPC 也没有物理 PUBACK 到虚拟设备 `DELIVERED` 的关联。
+
+## 第 27 章关键结论
+
+HTTP、MQTT、CoAP Provision 最终都进入 `ProvisionDeviceRequestMsg -> DeviceProvisionServiceImpl`，不创建普通设备 session，也不经过 Device Actor。`ALLOW_CREATE_NEW_DEVICES` 新建设备，`CHECK_PRE_PROVISIONED_DEVICES` 返回预建设备的现有凭据；TLS/DTLS 的 X.509 chain 自动创建是另一条入口。
+
+新建路径把 `device` 与 `device_credentials` 放在同一个 DAO 事务，但 `provisionState`、Cluster、Rule Engine 和 Audit 位于事务之外。属性写失败可导致设备已经提交而客户端得到 FAILURE；create 策略没有幂等 requestId，响应丢失后的盲目重试会被同名约束拒绝。
+
+## 第 28 章关键结论
+
+Device Claim 分为设备登记窗口和 Customer User 认领两段。设备协议 ACK 只确认 `ClaimDeviceMsg` 进入 Core Queue；Actor 后续把 ClaimData 写入 `claimDevices` cache，普通登记不会写持久 `claimingData` attribute。默认 Caffeine 是节点本地缓存，多 Core 部署需要 Redis、粘性路由或外部持久数据保证 REST 可见性。
+
+认领先提交 `device.customer_id`，再异步删除 Claim attributes/cache，两者没有共同事务。并发 Customer Claim 没有行锁、CAS 或版本列，多个请求可能都返回成功而后提交者覆盖前者；Reclaim 也可能先清空归属，再因 `claimingAllowed` 保存失败向调用方报错。
+
+## 第 29 章关键结论
+
+Transport 本地 listener、Device Actor session map 与 Device State 是三套不同状态。`registerAsyncSession`/`registerSyncSession` 只登记 listener，`deregisterSession` 只清理本地状态；协议实现必须显式发送 OPEN/CLOSED。第一条 session OPEN 和最后一条 CLOSED 产生 connect/disconnect，而 `active` 由活动时间窗口决定，不等价于 socket 在线。
+
+Activity 经过 Transport 聚合后进入 Core Queue，Actor 再调用 Device State；producer callback、consumer commit、状态持久化和 Rule Engine 处理互不构成事务。六个状态键默认写 SERVER_SCOPE attributes；切换到 telemetry 时还必须同步调整 `device_info_view`，否则设备列表可能继续读取旧来源。
+
+## 第 30 章关键结论
+
+Telemetry REST 查询直接沿 `TelemetryController -> AccessValidator -> BaseTimeseriesService -> DAO` 读取数据库，不经过 Actor 或 Kafka。keys 来自 latest 表而不是 history distinct scan；raw 使用 `[startTs,endTs)`，`limit` 按 key 生效且没有 offset/cursor。history 与 latest 可独立选择 PostgreSQL、TimescaleDB 或 Cassandra，查询层不做读时合并或一致性修复。
+
+普通 PostgreSQL 聚合按 key × bucket 产生 SQL Future，Timescale 固定 interval 运行时使用 `time_bucket`，Cassandra 每 bucket 并发读取相关 partitions 后在 Java 合并；3.6 未创建 Continuous Aggregate。默认 700 intervals 校验对亚秒 interval 存在实现缺口，SQL/Timescale 仍可能产生巨量 bucket。SQL/Timescale 查询未知 key 还会通过 `getOrSaveKeyId` 写 `ts_kv_dictionary`；Cassandra raw 某些失败 callback 只记录日志，Future 可能等到 Spring 30 秒异步超时。
+
+## 第 31 章关键结论
+
+Timeseries cleanup 由 SYS tenant Core partition owner 的 Spring scheduler 同步触发，且只进入 history `TimeseriesDao`。普通 PostgreSQL 先按 system TTL DROP cutoff 之前的完整分区，再按 tenant/customer `TTL` 属性 DELETE 行；TimescaleDB 3.6 只执行相同的行 DELETE，没有 `drop_chunks` 或 retention policy；Cassandra `cleanup` 为空，history 在写入时使用 `USING TTL`。
+
+SQL/Timescale 的 request TTL 和 tenant profile `defaultStorageTtlDays` 不写入 `ts_kv`，只参与 datapoint-days 计算；latest 也不会随 history 自动过期。release-3.6 SQL procedure 的 `tenant_ttl_ts/customer_ttl_ts` 未在每轮 loop 清空，TTL=0 可能沿用上一实体 cutoff；属性查询还缺少 scope 条件。生产启用前必须验证这一过程，并联合观察 WAL、dead tuples、VACUUM、replica lag；Cassandra 则重点观察 tombstone、compaction 与 partition registry 先于活跃 cell 过期的风险。
 
 ## 图表约定
 

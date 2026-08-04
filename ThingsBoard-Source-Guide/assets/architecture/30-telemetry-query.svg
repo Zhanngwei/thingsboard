@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1420" viewBox="0 0 1900 1420" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Telemetry 查询架构</title>
+  <desc id="desc">高对比展示 REST 和 Rule Engine 入口、权限与查询契约、history/latest 独立后端，以及 PostgreSQL、TimescaleDB、Cassandra 的 raw 和 aggregation 执行差异。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#1f2937"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#b91c1c"/>
+    </marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .subtitle{font:600 17px Arial,'Microsoft YaHei',sans-serif;fill:#374151}
+      .section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:700 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .tiny{font:14px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:700 14px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:7px;stroke-linejoin:round}
+      .band{fill:#f8fafc;stroke:#334155;stroke-width:2.5}
+      .blue{fill:#e8f4fd;stroke:#0369a1;stroke-width:3}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:3}
+      .amber{fill:#fff7e6;stroke:#a16207;stroke-width:3}
+      .red{fill:#fff1f2;stroke:#be123c;stroke-width:3}
+      .gray{fill:#f3f4f6;stroke:#374151;stroke-width:3}
+      .violet{fill:#f5f3ff;stroke:#6d28d9;stroke-width:3}
+      .line{fill:none;stroke:#1f2937;stroke-width:3;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#475569;stroke-width:2.6;stroke-dasharray:9 7;marker-end:url(#arrow)}
+      .redline{fill:none;stroke:#b91c1c;stroke-width:3;stroke-dasharray:10 7;marker-end:url(#arrow-red)}
+    </style>
+  </defs>
+
+  <rect width="1900" height="1420" fill="#ffffff"/>
+  <text x="950" y="48" text-anchor="middle" class="title">ThingsBoard 3.6 Telemetry 查询：两个存储接口、三种执行后端、一个 REST 契约</text>
+  <text x="950" y="78" text-anchor="middle" class="subtitle">源码事实：REST 读取不经过 Actor/Kafka；keys 来自 latest；history 与 latest 可独立选择数据库</text>
+
+  <rect x="30" y="110" width="390" height="840" rx="6" class="band"/>
+  <text x="225" y="148" text-anchor="middle" class="section">入口与 HTTP 边界</text>
+
+  <rect x="70" y="185" width="310" height="115" rx="5" class="blue"/>
+  <text x="225" y="218" text-anchor="middle" class="label">keys/timeseries</text>
+  <text x="225" y="248" text-anchor="middle" class="small">getTimeseriesKeys(String, String)</text>
+  <text x="225" y="276" text-anchor="middle" class="small">读取 latest 后提取 key</text>
+
+  <rect x="70" y="335" width="310" height="125" rx="5" class="green"/>
+  <text x="225" y="370" text-anchor="middle" class="label">values/timeseries latest</text>
+  <text x="225" y="400" text-anchor="middle" class="small">无 startTs/endTs mapping</text>
+  <text x="225" y="428" text-anchor="middle" class="small">全部 latest 或每 key 一个 Future</text>
+
+  <rect x="70" y="495" width="310" height="155" rx="5" class="amber"/>
+  <text x="225" y="530" text-anchor="middle" class="label">values/timeseries range</text>
+  <text x="225" y="560" text-anchor="middle" class="small">必须有 keys/startTs/endTs</text>
+  <text x="225" y="588" text-anchor="middle" class="small">raw: limit + orderBy</text>
+  <text x="225" y="616" text-anchor="middle" class="small">aggregate: interval/calendar + agg</text>
+
+  <rect x="70" y="690" width="310" height="120" rx="5" class="violet"/>
+  <text x="225" y="725" text-anchor="middle" class="label">TbGetTelemetryNode</text>
+  <text x="225" y="755" text-anchor="middle" class="small">FIRST / LAST / ALL</text>
+  <text x="225" y="783" text-anchor="middle" class="small">结果写入现有 TbMsg metadata</text>
+
+  <rect x="70" y="845" width="310" height="75" rx="5" class="red"/>
+  <text x="225" y="877" text-anchor="middle" class="label">本流程不经过</text>
+  <text x="225" y="904" text-anchor="middle" class="small">Device Actor / Core Queue / Kafka</text>
+
+  <rect x="455" y="110" width="520" height="840" rx="6" class="band"/>
+  <text x="715" y="148" text-anchor="middle" class="section">服务契约与异步编排</text>
+
+  <rect x="500" y="185" width="430" height="115" rx="5" class="red"/>
+  <text x="715" y="220" text-anchor="middle" class="label">AccessValidator</text>
+  <text x="715" y="250" text-anchor="middle" class="small">Entity lookup + READ_TELEMETRY</text>
+  <text x="715" y="278" text-anchor="middle" class="small">DeferredResult；默认 async timeout 30000 ms</text>
+
+  <rect x="500" y="340" width="430" height="160" rx="5" class="blue"/>
+  <text x="715" y="375" text-anchor="middle" class="label">BaseReadTsKvQuery（每 key 一个）</text>
+  <text x="715" y="407" text-anchor="middle" class="small">key / [startTs,endTs) / AggregationParams</text>
+  <text x="715" y="435" text-anchor="middle" class="small">limit / order；calendar interval + ZoneId</text>
+  <text x="715" y="463" text-anchor="middle" class="small">aggregation validator: max(interval,1000), 默认 700</text>
+
+  <rect x="500" y="540" width="430" height="205" rx="5" class="green"/>
+  <text x="715" y="575" text-anchor="middle" class="label">BaseTimeseriesService</text>
+  <text x="715" y="607" text-anchor="middle" class="small">findAllLatest / findLatest / findAllByQueries</text>
+  <text x="715" y="635" text-anchor="middle" class="small">指定 latest key：Futures.allAsList</text>
+  <text x="715" y="663" text-anchor="middle" class="small">history：校验、每 key dispatch、结果 flatten</text>
+  <text x="715" y="691" text-anchor="middle" class="small">Entity View：过滤 key、裁剪范围、映射 origin</text>
+  <text x="715" y="719" text-anchor="middle" class="small">latest/keys 不执行 Entity View 映射</text>
+
+  <rect x="500" y="785" width="430" height="135" rx="5" class="amber"/>
+  <text x="715" y="820" text-anchor="middle" class="label">TelemetryController callback</text>
+  <text x="715" y="852" text-anchor="middle" class="small">LinkedHashMap&lt;key,List&lt;TsData&gt;&gt;</text>
+  <text x="715" y="880" text-anchor="middle" class="small">strict=false 转 string；strict=true 保留类型</text>
+  <text x="715" y="908" text-anchor="middle" class="small">不存在的指定 latest key 返回 null 点</text>
+
+  <rect x="1010" y="110" width="860" height="840" rx="6" class="band"/>
+  <text x="1440" y="148" text-anchor="middle" class="section">独立装配的 Latest 与 History 后端</text>
+
+  <rect x="1050" y="185" width="780" height="180" rx="5" class="gray"/>
+  <text x="1440" y="220" text-anchor="middle" class="label">database.ts_latest.type → TimeseriesLatestDao</text>
+  <rect x="1080" y="245" width="340" height="90" rx="4" class="blue"/>
+  <text x="1250" y="276" text-anchor="middle" class="label">SQL / Timescale latest</text>
+  <text x="1250" y="305" text-anchor="middle" class="small">ts_kv_latest + ts_kv_dictionary</text>
+  <rect x="1460" y="245" width="340" height="90" rx="4" class="violet"/>
+  <text x="1630" y="276" text-anchor="middle" class="label">Cassandra latest</text>
+  <text x="1630" y="305" text-anchor="middle" class="small">ts_kv_latest_cf，text key</text>
+
+  <rect x="1050" y="405" width="780" height="500" rx="5" class="gray"/>
+  <text x="1440" y="440" text-anchor="middle" class="label">database.ts.type → TimeseriesDao</text>
+
+  <rect x="1080" y="475" width="220" height="365" rx="4" class="blue"/>
+  <text x="1190" y="508" text-anchor="middle" class="label">PostgreSQL</text>
+  <text x="1190" y="540" text-anchor="middle" class="small">RANGE partitioned ts_kv</text>
+  <text x="1190" y="574" text-anchor="middle" class="small">raw：每 key 一条</text>
+  <text x="1190" y="602" text-anchor="middle" class="small">PK(entity,key,ts)</text>
+  <text x="1190" y="650" text-anchor="middle" class="small">aggregate：</text>
+  <text x="1190" y="678" text-anchor="middle" class="small">每 key × 每 bucket</text>
+  <text x="1190" y="706" text-anchor="middle" class="small">一个 SQL Future</text>
+  <text x="1190" y="754" text-anchor="middle" class="small">空 bucket 省略</text>
+  <text x="1190" y="782" text-anchor="middle" class="small">timestamp = 中点</text>
+
+  <rect x="1330" y="475" width="220" height="365" rx="4" class="green"/>
+  <text x="1440" y="508" text-anchor="middle" class="label">TimescaleDB</text>
+  <text x="1440" y="540" text-anchor="middle" class="small">ts_kv hypertable</text>
+  <text x="1440" y="568" text-anchor="middle" class="small">默认 chunk 7 天</text>
+  <text x="1440" y="616" text-anchor="middle" class="small">raw：chunk pruning</text>
+  <text x="1440" y="650" text-anchor="middle" class="small">固定 interval：</text>
+  <text x="1440" y="678" text-anchor="middle" class="small">每 key time_bucket</text>
+  <text x="1440" y="706" text-anchor="middle" class="small">尾部 partial 可再查询</text>
+  <text x="1440" y="754" text-anchor="middle" class="small">calendar 仍逐 bucket</text>
+  <text x="1440" y="782" text-anchor="middle" class="small">无 Continuous Aggregate</text>
+
+  <rect x="1580" y="475" width="220" height="365" rx="4" class="violet"/>
+  <text x="1690" y="508" text-anchor="middle" class="label">Cassandra</text>
+  <text x="1690" y="540" text-anchor="middle" class="small">ts_kv_cf + partitions_cf</text>
+  <text x="1690" y="568" text-anchor="middle" class="small">默认 MONTHS partition</text>
+  <text x="1690" y="616" text-anchor="middle" class="small">raw：按方向逐 partition</text>
+  <text x="1690" y="644" text-anchor="middle" class="small">达到 per-key limit 即停</text>
+  <text x="1690" y="692" text-anchor="middle" class="small">aggregate：每 bucket</text>
+  <text x="1690" y="720" text-anchor="middle" class="small">并发读取相关 partitions</text>
+  <text x="1690" y="748" text-anchor="middle" class="small">Java 合并 partial result</text>
+  <text x="1690" y="782" text-anchor="middle" class="small">毫秒步长下限 1000</text>
+
+  <path d="M380 245 H500" class="line"/>
+  <path d="M380 400 H455 V245 H500" class="line"/>
+  <path d="M380 570 H455 V245 H500" class="line"/>
+  <path d="M380 750 H475 V640 H500" class="line"/>
+  <path d="M715 300 V340" class="line"/>
+  <path d="M715 500 V540" class="line"/>
+  <path d="M930 620 H1010" class="line"/>
+  <path d="M930 840 H985 V275 H1050" class="line"/>
+  <text x="961" y="602" text-anchor="middle" class="edge">history</text>
+  <text x="985" y="258" text-anchor="middle" class="edge">latest / keys</text>
+  <path d="M1440 365 V405" class="line"/>
+
+  <rect x="30" y="990" width="1840" height="390" rx="6" class="band"/>
+  <text x="950" y="1030" text-anchor="middle" class="section">查询语义、数据副作用与生产风险</text>
+
+  <rect x="70" y="1070" width="410" height="260" rx="5" class="blue"/>
+  <text x="275" y="1105" text-anchor="middle" class="label">Raw 读取契约</text>
+  <text x="275" y="1140" text-anchor="middle" class="small">时间范围：[startTs, endTs)</text>
+  <text x="275" y="1170" text-anchor="middle" class="small">limit 按 key；无 offset / cursor</text>
+  <text x="275" y="1200" text-anchor="middle" class="small">多 key = 多个独立 backend query</text>
+  <text x="275" y="1230" text-anchor="middle" class="small">返回 map 无跨 key 全局时间顺序</text>
+  <text x="275" y="1260" text-anchor="middle" class="small">客户端必须控制 key、range、response bytes</text>
+
+  <rect x="520" y="1070" width="410" height="260" rx="5" class="green"/>
+  <text x="725" y="1105" text-anchor="middle" class="label">Aggregation 契约</text>
+  <text x="725" y="1140" text-anchor="middle" class="small">MIN / MAX / AVG / SUM / COUNT</text>
+  <text x="725" y="1170" text-anchor="middle" class="small">输出点 timestamp = bucket 中点</text>
+  <text x="725" y="1200" text-anchor="middle" class="small">空 bucket 省略，无 gapfill</text>
+  <text x="725" y="1230" text-anchor="middle" class="small">orderBy 主要只影响 raw</text>
+  <text x="725" y="1260" text-anchor="middle" class="small">calendar 时区无效会回退 JVM default</text>
+
+  <rect x="970" y="1070" width="410" height="260" rx="5" class="amber"/>
+  <text x="1175" y="1105" text-anchor="middle" class="label">SQL 读路径的写副作用</text>
+  <text x="1175" y="1140" text-anchor="middle" class="small">指定 key → getOrSaveKeyId(key)</text>
+  <text x="1175" y="1170" text-anchor="middle" class="small">未知 key 会 INSERT ts_kv_dictionary</text>
+  <text x="1175" y="1200" text-anchor="middle" class="small">同时更新进程内 dictionary map</text>
+  <text x="1175" y="1230" text-anchor="middle" class="small">查询账号并非严格 read-only</text>
+  <text x="1175" y="1260" text-anchor="middle" class="small">应限制外部 key 数量与合法集合</text>
+
+  <rect x="1420" y="1070" width="410" height="260" rx="5" class="red"/>
+  <text x="1625" y="1105" text-anchor="middle" class="label">必须额外防护的风险</text>
+  <text x="1625" y="1140" text-anchor="middle" class="small">validator 以 max(interval,1000) 算 700</text>
+  <text x="1625" y="1170" text-anchor="middle" class="small">SQL/Timescale 却可继续使用 1ms interval</text>
+  <text x="1625" y="1200" text-anchor="middle" class="small">可能生成巨量 Future / bucket rows</text>
+  <text x="1625" y="1230" text-anchor="middle" class="small">Cassandra 某些 failure callback 仅 log</text>
+  <text x="1625" y="1260" text-anchor="middle" class="small">未完成 Future 最终触发 30s HTTP timeout</text>
+
+  <path d="M480 1200 H520" class="dash"/>
+  <path d="M930 1200 H970" class="dash"/>
+  <path d="M1380 1200 H1420" class="redline"/>
+  <text x="950" y="1365" text-anchor="middle" class="subtitle">排障顺序：确认 history/latest 后端 → 计算 key × bucket × partition/chunk → 检查 DAO Future 与连接池/driver timeout → 再看 HTTP 30 秒边界</text>
+</svg>

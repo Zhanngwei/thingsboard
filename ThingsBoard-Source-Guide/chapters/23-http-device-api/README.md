@@ -2,7 +2,7 @@
 
 > 源码基线：ThingsBoard `3.6.4`，提交 `0cb411fc90`。本章分析设备固件使用的 `/api/v1/{deviceToken}/...` Transport API，不分析平台用户使用JWT访问的 `/api/plugins/telemetry`。
 
-[上一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/23-http-device-api.svg) | [下一篇：24 CoAP 消息流程（待分析）](../../SUMMARY.md#chapter-24)
+[上一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/23-http-device-api.svg) | [下一篇：24 CoAP 消息流程](../24-coap-message-flow/README.md)
 
 ---
 
@@ -611,4 +611,4 @@ SQL/Timescale同`entity,key,ts`会UPSERT，Cassandra同主键也覆盖，但Rule
 
 ---
 
-[上一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md) | [返回全书目录](../../SUMMARY.md) | [下一篇：24 CoAP 消息流程（待分析）](../../SUMMARY.md#chapter-24)
+[上一篇：22 PostgreSQL 写入流程](../22-postgresql-write/README.md) | [返回全书目录](../../SUMMARY.md) | [下一篇：24 CoAP 消息流程](../24-coap-message-flow/README.md)

@@ -1,0 +1,225 @@
+@startuml
+title ThingsBoard 3.6 Telemetry Query: keys, latest, raw range and aggregation
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam sequenceArrowColor #1F2937
+skinparam sequenceLifeLineBorderColor #374151
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBorderColor #1F2937
+skinparam participantBackgroundColor #F8FAFC
+skinparam participantFontColor #111827
+skinparam actorBorderColor #1F2937
+skinparam actorBackgroundColor #EAF7FB
+skinparam noteBackgroundColor #FFF7D6
+skinparam noteBorderColor #92400E
+skinparam noteFontColor #111827
+skinparam groupBorderColor #374151
+skinparam groupHeaderBackgroundColor #E5E7EB
+skinparam groupFontColor #111827
+skinparam databaseBorderColor #1F2937
+skinparam databaseBackgroundColor #ECFDF5
+skinparam collectionsBorderColor #1F2937
+skinparam collectionsBackgroundColor #EFF6FF
+skinparam ArrowThickness 1.6
+skinparam maxMessageSize 240
+hide footbox
+
+actor "REST Client" as Client
+participant "Spring MVC" as MVC
+participant "TelemetryController" as Controller
+participant "AccessValidator" as Access
+participant "BaseTimeseriesService" as Service
+participant "TimeseriesLatestDao" as LatestDao
+participant "TimeseriesDao" as HistoryDao
+database "PostgreSQL\nSQL DAO" as PostgreSQL
+database "TimescaleDB\nTimescale DAO" as Timescale
+database "Cassandra\nCassandra DAO" as Cassandra
+participant "TbGetTelemetryNode" as RuleNode
+
+== Common REST and permission boundary ==
+Client -> MVC : GET /api/plugins/telemetry/{type}/{id}/...
+MVC -> Controller : mapped GET method
+Controller -> Access : validateEntityAndCallback(user, READ_TELEMETRY, entityId, callback)
+Access --> Controller : return new DeferredResult immediately
+Access -> Access : validate entity and accessControlService permission
+alt entity missing or access denied
+  Access -> MVC : response.setResult(error)
+  MVC --> Client : HTTP error
+else allowed
+  Access -> Controller : invoke callback(response, tenantId, entityId)
+end
+note over MVC,Access
+  DeferredResult has no local timeout.
+  spring.mvc.async.request-timeout defaults to 30000 ms.
+end note
+
+== Keys query ==
+Controller -> Service : findAllLatest(tenantId, entityId)
+Service -> LatestDao : findAllLatest(tenantId, entityId)
+alt database.ts_latest.type is sql or timescale
+  LatestDao -> PostgreSQL : SELECT latest rows JOIN ts_kv_dictionary
+  PostgreSQL --> LatestDao : existing latest rows
+else database.ts_latest.type is cassandra
+  LatestDao -> Cassandra : SELECT all keys and values from ts_kv_latest_cf partition
+  Cassandra --> LatestDao : existing latest rows
+end
+LatestDao --> Service : Future<List<TsKvEntry>>
+Service --> Controller : callback with latest entries
+Controller -> Controller : extract unique entry keys
+Controller -> MVC : DeferredResult.setResult(key array)
+MVC --> Client : HTTP 200 JSON array
+note over Controller,LatestDao
+  The keys endpoint reads latest storage.
+  It does not scan history for DISTINCT keys.
+end note
+
+== Latest values query ==
+Client -> MVC : GET values/timeseries?keys=k1,k2
+MVC -> Controller : getLatestTimeseries(type, id, keys, strictTypes)
+Controller -> Access : validate READ_TELEMETRY
+Access -> Controller : invoke allowed callback
+alt keys parameter is empty
+  Controller -> Service : findAllLatest(tenantId, entityId)
+  Service -> LatestDao : one findAllLatest query
+else keys were requested
+  loop one Future per key
+    Controller -> Service : findLatest(tenantId, entityId, key)
+    Service -> LatestDao : findLatest(tenantId, entityId, key)
+    alt SQL latest
+      LatestDao -> PostgreSQL : getOrSaveKeyId(key), SELECT by entityId and keyId
+    else Cassandra latest
+      LatestDao -> Cassandra : SELECT by entityType, entityId and text key
+    end
+  end
+  Service -> Service : Futures.allAsList(per-key futures)
+end
+alt requested key exists
+  LatestDao --> Service : stored timestamp and typed value
+else requested key is absent
+  LatestDao --> Service : current server timestamp and null StringDataEntry
+end
+Service --> Controller : List<TsKvEntry>
+Controller -> Controller : group by key; string or strict typed values
+Controller -> MVC : DeferredResult.setResult(ResponseEntity 200)
+MVC --> Client : key -> [{ts,value}]
+
+== Raw history range ==
+Client -> MVC : GET values/timeseries?keys=...&startTs=...&endTs=...&agg=NONE
+MVC -> Controller : getTimeseries(...)
+Controller -> Controller : one BaseReadTsKvQuery per key
+Controller -> Service : findAll(tenantId, entityId, queries)
+Service -> Service : validate each query
+opt entityId is ENTITY_VIEW
+  Service -> Service : load view, filter keys, clamp range, map origin entity
+end
+Service -> HistoryDao : findAllAsync(tenantId, entityId, queries)
+par PostgreSQL history
+  HistoryDao -> PostgreSQL : SELECT ts_kv WHERE entity/key and start <= ts < end ORDER BY ts LIMIT
+  PostgreSQL --> HistoryDao : per-key rows
+else Timescale history
+  HistoryDao -> Timescale : same logical range query; chunk pruning
+  Timescale --> HistoryDao : per-key rows
+else Cassandra history
+  HistoryDao -> Cassandra : discover ts_kv_partitions_cf partitions
+  loop partitions in query order until per-key limit is full
+    HistoryDao -> Cassandra : SELECT ts_kv_cf partition ORDER BY ts LIMIT remaining
+    Cassandra --> HistoryDao : partition rows
+  end
+end
+HistoryDao --> Service : List<ReadTsKvQueryResult>
+Service -> Service : flatten results into List<TsKvEntry>
+Service --> Controller : Future success
+Controller -> Controller : LinkedHashMap grouping by key
+Controller -> MVC : set HTTP response
+MVC --> Client : raw points per key
+note over Controller,HistoryDao
+  Range is half-open [startTs, endTs).
+  limit applies independently to every key.
+  No offset or cursor is exposed by this REST endpoint.
+end note
+
+== Aggregation history ==
+Client -> MVC : range query with AVG, SUM, MIN, MAX or COUNT
+MVC -> Controller : getTimeseries(... agg, interval or calendar ...)
+Controller -> Controller : AggregationParams and one query per key
+Controller -> Service : findAll(...)
+Service -> Service : validate interval count using max(interval, 1000)
+alt database.ts.type is sql
+  loop each key and each bucket
+    Service -> HistoryDao : findAllAsync(query bucket)
+    HistoryDao -> PostgreSQL : one aggregate SQL for [bucketStart,bucketEnd)
+    PostgreSQL --> HistoryDao : optional aggregate row
+  end
+else database.ts.type is timescale and interval is milliseconds
+  loop each key
+    HistoryDao -> Timescale : one time_bucket query for full range
+    Timescale --> HistoryDao : ordered bucket rows
+    opt partial final bucket
+      HistoryDao -> Timescale : separate tail aggregate query
+      Timescale --> HistoryDao : tail row
+    end
+  end
+else database.ts.type is timescale and interval is calendar
+  loop each key and calendar period
+    HistoryDao -> Timescale : one aggregate query for calculated period
+    Timescale --> HistoryDao : optional period row
+  end
+else database.ts.type is cassandra
+  loop each key and logical bucket
+    HistoryDao -> Cassandra : discover all partitions crossing bucket
+    par concurrent partial aggregate reads
+      HistoryDao -> Cassandra : aggregate CQL for partition 1
+    else
+      HistoryDao -> Cassandra : aggregate CQL for partition N
+    end
+    Cassandra --> HistoryDao : partial results
+    HistoryDao -> HistoryDao : AggregatePartitionsFunction.merge
+  end
+end
+HistoryDao --> Service : non-empty bucket entries at bucket midpoint
+Service --> Controller : flat entries
+Controller -> MVC : JSON response
+MVC --> Client : aggregate curve
+note over Service,Timescale
+  ThingsBoard 3.6 does runtime time_bucket aggregation.
+  No Continuous Aggregate is created by the install/query code.
+end note
+
+== Rule Engine internal caller ==
+RuleNode -> RuleNode : onMsg(ctx, msg), build FIRST/LAST/ALL queries
+RuleNode -> Service : findAll(tenantId, msg.originator, queries)
+Service -> HistoryDao : selected history backend
+HistoryDao --> Service : asynchronous query results
+alt Future succeeds
+  Service --> RuleNode : List<TsKvEntry>
+  RuleNode -> RuleNode : write values into TbMsg metadata
+  RuleNode -> RuleNode : ctx.tellSuccess(msg)
+else Future fails
+  Service --> RuleNode : throwable
+  RuleNode -> RuleNode : ctx.tellFailure(msg, throwable)
+end
+note over RuleNode,HistoryDao
+  The node is already running inside Rule Engine context.
+  It does not publish another Kafka message for the database read.
+end note
+
+== Failure and timeout boundary ==
+alt DAO Future fails normally
+  HistoryDao --> Controller : onFailure(throwable)
+  Controller -> Controller : log error and AccessValidator.handleError
+  Controller -> MVC : HTTP 500 result
+else Cassandra raw callback only logs and leaves Future incomplete
+  Cassandra --> HistoryDao : driver failure
+  HistoryDao -> HistoryDao : log without setException in selected paths
+  ... Spring MVC async timeout ...
+  MVC --> Client : asynchronous request timeout
+else client disconnects first
+  Client -> MVC : connection closed
+  note over MVC,HistoryDao
+    Source has no explicit cancellation propagation
+    from DeferredResult/client disconnect to the database Future.
+  end note
+end
+
+@enduml

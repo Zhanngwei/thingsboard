@@ -35,17 +35,17 @@
 ## 第三篇：协议与会话
 
 - <a id="chapter-23"></a>**23 HTTP 设备 API 流程**（已完成）：[Markdown](chapters/23-http-device-api/README.md) · [HTML](chapters/23-http-device-api/index.html) · [PlantUML](chapters/23-http-device-api/sequence.puml) · [时序图 SVG](chapters/23-http-device-api/sequence.svg) · [架构图 SVG](assets/architecture/23-http-device-api.svg)
-- <a id="chapter-24"></a>**24 CoAP 消息流程**（待分析）：资源匹配、DTLS、会话上下文、适配与响应。
-- <a id="chapter-25"></a>**25 LwM2M 注册与观测流程**（待分析）：Bootstrap、Registration、Observe、对象模型和遥测转换。
-- <a id="chapter-26"></a>**26 MQTT Gateway 流程**（待分析）：虚拟设备连接、遥测/属性代理、RPC 路由和会话维护。
-- <a id="chapter-27"></a>**27 Device Provision 流程**（待分析）：Provision Profile、密钥/X.509、设备创建和凭据返回。
-- <a id="chapter-28"></a>**28 Device Claim 流程**（待分析）：claim secret、客户归属、有效期与并发控制。
-- <a id="chapter-29"></a>**29 Session 与 Device State 流程**（待分析）：open/close/activity、在线状态、超时调度和 active 遥测。
+- <a id="chapter-24"></a>**24 CoAP 消息流程**（已完成）：[Markdown](chapters/24-coap-message-flow/README.md) · [HTML](chapters/24-coap-message-flow/index.html) · [PlantUML](chapters/24-coap-message-flow/sequence.puml) · [时序图 SVG](chapters/24-coap-message-flow/sequence.svg) · [架构图 SVG](assets/architecture/24-coap-message-flow.svg)
+- <a id="chapter-25"></a>**25 LwM2M 注册与观测流程**（已完成）：[Markdown](chapters/25-lwm2m-registration-observe/README.md) · [HTML](chapters/25-lwm2m-registration-observe/index.html) · [PlantUML](chapters/25-lwm2m-registration-observe/sequence.puml) · [时序图 SVG](chapters/25-lwm2m-registration-observe/sequence.svg) · [架构图 SVG](assets/architecture/25-lwm2m-registration-observe.svg)
+- <a id="chapter-26"></a>**26 MQTT Gateway 流程**（已完成）：[Markdown](chapters/26-mqtt-gateway/README.md) · [HTML](chapters/26-mqtt-gateway/index.html) · [PlantUML](chapters/26-mqtt-gateway/sequence.puml) · [时序图 SVG](chapters/26-mqtt-gateway/sequence.svg) · [架构图 SVG](assets/architecture/26-mqtt-gateway.svg)
+- <a id="chapter-27"></a>**27 Device Provision 流程**（已完成）：[Markdown](chapters/27-device-provision/README.md) · [HTML](chapters/27-device-provision/index.html) · [PlantUML](chapters/27-device-provision/sequence.puml) · [时序图 SVG](chapters/27-device-provision/sequence.svg) · [架构图 SVG](assets/architecture/27-device-provision.svg)
+- <a id="chapter-28"></a>**28 Device Claim 流程**（已完成）：[Markdown](chapters/28-device-claim/README.md) · [HTML](chapters/28-device-claim/index.html) · [PlantUML](chapters/28-device-claim/sequence.puml) · [时序图 SVG](chapters/28-device-claim/sequence.svg) · [架构图 SVG](assets/architecture/28-device-claim.svg)
+- <a id="chapter-29"></a>**29 Session 与 Device State 流程**（已完成）：[Markdown](chapters/29-session-device-state/README.md) · [HTML](chapters/29-session-device-state/index.html) · [PlantUML](chapters/29-session-device-state/sequence.puml) · [时序图 SVG](chapters/29-session-device-state/sequence.svg) · [架构图 SVG](assets/architecture/29-session-device-state.svg)
 
 ## 第四篇：查询、存储与实时推送
 
-- <a id="chapter-30"></a>**30 Telemetry 查询流程**（待分析）：latest/range/aggregation、分页、降采样和后端差异。
-- <a id="chapter-31"></a>**31 Timeseries TTL 清理流程**（待分析）：SQL partition、Timescale delete、Cassandra TTL 与租户 TTL。
+- <a id="chapter-30"></a>**30 Telemetry 查询流程**（已完成）：[Markdown](chapters/30-telemetry-query/README.md) · [HTML](chapters/30-telemetry-query/index.html) · [PlantUML](chapters/30-telemetry-query/sequence.puml) · [时序图 SVG](chapters/30-telemetry-query/sequence.svg) · [架构图 SVG](assets/architecture/30-telemetry-query.svg)
+- <a id="chapter-31"></a>**31 Timeseries TTL 清理流程**（已完成）：[Markdown](chapters/31-timeseries-ttl-cleanup/README.md) · [HTML](chapters/31-timeseries-ttl-cleanup/index.html) · [PlantUML](chapters/31-timeseries-ttl-cleanup/sequence.puml) · [时序图 SVG](chapters/31-timeseries-ttl-cleanup/sequence.svg) · [架构图 SVG](assets/architecture/31-timeseries-ttl-cleanup.svg)
 - <a id="chapter-32"></a>**32 Redis 与本地缓存流程**（待分析）：Cache-Aside、Caffeine/Redis、跨节点失效和一致性窗口。
 - <a id="chapter-33"></a>**33 WebSocket 订阅流程**（待分析）：session、subscription command、实时遥测通知和背压。
 - <a id="chapter-34"></a>**34 Entity Query 流程**（待分析）：EntityDataQuery、动态 SQL、关系过滤、latest join 和分页。

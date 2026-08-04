@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1500" viewBox="0 0 2000 1500" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 MQTT Gateway 流程架构</title>
+  <desc id="desc">高对比展示物理 Gateway 认证、本地虚拟设备会话、Transport API、Core 与 Rule Engine Queue、Device Actor、通知回程、数据库及确认边界。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#253746"/>
+    </marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .subtitle{font:17px Arial,'Microsoft YaHei',sans-serif;fill:#334155}
+      .section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:700 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .tiny{font:14px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:700 14px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8px}
+      .band{fill:#f8fafc;stroke:#334155;stroke-width:2.5}
+      .blue{fill:#eaf7fb;stroke:#0e7490;stroke-width:3}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:3}
+      .amber{fill:#fff7e6;stroke:#9a5b13;stroke-width:3}
+      .red{fill:#fff1f2;stroke:#be123c;stroke-width:3}
+      .gray{fill:#f3f4f6;stroke:#4b5563;stroke-width:3}
+      .violet{fill:#f5f3ff;stroke:#6d28d9;stroke-width:3}
+      .line{fill:none;stroke:#253746;stroke-width:3;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#475569;stroke-width:2.7;stroke-dasharray:9 7;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <rect width="2000" height="1500" fill="#ffffff"/>
+  <text x="1000" y="48" text-anchor="middle" class="title">ThingsBoard 3.6 MQTT Gateway：物理连接、虚拟会话与集群消息边界</text>
+  <text x="1000" y="80" text-anchor="middle" class="subtitle">Gateway API 是 v1/gateway/** 专用链路；普通 MQTT Device API 不进入本图</text>
+
+  <rect x="30" y="110" width="430" height="1040" rx="6" class="band"/>
+  <text x="245" y="148" text-anchor="middle" class="section">物理 MQTT 连接与 Topic</text>
+
+  <rect x="70" y="175" width="350" height="120" rx="5" class="blue"/>
+  <text x="245" y="212" text-anchor="middle" class="label">Physical MQTT Gateway</text>
+  <text x="245" y="243" text-anchor="middle" class="small">一条 TCP/TLS channel 代理多个设备</text>
+  <text x="245" y="270" text-anchor="middle" class="small">Access Token / MQTT Basic / X.509</text>
+
+  <rect x="70" y="340" width="350" height="245" rx="5" class="amber"/>
+  <text x="245" y="378" text-anchor="middle" class="label">ThingsBoard Gateway Topics</text>
+  <text x="245" y="411" text-anchor="middle" class="small">connect · disconnect · telemetry · attributes</text>
+  <text x="245" y="440" text-anchor="middle" class="small">attributes/request · attributes/response</text>
+  <text x="245" y="469" text-anchor="middle" class="small">rpc · claim</text>
+  <text x="245" y="508" text-anchor="middle" class="small">Gateway JSON 或固定 transport.proto envelope</text>
+  <text x="245" y="537" text-anchor="middle" class="small">wire format 由物理 Gateway Profile 决定</text>
+  <text x="245" y="566" text-anchor="middle" class="small">下行 QoS 由 MQTT SUBSCRIBE 记录</text>
+
+  <rect x="70" y="630" width="350" height="210" rx="5" class="green"/>
+  <text x="245" y="668" text-anchor="middle" class="label">Netty + MqttTransportHandler</text>
+  <text x="245" y="701" text-anchor="middle" class="small">1883，TLS 默认关闭；TLS 端口 8883</text>
+  <text x="245" y="730" text-anchor="middle" class="small">max_payload_size = 65536 bytes</text>
+  <text x="245" y="759" text-anchor="middle" class="small">认证、exact Topic switch、PUBACK/SUBACK</text>
+  <text x="245" y="788" text-anchor="middle" class="small">channel close 触发 physical + virtual CLOSED</text>
+  <text x="245" y="817" text-anchor="middle" class="small">普通设备发布 Gateway Topic 不会升级权限</text>
+
+  <rect x="70" y="890" width="350" height="190" rx="5" class="red"/>
+  <text x="245" y="928" text-anchor="middle" class="label">Gateway Session Auth Gate</text>
+  <text x="245" y="962" text-anchor="middle" class="small">先认证物理 Device Credentials</text>
+  <text x="245" y="991" text-anchor="middle" class="small">再检查 additionalInfo.gateway == true</text>
+  <text x="245" y="1020" text-anchor="middle" class="small">false：gatewaySessionHandler 保持 null</text>
+  <text x="245" y="1049" text-anchor="middle" class="small">true：创建 GatewaySessionHandler</text>
+
+  <rect x="490" y="110" width="460" height="1040" rx="6" class="band"/>
+  <text x="720" y="148" text-anchor="middle" class="section">Transport 实例本地状态</text>
+
+  <rect x="530" y="175" width="380" height="150" rx="5" class="blue"/>
+  <text x="720" y="213" text-anchor="middle" class="label">Physical DeviceSessionCtx</text>
+  <text x="720" y="246" text-anchor="middle" class="small">physical sessionId · nodeId · Netty channel</text>
+  <text x="720" y="275" text-anchor="middle" class="small">profile adaptor · Topic QoS maps · activity</text>
+  <text x="720" y="304" text-anchor="middle" class="small">DefaultTransportService.sessions 注册 listener</text>
+
+  <rect x="530" y="370" width="380" height="240" rx="5" class="green"/>
+  <text x="720" y="408" text-anchor="middle" class="label">GatewaySessionHandler</text>
+  <text x="720" y="441" text-anchor="middle" class="small">devices[deviceName] → virtual context</text>
+  <text x="720" y="470" text-anchor="middle" class="small">deviceFutures 合并同名异步创建</text>
+  <text x="720" y="499" text-anchor="middle" class="small">weak per-name lock 仅对当前 JVM 生效</text>
+  <text x="720" y="528" text-anchor="middle" class="small">显式 connect 或首条业务消息均可创建</text>
+  <text x="720" y="557" text-anchor="middle" class="small">批量 entry 分别 parse、限流、produce、ACK</text>
+  <text x="720" y="586" text-anchor="middle" class="small">不同 entry 共用原 MQTT packetId</text>
+
+  <rect x="530" y="655" width="380" height="240" rx="5" class="violet"/>
+  <text x="720" y="693" text-anchor="middle" class="label">每个虚拟设备的 SessionInfo</text>
+  <text x="720" y="726" text-anchor="middle" class="small">独立随机 virtual sessionId</text>
+  <text x="720" y="755" text-anchor="middle" class="small">gwSessionId 指向 physical sessionId</text>
+  <text x="720" y="784" text-anchor="middle" class="small">独立 tenant / device / customer / profile</text>
+  <text x="720" y="813" text-anchor="middle" class="small">listener 接收 Attributes / RPC 下行</text>
+  <text x="720" y="842" text-anchor="middle" class="small">OPEN 同时携带 Attr + RPC subscriptions</text>
+  <text x="720" y="871" text-anchor="middle" class="small">max_concurrent_sessions_per_device = 1</text>
+
+  <rect x="530" y="940" width="380" height="140" rx="5" class="gray"/>
+  <text x="720" y="978" text-anchor="middle" class="label">不是持久连接目录</text>
+  <text x="720" y="1011" text-anchor="middle" class="small">没有 connectedDevices 数据库表</text>
+  <text x="720" y="1040" text-anchor="middle" class="small">进程或 channel 结束即丢失 map/listener</text>
+  <text x="720" y="1069" text-anchor="middle" class="small">cleanSession=false 也不会恢复这些状态</text>
+
+  <rect x="980" y="110" width="460" height="1040" rx="6" class="band"/>
+  <text x="1210" y="148" text-anchor="middle" class="section">Queue、Partition 与消费组</text>
+
+  <rect x="1020" y="175" width="380" height="170" rx="5" class="amber"/>
+  <text x="1210" y="213" text-anchor="middle" class="label">Transport API Request / Reply</text>
+  <text x="1210" y="246" text-anchor="middle" class="small">tb_transport.api.requests</text>
+  <text x="1210" y="275" text-anchor="middle" class="small">tb_transport.api.responses.&lt;serviceId&gt;</text>
+  <text x="1210" y="304" text-anchor="middle" class="small">auth 与 get-or-create；correlation UUID</text>
+  <text x="1210" y="333" text-anchor="middle" class="tiny">Core group tb-core-transport-api-consumer</text>
+
+  <rect x="1020" y="390" width="380" height="195" rx="5" class="blue"/>
+  <text x="1210" y="428" text-anchor="middle" class="label">Core Queue</text>
+  <text x="1210" y="461" text-anchor="middle" class="small">默认 topic：tb_core</text>
+  <text x="1210" y="490" text-anchor="middle" class="small">key / partition：virtual DeviceId</text>
+  <text x="1210" y="519" text-anchor="middle" class="small">OPEN/CLOSED · Get Attributes · RPC response</text>
+  <text x="1210" y="548" text-anchor="middle" class="small">consumer group：tb-core-node</text>
+  <text x="1210" y="577" text-anchor="middle" class="tiny">producer callback 早于 Actor 实际处理</text>
+
+  <rect x="1020" y="635" width="380" height="185" rx="5" class="green"/>
+  <text x="1210" y="673" text-anchor="middle" class="label">Rule Engine Queue</text>
+  <text x="1210" y="706" text-anchor="middle" class="small">默认基名：tb_rule_engine</text>
+  <text x="1210" y="735" text-anchor="middle" class="small">virtual profile 的 default queue / rule chain</text>
+  <text x="1210" y="764" text-anchor="middle" class="small">Telemetry + Client Attributes</text>
+  <text x="1210" y="793" text-anchor="middle" class="small">consumer group：re-&lt;queueName&gt;-consumer</text>
+
+  <rect x="1020" y="870" width="380" height="210" rx="5" class="violet"/>
+  <text x="1210" y="908" text-anchor="middle" class="label">Transport Notification 回程</text>
+  <text x="1210" y="941" text-anchor="middle" class="small">tb_transport.notifications.&lt;serviceId&gt;</text>
+  <text x="1210" y="970" text-anchor="middle" class="small">目标由 Actor subscription 的 nodeId 决定</text>
+  <text x="1210" y="999" text-anchor="middle" class="small">payload 携带 virtual sessionId</text>
+  <text x="1210" y="1028" text-anchor="middle" class="small">consumer：transport-node-&lt;serviceId&gt;</text>
+  <text x="1210" y="1057" text-anchor="middle" class="tiny">提交 offset 不等待 Netty PUBLISH 成功</text>
+
+  <rect x="1470" y="110" width="500" height="1040" rx="6" class="band"/>
+  <text x="1720" y="148" text-anchor="middle" class="section">Core、Actor、Rule Engine 与数据库</text>
+
+  <rect x="1510" y="175" width="420" height="215" rx="5" class="amber"/>
+  <text x="1720" y="213" text-anchor="middle" class="label">DefaultTransportApiService</text>
+  <text x="1720" y="246" text-anchor="middle" class="small">按 gateway tenant + deviceName 查询</text>
+  <text x="1720" y="275" text-anchor="middle" class="small">新建：profile、device、随机 token credentials</text>
+  <text x="1720" y="304" text-anchor="middle" class="small">随后单独保存 Created relation</text>
+  <text x="1720" y="333" text-anchor="middle" class="small">已有：必要时更新 lastConnectedGateway</text>
+  <text x="1720" y="362" text-anchor="middle" class="small">最后发送 ENTITY_CREATED，非跨层事务</text>
+
+  <rect x="1510" y="435" width="420" height="260" rx="5" class="blue"/>
+  <text x="1720" y="473" text-anchor="middle" class="label">Virtual Device Actor</text>
+  <text x="1720" y="506" text-anchor="middle" class="small">按 virtual DeviceId 串行 session 状态</text>
+  <text x="1720" y="535" text-anchor="middle" class="small">attributesSubscriptions / rpcSubscriptions</text>
+  <text x="1720" y="564" text-anchor="middle" class="small">GET Attributes 与 persistent RPC 状态</text>
+  <text x="1720" y="593" text-anchor="middle" class="small">Device State active / activity / disconnect</text>
+  <text x="1720" y="622" text-anchor="middle" class="small">Redis 可恢复 Actor metadata</text>
+  <text x="1720" y="651" text-anchor="middle" class="small">默认 cache.type=caffeine：跳过 dump/restore</text>
+  <text x="1720" y="680" text-anchor="middle" class="tiny">Actor cache 无法恢复 Netty channel 与 listener</text>
+
+  <rect x="1510" y="745" width="420" height="235" rx="5" class="green"/>
+  <text x="1720" y="783" text-anchor="middle" class="label">Rule Engine + 数据存储</text>
+  <text x="1720" y="816" text-anchor="middle" class="small">Save Timeseries / Save Attributes Node 可选</text>
+  <text x="1720" y="845" text-anchor="middle" class="small">device + device_credentials + device_profile</text>
+  <text x="1720" y="874" text-anchor="middle" class="small">relation · attribute_kv · rpc</text>
+  <text x="1720" y="903" text-anchor="middle" class="small">ts_kv / TimescaleDB / Cassandra</text>
+  <text x="1720" y="932" text-anchor="middle" class="small">ts_kv_latest</text>
+  <text x="1720" y="961" text-anchor="middle" class="tiny">Rule Node 和 DAO transaction 都晚于 uplink PUBACK</text>
+
+  <rect x="1510" y="1025" width="420" height="80" rx="5" class="red"/>
+  <text x="1720" y="1057" text-anchor="middle" class="label">实时下行不查 lastConnectedGateway</text>
+  <text x="1720" y="1087" text-anchor="middle" class="small">只使用 live nodeId + virtual sessionId</text>
+
+  <path d="M245 295 L245 340" class="line"/>
+  <path d="M245 585 L245 630" class="line"/>
+  <path d="M245 840 L245 890" class="line"/>
+  <path d="M420 985 L475 985 L475 250 L530 250" class="line"/>
+  <text x="478" y="232" text-anchor="middle" class="edge">认证成功</text>
+  <path d="M720 325 L720 370" class="line"/>
+  <path d="M720 610 L720 655" class="line"/>
+  <path d="M910 485 L965 485 L965 260 L1020 260" class="line"/>
+  <text x="962" y="238" text-anchor="middle" class="edge">auth / get-or-create</text>
+  <path d="M1400 260 L1510 260" class="line"/>
+  <path d="M1510 305 L1445 305 L1445 315 L1400 315" class="line"/>
+  <text x="1454" y="242" text-anchor="middle" class="edge">request</text>
+  <text x="1456" y="340" text-anchor="middle" class="edge">response</text>
+  <path d="M910 760 L975 760 L975 488 L1020 488" class="line"/>
+  <text x="977" y="468" text-anchor="middle" class="edge">session / query / RPC response</text>
+  <path d="M910 810 L1020 730" class="line"/>
+  <text x="966" y="790" text-anchor="middle" class="edge">telemetry / client attrs</text>
+  <path d="M1400 488 L1510 550" class="line"/>
+  <text x="1458" y="500" text-anchor="middle" class="edge">consume</text>
+  <path d="M1400 730 L1510 850" class="line"/>
+  <text x="1458" y="760" text-anchor="middle" class="edge">consume</text>
+  <path d="M1510 630 L1460 630 L1460 970 L1400 970" class="line"/>
+  <text x="1460" y="946" text-anchor="middle" class="edge">nodeId 定向</text>
+  <path d="M1020 1015 L965 1015 L965 855 L910 855" class="line"/>
+  <text x="968" y="886" text-anchor="middle" class="edge">sessionId 找 listener</text>
+  <path d="M530 875 L475 875 L475 785 L420 785" class="line"/>
+  <text x="480" y="765" text-anchor="middle" class="edge">MQTT 下行 PUBLISH</text>
+
+  <rect x="30" y="1185" width="620" height="270" rx="6" class="blue"/>
+  <text x="340" y="1226" text-anchor="middle" class="section">确认边界</text>
+  <text x="70" y="1265" class="small">• CONNECT：Core producer callback 后 CONNACK</text>
+  <text x="70" y="1297" class="small">• gateway/connect：本地 setup 后 PUBACK，不等 Actor OPEN</text>
+  <text x="70" y="1329" class="small">• telemetry / attributes：RE producer callback 后 PUBACK</text>
+  <text x="70" y="1361" class="small">• attributes request / RPC response：Core producer callback 后 PUBACK</text>
+  <text x="70" y="1393" class="small">• 以上均不确认 Rule Chain、数据库 commit 或业务应用成功</text>
+  <text x="70" y="1425" class="small">• batch 没有跨设备 callback 聚合，允许部分成功</text>
+
+  <rect x="680" y="1185" width="620" height="270" rx="6" class="amber"/>
+  <text x="990" y="1226" text-anchor="middle" class="section">RPC、重试与重复语义</text>
+  <text x="720" y="1265" class="small">• Gateway QoS 1 RPC：Netty write 后仅上报 SENT</text>
+  <text x="720" y="1297" class="small">• 没有 virtual MID → RPC map，物理 PUBACK 不产生 DELIVERED</text>
+  <text x="720" y="1329" class="small">• client-side RPC request 在该 Gateway API 中未实现</text>
+  <text x="720" y="1361" class="small">• uplink PUBACK 丢失会重发；Transport 无 packetId 持久去重</text>
+  <text x="720" y="1393" class="small">• 相同时间序列主键可能覆盖，Rule Chain 副作用仍可能重复</text>
+  <text x="720" y="1425" class="small">• notification offset 提交不等待 Netty write，普通通知无专用重放</text>
+
+  <rect x="1330" y="1185" width="640" height="270" rx="6" class="red"/>
+  <text x="1650" y="1226" text-anchor="middle" class="section">断线、重连与生产排障</text>
+  <text x="1370" y="1265" class="small">• physical close 遍历所有 virtual context，注销 listener 并发送 CLOSED</text>
+  <text x="1370" y="1297" class="small">• 新连接生成新的 physical / virtual sessionId，可落到另一 Transport 实例</text>
+  <text x="1370" y="1329" class="small">• 重订阅下行 Topic；显式 connect 或首条 uplink 重建 virtual session</text>
+  <text x="1370" y="1361" class="small">• 排障顺序：auth → gateway flag → create → Queue lag → Actor → Rule / DB</text>
+  <text x="1370" y="1393" class="small">• producer / rate-limit error 可能关闭整条物理 channel</text>
+  <text x="1370" y="1425" class="small">• 重要 RPC 使用 persisted RPC + 业务 response，不依赖 live 通知恢复</text>
+</svg>

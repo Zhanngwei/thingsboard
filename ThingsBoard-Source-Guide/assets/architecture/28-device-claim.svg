@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1320" viewBox="0 0 1840 1320" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Device Claim 架构</title>
+  <desc id="desc">高对比展示 HTTP MQTT CoAP Claim 入口、Core Queue 与 Device Actor、Claim cache、Customer REST、数据库事务及并发一致性边界。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#253746"/></marker>
+    <style>
+      .title{font:700 34px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .subtitle{font:18px Arial,'Microsoft YaHei',sans-serif;fill:#374151}
+      .section{font:700 22px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .label{font:700 18px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .small{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .tiny{font:14px Arial,'Microsoft YaHei',sans-serif;fill:#111827}
+      .edge{font:15px Arial,'Microsoft YaHei',sans-serif;fill:#111827;paint-order:stroke;stroke:#fff;stroke-width:8}
+      .band{fill:#f8fafc;stroke:#475569;stroke-width:2}
+      .blue{fill:#eaf7fb;stroke:#0e7490;stroke-width:2.5}
+      .green{fill:#ecfdf5;stroke:#047857;stroke-width:2.5}
+      .amber{fill:#fff7e6;stroke:#9a5b13;stroke-width:2.5}
+      .red{fill:#fff1f2;stroke:#be123c;stroke-width:2.5}
+      .gray{fill:#f3f4f6;stroke:#4b5563;stroke-width:2.5}
+      .line{fill:none;stroke:#253746;stroke-width:2.5;marker-end:url(#arrow)}
+      .dash{fill:none;stroke:#475569;stroke-width:2.2;stroke-dasharray:8 7;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1840" height="1320" fill="#ffffff"/>
+  <text x="920" y="50" text-anchor="middle" class="title">ThingsBoard 3.6 Device Claim：登记、归属与一致性边界</text>
+  <text x="920" y="80" text-anchor="middle" class="subtitle">Device ACK 只确认 Core Queue producer；Customer REST 才改变 device.customer_id</text>
+
+  <rect x="30" y="105" width="410" height="1065" rx="6" class="band"/>
+  <text x="235" y="145" text-anchor="middle" class="section">设备入口与身份</text>
+  <rect x="70" y="175" width="330" height="165" rx="5" class="blue"/>
+  <text x="235" y="213" text-anchor="middle" class="label">HTTP Device API</text>
+  <text x="235" y="245" text-anchor="middle" class="small">POST /api/v1/{token}/claim</text>
+  <text x="235" y="273" text-anchor="middle" class="small">空 body 或 JSON</text>
+  <text x="235" y="301" text-anchor="middle" class="small">成功输出 HTTP 200</text>
+
+  <rect x="70" y="380" width="330" height="190" rx="5" class="green"/>
+  <text x="235" y="418" text-anchor="middle" class="label">MQTT Device / Gateway</text>
+  <text x="235" y="450" text-anchor="middle" class="small">v1/devices/me/claim</text>
+  <text x="235" y="478" text-anchor="middle" class="small">v1/gateway/claim</text>
+  <text x="235" y="506" text-anchor="middle" class="small">JSON / Proto / backward compatible</text>
+  <text x="235" y="534" text-anchor="middle" class="small">QoS 1 成功输出 PUBACK</text>
+
+  <rect x="70" y="610" width="330" height="165" rx="5" class="amber"/>
+  <text x="235" y="648" text-anchor="middle" class="label">CoAP Device API</text>
+  <text x="235" y="680" text-anchor="middle" class="small">POST /api/v1/{token}/claim</text>
+  <text x="235" y="708" text-anchor="middle" class="small">JSON 或 Profile Protobuf</text>
+  <text x="235" y="736" text-anchor="middle" class="small">成功输出 2.01 CREATED</text>
+
+  <rect x="70" y="815" width="330" height="205" rx="5" class="gray"/>
+  <text x="235" y="853" text-anchor="middle" class="label">统一输入契约</text>
+  <text x="235" y="885" text-anchor="middle" class="small">认证结果提供 DeviceId</text>
+  <text x="235" y="913" text-anchor="middle" class="small">secretKey 缺省为空字符串</text>
+  <text x="235" y="941" text-anchor="middle" class="small">durationMs 非正数走系统默认</text>
+  <text x="235" y="969" text-anchor="middle" class="small">内部 queue.proto ClaimDeviceMsg</text>
+
+  <rect x="70" y="1055" width="330" height="82" rx="5" class="red"/>
+  <text x="235" y="1087" text-anchor="middle" class="label">不是 Claim 结果</text>
+  <text x="235" y="1115" text-anchor="middle" class="small">200 / PUBACK / CREATED 仅为 Queue ACK</text>
+
+  <rect x="475" y="105" width="420" height="1065" rx="6" class="band"/>
+  <text x="685" y="145" text-anchor="middle" class="section">Core Queue 与 Device Actor</text>
+  <rect x="515" y="175" width="340" height="180" rx="5" class="blue"/>
+  <text x="685" y="213" text-anchor="middle" class="label">DefaultTransportService</text>
+  <text x="685" y="245" text-anchor="middle" class="small">checkLimits</text>
+  <text x="685" y="273" text-anchor="middle" class="small">recordActivityInternal</text>
+  <text x="685" y="301" text-anchor="middle" class="small">ToCoreMsg，routing key = DeviceId</text>
+  <text x="685" y="329" text-anchor="middle" class="small">producer callback 返回设备协议</text>
+
+  <rect x="515" y="400" width="340" height="200" rx="5" class="green"/>
+  <text x="685" y="438" text-anchor="middle" class="label">Core Queue</text>
+  <text x="685" y="470" text-anchor="middle" class="small">默认 in-memory provider</text>
+  <text x="685" y="498" text-anchor="middle" class="small">Kafka：tb_core.0 到 tb_core.9</text>
+  <text x="685" y="526" text-anchor="middle" class="small">group：tb-core-node</text>
+  <text x="685" y="554" text-anchor="middle" class="small">DeviceId hash 固定逻辑分区</text>
+
+  <rect x="515" y="645" width="340" height="175" rx="5" class="amber"/>
+  <text x="685" y="683" text-anchor="middle" class="label">Device Actor</text>
+  <text x="685" y="715" text-anchor="middle" class="small">同一 Device mailbox 串行</text>
+  <text x="685" y="743" text-anchor="middle" class="small">handleClaimDeviceMsg</text>
+  <text x="685" y="771" text-anchor="middle" class="small">发起 registerClaimingInfo Future</text>
+  <text x="685" y="799" text-anchor="middle" class="small">不等待 Future 即 callback success</text>
+
+  <rect x="515" y="865" width="340" height="205" rx="5" class="red"/>
+  <text x="685" y="903" text-anchor="middle" class="label">确认缺口</text>
+  <text x="685" y="935" text-anchor="middle" class="small">claimingAllowed 查询失败不回传</text>
+  <text x="685" y="963" text-anchor="middle" class="small">已归属的 register 失败不回传</text>
+  <text x="685" y="991" text-anchor="middle" class="small">Core pack 仍可 commit</text>
+  <text x="685" y="1019" text-anchor="middle" class="small">无 Claim 专用 retry / DLT</text>
+
+  <rect x="930" y="105" width="420" height="1065" rx="6" class="band"/>
+  <text x="1140" y="145" text-anchor="middle" class="section">Claim 窗口与 Customer REST</text>
+  <rect x="970" y="175" width="340" height="220" rx="5" class="blue"/>
+  <text x="1140" y="213" text-anchor="middle" class="label">ClaimDevicesServiceImpl</text>
+  <text x="1140" y="245" text-anchor="middle" class="small">全局默认允许或 Boolean claimingAllowed</text>
+  <text x="1140" y="273" text-anchor="middle" class="small">Device 必须尚未归属</text>
+  <text x="1140" y="301" text-anchor="middle" class="small">ClaimData = secretKey + expirationTime</text>
+  <text x="1140" y="329" text-anchor="middle" class="small">cache.putIfAbsent 首写获胜</text>
+  <text x="1140" y="357" text-anchor="middle" class="small">cache miss 读 SERVER_SCOPE claimingData</text>
+
+  <rect x="970" y="440" width="340" height="205" rx="5" class="green"/>
+  <text x="1140" y="478" text-anchor="middle" class="label">claimDevices Cache</text>
+  <text x="1140" y="510" text-anchor="middle" class="small">key = [DeviceId]</text>
+  <text x="1140" y="538" text-anchor="middle" class="small">默认 Caffeine：本 Core 进程</text>
+  <text x="1140" y="566" text-anchor="middle" class="small">TTL 1440 min · maxSize 1000</text>
+  <text x="1140" y="594" text-anchor="middle" class="small">Redis 可共享，但业务显式检查 expiration</text>
+
+  <rect x="970" y="690" width="340" height="205" rx="5" class="amber"/>
+  <text x="1140" y="728" text-anchor="middle" class="label">Customer REST</text>
+  <text x="1140" y="760" text-anchor="middle" class="small">POST：CUSTOMER_USER JWT</text>
+  <text x="1140" y="788" text-anchor="middle" class="small">tenantId + deviceName + secretKey</text>
+  <text x="1140" y="816" text-anchor="middle" class="small">SUCCESS 200 · FAILURE / CLAIMED 400</text>
+  <text x="1140" y="844" text-anchor="middle" class="small">DELETE：Reclaim / Unclaim</text>
+
+  <rect x="970" y="940" width="340" height="130" rx="5" class="gray"/>
+  <text x="1140" y="978" text-anchor="middle" class="label">权限边界</text>
+  <text x="1140" y="1010" text-anchor="middle" class="small">CLAIM_DEVICES 只要求同 Tenant</text>
+  <text x="1140" y="1038" text-anchor="middle" class="small">不要求当前 Device 属于该 Customer</text>
+
+  <rect x="1385" y="105" width="425" height="1065" rx="6" class="band"/>
+  <text x="1597" y="145" text-anchor="middle" class="section">数据库、事务与风险</text>
+  <rect x="1425" y="175" width="345" height="190" rx="5" class="blue"/>
+  <text x="1597" y="213" text-anchor="middle" class="label">device 表</text>
+  <text x="1597" y="245" text-anchor="middle" class="small">Claim：customer_id = JWT customerId</text>
+  <text x="1597" y="273" text-anchor="middle" class="small">Reclaim：customer_id = NULL_UUID</text>
+  <text x="1597" y="301" text-anchor="middle" class="small">普通 UUID 列，无 @Version</text>
+  <text x="1597" y="329" text-anchor="middle" class="small">无 WHERE customer_id IS NULL 条件更新</text>
+
+  <rect x="1425" y="410" width="345" height="215" rx="5" class="green"/>
+  <text x="1597" y="448" text-anchor="middle" class="label">attribute_kv SERVER_SCOPE</text>
+  <text x="1597" y="480" text-anchor="middle" class="small">claimingAllowed：Boolean 开关</text>
+  <text x="1597" y="508" text-anchor="middle" class="small">claimingData：持久 ClaimData fallback</text>
+  <text x="1597" y="536" text-anchor="middle" class="small">成功 Claim 后删除两个 key</text>
+  <text x="1597" y="564" text-anchor="middle" class="small">Reclaim 且默认关闭时写 allowed=true</text>
+  <text x="1597" y="592" text-anchor="middle" class="small">设备 register 本身不写 claimingData</text>
+
+  <rect x="1425" y="670" width="345" height="190" rx="5" class="amber"/>
+  <text x="1597" y="708" text-anchor="middle" class="label">分段提交</text>
+  <text x="1597" y="740" text-anchor="middle" class="small">事务一：saveDevice 并提交</text>
+  <text x="1597" y="768" text-anchor="middle" class="small">之后：cluster update</text>
+  <text x="1597" y="796" text-anchor="middle" class="small">异步：attribute delete / save</text>
+  <text x="1597" y="824" text-anchor="middle" class="small">后一步失败不会回滚 customer_id</text>
+
+  <rect x="1425" y="905" width="345" height="205" rx="5" class="red"/>
+  <text x="1597" y="943" text-anchor="middle" class="label">潜在一致性问题</text>
+  <text x="1597" y="975" text-anchor="middle" class="small">并发 Customer Claim：后写覆盖</text>
+  <text x="1597" y="1003" text-anchor="middle" class="small">本地 Caffeine：跨 Core 不可见</text>
+  <text x="1597" y="1031" text-anchor="middle" class="small">错误 secret 可 evict 整个 cache 窗口</text>
+  <text x="1597" y="1059" text-anchor="middle" class="small">长连接 SessionInfo 保留旧 customerId</text>
+  <text x="1597" y="1087" text-anchor="middle" class="small">secret 明文，无 attempt counter</text>
+
+  <path d="M400 260 H515" class="line"/><text x="457" y="246" text-anchor="middle" class="edge">ClaimDeviceMsg</text>
+  <path d="M855 500 H970" class="line"/><text x="912" y="486" text-anchor="middle" class="edge">Actor call</text>
+  <path d="M1310 285 H1425" class="dash"/><text x="1367" y="271" text-anchor="middle" class="edge">customer_id</text>
+  <path d="M1310 540 H1425" class="line"/><text x="1367" y="526" text-anchor="middle" class="edge">attributes</text>
+  <path d="M970 790 H855" class="dash"/><text x="912" y="776" text-anchor="middle" class="edge">bypass Actor</text>
+  <path d="M1425 765 H1310" class="dash"/><text x="1367" y="751" text-anchor="middle" class="edge">async result</text>
+
+  <rect x="75" y="1200" width="1690" height="82" rx="5" class="gray"/>
+  <text x="920" y="1232" text-anchor="middle" class="label">关键生产结论</text>
+  <text x="920" y="1262" text-anchor="middle" class="small">设备协议成功 ≠ ClaimData 可见；Customer REST 成功才表示归属完成。多 Core 使用本地 Caffeine、并发认领和 attribute 后置失败都需要额外治理。</text>
+</svg>

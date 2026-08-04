@@ -1,0 +1,767 @@
+# 28 Device Claim 流程
+
+> 源码基线：ThingsBoard `release-3.6` 当前工作树，版本 `3.6.4`，提交 `69124284c2`。本章链接行号按该工作树计算；只分析 3.6 实际存在的 Device Claim，不把 Provision 或普通“分配给客户”接口混作 Claim。
+
+[上一篇：27 Device Provision 流程](../27-device-provision/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/28-device-claim.svg) | [下一篇：29 Session 与 Device State 流程](../29-session-device-state/README.md)
+
+---
+
+## 一、流程目标
+
+Device Claim 解决的不是设备认证，而是**把一个已经属于 Tenant、尚未属于 Customer 的 Device，在有限时间内交给某个 Customer User 认领**。设备先用自己的 Transport credentials 发布 `secretKey` 与有效期，客户再用 JWT 调用 REST，并以 `deviceName + secretKey` 完成归属变更。最终业务结果是 `device.customer_id` 从零 UUID 变成当前用户的 `customerId`。
+
+3.6 源码中实际服务名是 [org.thingsboard.server.dao.device.ClaimDevicesService](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/device/ClaimDevicesService.java#L35) 和 [org.thingsboard.server.service.device.ClaimDevicesServiceImpl](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L74)，**不存在名为 `ClaimingDeviceService` 的类型**。
+
+```mermaid
+flowchart LR
+    DEVICE["已认证设备"] --> REGISTER["登记 secretKey 与 expirationTime"]
+    REGISTER --> WINDOW[("claimDevices cache 或 SERVER_SCOPE claimingData")]
+    USER["Customer User JWT"] --> REST["POST customer device name claim"]
+    REST --> CHECK{"名称 密钥 有效期 归属均通过"}
+    WINDOW --> CHECK
+    CHECK -->|"成功"| OWNER[("device.customer_id = 当前 customerId")]
+    CHECK -->|"失败"| REJECT["HTTP 400 FAILURE 或 CLAIMED"]
+    OWNER --> CLEAN["删除 claimingAllowed 与 claimingData 并清理 cache"]
+```
+
+必须先区分三种身份与两段动作：
+
+| 段 | 调用者身份 | 目标 | 是否改变 `customer_id` |
+|---|---|---|---|
+| 设备侧登记 | Device access token、MQTT credentials 或 CoAP credentials | 建立短期 ClaimData | 否 |
+| 客户侧认领 | `CUSTOMER_USER` JWT | 校验 ClaimData 并赋予归属 | 是 |
+| 取消认领 | `TENANT_ADMIN` 或 `CUSTOMER_USER` JWT | 清空归属并恢复可登记条件 | 是，变回零 UUID |
+
+本章最关键的源码结论是：设备侧 HTTP 200、MQTT PUBACK、CoAP `2.01 CREATED` 只确认 `ClaimDeviceMsg` 被 Core Queue producer 接受；它们不等待 Device Actor 内部的 `registerClaimingInfo(...)` Future，更不表示客户已经认领成功。
+
+---
+
+## 二、入口
+
+### 2.1 设备侧入口
+
+| 协议 | 精确入口 | payload | 成功输出 | 源码 |
+|---|---|---|---|---|
+| HTTP | `POST /api/v1/{deviceToken}/claim` | 可空；JSON `{"secretKey":"value","durationMs":60000}` | HTTP 200 | [DeviceApiController.claimDevice](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L280) |
+| MQTT v3/v5 | publish `v1/devices/me/claim` | Device Profile adaptor 决定 JSON、Proto 或 backward-compatible | QoS 1 PUBACK；QoS 0 无协议 ACK | [MqttTopics](../../../common/data/src/main/java/org/thingsboard/server/common/data/device/profile/MqttTopics.java#L115)、[MqttTransportHandler.processDevicePublish](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L584) |
+| MQTT Gateway | publish `v1/gateway/claim` | JSON 以 deviceName 为 key；Proto 为 `GatewayClaimMsg` | 每个目标设备走 Core Queue，入口 publish 的 ACK 受异步处理影响 | [AbstractGatewaySessionHandler.onDeviceClaim](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L180) |
+| CoAP | `POST /api/v1/{token}/claim` | Device Profile adaptor 决定 JSON 或 Proto | `2.01 CREATED` | [CoapTransportResource.processHandlePost](../../../common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java#L200) |
+
+```mermaid
+flowchart TB
+    H["HTTP POST api v1 token claim"] --> JSON["JsonConverter"]
+    M["MQTT v1 devices me claim"] --> ADAPTOR{"Device Profile payload adaptor"}
+    G["MQTT v1 gateway claim"] --> GW["按 deviceName 找已连接虚拟设备"]
+    C["CoAP POST api v1 token claim"] --> CADAPTOR{"CoAP JSON 或 Proto adaptor"}
+    ADAPTOR --> JSON
+    ADAPTOR --> PROTO["ProtoConverter"]
+    GW --> JSON
+    GW --> PROTO
+    CADAPTOR --> JSON
+    CADAPTOR --> PROTO
+    JSON --> MSG["TransportProtos.ClaimDeviceMsg"]
+    PROTO --> MSG
+```
+
+JSON 字段行为由 [JsonConverter.convertToClaimDeviceProto(DeviceId, JsonElement)](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/JsonConverter.java#L182) 固定：
+
+- 缺少 `secretKey` 时使用空字符串 `DataConstants.DEFAULT_SECRET_KEY`。
+- 缺少 `durationMs` 时生成 `0`，业务服务再替换为系统默认值。
+- `durationMs <= 0` 都走系统默认值，并非立即过期。
+- JSON 非对象、字段类型不合法会在 adaptor 层失败。
+- 正数没有源码级最大值；极大值还可能在 `currentTimeMillis + durationMs` 时溢出。
+
+Proto 对外结构是 [transport.proto](../../../common/proto/src/main/proto/transport.proto#L24) 的 `ClaimDevice { string secretKey; int64 durationMs; }`，内部结构是 [queue.proto](../../../common/proto/src/main/proto/queue.proto#L489) 的 `ClaimDeviceMsg { deviceIdMSB, deviceIdLSB, secretKey, durationMs }`。内部消息使用认证结果中的 DeviceId，不信任设备 payload 自报 ID。
+
+### 2.2 客户 REST 入口
+
+| 方法 | 权限 | 请求 | 正常响应 |
+|---|---|---|---|
+| `POST /api/customer/device/{deviceName}/claim` | 仅 `CUSTOMER_USER` | `ClaimRequest { secretKey }` | 200 + `ClaimResult`，或 400 + `FAILURE/CLAIMED` |
+| `DELETE /api/customer/device/{deviceName}/claim` | `TENANT_ADMIN`、`CUSTOMER_USER` | 无 body | 200 |
+
+入口位于 [org.thingsboard.server.controller.DeviceController](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L685)。客户只能按自己 JWT 中的 `tenantId` 查设备；但 [CustomerUserPermissions](../../../application/src/main/java/org/thingsboard/server/service/security/permission/CustomerUserPermissions.java#L81) 对 `CLAIM_DEVICES` 只要求同 Tenant，不要求当前 `device.customerId` 等于用户 Customer。因此 DELETE 路径也继承这个权限边界。
+
+```mermaid
+flowchart LR
+    JWT["Customer User JWT"] --> LOOKUP["tenantId 与 deviceName 查询 Device"]
+    LOOKUP --> ACL{"CLAIM_DEVICES 且同 Tenant"}
+    ACL -->|"POST"| CLAIM["校验 ClaimData"]
+    ACL -->|"DELETE"| RECLAIM["清空 customer_id"]
+    CLAIM --> RESULT{"ClaimResponse"}
+    RESULT -->|"SUCCESS"| OK["HTTP 200 ClaimResult"]
+    RESULT -->|"FAILURE 或 CLAIMED"| BAD["HTTP 400 枚举值"]
+    RECLAIM --> DEL["HTTP 200"]
+```
+
+一个真实边界是：Controller 声明 `@RequestBody(required=false)`，但 [getSecretKey(ClaimRequest)](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L783) 直接调用 `claimRequest.getSecretKey()`。所以 POST 完全省略 body 会触发空指针；现有测试传的是 `new ClaimRequest(null)`，并未覆盖真正的无 body 请求。
+
+---
+
+## 三、完整调用链
+
+### 3.1 设备登记完整调用链
+
+下表使用全限定类名、当前精确方法名与参数。输出列描述当前步骤的真实输出，最后一列刻意区分 Queue 确认和业务完成。
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出/职责 | 设计原因 | 确认或事务边界 |
+|---|---|---|---|---|---|
+| 1H | `org.thingsboard.server.transport.http.DeviceApiController.claimDevice(String deviceToken, String json)` | path token、可空 JSON | `DeferredResult<ResponseEntity>`；先校验 token | HTTP 与其他 Transport 复用统一认证 | [源码 L281](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L281)；无数据库事务 |
+| 1M | `org.thingsboard.server.transport.mqtt.MqttTransportHandler.processDevicePublish(ChannelHandlerContext ctx, MqttPublishMessage mqttMsg, String topicName, int msgId)` | 已认证 MQTT session、topic、payload | 匹配 `DEVICE_CLAIM_TOPIC` 并调用 adaptor | MQTT 连接认证只做一次，后续复用 SessionInfo | [源码 L584](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L584)；尚未 ACK |
+| 1C | `org.thingsboard.server.transport.coap.CoapTransportResource.processHandlePost(CoapExchange exchange)` | CoAP request | 把 `FeatureType.CLAIM` 路由成 `CLAIM_REQUEST` | Californium Resource 代替 Spring MVC | [源码 L200](../../../common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java#L200) |
+| 2J | `org.thingsboard.server.common.adaptor.JsonConverter.convertToClaimDeviceProto(DeviceId deviceId, String json)` | 认证得到的 DeviceId、JSON | 内部 `ClaimDeviceMsg` | 不允许 payload 伪造 DeviceId | [源码 L167](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/JsonConverter.java#L167) |
+| 2P | `org.thingsboard.server.common.adaptor.ProtoConverter.convertToClaimDeviceProto(DeviceId deviceId, byte[] bytes)` | DeviceId、`ClaimDevice` bytes | 内部 `ClaimDeviceMsg` | 对外 proto 与内部 queue proto 解耦 | [源码 L118](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/ProtoConverter.java#L118) |
+| 3 | `org.thingsboard.server.common.transport.service.DefaultTransportService.process(SessionInfoProto sessionInfo, ClaimDeviceMsg msg, TransportServiceCallback<Void> callback)` | session、claim 消息、协议回调 | 限流、记录 activity、组装 `TransportToDeviceActorMsg` | Claim 属于设备串行状态，不进 Rule Engine | [源码 L1107](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1107) |
+| 4 | `org.thingsboard.server.common.transport.service.DefaultTransportService.sendToDeviceActor(SessionInfoProto sessionInfo, TransportToDeviceActorMsg toDeviceActorMsg, TransportServiceCallback<Void> callback)` | Actor 消息 | `ToCoreMsg` | 屏蔽 monolith、Kafka 等 Queue provider | [源码 L1600](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1600) |
+| 5 | `org.thingsboard.server.common.transport.service.DefaultTransportService.sendToCore(TenantId tenantId, EntityId entityId, ToCoreMsg msg, UUID routingKey, TransportServiceCallback<Void> callback)` | tenant、device、deviceId routing key | producer send 到 DeviceId 所在 Core 分区 | 同一 Device 固定路由 | [源码 L1615](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1615)；协议成功回调在 producer 成功时触发 |
+| 6 | `org.thingsboard.server.service.queue.DefaultTbCoreConsumerService.launchMainConsumers()` | Core Queue poll pack | `TransportToDeviceActorMsgWrapper` | Queue consumer 与 Actor mailbox 解耦 | [源码 L334](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L334)；pack 最终 commit |
+| 7 | `org.thingsboard.server.actors.device.DeviceActorMessageProcessor.process(TransportToDeviceActorMsgWrapper wrapper)` | Actor wrapper、pack callback | 识别 `hasClaimDevice()` | Device Actor 保证同一设备消息串行 | [源码 L569](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L569) |
+| 8 | `org.thingsboard.server.actors.device.DeviceActorMessageProcessor.handleClaimDeviceMsg(ClaimDeviceMsg msg)` | 内部 ClaimDeviceMsg | 调用 `registerClaimingInfo(...)` | Actor 只做 DeviceId/tenant 路由，业务放服务层 | [源码 L634](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L634)；**没有等待返回 Future** |
+| 9 | `org.thingsboard.server.service.device.ClaimDevicesServiceImpl.registerClaimingInfo(TenantId tenantId, DeviceId deviceId, String secretKey, long durationMs)` | tenant、device、secret、duration | 校验开关/属性/归属并 `putIfAbsent` ClaimData | Claim 窗口与协议无关 | [源码 L135](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L135)；cache 写入，无 SQL 事务 |
+
+```mermaid
+sequenceDiagram
+    participant D as Device
+    participant T as ProtocolTransport
+    participant S as DefaultTransportService
+    participant P as CoreQueueProducer
+    participant C as CoreQueueConsumer
+    participant A as DeviceActor
+    participant R as ClaimDevicesService
+    participant K as ClaimCache
+    D->>T: Claim payload
+    T->>S: process SessionInfo ClaimDeviceMsg callback
+    S->>S: checkLimits and recordActivity
+    S->>P: send ToCoreMsg with deviceId key
+    P-->>T: producer callback success
+    T-->>D: HTTP 200 or PUBACK or CREATED
+    P->>C: Core Queue record
+    C->>A: TransportToDeviceActorMsgWrapper
+    A->>R: registerClaimingInfo tenant device secret duration
+    A-->>C: callback success without awaiting Future
+    R->>K: putIfAbsent ClaimData
+```
+
+`DeviceActorMessageProcessor.process(...)` 在 `handleClaimDeviceMsg(...)` 返回后立即 `callback.onSuccess()`；而 `registerClaimingInfo(...)` 在 `allowClaimingByDefault=false` 时还要异步读 attributes。该 Future 的异常没有接到 Actor callback。因此 Queue consumer 也可能在登记失败时 commit 该消息。
+
+### 3.2 客户认领完整调用链
+
+| 步骤 | 全限定类名与精确方法 | 输入 | 输出/职责 | 设计原因 | 确认或事务边界 |
+|---|---|---|---|---|---|
+| 1 | `org.thingsboard.server.controller.DeviceController.claimDevice(String deviceName, ClaimRequest claimRequest)` | Customer User JWT、deviceName、secret | `DeferredResult<ResponseEntity>` | REST 线程不阻塞异步 attribute 操作 | [源码 L695](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L695) |
+| 2 | `org.thingsboard.server.dao.device.DeviceService.findDeviceByTenantIdAndName(TenantId tenantId, String name)` | JWT tenantId、name | Device 快照 | 名称在 Tenant 内唯一 | 调用点 [L706](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L706)，可能命中 device cache |
+| 3 | `org.thingsboard.server.service.security.permission.CustomerUserPermissions.PermissionChecker.hasPermission(...)` | user、`CLAIM_DEVICES`、Device | 同 Tenant 即允许 | 允许客户认领尚未归属自己的设备 | [源码 L88](../../../application/src/main/java/org/thingsboard/server/service/security/permission/CustomerUserPermissions.java#L88) |
+| 4 | `org.thingsboard.server.service.entitiy.device.DefaultTbDeviceService.claimDevice(TenantId tenantId, Device device, CustomerId customerId, String secretKey, User user)` | Device 快照、JWT customerId | Future ClaimResult，并记录实体动作 | 业务与审计/通知编排分层 | [源码 L287](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/DefaultTbDeviceService.java#L287) |
+| 5 | `org.thingsboard.server.service.device.ClaimDevicesServiceImpl.claimDevice(Device device, CustomerId customerId, String secretKey)` | Device、目标 Customer、密钥 | `ListenableFuture<ClaimResult>` | 统一缓存与 SERVER_SCOPE fallback | [源码 L199](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L199) |
+| 6 | `org.thingsboard.server.service.device.ClaimDevicesServiceImpl.getClaimData(Cache cache, Device device)` | cache、Device | cache ClaimData，或读取 `claimingData` attribute | 支持设备侧临时数据与服务端持久数据 | [源码 L171](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L171) |
+| 7 | `org.thingsboard.server.dao.device.DeviceService.saveDevice(Device device)` | 已写入 customerId 的 Device | 持久化 Device | 复用实体校验、cache eviction 与事件 | 实现 [DeviceServiceImpl.saveDevice L257](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L257)，独立 `@Transactional` |
+| 8 | `org.thingsboard.server.cluster.TbClusterService.onDeviceUpdated(Device device, Device old)` | saved/new Device | Transport、Core、state 等更新通知 | 传播实体变化 | 实现 [DefaultTbClusterService L780](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L780)，不在 Device SQL 回滚范围内 |
+| 9 | `org.thingsboard.server.service.device.ClaimDevicesServiceImpl.removeClaimingSavedData(Cache cache, ClaimDataInfo data, Device device)` | claim 来源、Device | evict cache；异步删除两个 SERVER_SCOPE key | 成功后一次性消费 Claim 凭据 | [源码 L329](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L329) |
+| 10 | `org.thingsboard.server.service.telemetry.DefaultTelemetrySubscriptionService.deleteAndNotify(TenantId tenantId, EntityId entityId, String scope, List<String> keys, FutureCallback<Void> callback)` | `SERVER_SCOPE`、两个 key | `attribute_kv` delete Future + 通知 | 复用 attribute cache/WS/device 通知 | [源码 L470](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L470)；另一个异步边界 |
+| 11 | `DeviceController.FutureCallback.onSuccess(ClaimResult result)` | `SUCCESS/FAILURE/CLAIMED` | 200 ClaimResult 或 400 enum | REST 清晰区分成功与业务拒绝 | [源码 L715](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L715) |
+
+```mermaid
+sequenceDiagram
+    participant U as CustomerUser
+    participant R as DeviceController
+    participant D as DefaultTbDeviceService
+    participant C as ClaimDevicesService
+    participant K as CacheOrAttributes
+    participant DB as PostgreSQL
+    participant N as ClusterAndAudit
+    U->>R: POST customer device name claim
+    R->>R: lookup by tenant and name then permission
+    R->>D: claimDevice tenant device customer secret user
+    D->>C: claimDevice device customer secret
+    C->>K: get cache then SERVER_SCOPE claimingData
+    K-->>C: ClaimData or empty
+    C->>C: verify expiration secret and customer zero UUID
+    C->>DB: saveDevice with customerId
+    DB-->>C: committed Device
+    C->>N: onDeviceUpdated
+    C->>K: evict and delete claiming attributes
+    K-->>C: delete callback
+    C-->>D: SUCCESS ClaimResult
+    D->>N: audit ASSIGNED_TO_CUSTOMER
+    D-->>R: ClaimResult
+    R-->>U: HTTP 200
+```
+
+### 3.3 取消认领完整调用链
+
+`DeviceController.reClaimDevice(String deviceName)` 在 [L750](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L750) 查设备和权限，调用 [DefaultTbDeviceService.reclaimDevice(TenantId, Device, User)](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/DefaultTbDeviceService.java#L309)，最后进入 [ClaimDevicesServiceImpl.reClaimDevice(TenantId, Device)](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L251)：
+
+1. 若设备已有 Customer，先 evict Claim cache，读取旧 Customer。
+2. `device.setCustomerId(null)`；Device validator 会把 null 规范化成 `ModelConstants.NULL_UUID`。
+3. `deviceService.saveDevice(device)` 在独立事务中提交。
+4. 广播 Device updated。
+5. 全局默认允许 Claim 时，立即返回。
+6. 全局默认不允许时，再异步写 `SERVER_SCOPE claimingAllowed=true`，该 Future 成功后 REST 才返回 200。
+
+```mermaid
+flowchart TB
+    DEL["DELETE customer device name claim"] --> OWNED{"device.customer_id 是否为零 UUID"}
+    OWNED -->|"否"| EVICT["evict claimDevices cache"]
+    EVICT --> CUSTOMER["读取旧 Customer"]
+    CUSTOMER --> SAVE["customer_id 写回零 UUID"]
+    SAVE --> BROADCAST["cluster onDeviceUpdated"]
+    BROADCAST --> DEFAULT{"allowClaimingByDefault"}
+    DEFAULT -->|"true"| OK["返回 HTTP 200"]
+    DEFAULT -->|"false"| ATTR["保存 SERVER_SCOPE claimingAllowed true"]
+    ATTR --> OK
+    OWNED -->|"是"| CLEAN["仅 evict cache"]
+    CLEAN --> OK
+```
+
+---
+
+## 四、消息流
+
+Device Claim 的数据面不是 Rule Engine Queue。`ClaimDeviceMsg` 被包在 `TransportToDeviceActorMsg -> ToCoreMsg` 中，按 DeviceId 进入 Core Queue，再由 Device Actor 调用业务服务。
+
+```mermaid
+flowchart LR
+    PAYLOAD["HTTP MQTT CoAP payload"] --> INTERNAL["queue.proto ClaimDeviceMsg"]
+    INTERNAL --> LIMIT["Transport limits 与 activity"]
+    LIMIT --> TOACTOR["TransportToDeviceActorMsg"]
+    TOACTOR --> CORE["ToCoreMsg"]
+    CORE --> TOPIC["Core logical topic tb_core partition"]
+    TOPIC --> CONSUMER["Core consumer pack"]
+    CONSUMER --> APP["App Actor"]
+    APP --> TENANT["Tenant Actor"]
+    TENANT --> DEVICE["Device Actor"]
+    DEVICE --> SERVICE["ClaimDevicesServiceImpl"]
+    SERVICE --> CACHE[("claimDevices")]
+```
+
+### 4.1 确认边界
+
+| 可见结果 | 源码中真正确认的内容 | 尚未确认的内容 |
+|---|---|---|
+| HTTP Device API 200 | Core Queue producer callback 成功 | consumer、Actor、`claimingAllowed` 查询、cache put |
+| MQTT QoS 1 PUBACK | 同上；producer callback 调用 `ack(...)` | ClaimData 可见、客户认领成功 |
+| CoAP 2.01 CREATED | 同上；`CoapOkCallback.onSuccess` | Actor Future、数据库 |
+| Customer REST 200 | Device 已保存，Claim attributes delete callback 成功，审计 transform 已执行 | 已连接 Transport 的 SessionInfo customerId 已刷新 |
+| Reclaim REST 200 | Device 已取消归属；全局关闭默认 Claim 时还确认 `claimingAllowed=true` 保存 callback | 所有远端 session 已重认证 |
+
+```mermaid
+flowchart TB
+    SEND["Transport 调用 producer send"] --> BROKER{"Queue producer callback"}
+    BROKER -->|"失败"| PROTOCOL_ERROR["HTTP 500 或 MQTT 断开 或 CoAP 5.00"]
+    BROKER -->|"成功"| PROTOCOL_OK["设备侧成功响应"]
+    PROTOCOL_OK -.-> CONSUME["Core consumer 稍后 poll"]
+    CONSUME --> ACTOR["Device Actor 处理"]
+    ACTOR --> FUTURE["registerClaimingInfo Future"]
+    FUTURE -.-> CACHE["ClaimData 最终可见"]
+```
+
+这里没有业务级 Device Claim response topic，也没有设备侧查询登记结果的 API。设备想获得更强保证，只能在应用层等待后再由客户 REST 尝试，或把登记动作设计成可重试；但重复 publish 受 `putIfAbsent` 语义影响，不一定刷新窗口。
+
+---
+
+## 五、时序图
+
+完整图同时展示三种设备协议、Core Queue、Device Actor、客户 Claim、Reclaim 和两个分离的数据库边界。
+
+[点击新窗口打开原始 SVG](sequence.svg)
+
+<a class="static-svg-thumbnail" href="sequence.svg" target="_blank" rel="noopener noreferrer"><img src="sequence.svg" alt="ThingsBoard Device Claim 完整时序图"></a>
+
+可查看 [PlantUML 源文件](sequence.puml) 和 [手工架构图 SVG](../../assets/architecture/28-device-claim.svg)。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unassigned
+    Unassigned --> RegisterQueued: DevicePublish
+    RegisterQueued --> ClaimWindow: CachePut
+    RegisterQueued --> RegistrationLost: AsyncFailureIgnored
+    ClaimWindow --> Expired: NowAfterExpiration
+    ClaimWindow --> Assigned: MatchingCustomerClaim
+    ClaimWindow --> Consumed: WrongSecretFromCache
+    Assigned --> Reclaiming: DeleteClaim
+    Reclaiming --> Unassigned: CustomerCleared
+    Expired --> Unassigned: EvictThenRegister
+    Consumed --> Unassigned: RegisterAgain
+    RegistrationLost --> Unassigned: Retry
+```
+
+`Assigned` 并不自动关闭 MQTT/CoAP 长连接。设备认证 credentials 没变，连接通常继续；变化的是授权归属以及新建 SessionInfo 中的 customerId。
+
+---
+
+## 六、数据变化
+
+### 6.1 状态清单
+
+| 状态/数据 | 位置 | 写入动作 | 清理/过期 |
+|---|---|---|---|
+| `SessionInfoProto` | HTTP 临时对象、MQTT/CoAP Transport session | credentials 验证时创建 | HTTP 请求结束；MQTT/Observe 到断开 |
+| Device activity | Device State 路径 | Claim 进入 `DefaultTransportService` 后记录 | 由 Device State 策略维护，不是 ClaimData |
+| `ClaimData(secretKey, expirationTime)` | `claimDevices` Spring Cache | `putIfAbsent([deviceId], ClaimData)` | 成功 Claim、Reclaim、错误密钥命中 cache、cache TTL/eviction |
+| `claimingAllowed` | `attribute_kv` 的 `SERVER_SCOPE` | 管理端预置；Reclaim 且默认关闭时写 true | 成功 Claim 删除 |
+| `claimingData` | `attribute_kv` 的 `SERVER_SCOPE` string | 本章 Java 流程不自动创建；可作为服务端持久 ClaimData fallback | 成功 Claim 删除；过期/错密钥时源码不删除 |
+| `device.customer_id` | PostgreSQL `device` | 成功 Claim 设为 JWT customerId | Reclaim 设为零 UUID |
+| device cache | Spring cache `devices` | 按名称/ID读取 | `saveDevice` 发布 eviction event |
+| audit/entity action | audit/event 服务 | 成功 assign/unassign 后记录 | 按审计保留策略 |
+
+```mermaid
+flowchart TB
+    BEFORE[("device customer_id = NULL_UUID")]
+    BEFORE --> REGISTER["cache key = List DeviceId"]
+    REGISTER --> VALUE["ClaimData secretKey expirationTime"]
+    VALUE --> CLAIM["Customer REST SUCCESS"]
+    CLAIM --> AFTER[("device customer_id = JWT customerId")]
+    CLAIM --> DELETE[("DELETE SERVER_SCOPE claimingAllowed claimingData")]
+    CLAIM --> EVICT["evict claimDevices key"]
+    AFTER --> RECLAIM["DELETE Claim REST"]
+    RECLAIM --> BEFORE
+    RECLAIM --> CONDITIONAL["默认关闭时 UPSERT claimingAllowed = true"]
+```
+
+### 6.2 有效期与缓存 TTL 是两个时钟
+
+业务过期时间在 [persistInCache](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L302) 写成 `System.currentTimeMillis() + validateDurationMs(durationMs)`；客户认领时再次比较当前时间。Caffeine 还独立执行 `expireAfterWrite(cache TTL)`。
+
+```mermaid
+flowchart LR
+    DURATION["durationMs"] --> VALIDATE{"durationMs 大于零"}
+    VALIDATE -->|"是"| REQUESTED["使用请求值"]
+    VALIDATE -->|"否"| SYSTEM["security.claim.duration"]
+    REQUESTED --> EXP["expirationTime = now + duration"]
+    SYSTEM --> EXP
+    EXP --> BUSINESS["认领时显式比较"]
+    CACHE_TTL["claimDevices cache TTL"] --> EVICTION["缓存实现独立失效"]
+    EVICTION --> MISS["可能早于业务 expirationTime 变成 miss"]
+```
+
+默认 `security.claim.duration=86400000ms`，即 24 小时；配置行注释写着“1 minute”是陈旧注释，数值才是实际默认值。[thingsboard.yml L142-L146](../../../application/src/main/resources/thingsboard.yml#L142)。默认 Caffeine Claim cache TTL 是 1440 分钟、maxSize 1000，[thingsboard.yml L511](../../../application/src/main/resources/thingsboard.yml#L511)。
+
+### 6.3 SessionInfo 的 customerId 快照
+
+Claim 后 [DefaultTbClusterService.onDeviceUpdated](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L780) 会广播 Device update；但 [DefaultTransportService.onDeviceUpdate(Device)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1482) 合并 SessionInfo 时只更新 profile、name、type，没有重写 `customerIdMSB/customerIdLSB`。`getCustomerId(SessionInfoProto)` 又直接读该快照。
+
+因此长连接在 Claim 或 Reclaim 后可能继续携带旧 customerId，直到重新认证/重连。HTTP 每个设备请求重新认证，窗口较短；MQTT 和 CoAP Observe 风险更明显。源码没有 Claim 成功后强制断开设备的逻辑。
+
+---
+
+## 七、源码分析
+
+### 7.1 ClaimData 生成与覆盖语义
+
+[ClaimData](../../../common/dao-api/src/main/java/org/thingsboard/server/dao/device/claim/ClaimData.java#L34) 只包含明文 `secretKey` 和绝对毫秒 `expirationTime`，没有 hash、salt、attempt count、nonce 或版本号。缓存 key 是单元素 `List<Object>`，元素为 DeviceId。
+
+`persistInCache(...)` 使用 `cache.putIfAbsent`，这带来明确的 first-writer-wins 行为：
+
+- 同一 Device 在旧条目仍存在时再次 publish，不刷新 secret，也不延长 expirationTime。
+- 短 `durationMs` 到期后，条目可能仍存到 1440 分钟 cache TTL；若没有客户尝试触发 evict，设备重新登记会被旧值挡住。
+- 客户用错误 secret 命中 cache 时，源码直接 evict，当前窗口被一次错误尝试消费。
+- 多个 Device Actor 消息按设备串行，但跨节点共享性取决于 cache provider。
+
+```mermaid
+flowchart TB
+    FIRST["第一次 register"] --> PUT["putIfAbsent 成功"]
+    PUT --> ACTIVE["缓存保存 secret A 与 expiry A"]
+    SECOND["第二次 register secret B"] --> EXISTS{"旧 key 仍存在"}
+    EXISTS -->|"是"| KEEP["仍使用 secret A 与 expiry A"]
+    EXISTS -->|"否"| NEW["写入 secret B 与 expiry B"]
+    ACTIVE --> WRONG["客户提交错误 secret"]
+    WRONG --> EVICT["立即 evict cache key"]
+```
+
+### 7.2 `claimingAllowed` 的真实作用
+
+当 `security.claim.allowClaimingByDefault=true` 时，只检查 Device 尚未归属 Customer。为 false 时，`registerClaimingInfo(...)` 读取 `SERVER_SCOPE claimingAllowed`，要求它是 Boolean `true` 且 Device 未归属；字符串 `"true"` 不通过 `getBooleanValue()`。
+
+该开关只门控**设备侧 register**。客户侧 `claimDevice(...)` 读取 cache 或 `claimingData` 后并不会再次检查 `claimingAllowed`。所以手工放入格式正确的持久 `claimingData` 时，客户 Claim 的最终依据是 ClaimData、secret、expiration 和 customerId。
+
+### 7.3 `claimingData` fallback
+
+cache miss 后源码读取 `SERVER_SCOPE claimingData`，把 string value 反序列化为 `ClaimData`。全仓 Java 搜索中没有本流程自动保存 `claimingData` 的代码，设备侧登记只写 cache；它是服务端预置/外部流程可用的持久 fallback，不能描述成设备 publish 后自动落库。
+
+```mermaid
+flowchart LR
+    GET["getClaimData"] --> CACHE{"claimDevices 命中"}
+    CACHE -->|"是"| CD["ClaimDataInfo fromCache true"]
+    CACHE -->|"否"| ATTR["find SERVER_SCOPE claimingData"]
+    ATTR --> PRESENT{"attribute 存在"}
+    PRESENT -->|"是"| JSON["Jackson 反序列化 ClaimData"]
+    PRESENT -->|"否"| NONE["返回 null"]
+    JSON --> AD["ClaimDataInfo fromCache false"]
+```
+
+过期或错密钥时只有 `fromCache=true` 才 evict；过期的 `claimingData` attribute 不会在失败路径删除。成功或已归属且仍找到有效 ClaimData 时，才异步删除 `claimingAllowed` 与 `claimingData`。
+
+### 7.4 配置默认值
+
+| 配置 | 3.6 默认值 | 影响 |
+|---|---:|---|
+| `security.claim.allowClaimingByDefault` | `true` | false 时设备登记必须有 Boolean SERVER_SCOPE `claimingAllowed=true` |
+| `security.claim.duration` | `86400000ms` | `durationMs <= 0` 的默认业务窗口 |
+| `cache.type` | `caffeine` | 默认 Claim cache 是当前 Core 进程本地内存 |
+| `cache.specs.claimDevices.timeToLiveInMinutes` | `1440` | Caffeine 写后 TTL |
+| `cache.specs.claimDevices.maxSize` | `1000` | Caffeine maximumWeight |
+| `queue.type` | `in-memory` | monolith 默认不经过 Kafka broker，但走相同 Queue 抽象 |
+| `queue.core.topic` | `tb_core` | Core 逻辑 topic 基名 |
+| `queue.core.partitions` | `10` | DeviceId hash 的逻辑分区数 |
+| `queue.core.poll-interval` | `25ms` | Core consumer 空轮询间隔 |
+| `queue.core.pack-processing-timeout` | `2000ms` | pack 等待 Actor callback 的上限 |
+| Kafka `acks` / `retries` | `all` / `1` | 仅 broker produce 层重试，不是 Claim 业务重试 |
+
+### 7.5 测试给出的行为证据
+
+[MqttClaimDeviceTest](../../../application/src/test/java/org/thingsboard/server/transport/mqtt/mqttv3/claim/MqttClaimDeviceTest.java#L150) 和 [CoapClaimDeviceTest](../../../application/src/test/java/org/thingsboard/server/transport/coap/claim/CoapClaimDeviceTest.java#L142) 都先发布 `durationMs=1`，再断言客户 REST 返回 `FAILURE`；随后发布 60000ms 或空 payload，轮询 REST 直到 `SUCCESS`，最后再次认领得到 `CLAIMED`。轮询本身证明设备协议 ACK 与 ClaimData 可见之间存在异步窗口。
+
+覆盖还包括 MQTT JSON、Proto、backward compatibility、Gateway、MQTT v5，以及 CoAP JSON/Proto。未看到对应的 HTTP Device Claim 集成测试，也未覆盖 Reclaim、`allowClaimingByDefault=false`、多 Core+Caffeine、Redis TTL、并发 Customer Claim、真正无 body 的 Customer POST。
+
+---
+
+## 八、Actor 分析
+
+Claim 进入 Device Actor 的主要目的，是让设备侧针对同一 Device 的登记消息与其他设备状态消息按 mailbox 串行。客户 REST 认领和 Reclaim **不经过 Device Actor**，而是 Controller 直接调用服务与 DAO。
+
+```mermaid
+flowchart TB
+    TRANSPORT["ClaimDeviceMsg"] --> QUEUE["Core Queue by DeviceId"]
+    QUEUE --> APP["App Actor"]
+    APP --> TENANT["Tenant Actor"]
+    TENANT --> DEVICE["Device Actor mailbox"]
+    DEVICE --> HANDLE["handleClaimDeviceMsg"]
+    HANDLE --> REGISTER["registerClaimingInfo Future"]
+    CUSTOMER["Customer REST Claim"] --> SERVICE["ClaimDevicesServiceImpl"]
+    SERVICE --> DAO["DeviceService saveDevice"]
+    CUSTOMER -.-> DEVICE
+```
+
+### 8.1 Actor 保证与不保证
+
+| Actor 能保证 | Actor 不能保证 |
+|---|---|
+| 同一 Device 的 Core 消息在该 Actor mailbox 内顺序处理 | Customer REST 与 Device Actor 之间串行 |
+| `ClaimDeviceMsg` 使用目标 Device Actor 的 tenant/device 上下文 | `registerClaimingInfo` Future 成功后才 ack pack |
+| Gateway 虚拟设备按目标 DeviceId 路由 | 跨 Core 的本地 Caffeine cache 可见性 |
+| Claim 与 session/RPC 等 Device 消息共享 Actor 所有权 | `device.customer_id` 条件更新或分布式锁 |
+
+最容易误判的代码是 [DeviceActorMessageProcessor.process](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L595)：`handleClaimDeviceMsg` 发起 Future 后，方法在 L604 无条件 `callback.onSuccess()`。因此 Attribute DAO 查询失败、Device 已被认领、`claimingAllowed` 缺失，都不会反向变成设备协议失败。
+
+---
+
+## 九、Kafka 分析
+
+默认 monolith 使用 in-memory Queue；只有 `queue.type=kafka` 时以下 topic/group 变成 Kafka 实体。Claim 不使用 Rule Engine topic，也没有专用 claim topic。
+
+```mermaid
+flowchart LR
+    TRANSPORT["Transport producer"] --> RESOLVE["resolve TB_CORE tenant DeviceId"]
+    RESOLVE --> HASH["DeviceId hash 模 logical partitions"]
+    HASH --> TOPIC["prefix tb_core partitionNumber"]
+    TOPIC --> GROUP["consumer group prefix tb-core-node"]
+    GROUP --> PACK["Core consumer pack"]
+    PACK --> ACTOR["Device Actor"]
+    ACTOR --> COMMIT["pack callback 后 commit"]
+```
+
+[HashPartitionService.resolve](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/HashPartitionService.java#L434) 用 EntityId hash 选择逻辑分区；[TopicPartitionInfo](../../../common/message/src/main/java/org/thingsboard/server/common/msg/queue/TopicPartitionInfo.java#L67) 把分区拼入 `fullTopicName`，所以默认 Kafka 名称形如 `tb_core.0` 到 `tb_core.9`，每个逻辑 topic 默认创建一个 Kafka partition。消息 key 又是 DeviceId，[DefaultTransportService.getRoutingKey](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1552)。
+
+[KafkaTbCoreQueueFactory.createToCoreMsgConsumer](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L247) 的 groupId 是带全局 prefix 的 `tb-core-node`，clientId 带 serviceId。Partition discovery 把具体 `TopicPartitionInfo` 集合订阅给 owner Core 服务。
+
+### 9.1 重试、提交与重复
+
+- producer 默认 `acks=all`、`retries=1`，只处理 Kafka produce 的可重试错误。
+- 设备协议成功发生在 producer callback；客户端超时重发可能产生重复 Core records。
+- `putIfAbsent` 让重复登记通常保留第一次 ClaimData，不刷新窗口。
+- Core consumer 等 pack 最多 2000ms 后仍执行 `mainConsumer.commit()`；failed/timeout map 只记录日志，没有 Claim 专用 retry/DLT。
+- Actor 对 register Future 不等待，最常见的业务失败甚至不会进入 failed map。
+- Kafka 消费因此不是“数据库成功后提交”的 exactly-once 流程。
+
+```mermaid
+flowchart TB
+    RECORD["Claim Core record"] --> PRODUCE{"broker produce"}
+    PRODUCE -->|"瞬时失败"| RETRY["Kafka producer 最多一次重试"]
+    PRODUCE -->|"成功"| DEVICE_ACK["设备协议成功"]
+    DEVICE_ACK --> POLL["Core poll pack"]
+    POLL --> CALLBACK["Actor callback success"]
+    CALLBACK --> COMMIT["consumer commit"]
+    CALLBACK -.-> ASYNC["register Future 仍可能失败"]
+    ASYNC -.-> NORETRY["无 Claim 业务重试"]
+```
+
+生产排障应同时看 `tb_core.*` topic lag、`tb-core-node` group、Core consumer timeout/failed 日志、Device Actor 日志和 Claim service warning。只看 MQTT PUBACK 或 Kafka producer success 无法判断登记是否成功。
+
+---
+
+## 十、数据库分析
+
+### 10.1 表与键
+
+[schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L328) 中 `device.customer_id` 是普通可空 UUID 列，没有 Claim 专用唯一约束、版本列或 `customer_id IS NULL` 条件更新。Tenant 内 `device.name` 有唯一约束，因此 REST 可用 `tenantId + deviceName` 定位。
+
+`attribute_kv` 的主键是 `(entity_type, entity_id, attribute_type, attribute_key)`，[schema L105](../../../dao/src/main/resources/sql/schema-entities.sql#L105)。本流程涉及：
+
+- `entity_type=DEVICE`
+- `entity_id=deviceId`
+- `attribute_type=SERVER_SCOPE`
+- `attribute_key=claimingAllowed` 或 `claimingData`
+
+```mermaid
+erDiagram
+    DEVICE {
+        uuid id PK
+        uuid tenant_id
+        uuid customer_id
+        varchar name
+        uuid device_profile_id
+    }
+    CUSTOMER {
+        uuid id PK
+        uuid tenant_id
+        varchar title
+    }
+    ATTRIBUTE_KV {
+        varchar entity_type PK
+        uuid entity_id PK
+        varchar attribute_type PK
+        varchar attribute_key PK
+        boolean bool_v
+        varchar str_v
+        bigint last_update_ts
+    }
+    CUSTOMER o|--o{ DEVICE : owns
+    DEVICE ||--o{ ATTRIBUTE_KV : has
+```
+
+### 10.2 事务不是一个整体
+
+`ClaimDevicesServiceImpl` 没有 `@Transactional`。`DeviceServiceImpl.saveDevice(Device)` 自己开启事务并 `saveAndFlush`；事务返回后才广播 update，再异步删除 attributes。由此形成不可回滚的分段提交：
+
+```mermaid
+flowchart LR
+    VERIFY["校验 ClaimData"] --> TX1["事务一 UPDATE device customer_id"]
+    TX1 --> COMMIT1["事务一提交"]
+    COMMIT1 --> EVENT["cluster device update"]
+    EVENT --> TX2["异步 attribute removeAll"]
+    TX2 --> RESULT{"删除结果"}
+    RESULT -->|"成功"| HTTP200["REST 200"]
+    RESULT -->|"失败"| HTTPERR["REST error 但 customer_id 已提交"]
+```
+
+Reclaim 同理：先提交 `customer_id=NULL_UUID`，全局默认关闭时再异步保存 `claimingAllowed=true`。第二步失败会让 REST 报错，但设备已经取消归属。没有跨 `device` 与 `attribute_kv` 的单一事务，也没有补偿回滚。
+
+### 10.3 并发 Customer Claim
+
+两个 Customer 请求可能分别读到同一个未归属 Device 快照和同一 ClaimData。源码没有数据库行锁、分布式锁、乐观 `@Version`，也没有 `UPDATE device SET customer_id=? WHERE id=? AND customer_id IS NULL`。因此两者都可能通过内存判断并分别 `saveDevice`，后提交者覆盖前者；两个调用都可能返回 `SUCCESS`，但最终数据库只保留最后一次写入。
+
+```mermaid
+sequenceDiagram
+    participant A as CustomerA
+    participant B as CustomerB
+    participant S as ClaimService
+    participant DB as DeviceTable
+    A->>S: read unassigned Device and ClaimData
+    B->>S: read unassigned Device and ClaimData
+    A->>DB: update customer_id A
+    DB-->>A: commit success
+    B->>DB: update customer_id B
+    DB-->>B: commit success
+    A->>S: remove ClaimData
+    B->>S: remove ClaimData
+    Note over A,DB: Both may observe SUCCESS while final owner is B
+```
+
+这是源码可见的潜在一致性问题，不应把 Device Actor 的串行性误当成 Customer REST 的并发控制。
+
+---
+
+## 十一、异常处理
+
+### 11.1 结果矩阵
+
+| 条件 | 设备侧可见结果 | 客户 REST 可见结果 | 状态副作用 |
+|---|---|---|---|
+| 无效 device token | HTTP/CoAP 401；MQTT 在连接认证阶段失败 | 不适用 | 无 ClaimData |
+| malformed JSON/Proto | CoAP 4.00；MQTT adaptor error 后 ACK error/断开；HTTP 无 claim 专用异常映射 | body 反序列化错误 | 无 Core record |
+| Transport rate/entity limit | 协议 callback error | 不适用 | activity/queue 取决于失败点 |
+| Queue produce 失败 | HTTP 500、MQTT 关闭连接、CoAP 5.00 | 不适用 | 未确认进入 Core |
+| `claimingAllowed` 缺失/非 Boolean/false | 设备可能已经收到成功，因为 Actor 不等待 Future | 随后通常 400 FAILURE | cache 未写 |
+| Device 已归属时再次登记 | 同上 | 400 CLAIMED | register Future 失败被忽略 |
+| ClaimData 不存在 | 无直接设备反馈 | 未归属返回 FAILURE，已归属返回 CLAIMED | 无清理 |
+| secret 错误 | 无直接设备反馈 | 400 FAILURE | cache 来源会被 evict；attribute 来源保留 |
+| 已过期 | 无直接设备反馈 | 400 FAILURE | cache 来源会被 evict；attribute 来源保留 |
+| Device save 失败 | 不适用 | error result | ClaimData 通常仍在 |
+| attribute delete 失败 | 不适用 | error result | `customer_id` 已经提交，ClaimData/属性可能残留 |
+| Reclaim attribute save 失败 | 不适用 | error result | `customer_id` 已经清空，`claimingAllowed` 未必恢复 |
+
+```mermaid
+flowchart TB
+    REQUEST["Customer Claim request"] --> DATA{"找到 ClaimData"}
+    DATA -->|"否且未归属"| FAILURE1["400 FAILURE"]
+    DATA -->|"否且已归属"| CLAIMED1["400 CLAIMED"]
+    DATA -->|"是"| VALID{"未过期且 secret 匹配"}
+    VALID -->|"否"| EVICT{"来源是 cache"}
+    EVICT -->|"是"| DROP["evict 后 400 FAILURE"]
+    EVICT -->|"否"| KEEP["保留 attribute 后 400 FAILURE"]
+    VALID -->|"是且已归属"| CLEANCLAIMED["删除 Claim 数据后 400 CLAIMED"]
+    VALID -->|"是且未归属"| SAVE["保存 customer_id"]
+    SAVE --> DELETE["删除 Claim 数据"]
+    DELETE -->|"成功"| SUCCESS["200 SUCCESS"]
+    DELETE -->|"失败"| PARTIAL["HTTP error 与部分提交"]
+```
+
+### 11.2 安全与生产风险
+
+- secret 以明文存入 cache，持久 fallback 也是 JSON string；源码不做 hash。
+- 空 secret 是合法默认值，等价于仅凭同 Tenant 唯一 `deviceName` 认领。生产设备应主动生成高熵 secret。
+- Customer Claim 没有本服务内的 attempt counter、指数退避或专用 rate limiter。cache 来源的错误尝试会销毁窗口，但持久 `claimingData` 不会。
+- Caffeine 是进程本地缓存。多 Core 部署中，设备 Actor owner 写入节点 A，REST 落到节点 B 时会 cache miss；设备登记又不持久化 `claimingData`。需要共享 Redis、请求粘性或外部持久 ClaimData 才能避免该可见性问题。
+- Redis 配置类使用默认 `RedisCacheConfiguration`，没有从 `cache.specs.claimDevices` 设置 per-cache TTL/maxSize；业务 expirationTime 仍会阻止过期认领，但旧 key 可长期挡住 `putIfAbsent`，除非显式 evict 或 Redis 外部淘汰。
+- Reclaim 的 Customer 权限只检查同 Tenant。若产品要求“客户只能取消自己名下设备”，3.6 这条源码边界需要在网关/权限扩展中额外收紧。
+- Claim/Reclaim 后长连接 SessionInfo 可能保留旧 customerId，生产上可要求设备重连，并监控带旧 customerId 的 usage/Rule Engine metadata。
+
+### 11.3 排障路径
+
+```mermaid
+flowchart TB
+    SYMPTOM["设备 ACK 但客户总是 FAILURE"] --> AUTH["确认设备 token 与目标 DeviceId"]
+    AUTH --> CORE["检查 tb_core logical topic 与 consumer lag"]
+    CORE --> ACTOR["检查 DeviceActor 是否收到 hasClaimDevice"]
+    ACTOR --> ALLOW["检查全局开关与 Boolean claimingAllowed"]
+    ALLOW --> CACHE["检查 cache provider 节点与 key"]
+    CACHE --> EXP["核对 secret 与 expirationTime"]
+    EXP --> REST["核对 REST tenantId customerId deviceName"]
+    REST --> DB["检查 device.customer_id 与 attribute_kv"]
+    DB --> PARTIAL["检查 attribute delete 或 save callback 异常"]
+```
+
+建议日志/指标顺序：Transport adaptor error与认证、Core producer callback、Kafka `tb-core-node` lag、Core pack timeout、`ClaimDevicesServiceImpl` warning、Spring cache/Redis key、Device SQL update、attribute DAO callback、audit/cluster notification。由于设备 ACK 早于业务 Future，排障不能停在协议层。
+
+---
+
+## 十二、源码阅读路线
+
+```mermaid
+flowchart LR
+    P1["第一步 协议与 proto"] --> P2["第二步 Transport 与 Queue"]
+    P2 --> P3["第三步 Actor"]
+    P3 --> P4["第四步 Claim service"]
+    P4 --> P5["第五步 REST 与权限"]
+    P5 --> P6["第六步 Device DAO 与 Attributes"]
+    P6 --> P7["第七步 Cache Kafka Config 与测试"]
+```
+
+1. 从 [transport.proto](../../../common/proto/src/main/proto/transport.proto#L24)、[queue.proto](../../../common/proto/src/main/proto/queue.proto#L489) 先固定外部/内部消息结构。
+2. 读 [JsonConverter](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/JsonConverter.java#L167) 与 [ProtoConverter](../../../common/proto/src/main/java/org/thingsboard/server/common/adaptor/ProtoConverter.java#L118)，确认空值和默认值。
+3. 按协议读 [DeviceApiController](../../../common/transport/http/src/main/java/org/thingsboard/server/transport/http/DeviceApiController.java#L281)、[MqttTransportHandler](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L584)、[CoapTransportResource](../../../common/transport/coap/src/main/java/org/thingsboard/server/transport/coap/CoapTransportResource.java#L405)。Gateway 再补 [AbstractGatewaySessionHandler](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/session/AbstractGatewaySessionHandler.java#L654)。
+4. 跟 [DefaultTransportService.process Claim](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1107) 到 `sendToCore`，标出 producer callback。
+5. 跟 [DefaultTbCoreConsumerService.launchMainConsumers](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L334) 到 [DeviceActorMessageProcessor](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L569)，观察 Future 未被等待。
+6. 完整通读 [ClaimDevicesServiceImpl](../../../application/src/main/java/org/thingsboard/server/service/device/ClaimDevicesServiceImpl.java#L74)，把 register、claim、reclaim、cache 与 attributes 放在一张状态图中。
+7. 读 [DeviceController](../../../application/src/main/java/org/thingsboard/server/controller/DeviceController.java#L685)、[CustomerUserPermissions](../../../application/src/main/java/org/thingsboard/server/service/security/permission/CustomerUserPermissions.java#L81) 和 [DefaultTbDeviceService](../../../application/src/main/java/org/thingsboard/server/service/entitiy/device/DefaultTbDeviceService.java#L287)，固定 JWT 权限和响应。
+8. 读 [DeviceServiceImpl.saveDevice](../../../dao/src/main/java/org/thingsboard/server/dao/device/DeviceServiceImpl.java#L255)、[DeviceDataValidator](../../../dao/src/main/java/org/thingsboard/server/dao/service/validator/DeviceDataValidator.java#L85) 与 schema，确认没有条件更新/版本锁。
+9. 读 [DefaultTelemetrySubscriptionService](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L470)、[TbCaffeineCacheConfiguration](../../../common/cache/src/main/java/org/thingsboard/server/cache/TbCaffeineCacheConfiguration.java#L102)、[TBRedisCacheConfiguration](../../../common/cache/src/main/java/org/thingsboard/server/cache/TBRedisCacheConfiguration.java#L163)，确认分段事务与 provider 差异。
+10. 最后用 [MQTT Claim 测试](../../../application/src/test/java/org/thingsboard/server/transport/mqtt/mqttv3/claim/MqttClaimDeviceTest.java#L174)、[CoAP Claim 测试](../../../application/src/test/java/org/thingsboard/server/transport/coap/claim/CoapClaimDeviceTest.java#L166) 验证过期、空 secret、Gateway、SUCCESS/CLAIMED，并主动记录未覆盖场景。
+
+---
+
+## 十三、常见面试题
+
+### 1. Device Claim 与设备认证有什么区别？
+
+设备认证用 access token、MQTT basic 或 X.509 把连接映射到既有 Device；Claim 使用认证后的 Device 发布临时 ClaimData，再由 Customer User 改写 `device.customer_id`。Claim 不创建 Device，也不更换 credentials。
+
+### 2. 3.6 中 Device Claim 的核心服务类叫什么？
+
+接口是 `org.thingsboard.server.dao.device.ClaimDevicesService`，实现是 `org.thingsboard.server.service.device.ClaimDevicesServiceImpl`。源码中没有 `ClaimingDeviceService`，面试中应以实际类型为准。
+
+### 3. 三种原生设备协议的 Claim 入口分别是什么？
+
+HTTP 是 `POST /api/v1/{deviceToken}/claim`，MQTT 是 publish `v1/devices/me/claim`，CoAP 是 `POST /api/v1/{token}/claim`。MQTT Gateway 另有 `v1/gateway/claim`。
+
+### 4. `secretKey` 和 `durationMs` 都省略时会怎样？
+
+secret 变为空字符串，duration 内部为 0；`ClaimDevicesServiceImpl.validateDurationMs` 把非正数替换为 `security.claim.duration`，默认 86400000ms，即 24 小时。
+
+### 5. `durationMs=0` 或负数是否表示立即过期？
+
+不是。源码只在 `durationMs > 0` 时使用请求值，其余都回退系统默认值。没有“零表示永不过期”或“负数立即过期”的能力。
+
+### 6. `claimingAllowed` 在什么条件下必须存在？
+
+仅当 `security.claim.allowClaimingByDefault=false` 时，设备侧登记必须读到 Boolean 类型的 `SERVER_SCOPE claimingAllowed=true`，且设备尚未归属 Customer。字符串值 `"true"` 不等价。
+
+### 7. 设备收到 HTTP 200、PUBACK 或 CREATED 能证明什么？
+
+只能证明 Core Queue producer callback 成功。它不能证明 Core consumer 已处理、Device Actor 的 register Future 成功、ClaimData 已进入 cache，更不能证明 `customer_id` 已更新。
+
+### 8. 为什么 Actor 处理失败不会反馈给设备？
+
+`handleClaimDeviceMsg` 调用 `registerClaimingInfo(...)` 后丢弃返回的 `ListenableFuture`，外层 `process(...)` 随即 `callback.onSuccess()`。异步 attribute 查询或业务校验失败没有接回 Queue/Transport callback。
+
+### 9. ClaimData 存在哪里？
+
+设备侧登记只写名为 `claimDevices` 的 Spring Cache，key 是 `[DeviceId]`，value 是明文 secret 与绝对 expirationTime。cache miss 时客户侧还会读 `SERVER_SCOPE claimingData` string，但本章 Java 流程不自动写该 attribute。
+
+### 10. 默认 Caffeine 对多 Core 部署有什么问题？
+
+Caffeine 是进程本地缓存。设备消息由 DeviceId 固定到某个 Core Actor owner，而 REST 可能落到另一 Core，后者 cache miss 且没有设备登记产生的持久 fallback，于是返回 FAILURE。共享 Redis 或等价路由约束才能消除节点可见性差异。
+
+### 11. 为什么重复发布 Claim 不一定刷新有效期？
+
+缓存写使用 `putIfAbsent`。旧 key 仍存在时，新 secret 和新 expirationTime 都被忽略；即使业务 expiration 已过，cache TTL 尚未到，也可能挡住重新登记。
+
+### 12. 错误 secret 会消耗 Claim 窗口吗？
+
+若 ClaimData 来自 cache，错误 secret 或过期都会 evict key，所以会消耗窗口；若来自 `claimingData` attribute，失败路径不删除它，后续仍可继续尝试。
+
+### 13. 成功 Claim 会修改哪些持久数据？
+
+核心变化是 `device.customer_id` 写为当前 JWT 的 customerId；随后删除 `SERVER_SCOPE claimingAllowed` 和 `claimingData`。设备侧 cache ClaimData 被 evict，另外还产生实体更新和审计动作。
+
+### 14. Claim 的数据库操作是一个事务吗？
+
+不是。`saveDevice` 自己在事务中提交 Device；attribute 删除在之后异步执行。删除失败时 REST 可报错，但 customerId 已提交，前一步不会回滚。
+
+### 15. Reclaim 做了什么？
+
+它清理 Claim cache，把 Device customerId 规范化为零 UUID并保存，广播更新；若全局默认不允许 Claim，再异步写 `SERVER_SCOPE claimingAllowed=true`。它不自动创建新的 ClaimData。
+
+### 16. Reclaim 失败是否一定保持原归属？
+
+不一定。若 Device save 已提交但后续 `claimingAllowed` attribute 保存失败，REST 返回错误而设备已取消归属。这是分段提交导致的部分成功。
+
+### 17. 两个 Customer 同时认领会怎样？
+
+两者可能读到同一个未归属 Device 快照和有效 ClaimData。源码没有锁、版本列或条件 UPDATE，两个 `saveDevice` 都可能成功，后写覆盖先写，两个请求甚至都可能看到 SUCCESS。
+
+### 18. Device Actor 能防止 Customer Claim 竞争吗？
+
+不能。Actor 只串行设备侧 Core 消息；Customer REST 直接调用 Claim service 和 Device DAO，不经过 Device Actor mailbox。
+
+### 19. Kafka 中 Claim 使用什么 topic 和 consumer group？
+
+它使用 TB_CORE 主队列，默认逻辑 topic 为 `tb_core.0` 到 `tb_core.9`，按 DeviceId hash；Kafka consumer group 是带可选全局 prefix 的 `tb-core-node`。它不进入 Rule Engine topic。
+
+### 20. Core consumer 会对 Claim 业务失败自动重试吗？
+
+没有 Claim 专用重试或 DLT。consumer pack 在等待 callback 后 commit；Actor 又在 register Future 完成前 callback success。Kafka producer 的 `retries=1` 只处理 produce 错误，不处理业务失败。
+
+### 21. Claim/Reclaim 会强制 MQTT 设备重连吗？
+
+不会。credentials 未改变，源码没有强制断开。更细的风险是 Transport 的 `onDeviceUpdate` 没有刷新 SessionInfo customerId，因此长连接可继续携带旧归属快照直到重认证。
+
+### 22. 空 secret 是否安全？
+
+空 secret 是合法默认行为，但此时同 Tenant Customer User 只需知道唯一 deviceName 即可尝试 Claim。生产应使用高熵、短时、一次性 secret，并对 REST 暴露和日志做保护。
+
+### 23. Customer User 能取消其他 Customer 的设备归属吗？
+
+3.6 的 `CustomerUserPermissions` 对 `CLAIM_DEVICES` 特判为同 Tenant 即允许，不比较当前 Device customerId；POST 与 DELETE 共用该 operation。因此源码边界允许这种调用，是否符合产品要求需要部署方评估和收紧。
+
+### 24. 现有自动化测试覆盖和缺口是什么？
+
+覆盖 MQTT v3/v5、JSON/Proto/backward compatibility、Gateway、CoAP JSON/Proto、过期、空字段、SUCCESS 与 CLAIMED。明显缺少 HTTP Device Claim、Reclaim、默认关闭、跨节点 cache、并发 Claim、Redis 失效和 Customer POST 真正无 body。
+
+### 25. 排查“设备已 ACK，但客户一直 FAILURE”的最短路线是什么？
+
+先核对设备认证映射的 DeviceId，再查 Core topic/group lag与 Device Actor 收件；随后查 `allowClaimingByDefault`、Boolean `claimingAllowed`、cache provider及写入节点、ClaimData secret/expiration；最后核对 REST tenant/deviceName、`device.customer_id` 和 `attribute_kv`，不要把协议 ACK 当作业务完成。
+
+---
+
+[上一篇：27 Device Provision 流程](../27-device-provision/README.md) | [HTML 版](index.html) | [返回全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/28-device-claim.svg) | [下一篇：29 Session 与 Device State 流程](../29-session-device-state/README.md)
