@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>34 Entity Query 流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航"><a href="README.md">Markdown</a><a href="../../index.html">全书目录</a><a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>34 Entity Query 流程</strong>
+      <a href="#一-流程目标">一、流程目标</a><a href="#二-入口">二、入口</a><a href="#三-完整调用链">三、完整调用链</a><a href="#四-消息流">四、消息流</a><a href="#五-时序图">五、时序图</a><a href="#六-数据变化">六、数据变化</a><a href="#七-源码分析">七、源码分析</a><a href="#八-actor-分析">八、Actor 分析</a><a href="#九-kafka-分析">九、Kafka 分析</a><a href="#十-数据库分析">十、数据库分析</a><a href="#十一-异常处理">十一、异常处理</a><a href="#十二-源码阅读路线">十二、源码阅读路线</a><a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
+  <script id="markdown-source" type="text/plain"># 34 Entity Query 流程
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。当前 `HEAD 21a9049239` 只包含后续指南变化；`application`、`common`、`dao` 与该业务基线一致。本章只分析 Entity Query 的 REST count/find/keys 与 WebSocket v2 初始实体查询，WebSocket 后续遥测、属性和实体集合刷新不属于 Entity Query 本身。
+
+[上一篇：33 WebSocket 订阅流程](../33-websocket-subscription/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/34-entity-query.svg) | [下一篇：35 Relation 流程](../35-relation-flow/index.html)
+
+---
+
+## 一、流程目标
+
+<a id="architecture"></a>
+
+Entity Query 把一个多态 `EntityFilter`、可选 `KeyFilter`、字段投影、latest 值和分页排序转换为 PostgreSQL 动态 SQL。REST 与 WebSocket 初始查询共用 `EntityService -> JpaEntityQueryDao -> DefaultEntityQueryRepository`，差别在上层入口、动态值解析和结果发送；它不是 Actor 消息，也不经 Kafka，更没有独立缓存层。
+
+[架构图 SVG：REST/WS 初始入口、权限、动态 SQL 与 PostgreSQL](../../assets/architecture/34-entity-query.svg)
+
+[![Entity Query 架构图](../../assets/architecture/34-entity-query.svg)](../../assets/architecture/34-entity-query.svg)
+
+```mermaid
+flowchart LR
+    REST["REST count / find / keys"] --> QS["DefaultEntityQueryService"]
+    WS["WS ENTITY_DATA / ENTITY_COUNT initial"] --> SUB["TbEntityDataSubscriptionService"]
+    QS --> ES["EntityService"]
+    SUB --> ES
+    ES --> DAO["JpaEntityQueryDao"]
+    DAO --> REPO["DefaultEntityQueryRepository"]
+    REPO --> SQL["PostgreSQL dynamic SQL"]
+```
+
+必须先固定十二条源码事实：
+
+1. REST 有 `/api/entitiesQuery/count`、`/api/entitiesQuery/find`、`/api/entitiesQuery/find/keys` 三个入口；keys 只在请求 pageSize 大于 100 时把它压到 100，较小值和 page 原样保留，再异步汇总该页实体的键。
+2. WebSocket 的 `ENTITY_DATA` 和 `ENTITY_COUNT` 初始查询最终调用同一 `EntityService`；实时更新是订阅子系统的后续行为，不是 Entity Query SQL。
+3. `EntityCountQuery` 只有 `entityFilter + keyFilters`；`EntityDataQuery` 再增加 `pageLink + entityFields + latestValues`。
+4. `EntityFilter` 有 14 个 Jackson 子类型；不同子类型决定已注册实体表、关系递归派生表或 API usage 派生表，普通 filter 不能据此支持任意 `EntityType`。
+5. 普通查询权限有两层：Controller/WS session 门禁与 SQL tenant/customer 条件；SYS tenant count 和显式 internal find 会生成 `1=1`，RelationsQuery 还按 root type 套用默认权限模板。
+6. `EntityKeyMapping` 合并投影、过滤和排序所需 key，决定实体列、`ts_kv_latest`、`ts_kv_dictionary`、`attribute_kv` 与 `LATERAL` join。
+7. `KeyFilter.valueType` 在本基线 SQL 生成链中未被读取；真正选择 SQL 值列的是 predicate 的 `STRING/NUMERIC/BOOLEAN/COMPLEX` 类型。
+8. `find` 正常执行 count statement，再执行 data statement；count 为 0 时不发 data statement。
+9. 有排序时追加 `result.id` 次排序，但 multi-root relation 同一 ID 可有不同 parent，仍不是全序；无排序时没有 `ORDER BY`，跨页顺序不稳定。
+10. `LIMIT/OFFSET` 直接由 `pageSize` 与 `pageSize * page` 生成；通用 find 没有最大 pageSize 上限，也没有 offset 溢出保护。
+11. 仓库使用 `NamedParameterJdbcTemplate` 和 `QueryContext` 类型化绑定值，但实体表名、方向和 SQL 结构来自受控枚举/映射拼装。
+12. `DefaultEntityQueryRepository` 没有给这两类 statement 设置专属或全局 query timeout；`sql.relations.query_timeout` 属于 RelationService，不会自动约束这里的递归 SQL。
+
+```mermaid
+flowchart TB
+    INPUT["Entity query JSON"] --> FILTER["EntityFilter: choose entity set"]
+    INPUT --> KEYS["EntityKey / KeyFilter"]
+    FILTER --> PERM["tenant/customer SQL permission"]
+    KEYS --> MAP["EntityKeyMapping"]
+    PERM --> BUILD["FROM + WHERE"]
+    MAP --> BUILD
+    BUILD --> COUNT["count statement"]
+    COUNT -->|"> 0"| DATA["data statement + sort + limit/offset"]
+    COUNT -->|"0"| EMPTY["empty PageData"]
+```
+
+---
+
+## 二、入口
+
+### 2.1 REST count、find 与 keys
+
+[org.thingsboard.server.controller.EntityQueryController.countEntitiesByQuery(EntityCountQuery)](../../../application/src/main/java/org/thingsboard/server/controller/EntityQueryController.java#L87) 接收 `POST /api/entitiesQuery/count`，允许 `SYS_ADMIN/TENANT_ADMIN/CUSTOMER_USER`；[org.thingsboard.server.controller.EntityQueryController.findEntityDataByQuery(EntityDataQuery)](../../../application/src/main/java/org/thingsboard/server/controller/EntityQueryController.java#L104) 接收 `POST /api/entitiesQuery/find`，只允许 `TENANT_ADMIN/CUSTOMER_USER`。两者都只在 Controller 做非空检查，模型完整性由 DAO service 再校验。
+
+[org.thingsboard.server.controller.EntityQueryController.findEntityTimeseriesAndAttributesKeysByQuery(EntityDataQuery, boolean, boolean, String)](../../../application/src/main/java/org/thingsboard/server/controller/EntityQueryController.java#L168) 只在 pageSize 大于 100 时把它截断到 100，较小值和 page 不变，然后调用 [org.thingsboard.server.service.query.DefaultEntityQueryService.getKeysByQuery(SecurityUser, TenantId, EntityDataQuery, boolean, boolean, String)](../../../application/src/main/java/org/thingsboard/server/service/query/DefaultEntityQueryService.java#L320)。后者先执行完整 EntityData find，取得实体 ID 后才并行调用 TimeseriesService 与 AttributesService；因此 keys 不是仓库中的特殊 SQL，也不是全租户键扫描。
+
+```mermaid
+sequenceDiagram
+    participant C as REST Client
+    participant EC as EntityQueryController
+    participant QS as DefaultEntityQueryService
+    participant ES as EntityService
+    participant KS as TS / Attributes services
+    C->>EC: POST count or find
+    EC->>QS: query + current SecurityUser
+    QS->>ES: tenantId + customerId + query
+    ES-->>C: count or PageData
+    C->>EC: POST find/keys
+    EC->>EC: if pageSize > 100, set it to 100
+    EC->>QS: getKeysByQuery
+    QS->>ES: find requested page with pageSize at most 100
+    QS->>KS: async distinct keys by entity IDs
+    KS-->>C: entityTypes + timeseries + attribute
+```
+
+### 2.2 WebSocket 初始查询边界
+
+[org.thingsboard.server.service.ws.DefaultWebSocketService.handleWsEntityDataCmd(WebSocketSessionRef, EntityDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L315) 与 [org.thingsboard.server.service.ws.DefaultWebSocketService.handleWsEntityCountCmd(WebSocketSessionRef, EntityCountCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L328) 先做 WebSocket 命令校验，再转交订阅服务。[org.thingsboard.server.service.subscription.DefaultTbEntityDataSubscriptionService.handleCmd(WebSocketSessionRef, EntityDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L253) 新建 context 时在 `createSubCtx` 内解析一次 dynamic value，返回后又调用 `ctx.setAndResolveQuery` 解析第二次，再执行 `ctx.fetchData()`；[org.thingsboard.server.service.subscription.TbAbstractDataSubCtx.findEntityData()](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbAbstractDataSubCtx.java#L101) 才进入同一个 EntityService。
+
+`latestCmd` 的 keys 会先并入 `query.latestValues`，SQL/Timescale latest 模式通常可由 Entity Query join 带回 latest 快照；非 SQL latest 存储时，Entity Query 后还会调用 `TimeseriesService.findLatest` 补查没有同步到 SQL 的 telemetry。随后创建的 local subscriptions、动态 page 刷新和推送更新属于第 33 章，不应反推为 Entity Query 自身具备实时能力。
+
+```mermaid
+flowchart LR
+    FRAME["WS EntityDataCmd"] --> VALIDATE["validateSubscriptionCmd"]
+    VALIDATE --> CTX["TbEntityDataSubCtx"]
+    CTX --> RESOLVE["setAndResolveQuery"]
+    RESOLVE --> MERGE["merge latestCmd keys"]
+    MERGE --> FETCH["fetchData"]
+    FETCH --> ENTITYSQL["Entity Query initial snapshot"]
+    ENTITYSQL --> INITIAL["initial EntityDataUpdate"]
+    INITIAL -. "later, separate subsystem" .-> SUBS["telemetry / attribute subscriptions"]
+```
+
+### 2.3 同步入口与异步 keys
+
+count/find 的 JDBC 调用在当前请求或 WS 命令处理线程上同步完成；keys 只有在实体页已经同步返回后，才把键查询提交到 `DbCallbackExecutorService`。`DeferredResult` 没有在构造时传入 Entity Query 专属 timeout；它只能受 Spring MVC 异步请求全局配置影响。
+
+```mermaid
+flowchart TB
+    FIND["REST find or WS initial"] --> SYNC["synchronous JDBC count"]
+    SYNC --> SYNC2["synchronous JDBC data"]
+    KEYS["REST keys"] --> ENTITYPAGE["same synchronous entity page"]
+    ENTITYPAGE --> FUTURES["DbCallbackExecutor futures"]
+    FUTURES --> RESPONSE["DeferredResult response"]
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 服务、校验与 DAO
+
+[org.thingsboard.server.service.query.DefaultEntityQueryService.findEntityDataByQuery(SecurityUser, EntityDataQuery)](../../../application/src/main/java/org/thingsboard/server/service/query/DefaultEntityQueryService.java#L148) 先解析 REST 动态值，再调用 EntityService；count 的 [org.thingsboard.server.service.query.DefaultEntityQueryService.countEntitiesByQuery(SecurityUser, EntityCountQuery)](../../../application/src/main/java/org/thingsboard/server/service/query/DefaultEntityQueryService.java#L136) 没有这一步。[org.thingsboard.server.dao.entity.BaseEntityService.findEntityDataByQuery(TenantId, CustomerId, EntityDataQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/entity/BaseEntityService.java#L111) 校验 tenant/customer ID、filter 与 pageLink，然后经 [org.thingsboard.server.dao.sql.query.JpaEntityQueryDao.findEntityDataByQuery(TenantId, CustomerId, EntityDataQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/JpaEntityQueryDao.java#L68) 委托仓库。
+
+```mermaid
+sequenceDiagram
+    participant E as Entry
+    participant Q as DefaultEntityQueryService or WS Ctx
+    participant S as BaseEntityService
+    participant D as JpaEntityQueryDao
+    participant R as DefaultEntityQueryRepository
+    participant P as PostgreSQL
+    E->>Q: EntityDataQuery
+    Q->>Q: resolve dynamic values
+    Q->>S: findEntityDataByQuery
+    S->>S: validate ids/filter/pageLink
+    S->>D: findEntityDataByQuery
+    D->>R: findEntityDataByQuery
+    R->>P: count SQL
+    P-->>R: totalElements
+    alt totalElements > 0
+        R->>P: data SQL
+        P-->>R: rows
+    end
+    R-->>E: PageData<EntityData>
+```
+
+### 3.2 Query 对象组合
+
+[org.thingsboard.server.common.data.query.EntityCountQuery.EntityCountQuery(EntityFilter, List<KeyFilter>)](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/EntityCountQuery.java#L75) 固定集合过滤与值过滤；[org.thingsboard.server.common.data.query.EntityDataQuery.EntityDataQuery(EntityFilter, EntityDataPageLink, List<EntityKey>, List<EntityKey>, List<KeyFilter>)](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/EntityDataQuery.java#L64) 在其上增加分页、实体字段和 latest 值。`entityFields` 是实体表投影，`latestValues` 是属性/时序 latest 投影，`keyFilters` 可以引用两类 key。
+
+```mermaid
+classDiagram
+    EntityCountQuery <|-- AbstractDataQuery
+    AbstractDataQuery <|-- EntityDataQuery
+    EntityCountQuery : EntityFilter entityFilter
+    EntityCountQuery : List~KeyFilter~ keyFilters
+    AbstractDataQuery : EntityDataPageLink pageLink
+    AbstractDataQuery : List~EntityKey~ entityFields
+    AbstractDataQuery : List~EntityKey~ latestValues
+    EntityKey : EntityKeyType type
+    EntityKey : String key
+    KeyFilter : EntityKey key
+    KeyFilter : EntityKeyValueType valueType
+    KeyFilter : KeyFilterPredicate predicate
+```
+
+### 3.3 仓库组装阶段
+
+[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.findEntityDataByQuery(TenantId, CustomerId, EntityDataQuery, boolean)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L473) 依次解析实体类型、创建 `QueryContext`、准备 mappings、构造权限/实体过滤、构造 latest joins 与 textSearch，再形成 count/data 两套 FROM。内部调用 [org.thingsboard.server.dao.sql.query.EntityKeyMapping.prepareKeyMapping(EntityDataQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/EntityKeyMapping.java#L472) 建立投影 mappings，再把 sort/filter 合并到匹配项。输入 `entityFields/latestValues` 本身不做 `distinct`，重复 latest projection 会生成重复 join；只有 keyFilters 被 grouping 后附到其中一个 mapping。
+
+```mermaid
+flowchart TB
+    Q["EntityDataQuery"] --> TYPE["resolveEntityType"]
+    TYPE --> CTX["QueryContext + QuerySecurityContext"]
+    Q --> MAP["prepareKeyMapping"]
+    CTX --> WHERE["buildPermissionQuery + buildEntityFilterQuery"]
+    MAP --> JOINC["latest joins for count: filters only"]
+    MAP --> JOIND["latest joins for data: all selected/filter/sort"]
+    WHERE --> FC["fromClauseCount"]
+    JOINC --> FC
+    WHERE --> FD["fromClauseData"]
+    JOIND --> FD
+```
+
+---
+
+## 四、消息流
+
+### 4.1 14 种 EntityFilter 的真实 FROM/WHERE
+
+[org.thingsboard.server.common.data.query.EntityFilter](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/EntityFilter.java#L32) 用 `type` 反序列化 14 个子类；[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.addEntityTableQuery(QueryContext, EntityFilter)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L712) 选择 FROM，[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.buildEntityFilterQuery(QueryContext, EntityFilter)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L679) 追加 subtype WHERE。下表中的权限 WHERE 仍会额外存在。
+
+| filter type | 真实 FROM | subtype WHERE |
+|---|---|---|
+| `singleEntity` | `entityTableMap[已注册单实体类型] e` | `e.id = :entity_filter_single_entity_id` |
+| `entityList` | `entityTableMap[已注册 entityType] e` | `e.id in (:entity_filter_entity_ids)` |
+| `entityName` | `entityTableMap[已注册 entityType] e` | 对类型对应 name/title/email 列做 `ILIKE`；无 `%` 时自动前缀匹配 |
+| `entityType` | `entityTableMap[已注册 entityType] e` | 空，仅保留权限与 key filter |
+| `assetType` | `asset e` | `e.type in (...)`，可选 name `ILIKE` |
+| `deviceType` | `device e` | `e.type in (...)`，可选 name `ILIKE` |
+| `entityViewType` | `entity_view e` | `e.type in (...)`，可选 name `ILIKE` |
+| `edgeType` | `edge e` | `e.type in (...)`，可选 name `ILIKE` |
+| `relationsQuery` | `WITH RECURSIVE ...` 形成的跨类型派生表 `e` | subtype WHERE 空；关系类型/目标类型在递归结果阶段过滤，不剪枝中间路径 |
+| `assetSearchQuery` | `asset WHERE id in (WITH RECURSIVE ...)` 派生表 `e` | 外层空；relationType、ASSET、assetTypes 只过滤递归结果 |
+| `deviceSearchQuery` | `device WHERE id in (WITH RECURSIVE ...)` 派生表 `e` | 外层空；relationType、DEVICE、deviceTypes 只过滤递归结果 |
+| `entityViewSearchQuery` | `entity_view WHERE id in (WITH RECURSIVE ...)` 派生表 `e` | 外层空；relationType、ENTITY_VIEW、types 只过滤递归结果 |
+| `edgeSearchQuery` | `edge WHERE id in (WITH RECURSIVE ...)` 派生表 `e` | 外层空；relationType、EDGE、edgeTypes 只过滤递归结果 |
+| `apiUsageState` | `(select ... from api_usage_state aus) e` | subtype 空；权限决定 tenant/customer entity_id |
+
+普通 filter 的 default FROM 直接读取 `entityTableMap`。本基线只注册 `ASSET/DEVICE/ENTITY_VIEW/DASHBOARD/CUSTOMER/USER/TENANT/API_USAGE_STATE/EDGE/RULE_CHAIN/DEVICE_PROFILE/ASSET_PROFILE/TENANT_PROFILE`；其他 `EntityType` 即使能进入模型，也不会自动获得实体表映射，最终可能拼出无效 SQL。
+
+```mermaid
+flowchart TB
+    F{"EntityFilter type"}
+    F -->|"single/list/name/entity/type"| TABLE["mapped entity table"]
+    F -->|"relationsQuery"| REL["recursive cross-type derived table"]
+    F -->|"four searchQuery"| SEARCH["typed table WHERE id IN recursive relation IDs"]
+    F -->|"apiUsageState"| API["api_usage_state derived table"]
+    TABLE --> PERM["permission WHERE"]
+    REL --> PERM
+    SEARCH --> PERM
+    API --> PERM
+```
+
+### 4.2 权限两层
+
+第一层是 API/连接门禁：REST 的 `@PreAuthorize` 限制角色，WebSocket 使用已经认证的 `WebSocketSessionRef`。第二层通常是数据域权限：[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.buildPermissionQuery(QueryContext, EntityFilter)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L613) 对普通 tenant/customer 查询注入条件；customer 用户查询普通实体时是 `e.tenant_id=:tenant and e.customer_id=:customer`，查询 CUSTOMER 时改为 `e.id=:customer`，TENANT 则只能 `e.id=:tenant`。SYS tenant count 与显式 internal find 会使用 `ignorePermissionCheck=true` 生成 `1=1`。`RELATIONS_QUERY` 强制走 default permission，而 `ctx.entityType` 是 root/multi-root type，不是每个结果行的目标 type，跨类型结果可能按 root type 套用 `e.id` 或 `e.customer_id` 模板。
+
+`findEntityDataByQueryInternal` 是显式内部旁路；SYS tenant count 也是另一条自动旁路。普通 REST find 与普通 tenant/customer count 仍传 tenant/customer scope。
+
+```mermaid
+flowchart LR
+    REQUEST["authenticated request/session"] --> ROLE["role or WS command gate"]
+    ROLE --> SEC["tenantId + customerId"]
+    SEC --> SQLPERM{"entity type"}
+    SQLPERM -->|"tenant"| PT["e.id = tenant"]
+    SQLPERM -->|"customer entity"| PC["tenant + e.id = customer"]
+    SQLPERM -->|"ordinary entity"| PE["tenant + e.customer_id = customer"]
+    SQLPERM -->|"tenant admin"| PA["e.tenant_id = tenant"]
+```
+
+### 4.3 EntityKey、KeyFilter 与 predicate
+
+[org.thingsboard.server.common.data.query.EntityKey](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/EntityKey.java#L34) 是 `(EntityKeyType, key)`；类型包括 `ENTITY_FIELD`、`TIME_SERIES`、通用/三种 scope 属性和 `ALARM_FIELD`。Entity Query 不实现 `ALARM_FIELD` 语义，也不拒绝它：非 `ENTITY_FIELD/TIME_SERIES/ATTRIBUTE` 类型会落入 scoped attribute 分支并默认 `SERVER_SCOPE`；Alarm service 通常会先替换 alarm sort 才避免该路径。未知 `ENTITY_FIELD` filter 也不会必然报错，builder 返回 null 后可能被过滤掉，使查询条件静默放宽。[org.thingsboard.server.common.data.query.KeyFilter](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/KeyFilter.java#L34) 把 key、声明的 valueType 和多态 predicate 放在一起；predicate 实际支持 `STRING`、`NUMERIC`、`BOOLEAN` 和递归 `COMPLEX`。
+
+[org.thingsboard.server.dao.sql.query.EntityKeyMapping.buildComplexPredicateQuery(QueryContext, String, EntityKey, ComplexFilterPredicate, EntityFilterType)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/EntityKeyMapping.java#L693) 以 `AND/OR` 递归组合子 predicate；简单 predicate 根据自身类型选择 `str_v`、`long_v/dbl_v` 或 `bool_v`。源码全局只有 `KeyFilter` 声明 `valueType`，SQL 链没有 `getValueType()` 调用，因此不能把它描述成数据库列选择依据。
+
+```mermaid
+flowchart TB
+    KF["KeyFilter"] --> KEY["EntityKey type + key"]
+    KF --> VT["valueType metadata: unused by SQL builder"]
+    KF --> P{"predicate.type"}
+    P --> STRING["STRING -> str_v / entity text column"]
+    P --> NUM["NUMERIC -> long_v OR dbl_v"]
+    P --> BOOL["BOOLEAN -> bool_v"]
+    P --> COMPLEX["COMPLEX -> recursive AND / OR"]
+```
+
+### 4.4 Dynamic Value 的 REST 与 WS 差异
+
+[org.thingsboard.server.service.query.DefaultEntityQueryService.resolveDynamicValue(DynamicValue, SecurityUser, FilterPredicateType)](../../../application/src/main/java/org/thingsboard/server/service/query/DefaultEntityQueryService.java#L202) 从 current tenant/customer/user 的 `SERVER_SCOPE` 属性同步取值，按 predicate 类型转换，然后写入 `DynamicValue.resolvedValue`。模型还接受 `CURRENT_DEVICE`：REST 明确抛“不支持”，WS switch 没有该分支，会保持未解析并回退 defaultValue。最终 [org.thingsboard.server.common.data.query.FilterPredicateValue.getValue()](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/FilterPredicateValue.java#L92) 按 `userValue > resolved dynamicValue > defaultValue` 取值。
+
+WS 使用 [org.thingsboard.server.service.subscription.TbAbstractSubCtx.setAndResolveQuery(EntityCountQuery)](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbAbstractSubCtx.java#L153) 注册动态值并读取属性，还会为 source attributes 建 local subscription。REST 即使 `userValue` 已存在仍解析 dynamicValue，WS 则跳过这类值。新建 WS ENTITY_DATA context 时 `createSubCtx` 已调用一次 `setAndResolveQuery`，返回 handler 后又调用一次；第二次只清 dynamicValues map，不清第一次注册的 source attribute subscription。REST count 直接下沉 EntityService，没有调用 REST 动态值解析；REST find/keys 会解析。
+
+```mermaid
+flowchart LR
+    DV["DynamicValue"] --> SRC{"sourceType"}
+    SRC --> T["CURRENT_TENANT"]
+    SRC --> C["CURRENT_CUSTOMER"]
+    SRC --> U["CURRENT_USER"]
+    SRC --> D["CURRENT_DEVICE: REST rejects; WS leaves unresolved"]
+    T --> ATTR["SERVER_SCOPE sourceAttribute"]
+    C --> ATTR
+    U --> ATTR
+    ATTR --> CONVERT["convert by predicate type"]
+    CONVERT --> RES["resolvedValue"]
+    RES --> SQLPARAM["QueryContext parameter"]
+```
+
+---
+
+## 五、时序图
+
+<a id="sequence"></a>
+
+[PlantUML 源文件](sequence.puml) | [完整时序图 SVG](sequence.svg)
+
+[![Entity Query 完整时序图](sequence.svg)](sequence.svg)
+
+### 5.1 find 的两条 statement
+
+```mermaid
+sequenceDiagram
+    participant R as DefaultEntityQueryRepository
+    participant M as EntityKeyMapping
+    participant C as QueryContext
+    participant DB as PostgreSQL
+    R->>M: prepareKeyMapping(query)
+    R->>C: add permission/filter/key parameters
+    R->>M: buildLatestJoins(count=true)
+    R->>DB: SELECT count(id) ...
+    DB-->>R: totalElements
+    alt totalElements is zero
+        R-->>R: return empty PageData
+    else totalElements is positive
+        R->>M: use data joins/selections
+        R->>DB: SELECT * ... ORDER? LIMIT OFFSET
+        DB-->>R: rows
+        R-->>R: EntityDataAdapter.createEntityData
+    end
+```
+
+count 和 data 是同一 Spring transaction callback 内的两次 JDBC statement，但不是一条 SQL，也不是单一数据库快照的强保证说明。默认隔离级别下，并发写入可能让第一条 total 与第二条 rows 短暂不一致。
+
+### 5.2 WebSocket 初始 count/data
+
+```mermaid
+sequenceDiagram
+    participant WS as DefaultWebSocketService
+    participant SS as DefaultTbEntityDataSubscriptionService
+    participant CTX as TbEntityData/CountSubCtx
+    participant ES as EntityService
+    participant DB as PostgreSQL
+    WS->>SS: handleCmd(session, cmd)
+    SS->>CTX: setAndResolveQuery
+    alt ENTITY_DATA
+        SS->>CTX: fetchData
+        CTX->>ES: findEntityDataByQuery
+        ES->>DB: count + optional data statements
+        DB-->>CTX: initial EntityData page
+    else ENTITY_COUNT
+        SS->>CTX: fetchData
+        CTX->>ES: countEntitiesByQuery
+        ES->>DB: one count statement
+        DB-->>CTX: initial count
+    end
+    CTX-->>WS: initial update
+```
+
+本图到 initial update 为止。后续定时刷新、dynamic value 属性订阅、latest/telemetry subscriptions 都是 WebSocket subscription 生命周期，不是 Entity Query 的 statement 生命周期。
+
+---
+
+## 六、数据变化
+
+### 6.1 EntityKeyMapping 的合并规则
+
+`prepareKeyMapping` 先按输入顺序建立 `entityFieldsMappings` 与 `latestMappings`，不对重复 projection 去重；再把 sort key 标记到首个匹配 mapping 或创建 `ignore=true` 的隐藏投影，最后按 `EntityKey` 把 keyFilters grouping 后合并。没有被选择但只用于过滤的 key 会创建 `selection=false` mapping。实体字段 mapping 消耗一个 alias index；只有“已选择的 latest mapping”消耗两个，以容纳 value 与 timestamp，filter-only latest mapping 仍只加一。
+
+```mermaid
+flowchart TB
+    EF["entityFields"] --> EM["entity field mappings"]
+    LV["latestValues"] --> LM["latest mappings"]
+    SO["sort key"] --> EXIST{"mapping exists?"}
+    EXIST -->|yes| MARK["mark isSortOrder"]
+    EXIST -->|no| HIDDEN["add selection + ignore mapping"]
+    KF["keyFilters grouped by EntityKey"] --> ATTACH["attach to matching mapping"]
+    ATTACH --> FILTERONLY["remaining keys become filter-only mappings"]
+```
+
+### 6.2 行到 EntityData
+
+实体字段在内层被 cast 为 varchar；latest 值把 bool/string/long/double/json 列 `coalesce` 成字符串，同时保留 ts。`EntityData` 没有独立的 `entityFields` 成员；`EntityDataAdapter` 按 mapping alias 把所有投影写入 `latest` map，其中实体字段位于 `latest[ENTITY_FIELD][key]`，属性和时序值位于各自 `EntityKeyType` 分组。
+
+```mermaid
+flowchart LR
+    ROW["JDBC row map"] --> ID["id + entity_type"]
+    ROW --> FIELDS["aliasN entity fields"]
+    ROW --> VALUE["aliasN_value"]
+    ROW --> TS["aliasN_ts"]
+    FIELDS --> EF["latest[ENTITY_FIELD][key] = TsValue"]
+    VALUE --> LATEST["latest[type][key] = TsValue"]
+    TS --> LATEST
+    ID --> ED["EntityData"]
+    EF --> ED
+    LATEST --> ED
+```
+
+### 6.3 count 与数据间变化
+
+count query 为减少代价只 join 带过滤条件的 latest mapping；data query join 所有需要展示、过滤或排序的 latest mapping。存在 `textSearch` 时，源码把 `fromClauseCount` 替换成 `fromClauseData`，因为搜索作用于 join 后的 selection alias，代价明显增大。
+
+```mermaid
+flowchart TB
+    MAPS["all mappings"] --> COUNTJOIN["count joins only hasFilter latest keys"]
+    MAPS --> DATAJOIN["data joins selected + filtered + sort keys"]
+    SEARCH{"textSearch non-empty"}
+    SEARCH -->|no| COUNTJOIN
+    SEARCH -->|yes| DATAJOIN
+    DATAJOIN --> SEARCHWHERE["WHERE selected aliases ILIKE"]
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 latest telemetry、dictionary 与属性 scope
+
+[org.thingsboard.server.dao.sql.query.EntityKeyMapping.toLatestJoin(QueryContext, EntityFilter, EntityType)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/EntityKeyMapping.java#L357) 对 `TIME_SERIES` join `ts_kv_latest`，并用子查询 `select key_id from ts_kv_dictionary where key=:...` 把字符串 key 解析为整数 dictionary ID。指定 `CLIENT_ATTRIBUTE/SHARED_ATTRIBUTE/SERVER_ATTRIBUTE` 时直接 join `attribute_kv`，同时固定 `attribute_type` scope。
+
+通用 `ATTRIBUTE` 不指定 scope，因此使用 `(select * from attribute_kv ... ORDER BY last_update_ts DESC limit 1)` 的 `LATERAL` 子查询，在所有 scope 同 key 中取最后更新时间最新的一条。没有 filter 时 `hasFilter()` 为 false，稳定使用 LEFT JOIN；有 filter 时则由 `hasFilterValues(ctx)` 决定 LEFT 或 INNER/JOIN LATERAL。后者存在 alias 前缀碰撞，可能把没有自身有效参数的 mapping 误判为 INNER，因此不能把“filter 未产生参数”直接等同于 LEFT。
+
+```mermaid
+flowchart TB
+    K{"EntityKeyType"}
+    K -->|TIME_SERIES| D["ts_kv_dictionary key -> key_id"]
+    D --> TL["LEFT/INNER JOIN ts_kv_latest"]
+    K -->|CLIENT/SHARED/SERVER_ATTRIBUTE| AK["JOIN attribute_kv + exact attribute_type"]
+    K -->|ATTRIBUTE any scope| LAT["LATERAL attribute_kv ORDER BY last_update_ts DESC LIMIT 1"]
+    FILTER{"has filter and hasFilterValues(ctx)?"}
+    FILTER -->|yes, including prefix false positive| INNER["INNER/JOIN: missing key excluded"]
+    FILTER -->|no| LEFT["LEFT JOIN: missing key preserved"]
+```
+
+### 7.2 predicate 与 NULL/NOT 语义
+
+所有简单 predicate 外层都会加入 `field is not null`。字符串 `NOT_EQUAL`/`NOT_CONTAINS` 的内部字符串虽包含 `or field is null`，但又被外层 `field is not null AND (...)` 包住，因此 NULL 最终仍不匹配；字符串 `NOT_IN` 没有内部 `OR IS NULL`。数值和布尔 NOT_EQUAL 同样要求非 NULL。也就是说，这里的 NOT 是“存在且不满足正条件”，不是“缺失也算不等于”。
+
+空字符串 predicate 直接返回空 SQL，理论上可让 mapping 没有自身有效参数；但 [org.thingsboard.server.dao.sql.query.EntityKeyMapping.hasFilterValues(QueryContext)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/EntityKeyMapping.java#L406) 对整个 context 使用 `parameterName.startsWith(alias)`。因此 `alias2` 会误认 `alias20_*` 参数，data join 可能意外从 LEFT 升为 INNER，甚至让 count/data 集合分叉。不能把“空 predicate 保持 LEFT”当成可靠保证。
+
+```mermaid
+flowchart LR
+    NOT["NOT predicate"] --> EXISTS["field IS NOT NULL"]
+    EXISTS --> OP["field != / NOT LIKE / NOT IN parameter"]
+    NULL["database NULL"] --> FAIL["fails outer IS NOT NULL"]
+    EMPTY["empty string predicate"] --> NOSQL["no predicate SQL / no value parameter"]
+    NOSQL --> PREFIX{"another parameter starts with same alias prefix"}
+    PREFIX -->|"no"| LEFT["latest join may remain LEFT"]
+    PREFIX -->|"yes, e.g. alias2 vs alias20"| WRONG["unexpected INNER join"]
+```
+
+### 7.3 textSearch 的异常点
+
+[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.buildTextSearchQuery(QueryContext, List<EntityKeyMapping>, String)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L948) 仅在 `textSearch` 非空且 selectionMapping 非空时生成 `ILIKE`。但如果 selectionMapping 不为空、其中所有字段都因 `additionalInfo` 被标记为不可搜索，则 `searchAliases` 为 0，代码进入 `else` 后执行 `searchAliases.get(0)`，抛 `IndexOutOfBoundsException`。多个 alias 使用 `CONCAT`，没有字段分隔符；查询是 `%原文本%` 参数，并没有主动 lower-case，名称 `lowerSearchTextParam` 只是命名。
+
+```mermaid
+flowchart TB
+    TS["textSearch non-empty"] --> SEL{"selectionMapping empty?"}
+    SEL -->|yes| SKIP["no textSearch SQL"]
+    SEL -->|no| SEARCHABLE["filter searchable aliases"]
+    SEARCHABLE --> ZERO{"alias count"}
+    ZERO -->|0| EX["get(0) -> IndexOutOfBoundsException"]
+    ZERO -->|1| ONE["alias ILIKE parameter"]
+    ZERO -->|many| CONCAT["CONCAT aliases ILIKE parameter"]
+```
+
+---
+
+## 八、Actor 分析
+
+Entity Query 主链没有 Actor。REST Controller 和 WebSocket subscription service 都直接调用 EntityService，随后同步进入 JDBC；Actor/Rule Engine 可能在别处创建实体、写属性或时序，但这只是查询数据的生产来源，不是本次查询的执行通道。
+
+```mermaid
+flowchart LR
+    REST["REST thread"] --> SERVICE["EntityService"]
+    WS["WS command path"] --> SERVICE
+    SERVICE --> JDBC["NamedParameterJdbcTemplate"]
+    JDBC --> PG["PostgreSQL"]
+    ACTOR["Actor / Rule Engine"] -. "not in query call chain" .-> SERVICE
+```
+
+需要注意线程阻塞：动态值 REST 解析对 AttributesService Future 调用 `.get()`，WS `resolve` 对 `successfulAsList(...).get()`，仓库 count/data 也都是同步 JDBC。没有 Actor mailbox 帮忙隔离慢查询，递归、latest 多 join 或大 offset 会直接占用调用线程和连接。
+
+---
+
+## 九、Kafka 分析
+
+Entity Query 不生产也不消费 Kafka 消息。多节点部署不会把一次查询路由给 entity owner；任何接收 REST/WS 的 Core 节点都使用自己的 datasource 连接执行 SQL。Kafka 只可能参与上游数据写入或 WebSocket 后续跨节点通知，不能作为 Entity Query 缓存、重试或超时机制。
+
+```mermaid
+flowchart TB
+    CLIENT["REST / WS initial query"] --> CORE["receiving Core node"]
+    CORE --> POOL["local JDBC connection pool"]
+    POOL --> DB["shared PostgreSQL"]
+    KAFKA["Kafka"] -. "not used by Entity Query" .-> CORE
+    CACHE["Redis / Caffeine"] -. "no query-result cache" .-> CORE
+```
+
+这也意味着查询失败不会进入队列重试。REST 客户端或能观察到 error/close 的 WebSocket 上层只能自行决定是否重发；但初始 WS fetch 异常还可能只留下服务端日志，客户端不保证收到 error frame 或 close。
+
+---
+
+## 十、数据库分析
+
+### 10.1 WITH RECURSIVE Relation
+
+[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.HIERARCHICAL_QUERY_TEMPLATE](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L282) 从 `relation` 表的 root 边开始，`lvl=1`，path 初始只包含 root 的 `$in_id`。递归项检查当前候选边的 `r.$in_id` 不在已有 path，再把这个 input ID append 到 path；它不是在入行前检查或追加新的 `$out_id`。因此闭环目标可以作为 `$out_id` 输出一次，但下一轮以它作为 input 时会命中 path，不再继续扩展。`relation_type_group` 固定为 `COMMON`。
+
+`FROM` 方向使用 `from_id=root`、输出 `to_id`；`TO` 方向反过来。`getLvlFilter(maxLevel)` 把递归项限制为 `re.lvl <= effectiveMax-1`，其中 0、负数或超过上限的值统一钳到 `sql.relations.max_level` 当前配置，发行默认值是 50。multi-root 模板改为 `IN (:relation_root_ids)` 并投影 parentId。
+
+```mermaid
+flowchart LR
+    ROOT["root entity/entities"] --> EDGE1["relation lvl=1"]
+    EDGE1 --> PATH["path starts with root in_id"]
+    PATH --> NEXT{"current edge in_id in path?"}
+    NEXT -->|"no and lvl below max"| RECURSE["append current in_id; emit out_id"]
+    RECURSE --> NEXT
+    NEXT -->|"yes or max reached"| STOP["stop expansion; cycle out_id may already have been emitted"]
+    EDGE1 --> OUT["group entity_id/type, max lvl"]
+    RECURSE --> OUT
+```
+
+[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.relationQuery(QueryContext, RelationsQueryFilter)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L789) 把多个 `RelationEntityTypeFilter` 以 OR 组合；每项内部可以同时约束 relation type 和目标 entity types。没有 filters 时默认只返回 `TENANT/CUSTOMER/USER/DASHBOARD/ASSET/DEVICE/ENTITY_VIEW`，这不是所有 `EntityType`。这些 relation type/entity type 条件位于递归 CTE 之后重新 join `relation re` 的结果过滤阶段；递归本身只按方向、`COMMON`、path 和 level 扩展，不会用业务 filter 剪掉不匹配的中间边，四种 entity search query 也是同一边界。
+
+`fetchLastLevelOnly` 不是简单 `lvl=maxLevel`：条件是“已达到请求 maxLevel，或叶子 `NOT EXISTS` 判断认为没有下一条边”。叶子子查询与递归项条件并不相同：它缺少 `relation_type_group='COMMON'` 和 path 防环，因此非 COMMON 边或指回 path 内节点的边也会让候选被判为“非叶子”，即便 CTE 不会沿它继续递归。entity search 还直接使用原始 `entityFilter.getMaxLevel()` 比较，而递归上限使用钳制后的 effective max，非法/0 maxLevel 与 last-level 判断存在不对称。
+
+```mermaid
+flowchart TB
+    NODE["candidate related entity"] --> LAST{"fetchLastLevelOnly?"}
+    LAST -->|no| KEEP["keep every reached level"]
+    LAST -->|yes| MAX{"r_int.lvl = requested maxLevel?"}
+    MAX -->|yes| KEEP
+    MAX -->|no| CHILD{"matching next relation exists?"}
+    CHILD -->|no| KEEP
+    CHILD -->|yes| DROP["exclude intermediate node"]
+```
+
+### 10.2 count、排序与 LIMIT/OFFSET
+
+[org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.countEntitiesByQuery(TenantId, CustomerId, EntityCountQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L370) 在无 keyFilters 时走轻量 `select count(e.id) from <source> e where ...`；有 keyFilters 时才准备 mapping 和 latest joins。REST count 返回 long；data find 内部 total 却用 `Integer.class`，超过 `Integer.MAX_VALUE` 可能转换失败；WS ENTITY_COUNT 又把 long 强转 int，可能截断回绕。data find 始终先 count，再按需 data。
+
+有 sortOrder 且能找到 mapping 时，实体字段按 `valueAlias, result.id` 排序；latest 值先按数值别名、再字符串别名、最后 ID 排序。普通唯一实体行可借 ID 打破同值；multi-root CTE 同一 entityId 可因不同 parent 产生多行，排序没有追加 entityType/parentId，仍不是全序。无 sortOrder 完全不追加 `ORDER BY`。`pageSize > 0` 才追加 `limit pageSize offset pageSize*page`；Validator 只要求 pageSize >= 1、page >= 0，通用 find 没有 100 上限，乘法还是 `int`。
+
+```mermaid
+flowchart TB
+    PAGE["EntityDataPageLink"] --> SORT{"sortOrder mapping?"}
+    SORT -->|entity field| ES["ORDER BY value, id"]
+    SORT -->|latest value| LS["ORDER BY numeric, string, id"]
+    SORT -->|none/missing| NS["no ORDER BY"]
+    ES --> LIMIT["LIMIT pageSize"]
+    LS --> LIMIT
+    NS --> LIMIT
+    LIMIT --> OFFSET["OFFSET pageSize * page as int"]
+```
+
+### 10.3 QueryContext 参数绑定与 timeout
+
+[org.thingsboard.server.dao.sql.query.QueryContext](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/QueryContext.java#L41) 实现 `SqlParameterSource`，保存值、JDBC type 和 typeName；UUID 使用 Hibernate `PostgresUUIDType`，另有 string/double/long/boolean 与 list helpers。重名参数先覆盖 map，仅当旧值非 null 且新旧 value 不同时才抛异常；旧值为 null 或 JDBC type 不同不会被该检查拒绝。缺少参数会抛异常，NULL 只记录 warning。值不会通过字符串拼接进入 predicate SQL。
+
+关系 `maxLevel`、`LIMIT/OFFSET`、排序方向等结构性片段由整数或枚举分支拼入；它们不是用户字符串参数。仓库调用 `jdbcTemplate.queryForObject/queryForList` 时没有设置 `PreparedStatement.setQueryTimeout`。`thingsboard.yml` 的 JPA hint 不能证明它覆盖 NamedParameterJdbcTemplate，而 `sql.relations.query_timeout` 只注入 `BaseRelationService`；所以本链应按“无仓库级全局 timeout”评估，数据库/连接池外部策略另论。
+
+```mermaid
+flowchart LR
+    VALUE["UUID/string/number/list/bool"] --> ADD["QueryContext.addXParameter"]
+    ADD --> META["value + java.sql.Types + typeName"]
+    META --> JDBC["NamedParameterJdbcTemplate"]
+    STRUCT["enum/int controlled SQL structure"] --> SQL["dynamic SQL text"]
+    JDBC --> EXEC["queryForObject / queryForList"]
+    SQL --> EXEC
+    EXEC --> NOTIMEOUT["no repository setQueryTimeout"]
+```
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败矩阵
+
+| 阶段 | 典型异常/风险 | 实际行为 |
+|---|---|---|
+| JSON 多态解析 | 未知 filter/predicate type | 请求反序列化失败，不进入仓库 |
+| BaseEntityService 校验 | filter/pageLink 缺失、pageSize < 1、page < 0 | `IncorrectParameterException` |
+| keys Controller | `query.pageLink` 缺失 | 在进入 BaseEntityService 前解引用，可能 `NullPointerException` |
+| permission SQL | customer 指定其他 customer 的 API usage | `SecurityException` |
+| 动态值 REST | Future interrupted/failed | 包装为 `RuntimeException` |
+| QueryContext | 旧值非 null 的同名不同 value、引用未注册参数 | `RuntimeException`；旧 null 或仅 JDBC type 不同不触发重名检查 |
+| entity name/type | 未映射 name column、未支持 filter | `RuntimeException` |
+| unknown ENTITY_FIELD predicate | builder 返回 null | predicate 可能被过滤，查询被静默放宽 |
+| textSearch | 只有不可搜索投影 | `IndexOutOfBoundsException` |
+| JDBC count/data | SQL、连接、statement 失败 | Spring JDBC 异常向上冒泡；无仓库重试 |
+| WebSocket initial EntityData/Count fetch | `RuntimeException` | 位于局部 catch 之前，外层 command handler 只记录日志，不保证 error frame 或 close |
+| keys futures | TS/attribute keys 查询失败 | 记录错误并返回 HTTP 500 |
+
+```mermaid
+flowchart TB
+    ERR{"failure location"}
+    ERR -->|REST sync query| RESTERR["controller exception handling -> HTTP error"]
+    ERR -->|WS initial EntityData/Count runtime| WSLOG["outer handler logs; response/close not guaranteed"]
+    ERR -->|keys async future| HTTP500["AccessValidator.handleError -> 500"]
+    ERR -->|DB transient| NORETRY["no Entity Query retry/queue"]
+```
+
+### 11.2 资源与一致性风险
+
+大 pageSize 会放大 joins、行映射和响应内存；深页 offset 让数据库扫描并丢弃前序行，`pageSize * page` 还可能 int 溢出。无排序分页会重复或遗漏；count/data 两 statement 之间的并发变化会造成 total 与 data 不一致。递归 query 虽有 level 上限和 path 防环，但宽图仍可生成大量路径，且本仓库无 statement timeout。
+
+```mermaid
+flowchart LR
+    INPUT["unbounded pageSize/page or wide relation graph"] --> DBLOAD["large join/recursive/offset work"]
+    DBLOAD --> THREAD["request/WS thread blocked"]
+    DBLOAD --> CONN["JDBC connection occupied"]
+    DBLOAD --> MEM["large row maps/PageData"]
+    NOTIMEOUT["no repository query timeout"] --> THREAD
+```
+
+### 11.3 Alarm 边界
+
+[org.thingsboard.server.service.query.DefaultEntityQueryService.findAlarmDataByQuery(SecurityUser, AlarmDataQuery)](../../../application/src/main/java/org/thingsboard/server/service/query/DefaultEntityQueryService.java#L254) 先把 AlarmDataQuery 转成 pageSize=`maxEntitiesPerAlarmSubscription`、page=0 的 EntityDataQuery，查询实体 ID 与 latest 值；随后 `AlarmService.findAlarmDataByQueryForEntities` 才按 alarm fields、状态、assignee 和 alarm page 查询告警。alarm sort key 会被替换成实体 `createdTime` 只用于圈定实体集合。REST 这条候选实体路径直接调用 `entityService.findEntityDataByQuery`，没有经过本类普通 find 的 `resolveDynamicValuesInPredicates`，所以不会主动解析 keyFilter dynamic values；WS Alarm context 则会调用 `setAndResolveQuery` 解析并订阅 dynamic source attributes。
+
+因此 Entity Query 只负责 Alarm 的候选实体边界，不负责 alarm 表 FROM/WHERE，也不保证候选实体上限之外的告警可见。`countAlarmsByQuery` 更是直接走 AlarmService，不经过 `DefaultEntityQueryRepository.countEntitiesByQuery`。
+
+```mermaid
+flowchart LR
+    ADQ["AlarmDataQuery"] --> EDQ["EntityDataQuery page 0, max entity limit"]
+    EDQ --> ENTITY["Entity Query: candidate entity IDs + latest"]
+    ENTITY --> ALARMDAO["AlarmService query for entity IDs"]
+    ALARMDAO --> MERGE["merge entity latest into AlarmData"]
+    ACOUNT["AlarmCountQuery"] --> ALARMCOUNT["AlarmService directly"]
+```
+
+---
+
+## 十二、源码阅读路线
+
+建议按以下顺序阅读，每一步都能回答一个独立问题：
+
+1. 从 [org.thingsboard.server.controller.EntityQueryController](../../../application/src/main/java/org/thingsboard/server/controller/EntityQueryController.java#L61) 看 REST 路由、角色与 keys 的 100 上限。
+2. 读 [org.thingsboard.server.common.data.query.EntityFilter](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/EntityFilter.java#L32) 和 [org.thingsboard.server.common.data.query.EntityFilterType](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/EntityFilterType.java#L27)，列出 14 个子类型。
+3. 读 [org.thingsboard.server.common.data.query.AbstractDataQuery](../../../common/data/src/main/java/org/thingsboard/server/common/data/query/AbstractDataQuery.java#L33)，区分 filter、投影、latest 与分页。
+4. 读 [org.thingsboard.server.service.query.DefaultEntityQueryService](../../../application/src/main/java/org/thingsboard/server/service/query/DefaultEntityQueryService.java#L90)，确认 REST dynamic value 与 Alarm/keys 边界。
+5. 读 [org.thingsboard.server.service.subscription.TbAbstractSubCtx.setAndResolveQuery(EntityCountQuery)](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbAbstractSubCtx.java#L153)，只理解 WS 初始查询前的动态值解析。
+6. 读 [org.thingsboard.server.dao.entity.BaseEntityService.validateEntityCountQuery(EntityCountQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/entity/BaseEntityService.java#L251) 与 [org.thingsboard.server.dao.service.Validator.validateEntityDataPageLink(EntityDataPageLink)](../../../dao/src/main/java/org/thingsboard/server/dao/service/Validator.java#L243)，确认实际校验上限。
+7. 从 [org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.findEntityDataByQuery(TenantId, CustomerId, EntityDataQuery, boolean)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L473) 顺着 count/data SQL 读到分页。
+8. 转到 [org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.buildPermissionQuery(QueryContext, EntityFilter)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L613)，核对第二层权限。
+9. 读 [org.thingsboard.server.dao.sql.query.DefaultEntityQueryRepository.entitySearchQuery(QueryContext, EntitySearchQueryFilter, EntityType, List<String>)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L742) 与 relationQuery，画清方向、level 和 leaf 语义。
+10. 最后读 [org.thingsboard.server.dao.sql.query.EntityKeyMapping.toLatestJoin(QueryContext, EntityFilter, EntityType)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/EntityKeyMapping.java#L357) 和 predicate builders，确认 join、NULL 与参数绑定。
+
+```mermaid
+flowchart LR
+    A["Controller / WS initial entry"] --> B["query models + 14 filters"]
+    B --> C["dynamic values + validation"]
+    C --> D["repository count/data skeleton"]
+    D --> E["permissions + filter FROM/WHERE"]
+    E --> F["recursive relation"]
+    F --> G["EntityKeyMapping latest joins/predicates"]
+    G --> H["QueryContext + risks"]
+```
+
+---
+
+## 十三、常见面试题
+
+### 1. REST count、find、keys 的核心差别是什么？
+
+count 接收 `EntityCountQuery` 并只返回数量；find 接收 `EntityDataQuery`，通常执行 count 加 data 两条 statement；keys 保留请求 page 和不大于 100 的 pageSize，只把超过 100 的 pageSize 压到 100，再异步汇总该页实体的时序/属性键。缺 pageLink 时 keys Controller 还会先解引用并可能 NPE。
+
+### 2. WebSocket 实时更新是否属于 Entity Query？
+
+不属于。`ENTITY_DATA/ENTITY_COUNT` 的初始快照调用 Entity Query；之后的 local subscription、动态刷新、跨节点通知和 socket 推送属于 WebSocket subscription 流程。不能用后续更新机制描述 Entity Query 仓库。
+
+### 3. `EntityCountQuery` 与 `EntityDataQuery` 如何继承？
+
+`EntityDataQuery -> AbstractDataQuery -> EntityCountQuery`。count 层只有 entityFilter/keyFilters，data 层增加 pageLink/entityFields/latestValues。
+
+### 4. 14 种 EntityFilter 为什么会改变 FROM？
+
+普通类型只有在 `entityTableMap` 已注册对应 `EntityType` 时才能映射到具体实体表；`relationsQuery` 使用跨类型递归派生表；四种 searchQuery 用递归关系 ID 过滤特定实体表；`apiUsageState` 使用 api_usage_state 派生表。关系类型和目标类型只过滤递归结果，不剪枝中间路径；Subtype WHERE 与权限 WHERE 分开追加。
+
+### 5. Entity Query 的两层权限是什么？
+
+第一层是 REST `@PreAuthorize` 或已认证 WS session；第二层通常是 repository 根据 tenantId/customerId 注入 SQL 条件。普通查询通过第一层不意味着能跨 tenant/customer 读取数据，但 SYS tenant count 和 internal find 可旁路为 `1=1`，RelationsQuery 还按 root type 套用 default permission。
+
+### 6. Customer 用户查询普通实体、Customer 实体和 Tenant 实体时条件有何不同？
+
+对普通、非 relation、非旁路查询：普通实体要求 tenant_id 与 customer_id 同时匹配；Customer 实体要求 tenant_id 匹配且 id 等于当前 customer；Tenant 实体只能 id 等于当前 tenant。RelationsQuery 不能按结果行类型直接应用这组三分法。
+
+### 7. `EntityKeyMapping` 解决什么问题？
+
+它按输入 projection 建 mapping，再把 sort 和 grouped keyFilters 合到匹配项，分配 alias 并生成 selection/join/predicate/sort helper。projection 本身不去重，重复 latest key 会产生重复 join。
+
+### 8. `KeyFilter.valueType` 会决定查 `str_v` 还是 `long_v` 吗？
+
+在基线 `69124284c2` 不会。SQL builder 没有读取 valueType；它根据 predicate type 选择字符串、数值或布尔列，数值同时测试 `long_v OR dbl_v`。
+
+### 9. Dynamic Value 的取值优先级是什么？
+
+`FilterPredicateValue.getValue()` 依次选择非空 userValue、已解析 dynamicValue、defaultValue。Entity Query 实际可解析 current tenant/customer/user 的指定 server attribute；模型还接受 `CURRENT_DEVICE`，但 REST 拒绝它，WS 将它留作未解析并回退 defaultValue。
+
+### 10. REST 与 WebSocket 如何解析 Dynamic Value？
+
+REST find/keys 即使 userValue 已存在仍解析 dynamic source；WS 对已有 userValue 跳过解析并为其他 source attribute 建订阅。新 WS ENTITY_DATA 和 AlarmData context 都会分别在 createSubCtx 与 handler 中解析两次，ENTITY_COUNT 新 context 只解析一次。CURRENT_DEVICE 在 REST 被拒绝，WS 保持未解析并回退 default；REST count 和 REST Alarm 候选实体查询都不走普通 REST find 的解析方法。
+
+### 11. `WITH RECURSIVE` 如何避免关系环？
+
+每条递归路径维护 UUID 数组：seed path 只有 root，递归检查并追加当前边的 input ID，而不是预先加入 output ID。循环目标可以作为 output 返回一次，但下一轮成为 input 后命中 path，不再扩展；effective maxLevel 也限制深度。它阻止无限循环，但不消除宽图带来的路径数量增长。
+
+### 12. Relation 的 FROM 与 TO 方向如何解释？
+
+FROM 以 root 匹配 relation.from，向 relation.to 扩展并输出 to；TO 以 root 匹配 relation.to，向 relation.from 扩展并输出 from。模板通过 `$in/$out` 替换实现。
+
+### 13. `fetchLastLevelOnly` 是否只返回 `lvl=maxLevel`？
+
+不是。它返回达到请求 maxLevel 或叶子 NOT EXISTS 命中的节点；但叶子判断缺少递归项的 COMMON 与 path 条件，非 COMMON 边或回边也可能让实际不可继续递归的节点被判为非叶子。
+
+### 14. `maxLevel=0` 有什么特殊风险？
+
+递归深度会被钳到 `sql.relations.max_level` 的当前配置值（发行默认 50），但 `fetchLastLevelOnly` 部分比较可能仍使用原始 0；entity search 分支尤其存在 effective max 与原始 max 不对称，不能把 0 简单理解为零层。
+
+### 15. latest telemetry 为什么要查 dictionary？
+
+`ts_kv_latest.key` 存整数 key_id，查询输入是字符串 key；join 条件通过 `ts_kv_dictionary` 子查询把字符串解析成 key_id。
+
+### 16. 通用 `ATTRIBUTE` 与三种 scope attribute 有什么差别？
+
+三种 scope 直接按 `attribute_type` join；通用 ATTRIBUTE 不限定 scope，用 LATERAL 子查询按 `last_update_ts DESC limit 1` 从所有 scope 中选最新一条。
+
+### 17. latest join 何时是 INNER，何时是 LEFT？
+
+通常有效 filter 参数使 join 为 INNER，仅投影/排序使其为 LEFT；但参数检查使用 `startsWith(alias)`，`alias2` 可误认 `alias20_*`，空 predicate 也可能意外升级 INNER，不能把 LEFT 当成严格保证。
+
+### 18. NOT predicate 会把 NULL 当作“不等于”吗？
+
+不会。外层统一要求 `field is not null`，所以即使字符串 NOT_EQUAL 内部含 `or field is null`，最终 NULL 仍被排除。语义是“值存在且不等于”。
+
+### 19. find 为什么通常执行两条 statement？
+
+第一条计算 totalElements，第二条取得当前页；total 为 0 时跳过第二条。它们共享 transaction callback 和参数上下文，但仍是两次数据库执行。
+
+### 20. 有排序和无排序的分页稳定性有何不同？
+
+有有效 sort mapping 时会追加 `result.id`；普通唯一实体行可打破同值，但 multi-root 同一 ID 可有多个 parent，仍非全序。无排序完全没有 ORDER BY，跨页更容易重复或遗漏。
+
+### 21. pageSize 与 offset 有哪些风险？
+
+通用 find 只校验 pageSize 大于零，没有最大值；offset 是 `int pageSize * page`，可溢出。大 pageSize 放大 join/内存，大 offset 让数据库扫描并丢弃大量行。
+
+### 22. QueryContext 如何降低 SQL 注入风险？
+
+用户值通过带 JDBC type 的命名参数绑定；表、列、方向和操作符由枚举、固定映射与受控分支选择。重名检查只在旧值非 null 且新旧 value 不同时拒绝，旧 null 或 JDBC type 不同不受这项检查；缺失参数仍报错，仓库不提供 query timeout。
+
+### 23. Entity Query 有全局 timeout、缓存或 Kafka 重试吗？
+
+仓库没有设置 statement timeout，也没有查询结果缓存或 Kafka 主链。JPA timeout 不能直接等同于 NamedParameterJdbcTemplate timeout；外部数据库/连接池策略只能算部署层保护。
+
+### 24. textSearch 最值得关注的异常是什么？
+
+当 selectionMapping 非空但所有投影都不可搜索，例如只选择 additionalInfo，searchAliases 为空而代码调用 `get(0)`，可能抛 `IndexOutOfBoundsException`。有 textSearch 时 count 还会复用昂贵的 data joins。
+
+### 25. AlarmDataQuery 与 Entity Query 的边界在哪里？
+
+Entity Query 先按重写后的 originator entity pageSize 找候选 IDs 和 latest 值；AlarmService 再查询 alarm 表并处理 alarm fields、状态和分页。该 pageSize 是 Alarm 候选实体页上限，不是告警条数上限。REST Alarm 候选查询直接下沉 EntityService，不主动解析 dynamic keyFilter；WS Alarm context 会解析。Alarm count 直接走 AlarmService，不能归入 Entity Query count SQL。
+
+---
+
+[上一篇：33 WebSocket 订阅流程](../33-websocket-subscription/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/34-entity-query.svg) | [下一篇：35 Relation 流程](../35-relation-flow/index.html)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

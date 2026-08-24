@@ -1,0 +1,878 @@
+# 36 Event 与 Audit Log 流程
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章只分析 PostgreSQL 下的 Event、Rule Engine Debug Event 与 Audit Log：它们都是旁路记录，但不是同一条流水线；Event 与 Audit 彼此不共享执行器或数据库事务，不过 Audit 使用的 `JpaExecutorService` 还与其他 JPA 工作共享。
+
+[上一篇：35 Relation 流程](../35-relation-flow/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/36-event-audit-log.svg) | [下一篇：37 Rule Node 外部集成流程](../37-rule-node-external-integration/README.md)
+
+---
+
+## 一、流程目标
+
+Event 用于平台内部运行事件，`DEBUG_RULE_NODE`/`DEBUG_RULE_CHAIN` 只是五种 Event 多态中的两种；Audit Log 用于记录“谁对什么实体做了什么动作”。两条持久化链都不与主业务事务共提交，但不能把它简化成“旁路永远不影响调用方”：Debug Event 只有入队后的 JDBC batch 异步，入队前的构造、校验、截断和分区检查仍同步执行；Audit 只有提交到 `JpaExecutorService` 后的 JPA 保存失败通常不改变主业务结果，提交前未捕获的 `actionData` 构造异常或 executor 拒绝仍可同步抛错。实体名查询异常会被忽略，普通 validator 异常会转换成 immediate failed future，而不是直接抛回 Controller。
+
+[架构图 SVG：两条持久化链、不同执行器边界与独立事务](../../assets/architecture/36-event-audit-log.svg)
+
+[![Event 与 Audit Log 双链架构图](../../assets/architecture/36-event-audit-log.svg)](../../assets/architecture/36-event-audit-log.svg)
+
+```mermaid
+flowchart LR
+    subgraph DE["Debug producer + async JDBC batch"]
+        RN["RuleNode input/output"] --> ASC["ActorSystemContext.persistDebug*"]
+        ASC --> BES["sync validate / truncate"]
+        BES --> PART["sync partition check / DDL"]
+        PART --> EQ["Event SQL queues"]
+        EQ --> ETX["Event batch transaction"]
+        ETX --> E5["5 RANGE event tables"]
+    end
+    subgraph AL["Audit producer + async JPA save"]
+        API["BaseController / services"] --> EAS["EntityActionService"]
+        EAS --> ALS["AuditLogServiceImpl"]
+        ALS --> PRE["sync actionData / validate"]
+        PRE --> JPA["shared JpaExecutorService"]
+        JPA --> ATX["independent JPA transaction"]
+        ATX --> AUD["audit_log RANGE table"]
+        AUD --> RET["dao.save returns to callable"]
+        RET --> SINK["callable invokes AuditLogSink"]
+    end
+```
+
+必须先固定十六条源码事实：
+
+1. Rule Node 只有打开 `debugMode` 才记录输入/输出；输出路径在同一调用线程中先执行 `persistDebugOutput`，返回后才 `chainActor.tell`、TbMsg callback 或继续路由。只有入队后的 Debug Event JDBC batch 异步；失败 callback 使用 `directExecutor`，通常由完成 future 的 SQL queue 线程内联执行，若注册前 future 已完成则由注册 callback 的调用线程立即执行。它不会投递到 Actor mailbox，也不反向改变 TbMsg 的 ack、failure 或路由结果。
+2. [org.thingsboard.server.actors.ActorSystemContext.persistDebugAsync(TenantId, EntityId, String, TbMsg, String, Throwable, String)](../../../application/src/main/java/org/thingsboard/server/actors/ActorSystemContext.java#L1092) 构造 `RuleNodeDebugEvent`，并走 `EventService.saveAsync`。
+3. `EventType` 恰有 `ERROR`、`LC_EVENT`、`STATS`、`DEBUG_RULE_NODE`、`DEBUG_RULE_CHAIN` 五种，映射五张表。
+4. 五张 Event 表和 `audit_log` 都按时间 Range 分区，但 Event 写入走批量 JDBC，Audit Log 写入走 JPA 单记录事务。
+5. [org.thingsboard.server.dao.event.BaseEventService.saveAsync(Event)](../../../dao/src/main/java/org/thingsboard/server/dao/event/BaseEventService.java#L93) 在调用线程校验并截断指定文本字段；`JpaBaseEventDao.saveAsync` 还在入队前同步检查分区，缓存未命中时会持锁执行 DDL。
+6. Event SQL 队列底层是无容量参数的 `LinkedBlockingQueue`；`batch_size` 是每次 drain 上限，不是队列容量。
+7. Event 一个批次仅在 `sql.batch_sort=true` 时按 `createdTime` 排序（默认 `true`，可关闭），随后按类型分组并处在同一个 `TransactionTemplate` 中；任一组失败会回滚该批次并令批内所有 future 失败。五张表没有 PK/UNIQUE，INSERT 中的 `ON CONFLICT DO NOTHING` 在基线 DDL 下不提供 event id 去重。
+8. Audit Log 的 `OFF/W/RW` 先按 EntityType 和 [ActionType.isRead](../../../common/data/src/main/java/org/thingsboard/server/common/data/audit/ActionType.java#L74) 的硬编码分类过滤；过滤后返回 `null`，不会排队。它不是 HTTP 方法分类，只有 `CREDENTIALS_READ`、`ATTRIBUTES_READ` 被标为 read。
+9. Audit `actionData` 按 ActionType 拼装，可包含 entity、credentials、RPC params、attributes、timeseries、provisionRequest 等；ORM 以 `JsonStringType` 把 `JsonNode` 映射到物理列 `varchar(1000000)`，没有统一敏感字段脱敏器。
+10. Audit 失败记录保存完整异常堆栈到 `action_failure_details`；这与 Debug Event 的 `e_error` 是不同字段和不同链路。
+11. Audit 写入由共享的 `JpaExecutorService` 异步提交；该 pool 还服务 Relation、Attributes、EntityView 和通用异步 JPA DAO，并非 Audit 专用。`JpaAuditLogDao` 继承的 `save` 在独立 JPA 事务中落一行。
+12. `AuditLogSink` 由 `JpaExecutorService` 中的 Callable 在 `auditLogDao.save` 返回后调用，不是 DAO 调用；默认 `none` 是空实现，Elasticsearch 是额外异步副本，不是查询主存储。
+13. Rule Engine 的 entity-action TbMsg 与 Audit 写入是两个旁路分支；Rule Engine 推送失败被捕获，不阻止随后发起 Audit。
+14. Edge Event 使用 `edge_event`、`EdgeEventService` 和自己的 SQL 队列/TTL，不属于本章 Event 五表，也不是 Audit Log。
+15. Event/Audit 没有 Cassandra DAO、Kafka 持久链或 WebSocket 推送链；REST 查询直接读 PostgreSQL Repository。
+16. TTL 由持有 SYS_TENANT TB_CORE 分区的节点执行整分区 DETACH/DROP；非 owner 节点只清本机分区缓存。
+
+```mermaid
+flowchart TB
+    SOURCE{"record kind"}
+    SOURCE -->|"runtime/debug"| EVENT["Event hierarchy"]
+    SOURCE -->|"user/entity action"| AUDIT["AuditLog"]
+    SOURCE -->|"cloud-edge replication"| EDGE["EdgeEvent"]
+    EVENT --> SQL5["five event tables"]
+    AUDIT --> SQLA["audit_log"]
+    EDGE --> SQLE["edge_event"]
+    SQL5 -. "no shared transaction" .- SQLA
+    SQLA -. "no WebSocket notification" .- WS["WebSocket"]
+```
+
+---
+
+## 二、入口
+
+### 2.1 Rule Node input/output 与 Debug 入口
+
+[org.thingsboard.server.actors.ruleChain.RuleNodeActorMessageProcessor.onRuleChainToRuleNodeMsg(RuleChainToRuleNodeMsg)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleNodeActorMessageProcessor.java#L197) 在真正调用 `tbNode.onMsg` 前，按 `ruleNode.isDebugMode()` 调用 `persistDebugInput`；self 消息入口 [onRuleToSelfMsg(RuleNodeToSelfMsg)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleNodeActorMessageProcessor.java#L171) 同样记录 `IN/Self`。
+
+输出入口不止一个。[org.thingsboard.server.actors.ruleChain.DefaultTbContext.output(TbMsg, String)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L251) 在跨 Rule Chain 返回时记录输出；tell next、failure、ack、重新入队到 root chain 也分别调用 `persistDebugOutput`。这些方法不是并行启动“记录”和“路由”：在同一个调用线程中，`persistDebugOutput` 先同步完成构造、校验、分区检查和入队，返回后代码才执行 `chainActor.tell`、TbMsg callback、cluster push 或后续路由。只有队列消费和 JDBC batch 在入队后异步。这说明“input/output”是观测点集合，不是包住 Rule Node 执行的事务拦截器。
+
+```mermaid
+flowchart TB
+    IN["RuleChainToRuleNodeMsg"] --> DEBUG{"ruleNode.debugMode"}
+    DEBUG -->|"true"| DIN["persistDebugInput IN"]
+    DEBUG -->|"false"| NODE["tbNode.onMsg"]
+    DIN --> NODE
+    NODE --> OUT{"tellNext / failure / ack / output"}
+    OUT --> DOUT["persistDebugOutput OUT: sync through queue.add"]
+    DOUT --> ROUTE["then chainActor.tell / callback / routing"]
+    DOUT -. "after queue.add only: JDBC batch async" .-> BATCH["SQL queue thread"]
+```
+
+### 2.2 Audit Log 业务入口
+
+[org.thingsboard.server.controller.BaseController.doSaveAndLog(EntityType, E, BiFunction&lt;TenantId,E,E&gt;)](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L1321) 先执行实体保存，再调用 audit；异常分支也发起 FAILURE audit 后重新抛业务异常。[doDeleteAndLog(EntityType, E, BiConsumer&lt;TenantId,I&gt;)](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L1334) 使用同样模式。非 Controller 场景还会从 Telemetry、认证、provision、bulk import 等服务直接进入 `AuditLogService` 或 `EntityActionService`。
+
+这个 helper 有一个明确例外：[BaseController.logEntityAction(...)](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L1313) 仅在 `!user.isSystemAdmin()` 时委托 `EntityActionService`，因此经这些 helper 执行的 SYS_ADMIN 操作跳过 Entity Action TbMsg 和 Audit。它也不是“保存成功后绝不会改变 HTTP 结果”的隔离层：audit producer 仍在 Controller 调用线程执行，若 `actionData` 构造等未捕获代码抛错，或 executor `submit` 被拒绝，保存可能已经完成而请求仍返回失败。`entityService.fetchEntityName` 的异常会被忽略，validator 的普通异常则返回 immediate failed future，二者不能作为 HTTP 失败证据。
+
+[org.thingsboard.server.service.action.EntityActionService.logEntityAction(User, I, E, CustomerId, ActionType, Exception, Object...)](../../../application/src/main/java/org/thingsboard/server/service/action/EntityActionService.java#L275) 是常用汇合点：成功动作先旁路推 Entity Action TbMsg，再无条件发起 Audit；失败动作不推 Rule Engine，但仍发起 FAILURE Audit。
+
+```mermaid
+flowchart LR
+    CTRL["BaseController doSaveAndLog"] --> BIZ["business save/delete"]
+    BIZ -->|"success"| EA["EntityActionService"]
+    BIZ -->|"exception"| FAIL["FAILURE audit request"]
+    EA --> RE["push entity-action TbMsg"]
+    RE --> AUD["then invoke Audit"]
+    FAIL --> AUD
+```
+
+### 2.3 REST 查询入口
+
+Event 有三类 REST 读入口：[org.thingsboard.server.controller.EventController.getEvents(String, String, String, String, int, int, String, String, String, Long, Long)](../../../application/src/main/java/org/thingsboard/server/controller/EventController.java#L136) 按类型分页；同路径的 deprecated GET 只返回 `LC_EVENT`；[getEvents(String, String, String, int, int, EventFilter, String, String, String, Long, Long)](../../../application/src/main/java/org/thingsboard/server/controller/EventController.java#L239) 用 POST body 承载多态 filter。
+
+“latest input”不是通用 Event REST。[org.thingsboard.server.controller.RuleChainController.getLatestRuleNodeDebugInput(String)](../../../application/src/main/java/org/thingsboard/server/controller/RuleChainController.java#L451) 固定取最新 2 条 `DEBUG_RULE_NODE`，再在 JVM 中找第一条 `body.type == IN`；因此最近两个事件都为 OUT 时会返回 `null`，它不是“向后无限查最近 IN”。底层 SQL 只有 `ORDER BY ts DESC LIMIT 2`，没有 `id` 次排序；`ts` 是毫秒值，同毫秒有多条事件时，入选的两条及其顺序不稳定。
+
+Audit REST 提供 tenant、customer、user、entity 四个 scope，均要求 `pageSize/page`，并接受 `textSearch`、排序、`startTime/endTime`、`actionTypes`。例如 [org.thingsboard.server.controller.AuditLogController.getAuditLogsByEntityId(String, String, int, int, String, String, String, Long, Long, String)](../../../application/src/main/java/org/thingsboard/server/controller/AuditLogController.java#L192)。
+
+```mermaid
+flowchart TB
+    REST{"REST query"}
+    REST --> ETYPE["GET events by type"]
+    REST --> EFILTER["POST events + EventFilter"]
+    REST --> LATEST["GET ruleNode debugIn"]
+    REST --> AUDIT["GET audit logs by scope"]
+    ETYPE --> TP["TimePageLink offset page"]
+    EFILTER --> TP
+    LATEST --> TWO["latest 2 then find IN"]
+    AUDIT --> AP["TimePageLink + actionTypes"]
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 Debug Event 独立异步链
+
+[org.thingsboard.server.actors.ActorSystemContext.persistDebugInput(TenantId, EntityId, TbMsg, String)](../../../application/src/main/java/org/thingsboard/server/actors/ActorSystemContext.java#L1023) 和 [org.thingsboard.server.actors.ActorSystemContext.persistDebugOutput(TenantId, EntityId, TbMsg, String)](../../../application/src/main/java/org/thingsboard/server/actors/ActorSystemContext.java#L1078) 都委托私有 `persistDebugAsync`。后者在 Actor 调用线程执行 JVM tenant rate limit、构造 `RuleNodeDebugEvent` 并调用 `EventService.saveAsync`；只有事件成功加入 SQL queue 后，JDBC batch 才与 Actor 解耦。返回的 future 使用 `MoreExecutors.directExecutor()` 挂错误日志 callback：通常在设置结果的 SQL queue 线程内联执行；若 callback 注册前 future 已完成，则在注册 callback 的调用线程立即执行。两种情况都不会投递回 Actor mailbox。
+
+`BaseEventService` 在调用线程校验与截断后进入 [org.thingsboard.server.dao.sql.event.JpaBaseEventDao.saveAsync(Event)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/JpaBaseEventDao.java#L221)：补 time-based UUID/createdTime、同步调用 `createPartitionIfNotExists`，再把事件哈希到专用 SQL queue。分区缓存未命中时会获取 `partitionCreationLock` 并执行 JDBC DDL，因此 `saveAsync` 的名字不代表生产阶段非阻塞。队列线程随后批量调用 `EventInsertRepository.save`，最终完成每条 future。
+
+```mermaid
+sequenceDiagram
+    participant RN as RuleNode actor/context
+    participant ASC as ActorSystemContext
+    participant BES as BaseEventService
+    participant DAO as JpaBaseEventDao
+    participant Q as Event SQL queue
+    participant TX as EventInsertRepository TX
+    RN->>ASC: persistDebugInput/output(...)
+    ASC->>ASC: JVM tenant rate limit
+    ASC->>BES: saveAsync(RuleNodeDebugEvent)
+    BES->>BES: validate + truncate
+    BES->>DAO: saveAsync(event)
+    DAO->>DAO: sync createPartitionIfNotExists / possible DDL
+    DAO->>Q: add(event)
+    Q-->>ASC: ListenableFuture (pending)
+    Q->>TX: save(batch)
+    TX-->>Q: commit or rollback whole batch
+    Q->>Q: complete future, directExecutor callback logs inline
+```
+
+### 3.2 Audit Log 独立异步链
+
+[org.thingsboard.server.dao.audit.AuditLogServiceImpl.logEntityAction(TenantId, CustomerId, UserId, String, I, E, ActionType, Exception, Object...)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L183) 先做 level filter，再在调用线程构造 `actionData`、状态、entityName 和失败堆栈。私有 [logAction(TenantId, EntityId, String, CustomerId, UserId, String, ActionType, JsonNode, ActionStatus, String)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L508) 也在调用线程校验，之后才把 Callable 提交给 `JpaExecutorService`。未捕获的同步构造异常或 executor 拒绝会直接到达调用方；实体名查询异常被忽略，普通 validator 异常被转换成 immediate failed future；已提交后的 JPA/sink future 失败也通常被调用方忽略。
+
+Callable 中先调用 `auditLogDao.save`，其继承实现 [org.thingsboard.server.dao.sql.JpaAbstractDao.save(TenantId, D)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L78) 标注 `@Transactional`；提交返回后才调用 `AuditLogSink.logAction`。这个事务既不包含原业务保存，也不包含 Event batch，更不等待 Elasticsearch HTTP 回调。
+
+```mermaid
+sequenceDiagram
+    participant C as Controller/service caller
+    participant A as AuditLogServiceImpl
+    participant J as JpaExecutorService
+    participant D as JpaAuditLogDao
+    participant DB as PostgreSQL audit_log
+    participant S as AuditLogSink
+    C->>A: logEntityAction(...)
+    A->>A: level filter + actionData + stack
+    A->>A: validate before submit
+    alt ordinary validation failure
+        A-->>C: immediate failed Future, no submit
+    else validation passes
+        A->>J: submit(Callable)
+        J-->>C: ListenableFuture (usually ignored)
+        J->>D: save(tenantId, auditLog)
+        D->>DB: independent JPA transaction
+        DB-->>D: commit
+        D-->>J: persisted AuditLog
+        J->>S: callable invokes logAction
+        alt sink executor accepts / no-op
+            S-->>J: scheduled / returned
+        else sink executor.execute rejects
+            S-->>J: exception, Audit future fails and DB remains
+        end
+    end
+```
+
+### 3.3 执行器与事务隔离
+
+Debug Event 使用 `sql.events.batch_threads` 个 `sql-queue-N-events` 单线程消费器；每批进入 [org.thingsboard.server.dao.sql.event.EventInsertRepository.save(List&lt;Event&gt;)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/EventInsertRepository.java#L118) 的 `TransactionTemplate`。Audit 使用 [org.thingsboard.server.dao.sql.JpaExecutorService](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaExecutorService.java#L32) 的 work-stealing pool，线程数来自 Hikari maximumPoolSize，每个 Audit 的 DAO `save` 自开 JPA 事务。但 `JpaExecutorService` 是共享 bean，[BaseRelationService](../../../dao/src/main/java/org/thingsboard/server/dao/relation/BaseRelationService.java#L521)、[CachedAttributesService](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/CachedAttributesService.java#L235)、EntityView 和继承 [JpaAbstractDaoListeningExecutorService](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDaoListeningExecutorService.java#L37) 的异步 DAO 也会提交任务；源码没有 Audit 专用容量、背压、拒绝策略或失败计数保证，其他 JPA 工作可与 Audit 相互排队和争用连接。
+
+```mermaid
+flowchart LR
+    subgraph EEXEC["Event executor domain"]
+        EQ1["event queue 0"] --> BTX1["batch JDBC TX"]
+        EQ2["event queue N"] --> BTX2["batch JDBC TX"]
+    end
+    subgraph AEXEC["Shared JPA executor domain"]
+        JP["shared JpaExecutorService pool"] --> JTX1["JPA TX audit row A"]
+        JP --> JTX2["JPA TX audit row B"]
+        JP --> OTHER["Relation / Attributes / other JPA work"]
+    end
+    BTX1 -. "no shared commit" .- JTX1
+```
+
+### 3.4 Rule Engine action 旁路与 Edge 边界
+
+[org.thingsboard.server.service.action.EntityActionService.pushEntityActionToRuleEngine(EntityId, HasName, TenantId, CustomerId, ActionType, User, Object...)](../../../application/src/main/java/org/thingsboard/server/service/action/EntityActionService.java#L90) 只在 ActionType 能映射 Rule Engine TbMsgType 时推送，且捕获异常。随后 Audit 仍独立提交。`EdgeEvent` 则由 [org.thingsboard.server.dao.sql.edge.JpaBaseEdgeEventDao.saveAsync(EdgeEvent)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/JpaBaseEdgeEventDao.java#L213) 写 `edge_event`，拥有自己的批队列、分区和 TTL。
+
+```mermaid
+flowchart TB
+    ACTION["entity action success"] --> MAP{"ActionType has RE msg type"}
+    MAP -->|"yes"| RE["push TbMsg to Rule Engine"]
+    MAP -->|"no"| SKIP["skip RE branch"]
+    ACTION --> AUD["submit Audit Log"]
+    EDGEACTION["edge synchronization"] --> EDGE["EdgeEventService -> edge_event"]
+    RE -. "independent outcome" .- AUD
+    EDGE -. "different domain" .- AUD
+```
+
+---
+
+## 四、消息流
+
+### 4.1 Event 构造、限流与截断
+
+`ActorSystemContext` 把 TbMsg 的 originator、msgId、msgType、dataType、relationType、data、metadata 和 error 投影为 RuleNodeDebugEvent。tenant rate limit 默认 `50000:3600`，保存在本 JVM 的 `ConcurrentMap<TenantId, DebugTbRateLimits>`；超限时当前 JVM 不再写逐条 Debug Event，并尝试写一条 `RuleChainDebugEvent("Reached debug mode rate limit!")`。
+
+[org.thingsboard.server.dao.event.BaseEventService.checkAndTruncateDebugEvent(Event)](../../../dao/src/main/java/org/thingsboard/server/dao/event/BaseEventService.java#L105) 对 Rule Node 的 data/metadata/error、Rule Chain 的 message/error、Lifecycle/Error 的 error 使用同一个 `event.debug.max-symbols` 截断。它是字符长度控制，不是 JSON 感知、字段级脱敏或加密。
+
+```mermaid
+flowchart TB
+    TB["TbMsg + relation/error"] --> LIMIT{"JVM tenant tokens available"}
+    LIMIT -->|"yes"| RNE["RuleNodeDebugEvent"]
+    LIMIT -->|"no"| RCE["one RuleChain rate-limit event"]
+    RNE --> TRUNC["truncate data metadata error"]
+    RCE --> TRUNC2["truncate message error"]
+    TRUNC --> QUEUE["Event queue"]
+    TRUNC2 --> QUEUE
+```
+
+### 4.2 Event 队列、分片与批事务
+
+[org.thingsboard.server.dao.sql.TbSqlBlockingQueueWrapper.add(E)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueueWrapper.java#L89) 用 tenantId/entityId 哈希到固定队列，维持同实体的稳定分片。[org.thingsboard.server.dao.sql.TbSqlBlockingQueue.init(ScheduledLogExecutorComponent, Consumer&lt;List&lt;E&gt;&gt;, Comparator&lt;E&gt;, int)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L82) poll 第一条后最多 drain 到 batchSize；仅当 `sql.batch_sort=true` 时才按 createdTime 排序，再批量保存。该配置默认 `true`，但可通过 `SQL_BATCH_SORT=false` 关闭，不能把排序描述为无条件保证。
+
+五条 INSERT 虽然都带 `ON CONFLICT DO NOTHING`，但 release-3.6 [基线五表 DDL](../../../application/src/main/data/sql/schema-entities.sql#L360) 没有 PK/UNIQUE，[配套 `idx_*_event_main`](../../../dao/src/main/resources/sql/schema-entities-idx-psql-addon.sql#L24) 也只是普通索引。因此该子句在默认 DDL 下不能按 event id 去重；重复提交同一 id 仍可能形成重复行，除非部署方另加唯一约束。
+
+```mermaid
+flowchart LR
+    ADD["queue.add(event)"] --> HASH["hash tenant + entity"]
+    HASH --> Q0["unbounded queue 0"]
+    HASH --> Q1["unbounded queue 1"]
+    HASH --> QN["unbounded queue N"]
+    Q0 --> DRAIN["poll + drain <= batchSize"]
+    DRAIN --> SORT{"sql.batch_sort"}
+    SORT -->|"true by default"| ORDER["sort by createdTime"]
+    SORT -->|"false"| GROUP["keep drained order"]
+    ORDER --> GROUP["group by EventType"]
+    GROUP --> TX["one TransactionTemplate"]
+```
+
+### 4.3 Audit actionData、失败堆栈与 Sink
+
+[org.thingsboard.server.dao.audit.AuditLogServiceImpl.constructActionData(I, E, ActionType, Object...)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L233) 是 ActionType switch：例如 ADDED/UPDATED 放 entity，RPC_CALL 放 method/params，CREDENTIALS_UPDATED 放 credentials，登录放客户端信息，遥测动作放 values/keys。异常经 [getFailureStack(Exception)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L447) 完整序列化。
+
+```mermaid
+flowchart TB
+    ACTION["ActionType + entity + additionalInfo"] --> SWITCH{"constructActionData"}
+    SWITCH --> ENTITY["entity / metadata"]
+    SWITCH --> SECRET["credentials / RPC params"]
+    SWITCH --> DATA["attributes / timeseries"]
+    SWITCH --> CLIENT["client / browser / OS"]
+    EX["Exception"] --> STACK["full stack trace"]
+    ENTITY --> ROW["AuditLog row"]
+    SECRET --> ROW
+    DATA --> ROW
+    CLIENT --> ROW
+    STACK --> ROW
+    ROW --> DB["commit audit_log"]
+    DB --> CALLABLE["return to JpaExecutor callable"]
+    CALLABLE --> SINK["invoke none or Elasticsearch sink"]
+```
+
+### 4.4 Future 的可见完成点
+
+Debug Event future 在整个 JDBC batch 成功后完成；Actor 的 debug callback 只记录入队后保存失败。`persistError`/`persistLifecycleEvent` 直接丢弃 future。Audit future 在 JPA save 完成且 `AuditLogSink.logAction` 返回后完成，但 Elasticsearch 实现的 `logAction` 只把任务放进另一个 executor，因此它不代表 ES 已写成功。多数入口也没有保存或监听 Audit future。这里的 future 语义不覆盖 `constructActionData` 等未捕获的提交前异常，也不覆盖 executor 拒绝；但 validator 的普通异常本身会返回 immediate failed future，而非直接抛给 Controller。
+
+```mermaid
+stateDiagram-v2
+    [*] --> EventQueued
+    EventQueued --> EventFutureSuccess: JDBC batch committed
+    EventQueued --> EventFutureFailure: batch rolled back
+    [*] --> AuditProducer
+    AuditProducer --> AuditValidationFailure: validator fails before submit
+    AuditValidationFailure --> AuditImmediateFailedFuture: no JpaExecutor task
+    AuditProducer --> AuditSubmitted: validation passes and submit accepts
+    AuditSubmitted --> AuditFutureSuccess: DB committed and sink returns
+    AuditSubmitted --> AuditFutureFailure: JPA fails or sink execute rejects
+    AuditFutureSuccess --> EsSuccess: async HTTP callback success
+    AuditFutureSuccess --> EsFailure: async HTTP callback failure only logged
+```
+
+---
+
+## 五、时序图
+
+[PlantUML 源文件](sequence.puml) | [完整时序图 SVG](sequence.svg)
+
+[![Event 与 Audit Log 完整时序图](sequence.svg)](sequence.svg)
+
+### 5.1 Debug Event 同线程顺序与异步落库语义
+
+```mermaid
+sequenceDiagram
+    participant A as RuleNodeActor
+    participant C as ActorSystemContext
+    participant N as TbNode
+    participant E as Event queue
+    A->>C: persistDebugInput
+    C->>E: saveAsync
+    C-->>A: return after sync producer work and enqueue
+    A->>N: onMsg
+    N-->>A: tellNext/failure
+    A->>C: persistDebugOutput
+    C->>E: saveAsync, sync through queue.add
+    C-->>A: return after enqueue
+    A->>A: then chainActor.tell / callback / routing
+    E->>E: JDBC batch completes future, direct callback usually logs here
+    Note over A,E: Only work after queue.add is asynchronous, partition DDL before enqueue may block A
+```
+
+### 5.2 Audit 与业务事务分离
+
+```mermaid
+sequenceDiagram
+    participant U as REST caller
+    participant B as BaseController
+    participant S as Entity service
+    participant A as Audit service
+    participant J as JpaExecutor
+    participant D as audit_log
+    U->>B: save/delete request
+    B->>S: business operation
+    alt business success
+        S-->>B: entity
+        B->>A: SUCCESS audit producer
+        A->>A: sync actionData / name, then validate before submit
+        alt validator returns immediate failed future
+            A-->>B: failed Future, no JpaExecutor task
+            B-->>U: business response because Future is ignored
+        else producer submits successfully
+            A->>J: submit
+            B-->>U: business response
+        else uncaught construction error or submit rejection
+            A-->>B: synchronous exception
+            B-->>U: request may fail after entity was saved
+        end
+    else business failure
+        S-->>B: exception
+        B->>A: FAILURE audit
+        A->>J: submit
+        B-->>U: original error
+    end
+    J->>D: later independent JPA transaction
+```
+
+### 5.3 Event 与 Audit TTL owner
+
+```mermaid
+sequenceDiagram
+    participant S as Scheduled cleanup on every node
+    participant P as PartitionService
+    participant O as SYS_TENANT TB_CORE owner
+    participant R as SqlPartitioningRepository
+    participant N as non-owner node
+    S->>P: resolve(SYS_TENANT, SYS_TENANT)
+    alt this node is owner
+        O->>R: dropPartitionsBefore(table, expTs, size)
+        R->>R: DETACH expired whole partition
+        R->>R: DROP TABLE partition
+    else non-owner
+        N->>R: cleanupPartitionsCache only
+    end
+```
+
+---
+
+## 六、数据变化
+
+### 6.1 Event 五表多态
+
+[org.thingsboard.server.common.data.event.Event](../../../common/data/src/main/java/org/thingsboard/server/common/data/event/Event.java#L42) 定义 tenantId/entityId/serviceId 和抽象 `EventType getType()`；[EventType](../../../common/data/src/main/java/org/thingsboard/server/common/data/event/EventType.java#L29) 决定具体表。基线 DDL 从 [schema-entities.sql#L360](../../../application/src/main/data/sql/schema-entities.sql#L360) 开始定义五张 `PARTITION BY RANGE (ts)` 表。
+
+与 `audit_log` 一样，这五张父表都没有数据库 PK/UNIQUE；`EventEntity` 上的 JPA `@Id` 只是 ORM 映射，不会替代显式 DDL 约束。release-3.6 配套索引按 `(tenant_id, entity_id, ts DESC)` 建普通索引，也没有 event id 唯一索引。
+
+| EventType | Java 子类 | PostgreSQL 表 | 主要特有字段 | 默认分区 |
+|---|---|---|---|---|
+| `DEBUG_RULE_NODE` | `RuleNodeDebugEvent` | `rule_node_debug_event` | direction、originator、msg、data、metadata、error | 1 小时 |
+| `DEBUG_RULE_CHAIN` | `RuleChainDebugEvent` | `rule_chain_debug_event` | message、error | 1 小时 |
+| `STATS` | `StatisticsEvent` | `stats_event` | messagesProcessed、errorsOccurred | 168 小时 |
+| `LC_EVENT` | `LifecycleEvent` | `lc_event` | type、success、error | 168 小时 |
+| `ERROR` | `ErrorEvent` | `error_event` | method、error | 168 小时 |
+
+```mermaid
+classDiagram
+    class Event {
+      +TenantId tenantId
+      +UUID entityId
+      +String serviceId
+      +EventType getType()
+    }
+    Event <|-- RuleNodeDebugEvent
+    Event <|-- RuleChainDebugEvent
+    Event <|-- StatisticsEvent
+    Event <|-- LifecycleEvent
+    Event <|-- ErrorEvent
+```
+
+```mermaid
+erDiagram
+    RULE_NODE_DEBUG_EVENT { uuid id bigint ts uuid tenant_id uuid entity_id string e_data string e_metadata string e_error }
+    RULE_CHAIN_DEBUG_EVENT { uuid id bigint ts uuid tenant_id uuid entity_id string e_message string e_error }
+    STATS_EVENT { uuid id bigint ts uuid tenant_id uuid entity_id bigint e_messages_processed bigint e_errors_occurred }
+    LC_EVENT { uuid id bigint ts uuid tenant_id uuid entity_id string e_type boolean e_success }
+    ERROR_EVENT { uuid id bigint ts uuid tenant_id uuid entity_id string e_method string e_error }
+```
+
+### 6.2 audit_log 字段与无外键设计
+
+[schema-entities.sql#L89](../../../application/src/main/data/sql/schema-entities.sql#L89) 定义 `audit_log`：`id`、`created_time`、tenant/customer/entity/user 标识与名称、`action_type`、物理列 [`action_data varchar(1000000)`](../../../application/src/main/data/sql/schema-entities.sql#L100)、`action_status`、`action_failure_details varchar(1000000)`，按 `created_time` Range 分区。[AuditLogEntity.actionData](../../../dao/src/main/java/org/thingsboard/server/dao/model/sql/AuditLogEntity.java#L125) 的 Java 类型是 `JsonNode`，由 [JsonStringType](../../../dao/src/main/java/org/thingsboard/server/dao/util/mapping/JsonStringType.java#L32) 做字符串列映射；物理 DDL 不是 PostgreSQL `json/jsonb`。DDL 没有主键、外键或 `REFERENCES`；这允许被审计实体/用户删除后保留历史，但不能靠数据库 FK 保证引用有效。
+
+```mermaid
+erDiagram
+    AUDIT_LOG {
+      uuid id
+      bigint created_time
+      uuid tenant_id
+      uuid customer_id
+      uuid entity_id
+      string entity_type
+      string entity_name
+      uuid user_id
+      string user_name
+      string action_type
+      varchar action_data "length 1000000, ORM JsonNode"
+      string action_status
+      string action_failure_details
+    }
+    TENANT ||..o{ AUDIT_LOG : "logical id only, no FK"
+    ENTITY ||..o{ AUDIT_LOG : "logical id only, no FK"
+    USER ||..o{ AUDIT_LOG : "logical id only, no FK"
+```
+
+### 6.3 filter、闭区间与 latest input
+
+Event Repository 使用 `ts >= startTime` 且 `ts <= endTime`，Audit Repository 使用 `createdTime >= startTime` 且 `createdTime <= endTime`，所以两端都是闭区间。Rule Node filter 还支持 serviceId、方向、originator、msgId/msgType、relationType、data/metadata contains、isError/error contains，见 [org.thingsboard.server.dao.sql.event.RuleNodeDebugEventRepository.findEvents(UUID, UUID, Long, Long, String, String, String, String, String, String, String, String, String, boolean, String, Pageable)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/RuleNodeDebugEventRepository.java#L123)。
+
+`getLatestRuleNodeDebugInput` 使用的 [专用 native query](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/RuleNodeDebugEventRepository.java#L52) 只按 `ts DESC` 取 2 条，没有按 id 补充稳定排序。Event 的 `createdTime/ts` 来自 [time UUID 的毫秒时间](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/JpaBaseEventDao.java#L224)，同毫秒多条记录完全可能出现；PostgreSQL 可任选这些并列行，所以“最新 2 条”不仅窗口很窄，并列时连窗口成员也不确定。
+
+```mermaid
+flowchart LR
+    INPUT["startTime, endTime"] --> WHERE["ts >= start AND ts <= end"]
+    FILTER["polymorphic EventFilter"] --> TYPE{"EventType"}
+    TYPE --> RN["RuleNode predicates"]
+    TYPE --> RC["RuleChain predicates"]
+    TYPE --> ST["Stats predicates"]
+    TYPE --> LC["Lifecycle predicates"]
+    TYPE --> ER["Error predicates"]
+    LATEST["debugIn"] --> LAST2["ORDER BY ts DESC LIMIT 2"]
+    LAST2 --> FINDIN["first type IN in JVM"]
+```
+
+### 6.4 Audit offset 分页
+
+Audit Controller 接收从 0 开始的 `page` 与 `pageSize`，`PageLink` 保存页码，[JpaAuditLogDao.findAuditLogsByTenantId(UUID, List&lt;ActionType&gt;, TimePageLink)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/audit/JpaAuditLogDao.java#L183) 通过 `DaoUtil.toPageable(pageLink)` 交给 Spring Data JPA。因此这是 offset/page-number 分页，不是 cursor/keyset；深页需要跳过前序结果，数据并发插入时也可能跨页重复或漏看。
+
+```mermaid
+flowchart LR
+    REQ["pageSize + page"] --> LINK["TimePageLink"]
+    LINK --> PAGEABLE["Spring Pageable"]
+    PAGEABLE --> SQL["LIMIT pageSize OFFSET page*pageSize"]
+    SQL --> RESULT["PageData"]
+    INSERT["new audit rows"] -. "may shift offsets" .-> SQL
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 五表而不是单表 discriminator
+
+Event 多态在 Java 层共享接口和 service，在 DAO 层由 `Map<EventType, EventRepository<?, ?>>` 分派；插入时 [org.thingsboard.server.dao.sql.event.EventInsertRepository.init()](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/EventInsertRepository.java#L94) 为五种类型准备五条 SQL。它不是一张 `event(type, body)` 表，也没有跨五表的统一时间线查询。五条 SQL 的 `ON CONFLICT DO NOTHING` 不能被理解为内建幂等：默认五表没有 PK/UNIQUE 可检测重复 event id。
+
+```mermaid
+flowchart TB
+    EVENT["Event"] --> TYPE["getType()"]
+    TYPE --> MAP["repository map"]
+    TYPE --> SQLMAP["insert SQL map"]
+    MAP --> TABLE["one selected table"]
+    SQLMAP --> TABLE
+    QUERY["REST eventType/filter"] --> MAP
+```
+
+### 7.2 截断不等于脱敏
+
+`StringUtils.truncate` 只限制字符数；Debug Event 的 TbMsg data/metadata 可能含 token、密码、个人信息。Audit 更直接把 credentials、RPC params 和 entity JSON 放进 `actionData`。局部处理仅有 Dashboard configuration 置空、Elasticsearch 初始化日志把 sink password 显示为 `***`，不存在覆盖两条链的统一 redact policy。
+
+```mermaid
+flowchart LR
+    SENSITIVE["payload / metadata / credentials / params"] --> LENGTH["length truncation or direct JSON"]
+    LENGTH --> DB["PostgreSQL"]
+    DB --> REST["authorized REST query"]
+    DB --> ES["optional Elasticsearch copy"]
+    REDACT["unified redactor"] -. "not present" .-> LENGTH
+```
+
+### 7.3 分区创建与缓存
+
+[org.thingsboard.server.dao.sqlts.insert.sql.SqlPartitioningRepository.createPartitionIfNotExists(String, long, long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/sql/SqlPartitioningRepository.java#L88) 按 `floor(ts/duration)*duration` 计算分区，使用 JVM map 和 lock 避免本节点重复 DDL；DDL 以 `Propagation.NOT_SUPPORTED` 执行，不加入 Event batch 或 Audit JPA 事务。
+
+```mermaid
+flowchart TB
+    WRITE["event/audit write timestamp"] --> FLOOR["calculate partition start"]
+    FLOOR --> CACHE{"local cache contains start"}
+    CACHE -->|"yes"| DATA["write row"]
+    CACHE -->|"no"| LOCK["partitionCreationLock"]
+    LOCK --> DDL["CREATE TABLE PARTITION"]
+    DDL --> CACHEPUT["cache partition"]
+    CACHEPUT --> DATA
+```
+
+---
+
+## 八、Actor 分析
+
+### 8.1 Debug hook 在 Actor 路径，持久化不在 Actor mailbox
+
+输入 hook 位于 RuleNodeActorMessageProcessor，输出 hook 位于 DefaultTbContext/RuleChainActorMessageProcessor。Actor 线程同步完成 event 构造、校验、截断、分区检查和入队；分区缓存未命中时还会持锁执行 DDL。成功 `queue.add` 后才把 JDBC batch 交给 SQL queue，Actor 不执行 batch，也不等待 batch future。
+
+```mermaid
+flowchart LR
+    MAIL["Actor mailbox thread"] --> HOOK["debug hook"]
+    HOOK --> PART["sync partition check / possible DDL"]
+    PART --> ENQUEUE["Event SQL queue.add"]
+    ENQUEUE --> NODE["then TbNode execution / tell / callback / routing"]
+    ENQUEUE --> SQLTHREAD["sql-queue event thread"]
+    SQLTHREAD --> DB["PostgreSQL"]
+    DB --> SQLTHREAD
+    SQLTHREAD --> CALLBACK["directExecutor callback logs inline"]
+```
+
+### 8.2 Audit 不要求 Actor
+
+多数 Audit 来自 REST/服务调用，先在调用线程完成 producer 工作，再进入共享 `JpaExecutorService`；`ActorSystemContext` 虽同时注入 EventService 与 AuditLogService，但 Debug 持久化只调用 EventService。EntityActionService 的 Rule Engine push 是旁路副作用，不能据此把 Audit 描述为 Actor 消息消费结果。BaseController helper 还会对 SYS_ADMIN 直接跳过 EntityAction/Audit。
+
+```mermaid
+flowchart TB
+    REST["REST/service thread"] --> AUDIT["AuditLogService sync producer"]
+    AUDIT --> JPA["shared JpaExecutorService"]
+    ACTION["same entity action"] --> RE["optional Rule Engine TbMsg"]
+    RE --> ACTOR["Actor processing"]
+    ACTOR -. "not audit prerequisite" .- JPA
+```
+
+---
+
+## 九、Kafka 分析
+
+Event SQL queue 是 JVM 内部 `LinkedBlockingQueue`，不是 TbQueue/Kafka topic；共享 JpaExecutor 和 Elasticsearch executor 也都是本进程执行器。Entity action 可另行推到 Rule Engine queue，但那条消息不承载 Audit row，也没有 Audit 写入确认。REST 查询直接查 PostgreSQL，系统没有 Event/Audit WebSocket subscription 或 fan-out。
+
+```mermaid
+flowchart LR
+    DEBUG["Debug Event"] --> JVMQ["in-JVM SQL queue"] --> PG["PostgreSQL"]
+    AUDIT["Audit Log"] --> JVME["in-JVM shared JpaExecutor"] --> PG
+    ACTION["Entity action TbMsg"] --> TBQ["TbQueue: in-memory/Kafka"] --> RE["Rule Engine"]
+    TBQ -. "separate branch" .- AUDIT
+    PG --> REST["REST query"]
+    PG -. "no built-in push" .-> WS["WebSocket"]
+```
+
+---
+
+## 十、数据库分析
+
+### 10.1 Event batch 事务与 Audit JPA 事务
+
+Event batch 先按 EventType 分组，在同一 `TransactionTemplate` 里逐组 `jdbcTemplate.batchUpdate`；所以一个类型的 SQL 异常会回滚同队列本批的其他类型。Audit 每条 `JpaAbstractDao.save` 是单独事务，创建 Range 分区后 persist/merge。原实体保存事务、Event batch 事务、Audit JPA 事务三者没有原子性。事务不共提交只说明异步 JPA 失败不会回滚原实体；它不屏蔽 Audit producer 在提交 executor 前同步抛出的异常。
+
+```mermaid
+flowchart TB
+    subgraph BT["business transaction"]
+        ENTITY["entity save/delete"]
+    end
+    subgraph ET["Event batch transaction"]
+        E1["batchUpdate type A"] --> E2["batchUpdate type B"]
+    end
+    subgraph AT["Audit JPA transaction"]
+        A1["persist one AuditLogEntity"]
+    end
+    ENTITY -. "async boundary" .-> A1
+    ENTITY -. "debug side effect" .-> E1
+```
+
+### 10.2 Event/Debug/Audit TTL
+
+[org.thingsboard.server.service.ttl.EventsCleanUpService.cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/EventsCleanUpService.java#L84) 分别计算 regular 与 debug 过期时间；默认 regular TTL 为 0、debug 为 604800 秒，regular 分区 168 小时、debug 分区 1 小时。[org.thingsboard.server.service.ttl.AuditLogsCleanUpService.cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/AuditLogsCleanUpService.java#L83) 默认 TTL 0，分区 168 小时、检查周期 1 天。
+
+[org.thingsboard.server.dao.sqlts.insert.sql.SqlPartitioningRepository.dropPartitionsBefore(String, long, long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/sql/SqlPartitioningRepository.java#L122) 只在 `partitionEndTime < expTime` 时 DETACH/DROP 整分区，不逐行 delete。因此实际保留时间会多出最多一个分区宽度、一次 scheduler 间隔和 owner 调度延迟；边界恰等于 expTime 的分区还不会删。
+
+```mermaid
+timeline
+    title TTL 实际删除延迟
+    写入时间 : row enters time range partition
+    TTL 到期 : row is logically expired
+    分区结束早于阈值 : whole partition becomes droppable
+    owner 下次调度 : DETACH PARTITION
+    删除完成 : DROP TABLE partition
+```
+
+### 10.3 PostgreSQL-only、Edge 独立
+
+五种 Event 和 Audit 的 DAO 都位于 `dao.sql`，DDL 也只在 PostgreSQL schema 中；没有 Cassandra Event/Audit 表或 DAO。`EdgeEvent` 的 `edge_event` 是第七个独立 Range 分区域，默认 TTL 一个月，用于 Edge 同步，不应计入 EventType 五表或 `audit_log`。
+
+```mermaid
+flowchart TB
+    STORAGE{"storage family"}
+    STORAGE --> PG["PostgreSQL"]
+    PG --> E5["five Event tables"]
+    PG --> AU["audit_log"]
+    PG --> ED["edge_event"]
+    STORAGE --> CAS["Cassandra"]
+    CAS -. "no Event/Audit DAO" .-> NONE["none"]
+```
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败矩阵
+
+| 失败点 | 当前行为 | 主业务影响 | 风险 |
+|---|---|---|---|
+| Debug JVM 限流 | 丢逐条事件，尝试写一条 Rule Chain 提示 | 不影响 TbMsg | 限流按 JVM，不是集群全局 |
+| Event 分区创建失败 | 记录 warn，随后仍入队 | 不影响 Actor 当前路由 | batch 可能因无分区失败 |
+| Event batch 任一 SQL 失败 | 整批事务回滚，批内 futures 全失败 | debug callback 只记日志 | 无自动重试，事件丢失 |
+| Event 队列积压 | 无界增长 | 先消耗 heap | OOM/长尾延迟 |
+| Event shutdown | `shutdownNow` 中断消费 | 不等待 drain | 队列中 futures 可能永不完成 |
+| Debug 分区缓存未命中 | Actor 线程持锁检查并可能执行 DDL | batch 尚未异步 | Actor mailbox 延迟；`saveAsync` 不等于 producer 非阻塞 |
+| Audit level OFF | 返回 `null` | 不影响业务 | 调用方不能把 null 当成功 future |
+| Audit producer 同步失败 | 未捕获的 `actionData` 构造异常或 executor submit 拒绝 | 可能改变 HTTP 结果 | 实体可能已保存但请求返回失败；名称查询异常被忽略；validator 在 submit 前校验，普通异常返回 immediate failed future |
+| 共享 JpaExecutor 积压 | Audit 与 Relation/Attributes/其他 JPA 工作共同排队 | 提交成功不代表及时执行 | 无 Audit 专用容量、背压或失败计数保证 |
+| Audit JPA 失败 | future 失败 | 常见调用方忽略 | 源码没有 Audit 专用 callback/JMX 指标保证，缺口可能缺少明确告警 |
+| Dummy audit service | disabled 时读空页、写返回 null | 不影响业务 | “无记录”可能只是功能关闭 |
+| Dummy sink | DB 正常，外部副本 no-op | REST 仍可查 DB | 不应期待外部索引 |
+| ES sink HTTP 失败 | listener warn | DB audit 已提交 | Audit future 通常仍已成功 |
+| ES sink executor 拒绝 | `executor.execute` 异常穿透 sink，令 JpaExecutor Callable/Audit future 失败 | 常见调用方忽略，不同步改变 HTTP | DB 已先提交且不回滚；与内部 task/HTTP warning 语义不同 |
+| Audit TTL DROP 失败 | 记录 error，下轮再试 | 不影响写入 | 旧分区继续占空间 |
+
+```mermaid
+flowchart TB
+    FAIL{"failure"}
+    FAIL --> EVENT["Event batch"]
+    EVENT --> EF["all batch futures fail"]
+    FAIL --> AUDDB["Audit JPA"]
+    AUDDB --> AF["audit future fails"]
+    FAIL --> ES["ES task / async HTTP"]
+    ES --> LOG["error/warn only, DB row remains"]
+    FAIL --> ESREJECT["ES executor.execute rejects"]
+    ESREJECT --> AF
+    FAIL --> TTL["partition DROP"]
+    TTL --> RETRY["partition remains until later schedule"]
+```
+
+### 11.2 无界队列、shutdownNow 与批次失败
+
+[org.thingsboard.server.dao.sql.TbSqlBlockingQueue](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L46) 在第 48 行直接 `new LinkedBlockingQueue<>()`，没有 capacity；第 154 行 `shutdownNow()`，没有 flush/join。`batchSize=10000` 只限制单批。Elasticsearch sink 的 `Executors.newSingleThreadExecutor` 同样使用无界工作队列，并在销毁时 `shutdownNow`。
+
+```mermaid
+flowchart LR
+    PRODUCER["fast producers"] --> UQ["unbounded queue"]
+    UQ --> SLOW["slow DB / ES consumer"]
+    UQ --> HEAP["heap growth"]
+    STOP["shutdownNow"] --> INT["interrupt worker"]
+    INT --> LEFT["queued items not drained"]
+    SQLERR["one SQL error"] --> ROLLBACK["rollback whole Event batch"]
+```
+
+### 11.3 Future 被忽略与完成语义
+
+`ActorSystemContext.persistError/persistLifecycleEvent` 不保存 Event future；Debug Event 虽挂 callback，也只 log 入队后的保存失败。`EntityActionService.logEntityAction` 忽略 Audit future，因此成功提交 executor 后，BaseController 可在 audit 尚未执行时返回业务响应。反过来，未捕获的提交前构造异常或 executor 拒绝仍可沿调用栈返回；普通 validator 异常则成为同样容易被忽略的 immediate failed future。不能用 HTTP 2xx 或 Rule Engine ack 证明记录已持久化，也不能把“future 被忽略”扩展成所有 Audit 代码都不影响 HTTP。
+
+```mermaid
+flowchart TB
+    HTTP["business HTTP 2xx"] --> BIZ["business operation succeeded"]
+    ACK["Rule Engine ack"] --> MSG["message path succeeded"]
+    BIZ -. "does not prove" .-> AUD["audit_log committed"]
+    MSG -. "does not prove" .-> EVT["debug event committed"]
+    CHECK["verify DB/future/error metrics"] --> AUD
+    CHECK --> EVT
+    SYNC["audit producer throws before submit"] -. "may fail HTTP after save" .-> BIZ
+```
+
+### 11.4 Dummy、敏感数据与 Elasticsearch
+
+`audit-log.enabled=false` 选择 `DummyAuditLogServiceImpl`，所有查询返回空页、写入返回 null；`audit-log.sink.type=none` 仅关闭外部 sink，PostgreSQL audit 仍写。ES sink 的 executor 接受任务后，task 内异常和异步 HTTP response failure 只记录日志，不重试、不回写 DB 状态，也不令外层 future 失败。但 `executor.execute` 本身若拒绝任务，异常位于 task 内部 `try/catch` 之外，会穿透 `logAction` 并令 Audit future 失败；此时 PostgreSQL 行已提交，不回滚，常见调用方忽略 future，因此也不会同步反映到 HTTP。
+
+```mermaid
+flowchart TB
+    ENABLED{"audit-log.enabled"}
+    ENABLED -->|"false"| DS["DummyAuditLogService: no DB rows"]
+    ENABLED -->|"true"| DB["PostgreSQL audit_log"]
+    DB --> ST{"sink.type"}
+    ST -->|"none"| NOOP["DummyAuditLogSink"]
+    ST -->|"elasticsearch"| ESQ["single-thread unbounded queue"]
+    ESQ -->|"execute rejected"| AF["Audit future fails, DB remains"]
+    ESQ --> HTTP["async REST request"]
+    HTTP -->|"failure"| WARN["warn only, no retry"]
+```
+
+### 11.5 排障顺序
+
+1. 先区分缺的是 Debug Event、regular Event、Audit Log 还是 Edge Event，不要混查表。
+2. Debug 先确认 Rule Node `debugMode`、input/output hook 和本 JVM tenant rate-limit 状态。
+3. 检查 `events.queue.*` 的 added/saved/failed/queueSize，确认无界队列是否积压。
+4. 核对 Event 分区是否存在、批事务异常以及 future callback 错误日志。
+5. Audit 先核对 `audit-log.enabled`、BaseController 的 SYS_ADMIN 跳过条件、EntityType mask 与 `ActionType.isRead()` 硬编码分类；只有 CREDENTIALS_READ/ATTRIBUTES_READ 属于 read。
+6. 检查调用方是否传入 entity/additionalInfo，确认 `actionData` 构造是否抛错或泄露敏感值。
+7. 检查共享 JpaExecutor/Hikari 是否被 Audit、Relation、Attributes 或其他 JPA 工作共同占满，再检查 `audit_log` 分区创建和 JPA transaction 异常；不要假设存在 Audit 专用队列容量、背压或失败指标。
+8. 区分 PostgreSQL 已有记录但 ES 缺失，与 Audit DB 本身缺失；ES 失败不会回滚 DB。
+9. TTL 问题最后检查 SYS_TENANT TB_CORE owner、scheduler、分区 endTime 与严格 `< expTime` 条件。
+
+---
+
+## 十二、源码阅读路线
+
+1. [org.thingsboard.server.actors.ruleChain.RuleNodeActorMessageProcessor.onRuleChainToRuleNodeMsg(RuleChainToRuleNodeMsg)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleNodeActorMessageProcessor.java#L197)：看 Debug input 与 `tbNode.onMsg` 的先后关系。
+2. [org.thingsboard.server.actors.ruleChain.DefaultTbContext.output(TbMsg, String)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L251)：看 Debug output 与正常跨链输出并行。
+3. [org.thingsboard.server.actors.ActorSystemContext.persistDebugAsync(TenantId, EntityId, String, TbMsg, String, Throwable, String)](../../../application/src/main/java/org/thingsboard/server/actors/ActorSystemContext.java#L1092)：看字段投影、JVM 限流与 callback。
+4. [org.thingsboard.server.dao.event.BaseEventService.saveAsync(Event)](../../../dao/src/main/java/org/thingsboard/server/dao/event/BaseEventService.java#L93)：看校验和截断。
+5. [org.thingsboard.server.common.data.event.EventType](../../../common/data/src/main/java/org/thingsboard/server/common/data/event/EventType.java#L29)：确认五种类型和表名。
+6. [org.thingsboard.server.dao.sql.event.JpaBaseEventDao.init()](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/JpaBaseEventDao.java#L183)：看 Event 专用批队列和 repository map。
+7. [org.thingsboard.server.dao.sql.event.JpaBaseEventDao.saveAsync(Event)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/JpaBaseEventDao.java#L221)：看 UUID、createdTime、分区和入队。
+8. [org.thingsboard.server.dao.sql.TbSqlBlockingQueue.init(ScheduledLogExecutorComponent, Consumer&lt;List&lt;E&gt;&gt;, Comparator&lt;E&gt;, int)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L82)：看无界队列消费、future 与 `shutdownNow`。
+9. [org.thingsboard.server.dao.sql.event.EventInsertRepository.save(List&lt;Event&gt;)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/EventInsertRepository.java#L118)：看按类型分组后的单批事务。
+10. [org.thingsboard.server.controller.EventController.getEvents(String, String, String, String, int, int, String, String, String, Long, Long)](../../../application/src/main/java/org/thingsboard/server/controller/EventController.java#L136)：看按类型 REST 查询。
+11. [org.thingsboard.server.controller.EventController.getEvents(String, String, String, int, int, EventFilter, String, String, String, Long, Long)](../../../application/src/main/java/org/thingsboard/server/controller/EventController.java#L239)：看多态 filter REST。
+12. [org.thingsboard.server.controller.RuleChainController.getLatestRuleNodeDebugInput(String)](../../../application/src/main/java/org/thingsboard/server/controller/RuleChainController.java#L451)：理解 latest 2 + JVM 过滤，以及 `ORDER BY ts DESC` 无 id 次排序的边界。
+13. [org.thingsboard.server.controller.BaseController.doSaveAndLog(EntityType, E, BiFunction&lt;TenantId,E,E&gt;)](../../../application/src/main/java/org/thingsboard/server/controller/BaseController.java#L1321)：看业务成功/失败 audit 入口、SYS_ADMIN 跳过条件和同步 producer 异常边界。
+14. [org.thingsboard.server.service.action.EntityActionService.logEntityAction(User, I, E, CustomerId, ActionType, Exception, Object...)](../../../application/src/main/java/org/thingsboard/server/service/action/EntityActionService.java#L275)：区分 Rule Engine action 与 Audit 两条旁路。
+15. [org.thingsboard.server.dao.audit.AuditLogLevelFilter.logEnabled(EntityType, ActionType)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogLevelFilter.java#L65)：看 OFF/W/RW。
+16. [org.thingsboard.server.dao.audit.AuditLogServiceImpl.logEntityAction(TenantId, CustomerId, UserId, String, I, E, ActionType, Exception, Object...)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L183)：看 actionData/status/stack。
+17. [org.thingsboard.server.dao.audit.AuditLogServiceImpl.logAction(TenantId, EntityId, String, CustomerId, UserId, String, ActionType, JsonNode, ActionStatus, String)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/AuditLogServiceImpl.java#L508)：看 JpaExecutor 和 sink 顺序。
+18. [org.thingsboard.server.dao.sql.JpaExecutorService.getThreadPollSize()](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaExecutorService.java#L46)：看共享 JPA 异步执行器大小来源，并结合 Relation/Attributes 等调用点确认它不是 Audit 专用池。
+19. [org.thingsboard.server.dao.sql.JpaAbstractDao.save(TenantId, D)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/JpaAbstractDao.java#L78)：确认独立 JPA 事务。
+20. [org.thingsboard.server.dao.sql.audit.JpaAuditLogDao.findAuditLogsByTenantIdAndEntityId(UUID, EntityId, List&lt;ActionType&gt;, TimePageLink)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/audit/JpaAuditLogDao.java#L114)：看 Audit scope 与 offset PageRequest。
+21. [org.thingsboard.server.dao.sql.audit.AuditLogRepository.findByTenantId(UUID, String, Long, Long, List&lt;ActionType&gt;, Pageable)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/audit/AuditLogRepository.java#L62)：看闭区间、textSearch 和 actionTypes。
+22. [org.thingsboard.server.dao.audit.sink.ElasticsearchAuditLogSink.logAction(AuditLog)](../../../dao/src/main/java/org/thingsboard/server/dao/audit/sink/ElasticsearchAuditLogSink.java#L165)：看二次异步和失败只记日志。
+23. [org.thingsboard.server.service.ttl.EventsCleanUpService.cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/EventsCleanUpService.java#L84)：看 regular/debug 两套 TTL。
+24. [org.thingsboard.server.service.ttl.AuditLogsCleanUpService.cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/AuditLogsCleanUpService.java#L83)：看 Audit owner 与非 owner 行为。
+25. [org.thingsboard.server.dao.sqlts.insert.sql.SqlPartitioningRepository.dropPartitionsBefore(String, long, long)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/insert/sql/SqlPartitioningRepository.java#L122)：用整分区 DETACH/DROP 结束阅读。
+
+---
+
+## 十三、常见面试题
+
+### 1. Debug Event 与 Audit Log 为什么必须画成两条链？
+
+Debug Event 从 Rule Node input/output 进入 ActorSystemContext，同步完成构造、校验、分区检查和入队，再由 Event 专用无界 SQL queue 执行 batch JDBC 事务；Audit 从 Controller/服务进入 AuditLogService，同步完成 producer 工作后提交到共享 JpaExecutorService，再由独立 JPA 事务写 `audit_log`。Event 与 Audit 彼此不共享执行器、事务或完成信号，但 JpaExecutorService 还与其他 JPA 工作共享。
+
+### 2. Rule Node Debug input 在什么时候记录？
+
+RuleNodeActorMessageProcessor 在 `tbNode.onMsg` 前检查 `ruleNode.isDebugMode()` 并调用 `persistDebugInput`；self 消息记 relationType `Self`，普通链路记上游 relationType。入队后的 JDBC batch 失败不会阻止节点执行，但入队前校验和分区检查仍同步占用 Actor 线程，首次分区 DDL 可能增加 mailbox 延迟。
+
+### 3. Rule Node Debug output 只有 `output()` 一个入口吗？
+
+不是。跨 Rule Chain 的 `DefaultTbContext.output` 是一处，tell next、failure、ack、to-root enqueue 等路径也调用 `persistDebugOutput`，用于记录不同 relationType 和错误结果。各输出方法在同一调用线程中先完成 `persistDebugOutput` 至 queue.add，返回后才执行 `chainActor.tell`、TbMsg callback 或后续路由，并非并行；future callback 使用 `directExecutor`，通常在完成 future 的 SQL queue 线程内联执行，若注册时 future 已完成则在注册线程立即执行，但都不回 Actor mailbox。
+
+### 4. Event 多态如何映射到数据库？
+
+抽象 Event 由 `getType()` 返回 EventType；DAO 通过 EventType 选择 Repository 和 INSERT SQL。五种类型分别写 `error_event`、`lc_event`、`stats_event`、`rule_node_debug_event`、`rule_chain_debug_event` 五张 Range 分区表。五表都没有 PK/UNIQUE；默认 DDL 下 `ON CONFLICT DO NOTHING` 不按 event id 去重。
+
+### 5. BaseEventService 截断哪些字段？
+
+Rule Node Debug 截 data、metadata、error；Rule Chain Debug 截 message、error；Lifecycle 和 Error Event 截 error。长度由 `event.debug.max-symbols` 控制。Statistics 没有相应字符串字段。
+
+### 6. 截断能否视为敏感数据脱敏？
+
+不能。它只保留字符串前 N 个字符，不理解 token、password、credentials、PII 或 JSON path。Audit actionData 也可能直接包含 credentials/RPC params；平台没有覆盖两条链的统一 redactor。
+
+### 7. Event SQL queue 的 `batch_size=10000` 是否限制队列最多一万条？
+
+不是。底层 `new LinkedBlockingQueue<>()` 没有容量，`batch_size` 只控制一次 poll/drain 的批量上限。生产持续快于数据库时，队列可无界占用 heap。
+
+### 8. Event batch 的事务失败粒度是什么？
+
+一个队列取出的批次按 EventType 分组，但所有分组在同一个 TransactionTemplate 中执行。任一 batchUpdate 抛错会回滚该事务，队列把批内所有 future 标成失败，不做自动重试。事务原子性不等于幂等；五表无唯一约束，重复 event id 不会被内建去重。
+
+### 9. Event future 会影响 Rule Engine ack 吗？
+
+不会。Debug future 只挂失败日志 callback，消息处理继续；Error/Lifecycle 的调用甚至直接忽略 future。Rule Engine ack 成功不证明 Debug Event 已提交。
+
+### 10. Debug rate limit 是集群全局的吗？
+
+不是。`debugPerTenantLimits` 是 ActorSystemContext 内的 JVM ConcurrentMap。每个服务实例独立计数，扩缩容或重启都会改变集群总有效速率和本机状态。
+
+### 11. REST Event filter 与普通按类型查询有什么差别？
+
+按类型 GET 只带 EventType、时间、textSearch/排序/分页；POST filter 根据五种 EventFilter 子类型下推字段谓词。filter 为空时 DAO 回退到普通按类型查询。
+
+### 12. Event 与 Audit 的时间范围是否包含端点？
+
+包含。Repository 条件分别是 `ts >= startTime AND ts <= endTime`、`createdTime >= startTime AND createdTime <= endTime`，是闭区间；未传端点则相应条件关闭。
+
+### 13. `getLatestRuleNodeDebugInput` 是否保证找到历史上最近一条 IN？
+
+不保证。它只查询最新两条 Debug Rule Node Event，再在内存中找第一条 `type=IN`。若最新两条都是 OUT，即使第三条是 IN 也返回 null；底层只按毫秒级 `ts DESC` 排序，没有 id 次排序，同毫秒并列事件中哪两条入选也不稳定。
+
+### 14. Audit 的 OFF/W/RW 如何判定？
+
+AuditLogLevelFilter 先按 EntityType 查 mask，再根据 `ActionType.isRead()` 的硬编码值选 read 或 write 位。OFF 都不记，W 记录 `isRead=false`，RW 两类都记；未配置 EntityType 等同关闭。它不是 HTTP/业务语义推断：只有 `CREDENTIALS_READ`、`ATTRIBUTES_READ` 为 read，LOGIN、LOGOUT、LOCKOUT、RPC_CALL 等都落入 write。
+
+### 15. Audit actionData 从哪里来？
+
+AuditLogServiceImpl 按 ActionType switch，从 entity 和 additionalInfo 构造 JSON。不同动作可放实体快照、Rule Chain metadata、属性、遥测、relation、登录客户端、RPC params、credentials 或 provisionRequest。
+
+### 16. Audit 如何记录业务失败？
+
+BaseController 捕获业务异常后发起带 Exception 的 audit，再重抛原异常。Audit 将状态设为 FAILURE，并把完整 Java stack trace 写入 `action_failure_details`；RPC_CALL 也可用 rpc error string 判失败。
+
+### 17. Audit 写入与原业务保存是否同事务？
+
+不是。业务保存先完成或抛错，Audit producer 随后在调用线程构造 actionData、查询名称并校验，成功后才提交到共享 JpaExecutorService；真正 `auditLogDao.save` 在另一个线程的独立 JPA 事务中。因此异步 JPA 失败不会回滚业务保存，但未捕获的构造异常或 executor 拒绝可使实体已保存而 HTTP 仍失败；名称查询异常被忽略，普通 validator 异常返回 immediate failed future。也可能业务失败但 FAILURE Audit 成功。BaseController helper 对 SYS_ADMIN 还会直接跳过 Audit。
+
+### 18. Entity Action Rule Engine 消息与 Audit 的关系是什么？
+
+它们是同一入口发起的两条旁路。成功动作可先推 Rule Engine TbMsg，推送异常被捕获；随后仍调用 Audit。失败动作跳过 Rule Engine 分支但仍 Audit，没有共同 ack 或事务。
+
+### 19. `audit_log` 为什么没有外键？
+
+DDL 只保存 tenant/customer/entity/user 的逻辑 ID 和快照名称，没有 REFERENCES。这样实体或用户删除后历史仍可保留，也减少写入耦合；代价是数据库不能保证引用存在或自动级联清理。
+
+### 20. Audit REST 分页为什么是 offset 分页？
+
+API 要求 pageSize/page，TimePageLink 转 Spring Pageable，最终对应 LIMIT/OFFSET。深页成本随 offset 增长；并发新增记录会移动后续页边界，不具备 cursor 快照语义。
+
+### 21. Dummy AuditLogService 与 DummyAuditLogSink 有什么差别？
+
+`audit-log.enabled=false` 使用 Dummy service，不写 DB，查询空页，写返回 null；`sink.type=none` 只让外部 sink no-op，AuditLogService 仍写 PostgreSQL，REST 仍能查询。
+
+### 22. Elasticsearch sink 失败会让 Audit future 失败吗？
+
+分情况。JpaExecutor Callable 在 DB commit 后调用 sink；ES executor 接受任务后，task 内部异常和异步 HTTP failure 只记 error/warn，通常不令外层 future 失败。若 `executor.execute` 自身拒绝任务，异常会穿透 sink，使 Callable 和 Audit future 失败；但 PostgreSQL row 已提交，不会回滚。常见入口忽略该 future，所以这类失败通常也不会同步改变 HTTP 结果。
+
+### 23. shutdownNow 对 Event 与 ES sink 有什么风险？
+
+Event SQL queue 和 ES sink 销毁都使用 `shutdownNow`，没有显式 drain/await。进程优雅关闭窗口也可能遗留未消费元素；Event 的 pending future 可能不完成，ES 外部副本可能缺失。
+
+### 24. TTL 为什么不能精确到配置秒数？
+
+TTL 删除整分区，条件还是 `partitionEnd < expTime`，并由 owner scheduler 周期执行。误差至少受分区宽度、严格边界、检查周期和 owner 延迟影响；debug 默认小时分区比 regular/audit 周分区精细。
+
+### 25. 排查“业务成功但没有记录”时怎样区分两条链？
+
+Debug 先查 debugMode、JVM rate limit、同步分区检查/DDL、Event queue/批事务和 callback；Audit 先查 enabled、SYS_ADMIN 跳过条件、ActionType 硬编码分类、同步 producer、共享 JpaExecutor/JPA 分区与 future。若 PostgreSQL audit 已存在但 ES 不存在，再查 sink executor/HTTP listener。不要用 Rule Engine ack、Kafka offset、WebSocket 或 Edge Event 表替代这两条链的证据。
+
+---
+
+[上一篇：35 Relation 流程](../35-relation-flow/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/36-event-audit-log.svg) | [下一篇：37 Rule Node 外部集成流程](../37-rule-node-external-integration/README.md)

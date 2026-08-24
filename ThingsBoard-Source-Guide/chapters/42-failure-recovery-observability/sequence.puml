@@ -1,0 +1,476 @@
+@startuml
+title ThingsBoard release-3.6 - failure recovery and observability
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #111827
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #001F33
+skinparam ParticipantBackgroundColor #083B66
+skinparam ParticipantFontColor #FFFFFF
+skinparam SequenceGroupBorderColor #9A3412
+skinparam SequenceGroupBackgroundColor #FFF7ED
+skinparam NoteBorderColor #166534
+skinparam NoteBackgroundColor #F0FDF4
+skinparam NoteFontColor #111827
+skinparam DividerBorderColor #111827
+skinparam DividerBackgroundColor #E5E7EB
+skinparam BoxBorderColor #001F33
+
+box "Durable queue boundary" #EFF6FF
+queue "Queue provider\n(Kafka shown first)" as Broker
+participant "TbKafkaConsumerTemplate" as Kafka
+end box
+
+box "Rule Engine consumer JVM" #F0FDF4
+participant "TbRuleEngineQueue\nConsumerManager" as Manager
+participant "SubmitStrategy" as Submit
+participant "TbMsgPackProcessingContext" as Pack
+participant "TbRuleEngineProcessing\nStrategy" as Strategy
+end box
+
+box "Actor and side effects" #FFF7ED
+participant "Tenant / RuleChain /\nRuleNode actors" as Actors
+participant "Rule Node" as Node
+database "PostgreSQL / external target" as Target
+end box
+
+== Successful processing and explicit commit boundary ==
+
+Manager -> Kafka: poll(queue.pollInterval)
+Kafka -> Broker: KafkaConsumer.poll(duration)
+Broker --> Kafka: records at current position
+Kafka -> Kafka: decode each record
+Kafka --> Manager: List<TbProtoQueueMsg>
+Manager -> Submit: init(msgs)
+Manager -> Pack: new(pack, skipTimeoutPossible)
+Manager -> Submit: submitAttempt(callback)
+Submit -> Manager: submitMessage(id, msg)
+Manager -> Pack: create TbMsgPackCallback
+Manager -> Actors: ActorSystemContext.tell(QueueToRuleEngineMsg)
+Actors -> Node: tbNode.onMsg(...)
+Node -> Target: business side effect
+Target --> Node: commit / external response
+Node -> Pack: callback.onSuccess()
+Pack -> Pack: pending -> success; latch countDown
+Manager -> Pack: await(packProcessingTimeout)
+Pack --> Manager: completed
+Manager -> Strategy: analyze(result)
+Strategy --> Manager: decision(commit=true)
+Manager -> Pack: cleanup(); clear maps; canceled=true
+note right of Pack
+isCanceled = skipTimeoutMsgsPossible AND canceled.
+Default Main SKIP_ALL_FAILURES passes false, so its late
+callback remains valid and Rule Node work may continue after commit.
+Retry strategies and SKIP_ALL_FAILURES_AND_TIMED_OUT pass true.
+end note
+Manager -> Submit: stop()
+Manager -> Kafka: commit()
+Kafka -> Broker: commitSync()
+alt offset commit acknowledged
+  Broker --> Kafka: success
+  Kafka --> Manager: return
+else commitSync throws
+  Broker --> Kafka: commit exception
+  Kafka --> Manager: exception
+  Manager -> Manager: outer catch; warn; sleep(pollDuration)
+  Manager -> Kafka: next poll() without seek or pack resubmit
+  note over Manager,Broker
+  Consumer position is already after the failed pack.
+  A later higher-offset commit may cross it; restart/rebalance before
+  that commit may instead redeliver from the old committed offset.
+  end note
+end
+
+note over Target,Broker
+The database/external effect and queue offset are not one transaction.
+Success followed by process death before commit allows redelivery.
+Idempotency belongs to the Rule Node and target data model.
+end note
+
+== Failure, timeout, in-memory reprocess, and final skip ==
+
+Manager -> Kafka: poll(pack)
+Kafka --> Manager: records
+Manager -> Pack: pendingMap = records
+Manager -> Actors: submit all / strategy-selected records
+
+alt callback failure
+  Actors -> Pack: onFailure(tenantId, id, exception)
+  Pack -> Pack: pending -> failed
+else processing timeout
+  Manager -> Pack: await(...) returns false
+  note right of Pack
+  Timeout does not cancel Actor or Rule Node work.
+  Late callbacks can arrive after cleanup. They are invalid only when
+  skipTimeoutMsgsPossible=true; default Main passes false.
+  end note
+else rate limit exception
+  Actors -> Pack: TbMsgPackCallback.onRateLimit(...)
+  Pack -> Pack: onSuccess(id)
+end
+
+Manager -> Strategy: analyze(pending/failed/success)
+alt retry selected records
+  Strategy -> Strategy: retryCount++
+  note right of Strategy
+  Default High Priority: RETRY_FAILED_AND_TIMED_OUT,
+  retries=0 and failurePercentage=0, so no retry-count limit.
+  Default Sequential By Originator: retries=3.
+  end note
+  Strategy -> Strategy: sleep(pauseBetweenRetries)
+  Strategy --> Manager: commit=false + reprocessMap
+  Manager -> Pack: cleanup old context; validity is strategy-dependent
+  Manager -> Submit: update(reprocessMap)
+  Manager -> Pack: new context
+  Manager -> Actors: resubmit selected records
+else max retries / failure percentage / skip strategy
+  Strategy --> Manager: commit=true
+  Manager -> Kafka: commitSync()
+  note over Manager,Broker
+  No application DLQ write occurs here.
+  Remaining failed or timed-out payloads are not durably recorded as attempts.
+  end note
+end
+
+== Process crash windows ==
+
+group Crash A: after side effect, before broker commit
+  Node -> Target: commit side effect
+  Target --> Node: success
+  Node -> Pack: callback success
+  Manager -x Kafka: process dies before commit
+  Broker -> Kafka: redeliver from committed offset
+  Kafka -> Manager: same record after restart
+  Manager -> Actors: execute again
+end
+
+group Crash B: after poll, before side effect
+  Broker -> Kafka: record
+  Kafka --> Manager: decoded record
+  Manager -x Actors: process dies
+  Broker -> Kafka: redeliver if provider retained unconfirmed record
+end
+
+group Decode poison
+  Broker -> Kafka: records N, N+1, N+2
+  Kafka -> Kafka: decode N succeeds
+  Kafka -> Kafka: decode N+1 throws IOException
+  Kafka --> Manager: poll throws RuntimeException
+  Manager -> Manager: warn + sleep pollDuration
+  note over Kafka,Broker
+  There is no common seek, nack, or DLQ call.
+  Kafka position and committed offset now differ;
+  later commit or restart/rebalance determines the observed outcome.
+  end note
+end
+
+newpage Provider commit methods are not equivalent
+
+participant "TB consumer caller" as Caller
+participant "Provider template" as Provider
+queue "Remote provider" as Remote
+participant "Local async executor" as LocalExec
+
+== Kafka ==
+Caller -> Provider: commit()
+Provider -> Remote: Kafka commitSync()
+Remote --> Provider: success or exception
+Provider --> Caller: return or throw
+
+== RabbitMQ ==
+Provider -> Remote: queueDeclare(durable=false, exclusive=false, autoDelete=false)
+Provider -> Remote: basicPublish(empty BasicProperties)
+note over Provider,Remote
+The queue is non-durable and the message is non-persistent.
+The producer does not enable publisher confirms.
+end note
+Caller -> Provider: commit()
+Provider -> Remote: basicAck(0, true)
+alt IOException
+  Remote --> Provider: IOException
+  Provider -> Provider: log.error; do not rethrow
+end
+Provider --> Caller: return
+note over Caller,Remote
+basicAck directly sends a method frame; its return is not a broker
+acknowledgement. A normal return therefore does not prove durable confirm.
+end note
+
+== AWS SQS ==
+Caller -> Provider: commit()
+Provider -> LocalExec: submit(deleteMessageBatch)
+Provider -> Provider: pendingMessages.clear()
+Provider --> Caller: return before delete result
+LocalExec -> Remote: deleteMessageBatch later
+Remote --> LocalExec: success/failure not propagated to caller
+
+== Google Pub/Sub ==
+Caller -> Provider: commit()
+Provider -> Remote: acknowledgeCallable().futureCall()
+Provider -> Provider: acknowledgeRequests.clear()
+Provider --> Caller: return before future result
+
+== Azure Service Bus ==
+Caller -> Provider: commit()
+Provider -> Remote: completeMessageAsync(deliveryTag)
+Provider -> Provider: pendingMessages.clear()
+Provider --> Caller: return before completion result
+
+== In-memory ==
+Caller -> Provider: poll() removes from JVM storage
+Caller -> Provider: commit()
+Provider --> Caller: no-op
+
+note over Caller,Remote
+The common commit() name does not make remote acknowledgement synchronous.
+Provider redelivery, visibility timeout, ack deadline, and channel state remain provider-specific.
+end note
+
+newpage Actor initialization, process failure, and poison behavior
+
+box "Actor system JVM" #EFF6FF
+participant "DefaultTbActorSystem" as ActorSystem
+participant "TbActorMailbox" as Mailbox
+participant "TbActor" as Actor
+participant "ComponentMsgProcessor" as Processor
+end box
+participant "Rule Engine pack callback" as ReCallback
+
+== Initialization retry ==
+ActorSystem -> Mailbox: createActor(); initActor()
+Mailbox -> Actor: init(ctx), attempt=1
+alt init succeeds
+  Actor --> Mailbox: return
+  Mailbox -> Mailbox: ready=true; process queues
+else recoverable init failure
+  Actor --> Mailbox: Throwable
+  Mailbox -> Actor: onInitFailure(attempt, t)
+  Actor --> Mailbox: retryWithDelay(5000 * attempt)
+  Mailbox -> Mailbox: schedule next tryInit
+else unrecoverable or maximum attempts
+  Mailbox -> Mailbox: stopReason=INIT_FAILED
+  Mailbox -> Actor: destroy(INIT_FAILED, cause)
+  Mailbox -> ReCallback: onTbActorStopped for queued messages
+end
+
+== Process failure is resume/stop, not retry/restart ==
+Mailbox -> Mailbox: poll one mailbox message
+Mailbox -> Actor: process(msg)
+alt ordinary Exception escapes
+  Actor --> Mailbox: Exception
+  Mailbox -> Actor: onProcessFailure(msg, t)
+  Actor --> Mailbox: ProcessFailureStrategy.resume()
+  Mailbox -> Mailbox: continue with next message
+  note right of Mailbox
+  The current message is not put back into the mailbox.
+  end note
+else Error escapes
+  Actor --> Mailbox: Error
+  Actor --> Mailbox: ProcessFailureStrategy.stop()
+  Mailbox -> ActorSystem: stop(selfId)
+  ActorSystem -> Actor: destroy(STOPPED, cause)
+else TbRuleNodeUpdateException
+  Actor --> Mailbox: update exception
+  Mailbox -> Actor: destroy(INIT_FAILED, cause)
+end
+
+== Component lifecycle restart ==
+Actor -> Processor: onUpdate(ctx) / onActivate(ctx)
+Processor -> Processor: stop(ctx)
+Processor -> Processor: start(ctx)
+note right of Processor
+This restart is processor lifecycle handling.
+It is not automatic replay of the message that triggered a failure.
+end note
+
+== Rule Node ordinary exception ==
+Mailbox -> Actor: RuleNodeActor.process(msg)
+Actor -> Processor: onRuleChainToRuleNodeMsg
+Processor -> Processor: tbNode.onMsg
+alt node throws Exception
+  Processor -> Processor: persist debug/error where enabled
+  Processor -> ReCallback: route Failure or onFailure
+end
+
+newpage Transport sessions, service restart, and subscription repair
+
+box "Transport process" #F0FDF4
+participant "Protocol handler" as Protocol
+participant "DefaultTransportService" as Transport
+collections "sessions<UUID, SessionMetaData>" as LocalSessions
+end box
+
+queue "Core queue" as CoreQueue
+
+box "Core process" #EFF6FF
+participant "DeviceActor" as DeviceActor
+collections "DeviceActor session maps" as ActorSessions
+participant "TbCoreStartupService" as Startup
+participant "LocalSubscriptionService" as LocalSubs
+participant "DefaultSubscription\nManagerService" as SubManager
+participant "DefaultActorService" as ActorService
+participant "HashPartitionService" as PartitionService
+end box
+
+database "Shared cache (Redis mode)" as Cache
+participant "ZkDiscoveryService" as Zk
+participant "Device client" as Device
+
+== Session open and snapshot ==
+Device -> Protocol: TCP/MQTT connect
+Protocol -> Transport: registerAsyncSession(info, listener)
+Transport -> LocalSessions: computeIfAbsent(sessionId, listener)
+Protocol -> Transport: process(OPEN / subscribe)
+Transport -> CoreQueue: ToDeviceActorMsg
+CoreQueue -> DeviceActor: process session message
+DeviceActor -> ActorSessions: add ASYNC session/subscriptions
+DeviceActor -> Cache: dumpSessions() [non-local cache only]
+
+== Transport process death ==
+Transport -x LocalSessions: JVM dies; listeners lost
+Protocol -x Device: socket closes
+Zk -> SubManager: OtherServiceShutdownEvent(serviceId, serviceTypes)
+SubManager -> SubManager: remove subscription ownership for stopped Core
+Zk -> PartitionService: delayed recalculatePartitions(...)
+PartitionService -> ActorService: PartitionChangeEvent (separate event path)
+ActorService -> DeviceActor: PartitionChangeMsg via AppActor/TenantActor tree
+DeviceActor -> DeviceActor: stop if TB_CORE partition moved
+note over LocalSessions,Cache
+The shared cache contains metadata, nodeId, activity, and subscription flags.
+It does not contain a live socket or SessionMsgListener.
+SYNC sessions are excluded from the snapshot.
+end note
+note over Zk,DeviceActor
+OtherServiceShutdownEvent is not sent directly to DeviceActor.
+Subscription ownership cleanup and Actor partition adjustment are distinct flows.
+end note
+
+== DeviceActor recreation ==
+DeviceActor -> Cache: restoreSessions()
+Cache --> DeviceActor: ASYNC metadata snapshot or decode failure
+DeviceActor -> ActorSessions: rebuild metadata maps
+DeviceActor -> Transport: downlink to old nodeId/sessionId
+Transport -> LocalSessions: sessions.get(sessionId)
+alt no live local session
+  LocalSessions --> Transport: null
+  Transport -> Transport: no listener delivery
+end
+
+== Real connection recovery ==
+Device -> Protocol: client reconnect/backoff
+Protocol -> Transport: new register + OPEN + subscriptions
+Transport -> CoreQueue: new session state
+CoreQueue -> DeviceActor: replace/update snapshot
+
+== Core startup subscription repair ==
+Startup -> CoreQueue: broadcast CoreStartupMsg(serviceId, partitions)
+CoreQueue -> LocalSubs: onCoreStartupMsg(msg)
+LocalSubs -> LocalSubs: submit asynchronous repair task
+LocalSubs --> CoreQueue: callback success before repair completes
+LocalSubs -> CoreQueue: push UPDATED subscriptions to new Core partitions
+
+note over Startup,LocalSubs
+CoreStartupMsg repairs telemetry/WebSocket subscription ownership only.
+It is not a barrier for all service state and does not restore transport connections.
+end note
+
+newpage Database queues, futures, and observability
+
+box "PostgreSQL async batch" #FFF7ED
+participant "DAO caller" as DaoCaller
+queue "TbSqlBlockingQueue" as SqlQueue
+participant "Batch repository" as Repository
+database "PostgreSQL" as Pg
+end box
+
+box "Cassandra buffered executor" #EFF6FF
+participant "AbstractBufferedRateExecutor" as CassExec
+participant "Cassandra driver future" as Driver
+database "Cassandra" as Cassandra
+end box
+
+box "Signals" #F0FDF4
+participant "DefaultStatsFactory" as Stats
+participant "Periodic loggers" as Logs
+participant "Actuator / Prometheus" as Prom
+participant "KafkaConsumerStatsService" as Lag
+participant "Debug Event / Audit" as Events
+end box
+
+== PostgreSQL batch future ==
+DaoCaller -> SqlQueue: add(entity)
+SqlQueue --> DaoCaller: pending SettableFuture
+SqlQueue -> SqlQueue: poll + drainTo(batchSize)
+SqlQueue -> Repository: saveFunction.accept(batch)
+Repository -> Pg: TransactionTemplate transaction
+alt commit succeeds
+  Pg --> Repository: commit
+  Repository --> SqlQueue: return
+  SqlQueue -> DaoCaller: future.set(null) for each entity
+else transaction/save throws
+  Pg --> Repository: rollback/error
+  Repository --> SqlQueue: Throwable
+  SqlQueue -> DaoCaller: future.setException(t) for each entity
+  SqlQueue -> SqlQueue: clear batch; no automatic requeue
+end
+
+group PostgreSQL crash windows
+  DaoCaller -> SqlQueue: add(entity)
+  SqlQueue -x Repository: process dies before save; entity lost from JVM
+  Repository -> Pg: commit another batch
+  Pg --> Repository: success
+  Repository -x SqlQueue: process dies before future.set; upstream may replay
+end
+
+== Cassandra buffered future ==
+DaoCaller -> CassExec: submit(task)
+alt tenant rate limit / queue full
+  CassExec --> DaoCaller: future exception
+else queued
+  CassExec -> Driver: execute(task)
+  alt execute / withTimeout / addCallback throws synchronously
+    Driver --> CassExec: Throwable before callback installation completes
+    CassExec -> CassExec: outer catch: failed++ / concurrency-- / debug log
+    note over CassExec,DaoCaller
+    taskCtx.future is not completed with setException.
+    The caller future may remain pending forever.
+    end note
+  else callback installed
+    Driver -> Cassandra: async request
+    alt timeout or driver failure callback
+      Driver --> CassExec: onFailure(t)
+      CassExec --> DaoCaller: future.setException(t); no executor requeue
+    else success callback
+      Cassandra --> Driver: result
+      Driver --> CassExec: onSuccess(result)
+      CassExec --> DaoCaller: future.set(result)
+    end
+  end
+end
+
+== Observability fan-out and blind spots ==
+SqlQueue -> Stats: successful/failed/total AtomicInteger
+SqlQueue -> Logs: queueSize + batch totals; periodic reset
+Manager -> Stats: RE tmp/final counters and optional timers
+Stats -> Prom: Micrometer counters/gauges/timers
+Lag -> Broker: committed offsets + end offsets
+Lag -> Logs: non-zero lag at INFO
+Actors -> Events: debug/error event when enabled and not limited
+DaoCaller -> Events: audit action when enabled by mask
+
+note over Stats,Prom
+metrics.enabled=false stubs StatsCounter's Micrometer Counter,
+but AtomicInteger log windows remain. Gauge/Timer registration follows their
+own call paths. Prometheus also requires actuator endpoint exposure.
+end note
+
+note over Logs,Events
+There is no common end-to-end trace, durable attempt ledger, Actor mailbox gauge,
+application DLQ, SQL oldest-age metric, or unified provider async-ack failure metric.
+Debug Event and Audit are fallible side channels, not completion receipts.
+end note
+
+@enduml

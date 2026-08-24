@@ -1,0 +1,265 @@
+@startuml
+title ThingsBoard release-3.6 - service startup and shutdown
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #111827
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #001F33
+skinparam ParticipantBackgroundColor #083B66
+skinparam ParticipantFontColor #FFFFFF
+skinparam SequenceGroupBorderColor #9A3412
+skinparam SequenceGroupBackgroundColor #FFF7ED
+skinparam NoteBorderColor #166534
+skinparam NoteBackgroundColor #F0FDF4
+skinparam NoteFontColor #111827
+skinparam DividerBorderColor #111827
+skinparam DividerBackgroundColor #E5E7EB
+
+box "One-shot database process" #FFF7ED
+participant "ThingsboardInstallApplication" as InstallMain
+participant "Install Spring context\n(profile=install)" as InstallCtx
+participant "ThingsboardInstallService" as Installer
+database "PostgreSQL / Cassandra" as InstallDb
+end box
+
+== Install or upgrade: separate process ==
+
+InstallMain -> InstallMain: main(String[])
+InstallMain -> InstallCtx: setAdditionalProfiles("install")\nrun(updateArguments(args))
+InstallCtx --> InstallMain: ConfigurableApplicationContext
+InstallMain -> Installer: performInstall()
+alt install.upgrade = false
+  Installer -> InstallDb: create entity schema
+  Installer -> InstallDb: create views/functions/device_info view
+  Installer -> InstallDb: create TS schema/keyspace/latest schema
+  Installer -> InstallDb: load system data and optional demo
+else install.upgrade = true
+  Installer -> Installer: cacheCleanupService.clearCache(fromVersion)
+  alt fromVersion = cassandra-latest-to-postgres
+    Installer -> InstallDb: latestMigrateService.migrate()
+  else fromVersion = 3.6.2-images
+    Installer -> InstallDb: installScripts.updateImages()
+  else regular version
+    Installer -> InstallDb: fall-through upgradeDatabase(fromVersion...)
+    Installer -> InstallDb: post-switch views + data/system resources
+  end
+end
+Installer -> InstallCtx: SpringApplication.exit(context) [finally]
+InstallCtx --> InstallMain: context closed
+
+note over InstallMain,InstallDb
+This context never becomes the runtime context.
+Deployment orchestration must start runtime services later.
+end note
+
+newpage Runtime startup and shutdown
+
+box "Java runtime process" #EFF6FF
+participant "ThingsboardServerApplication" as Main
+participant "Spring ApplicationContext" as Spring
+participant "ServiceInfo + Discovery" as Discovery
+participant "HashPartitionService" as Partition
+participant "TbCoreStartupService" as CoreStartup
+participant "TbClusterService" as Cluster
+participant "DefaultActorService" as Actors
+participant "Core / Rule consumers" as Consumers
+participant "DefaultTransportService" as Transport
+participant "MQTT / CoAP servers" as Protocols
+participant "Same-order listener" as Regular
+participant "Async worker/resource" as Workers
+participant "Selected singleton" as Destroyed
+end box
+
+queue "Kafka / queue backend" as Broker
+database "Application database" as Db
+
+== Context refresh: dependency graph, not a global total order ==
+
+Main -> Main: main(String[])
+Main -> Main: updateArguments(args)
+Main -> Spring: SpringApplication.run(...)
+activate Spring
+
+note over Spring,Protocols
+Each selected singleton has its own partial order:
+construct -> inject dependencies -> local @PostConstruct.
+The container invokes creations one at a time by its dependency graph,
+but unrelated beans have no mutual order contract.
+
+Independent bean-local examples (list order is not execution order):
+* ServiceInfo: id + ServiceType list
+* Partition: queue topics + partition sizes
+* Actor service: dispatchers + root actors
+* Rule consumer: DB findAllQueues + managers/executors
+* Transport: producer/templates + notification subscription
+* MQTT/CoAP: bind protocol ports
+end note
+
+Spring -> Spring: required singleton pre-instantiation completes
+note over Spring,Protocols
+Protocol ports may be open before ApplicationReadyEvent.
+end note
+
+Spring -> Discovery: setTransports()\nContextRefreshedEvent
+Discovery -> Spring: enumerate TbTransportService beans
+
+== ApplicationReadyEvent ordered listeners ==
+
+Spring -> Partition: partitionsInit() [order 1]
+Spring -> Discovery: publish current service [order 2]
+Discovery -> Partition: recalculatePartitions(current, others)
+Partition -> Spring: publish PartitionChangeEvent(s)
+Spring -> Consumers: onTbApplicationEvent(partitions)
+Consumers -> Consumers: update/queue assignments
+Spring -> Actors: onTbApplicationEvent(partitions)
+Actors -> Actors: enqueue PartitionChangeMsg
+
+Spring -> CoreStartup: onApplicationEvent(Ready) [order 8]
+CoreStartup -> Partition: getMyPartitions(QueueKey(TB_CORE))
+Partition --> CoreStartup: local core partition ids
+CoreStartup -> Cluster: broadcastToCore(CoreStartupMsg)
+Cluster -> Broker: publish core notification
+
+Spring -> Actors: onApplicationEvent(Ready) [order 9]
+Actors -> Actors: tellWithHighPriority(AppInitMsg)
+note right of Actors
+Listener returns after enqueue.
+Actor-tree initialization continues asynchronously.
+end note
+
+loop order 10 listeners; one callback at a time, peer order unspecified
+  Spring -> Regular: invoke next listener
+  alt callback submits asynchronous work
+    Regular --> Workers: submit poll loop / scheduled work
+  else callback performs synchronous setup
+    Regular -> Regular: subscribe or initialize template
+  end
+  Regular --> Spring: callback returns
+end
+
+note over Regular,Workers
+Core/rule consumers, transport API and update checks are examples.
+Their callbacks are serial; submitted workers may overlap later callbacks.
+end note
+
+Spring -> Transport: start() [transport order]
+Transport -> Transport: launch notification poll loop
+Workers -> Broker: asynchronous poll/work may already be running
+deactivate Spring
+
+... runtime: poll, callback, commit, scheduled work ...
+
+Consumers -> Broker: poll(pack)
+Consumers -> Actors: tell(message)
+Actors -> Db: business transaction
+Db --> Actors: commit / rollback
+Actors --> Consumers: callback
+Consumers -> Broker: commit offset
+
+== Context close: dependency-driven destruction ==
+
+Main -> Spring: shutdown hook / close()
+activate Spring
+note over Spring
+No project ContextClosedEvent listener or SmartLifecycle phase.
+Peer beans without dependency edges have no documented total order.
+end note
+
+loop eligible singletons; one destroy callback at a time, peer order unspecified
+  Spring -> Destroyed: invoke next @PreDestroy / destroyMethod
+  alt selected bean = ZkDiscoveryService
+    Destroyed -> Destroyed: stopped=true; unpublishCurrentServer()
+    Destroyed -> Destroyed: client.delete().forPath(nodePath)
+    Destroyed -> Destroyed: close cache; close client; shutdownNow ZK executor
+    note right of Destroyed
+    Ephemeral-session removal is fallback when explicit delete fails
+    or the session is already lost.
+    Peer ZK watchers observe node removal later and trigger recalculation;
+    this is not a direct destroy-to-partition call.
+    end note
+  else selected bean = Rule Engine consumer
+    Destroyed -> Destroyed: stop managers; await each task up to 30s
+    Destroyed --> Workers: shutdownNow context executors
+  else selected bean = Actor service
+    Destroyed -> Destroyed: shutdown dispatchers; await each up to 3s
+    Destroyed --> Workers: shutdownNow scheduler; clear actor map
+  else selected bean = transport/protocol
+    Destroyed -> Destroyed: close/unsubscribe; bean-local optional wait
+    Destroyed --> Workers: shutdownNow or Netty graceful shutdown
+  else another singleton
+    Destroyed -> Destroyed: run its bean-local destroy callback
+  end
+  Destroyed --> Spring: callback returns
+end
+
+Spring --> Main: context closed
+deactivate Spring
+
+note over Consumers,Db
+shutdownNow is not completion. An effect committed before an
+offset commit may be replayed; an open JDBC call may outlive interruption.
+end note
+
+newpage Node.js JS Executor process
+
+box "Independent Node.js process" #F0FDF4
+participant "server.ts" as NodeMain
+participant "Queue template" as NodeQueue
+participant "JsInvokeMessageProcessor" as JsProcessor
+participant "HttpServer" as Health
+end box
+
+queue "JS request/response topics" as JsBroker
+
+== JS Executor startup ==
+
+NodeMain -> NodeMain: async IIFE
+NodeMain -> NodeQueue: createQueue(queue_type)
+NodeMain -> NodeQueue: await init()
+alt queue_type = kafka
+  NodeQueue -> JsBroker: connect admin; list/create request topic
+  NodeQueue -> NodeQueue: create consumer object; create producer object
+  NodeQueue -> JsProcessor: construct JsInvokeMessageProcessor
+  NodeQueue -> JsBroker: connect consumer; connect producer
+  NodeQueue -> NodeQueue: start response send loop
+  NodeQueue -> JsBroker: subscribe request topic
+  NodeQueue -> JsBroker: consumer.run(eachMessage)
+else pubsub / aws-sqs / rabbitmq / service-bus
+  NodeQueue -> NodeQueue: backend-specific init()
+end
+NodeQueue --> NodeMain: queue template started
+NodeMain -> Health: new HttpServer(httpPort)
+Health -> Health: listen + /livenessProbe
+
+JsBroker -> NodeQueue: JS request
+NodeQueue -> JsProcessor: onJsInvokeMessage(msg)
+JsProcessor -> JsProcessor: compile/invoke/release
+JsProcessor -> NodeQueue: send(response)
+NodeQueue -> JsBroker: batched response
+
+== JS Executor signal shutdown ==
+
+NodeMain -> NodeMain: SIGTERM/SIGINT/uncaughtException
+NodeMain -> Health: await stop()
+Health -> Health: end sockets + server.close()
+NodeMain -> NodeQueue: await destroy()
+alt queue_type = kafka
+  NodeQueue -> JsBroker: disconnect admin
+  NodeQueue -> JsBroker: disconnect consumer
+  NodeQueue -> JsBroker: flush pending response batch
+  NodeQueue -> JsBroker: disconnect producer
+  NodeQueue -> NodeMain: process.exit(0) [KafkaTemplate only]
+else pubsub / aws-sqs / rabbitmq / service-bus
+  NodeQueue -> NodeQueue: backend-specific destroy()
+end
+
+note over NodeMain,JsBroker
+Java RemoteJsInvokeService has a separate Spring lifecycle.
+There is no cross-process ready or shutdown barrier.
+Kafka admin/consumer/producer order must not be generalized to other queues.
+end note
+
+@enduml

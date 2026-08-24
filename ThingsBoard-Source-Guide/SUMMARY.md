@@ -46,17 +46,17 @@
 
 - <a id="chapter-30"></a>**30 Telemetry 查询流程**（已完成）：[Markdown](chapters/30-telemetry-query/README.md) · [HTML](chapters/30-telemetry-query/index.html) · [PlantUML](chapters/30-telemetry-query/sequence.puml) · [时序图 SVG](chapters/30-telemetry-query/sequence.svg) · [架构图 SVG](assets/architecture/30-telemetry-query.svg)
 - <a id="chapter-31"></a>**31 Timeseries TTL 清理流程**（已完成）：[Markdown](chapters/31-timeseries-ttl-cleanup/README.md) · [HTML](chapters/31-timeseries-ttl-cleanup/index.html) · [PlantUML](chapters/31-timeseries-ttl-cleanup/sequence.puml) · [时序图 SVG](chapters/31-timeseries-ttl-cleanup/sequence.svg) · [架构图 SVG](assets/architecture/31-timeseries-ttl-cleanup.svg)
-- <a id="chapter-32"></a>**32 Redis 与本地缓存流程**（待分析）：Cache-Aside、Caffeine/Redis、跨节点失效和一致性窗口。
-- <a id="chapter-33"></a>**33 WebSocket 订阅流程**（待分析）：session、subscription command、实时遥测通知和背压。
-- <a id="chapter-34"></a>**34 Entity Query 流程**（待分析）：EntityDataQuery、动态 SQL、关系过滤、latest join 和分页。
-- <a id="chapter-35"></a>**35 Relation 流程**（待分析）：关系创建、递归查询、方向语义与删除联动。
-- <a id="chapter-36"></a>**36 Event 与 Audit Log 流程**（待分析）：调试事件、审计上下文、TTL 与分区。
+- <a id="chapter-32"></a>**32 Redis 与本地缓存流程**（已完成）：[Markdown](chapters/32-redis-local-cache/README.md) · [HTML](chapters/32-redis-local-cache/index.html) · [PlantUML](chapters/32-redis-local-cache/sequence.puml) · [时序图 SVG](chapters/32-redis-local-cache/sequence.svg) · [架构图 SVG](assets/architecture/32-redis-local-cache.svg)
+- <a id="chapter-33"></a>**33 WebSocket 订阅流程**（已完成）：[Markdown](chapters/33-websocket-subscription/README.md) · [HTML](chapters/33-websocket-subscription/index.html) · [PlantUML](chapters/33-websocket-subscription/sequence.puml) · [时序图 SVG](chapters/33-websocket-subscription/sequence.svg) · [架构图 SVG](assets/architecture/33-websocket-subscription.svg)
+- <a id="chapter-34"></a>**34 Entity Query 流程**（已完成）：[Markdown](chapters/34-entity-query/README.md) · [HTML](chapters/34-entity-query/index.html) · [PlantUML](chapters/34-entity-query/sequence.puml) · [时序图 SVG](chapters/34-entity-query/sequence.svg) · [架构图 SVG](assets/architecture/34-entity-query.svg)
+- <a id="chapter-35"></a>**35 Relation 流程**（已完成）：[Markdown](chapters/35-relation-flow/README.md) · [HTML](chapters/35-relation-flow/index.html) · [PlantUML](chapters/35-relation-flow/sequence.puml) · [时序图 SVG](chapters/35-relation-flow/sequence.svg) · [架构图 SVG](assets/architecture/35-relation-flow.svg)
+- <a id="chapter-36"></a>**36 Event 与 Audit Log 流程**（已完成）：[Markdown](chapters/36-event-audit-log/README.md) · [HTML](chapters/36-event-audit-log/index.html) · [PlantUML](chapters/36-event-audit-log/sequence.puml) · [时序图 SVG](chapters/36-event-audit-log/sequence.svg) · [架构图 SVG](assets/architecture/36-event-audit-log.svg)
 
 ## 第五篇：平台协作与运行时
 
-- <a id="chapter-37"></a>**37 Rule Node 外部集成流程**（待分析）：HTTP/MQTT/Kafka/邮件节点、异步回调与错误关系。
-- <a id="chapter-38"></a>**38 Notification 流程**（待分析）：请求、模板、规则、队列、发送器与状态。
-- <a id="chapter-39"></a>**39 Edge 同步流程**（待分析）：Edge Event、gRPC、顺序、冲突和重试。
-- <a id="chapter-40"></a>**40 服务启动与关闭流程**（待分析）：Spring 生命周期、schema 安装、Actor/Queue/Transport 初始化顺序。
-- <a id="chapter-41"></a>**41 限流与 API Usage 流程**（待分析）：Transport 限流、租户配额、Rule Engine/DB 开关和统计。
-- <a id="chapter-42"></a>**42 失败恢复与可观测性**（待分析）：消息重放、死信缺口、指标、日志、debug event 和排障路径。
+- <a id="chapter-37"></a>**37 Rule Node 外部集成流程**（已完成）：[Markdown](chapters/37-rule-node-external-integration/README.md) · [HTML](chapters/37-rule-node-external-integration/index.html) · [PlantUML](chapters/37-rule-node-external-integration/sequence.puml) · [时序图 SVG](chapters/37-rule-node-external-integration/sequence.svg) · [架构图 SVG](assets/architecture/37-rule-node-external-integration.svg)
+- <a id="chapter-38"></a>**38 Notification 流程**（已完成）：[Markdown](chapters/38-notification-flow/README.md) · [HTML](chapters/38-notification-flow/index.html) · [PlantUML](chapters/38-notification-flow/sequence.puml) · [时序图 SVG](chapters/38-notification-flow/sequence.svg) · [架构图 SVG](assets/architecture/38-notification-flow.svg)
+- <a id="chapter-39"></a>**39 Edge 同步流程**（已完成）：[Markdown](chapters/39-edge-sync/README.md) · [HTML](chapters/39-edge-sync/index.html) · [PlantUML](chapters/39-edge-sync/sequence.puml) · [时序图 SVG](chapters/39-edge-sync/sequence.svg) · [架构图 SVG](assets/architecture/39-edge-sync.svg)
+- <a id="chapter-40"></a>**40 服务启动与关闭流程**（已完成）：[Markdown](chapters/40-service-lifecycle/README.md) · [HTML](chapters/40-service-lifecycle/index.html) · [PlantUML](chapters/40-service-lifecycle/sequence.puml) · [时序图 SVG](chapters/40-service-lifecycle/sequence.svg) · [架构图 SVG](assets/architecture/40-service-lifecycle.svg)
+- <a id="chapter-41"></a>**41 限流与 API Usage 流程**（已完成）：[Markdown](chapters/41-rate-limit-api-usage/README.md) · [HTML](chapters/41-rate-limit-api-usage/index.html) · [PlantUML](chapters/41-rate-limit-api-usage/sequence.puml) · [时序图 SVG](chapters/41-rate-limit-api-usage/sequence.svg) · [架构图 SVG](assets/architecture/41-rate-limit-api-usage.svg)
+- <a id="chapter-42"></a>**42 失败恢复与可观测性**（已完成）：[Markdown](chapters/42-failure-recovery-observability/README.md) · [HTML](chapters/42-failure-recovery-observability/index.html) · [PlantUML](chapters/42-failure-recovery-observability/sequence.puml) · [时序图 SVG](chapters/42-failure-recovery-observability/sequence.svg) · [架构图 SVG](assets/architecture/42-failure-recovery-observability.svg)

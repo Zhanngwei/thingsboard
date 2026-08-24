@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>42 失败恢复与可观测性 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航"><a href="README.md">Markdown</a><a href="../../index.html">全书目录</a><a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>42 失败恢复与可观测性</strong>
+      <a href="#一-流程目标">一、流程目标</a><a href="#二-入口">二、入口</a><a href="#三-完整调用链">三、完整调用链</a><a href="#四-消息流">四、消息流</a><a href="#五-时序图">五、时序图</a><a href="#六-数据变化">六、数据变化</a><a href="#七-源码分析">七、源码分析</a><a href="#八-actor-分析">八、Actor 分析</a><a href="#九-kafka-分析">九、Kafka 分析</a><a href="#十-数据库分析">十、数据库分析</a><a href="#十一-异常处理">十一、异常处理</a><a href="#十二-源码阅读路线">十二、源码阅读路线</a><a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
+  <script id="markdown-source" type="text/plain"># 42 失败恢复与可观测性
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章不把“队列存在”“调用了 commit”“有 metrics”推导成端到端可靠性保证，而是逐段核对失败后谁保留状态、谁重试、何时确认、进程崩溃后还能看到什么。队列提供者、Rule Engine 策略、Actor、Transport session、数据库 batch 和观测信号彼此没有统一事务。
+
+[上一篇：41 限流与 API Usage](../41-rate-limit-api-usage/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/42-failure-recovery-observability.svg) | [下一篇：全书目录](../../SUMMARY.md)
+
+[![失败恢复与可观测性架构图](../../assets/architecture/42-failure-recovery-observability.svg)](../../assets/architecture/42-failure-recovery-observability.svg)
+
+[![失败恢复与可观测性详细时序图](sequence.svg)](sequence.svg)
+
+---
+
+## 一、流程目标
+
+恢复分析必须先分开四个完成点：业务副作用完成、`TbMsgCallback` 完成、`TbQueueConsumer.commit()` 返回、broker 真正确认。它们可能依次发生，也可能因为 provider 的异步确认实现而只表示“已发起确认”。同样，日志、Micrometer、Kafka lag、Debug Event 与 Audit Log 是不同信号源；任一单点都不足以证明消息没有重复或丢失。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    P["poll pack"] --> A["Actor / Rule Node"]
+    A --> E["business side effect"]
+    E --> C["TbMsg callback"]
+    C --> D{"processing decision"}
+    D -->|"commit"| O["provider confirm"]
+    D -->|"reprocess"| R["same pack in JVM"]
+```
+
+必须固定以下十八条源码事实：
+
+1. [org.thingsboard.server.queue.common.AbstractTbQueueConsumerTemplate.poll(long)](../../../common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java#L117) 在 provider poll 后逐条 decode；任一 decode 抛 `IOException` 会令整次调用异常，没有统一 seek、nack 或 DLQ 分支。
+2. Kafka 的 [org.thingsboard.server.queue.kafka.TbKafkaConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerTemplate.java#L161) 是 `commitSync()`；这只提交 consumer offset，不与 Rule Node 的数据库/外部副作用组成事务。RabbitMQ 则声明 non-durable queue、使用默认 non-persistent `BasicProperties`；`basicAck` 返回不等于 broker 发回确认，且 `IOException` 被 consumer template 吞掉。
+3. [org.thingsboard.server.service.queue.ruleengine.TbRuleEngineQueueConsumerManager.processMsgs(List, TbQueueConsumer, Queue)](../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L393) 等 callback、执行 Processing Strategy，并先 `cleanup()`/`submitStrategy.stop()` 再 commit。`cleanup()` 只在 `isSkipTimeoutMsgs()==true` 时令旧 callback invalid；默认 Main 的该值为 false，超时消息可在 commit 后继续执行。若 Kafka `commitSync()` 抛错，外层只 sleep 后继续 poll，没有 seek 或重交原 pack。
+4. Rule Engine retry 是 `submitStrategy.update(reprocessMap)` 后对当前 JVM 内同一 pack 再提交，不是重新 poll broker，也不是持久 retry topic。
+5. 默认安装的 Main Queue 使用 `SKIP_ALL_FAILURES`；High Priority 使用 `RETRY_FAILED_AND_TIMED_OUT` 且 `retries=0`，在当前 RetryStrategy 中没有次数上限；只有 Sequential By Originator 默认 `retries=3`。具体默认值和 submit 顺序已在[第17章 Kafka Consumer](../17-kafka-consumer/index.html)展开，本章只分析故障恢复结果。
+6. [org.thingsboard.server.service.queue.TbMsgPackCallback.onRateLimit(RuleEngineException)](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackCallback.java#L110) 把 rate limit 记作 `ctx.onSuccess(id)`；因此 queue success 不等于 Rule Node 业务成功。
+7. 达到 `maxRetries` 或失败百分比阈值后，[org.thingsboard.server.service.queue.processing.TbRuleEngineProcessingStrategyFactory.RetryStrategy.analyze(TbRuleEngineProcessingResult)](../../../application/src/main/java/org/thingsboard/server/service/queue/processing/TbRuleEngineProcessingStrategyFactory.java#L150) 返回 commit；没有把剩余消息交给内建 DLQ。
+8. `TenantActor` 对不存在的显式 Rule Chain 仍保留 `TODO` dead letters，并 callback success；release-3.6 公共 Rule Engine 链没有应用级 DLQ 实现。
+9. Actor 初始化默认按 `5000ms * attempt` 重试，受 `actors.system.max_actor_init_attempts` 限制；普通 process `Exception` 默认 resume 当前 Actor，但失败消息不会由 mailbox 自动重放；`Error` 才 stop。
+10. Rule Node 在自己的处理入口捕获普通 `Exception` 并转为 `logAndPersist`/Failure 路由，所以不能把所有 Rule Node 异常都等同于 Actor restart。
+11. Transport JVM 的 session map 含真实 `SessionMsgListener`，进程重启后不能恢复 socket/listener；DeviceActor 的共享 cache 只恢复 ASYNC session 元数据和订阅标志，SYNC session 不写快照。
+12. PostgreSQL attributes、timeseries latest、Event 等 `TbSqlBlockingQueue` 是 JVM 无界队列；batch 成功才完成 futures，batch 异常只令该批 futures 失败，不会自动重新入队。
+13. DB commit 到 future completion 之间仍有崩溃窗口；上游若因 offset 未提交而重放，是否安全取决于具体表约束、upsert 和 Rule Node 幂等设计。
+14. Cassandra buffered executor 的异步 callback `onFailure` 会 `setException`；但 `execute(...)`、`Futures.withTimeout(...)` 或 `Futures.addCallback(...)` 安装阶段同步抛出的 `Throwable` 只被 dispatch 外层 catch 统计和记录，没有完成 task future，调用方 future 可能永久 pending。驱动级 retry policy 不能被描述成 ThingsBoard 业务级重放保证。
+15. ZK 的 `OtherServiceShutdownEvent` 由 `DefaultSubscriptionManagerService` 消费并清理下线 Core 的 subscription ownership，不直接投递给 DeviceActor。partition 重算另发 `PartitionChangeEvent`，`DefaultActorService` 再把 `PartitionChangeMsg` 送入 Actor 树。Core 启动广播 `CoreStartupMsg` 只用于补发本地 telemetry/WebSocket subscription。
+16. `metrics.enabled=false` 时 `createStatsCounter` 使用 stub Micrometer Counter，但 AtomicInteger 日志统计仍工作；`createGauge` 和 `createTimer` 的实现并未用该开关统一短路。Prometheus 还必须显式暴露 actuator endpoint。
+17. Hikari MBean 与 Cassandra driver JMX 是两个独立开关，默认均关闭；项目没有一个覆盖所有 executor、mailbox、provider 确认和 DB future 的统一 JMX 模型。
+18. Debug Event 与 Audit Log 都是异步旁路且可能自身失败；前者受 debugMode、限流和 TTL 影响，后者受 level mask、独立事务和 executor 影响。它们是诊断证据，不是消息完成凭证，细节见[第36章 Event 与 Audit Log](../36-event-audit-log/index.html)。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    subgraph DUR["durable or external"]
+        B["broker record"]
+        DB["committed row"]
+        RC["Redis session snapshot"]
+    end
+    subgraph VOL["JVM volatile"]
+        PK["Rule Engine pack"]
+        MB["Actor mailbox"]
+        SQ["SQL batch queue"]
+        LS["transport listener"]
+    end
+    VOL -. "process death" .-> X["lost"]
+```
+
+本章使用的准确表述是：持久 broker 加“副作用完成后再 commit”可形成 **at-least-once 的重投窗口**；它不自动提供 exactly-once。内存 queue/provider 或策略主动 skip 又可能出现 at-most-once/丢弃表现。端到端语义必须按部署 provider、Queue 配置、Rule Node 副作用和幂等键逐条判断。
+
+---
+
+## 二、入口
+
+### 2.1 TB Queue poll 与 commit 入口
+
+[org.thingsboard.server.queue.common.AbstractTbQueueConsumerTemplate.poll(long)](../../../common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java#L117) 在 `consumerLock` 内应用最新 partitions、调用 provider `doSubscribe`/`doPoll`，解锁后 decode。对应 [org.thingsboard.server.queue.common.AbstractTbQueueConsumerTemplate.commit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java#L209) 再次持同一把锁并调用 `doCommit()`。抽象层串行化 poll/commit，但不统一 provider 的确认完成语义。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    I["poll(duration)"] --> L["consumerLock"]
+    L --> S["apply subscribeQueue"]
+    S --> P["provider doPoll"]
+    P --> DE["decode records"]
+    DE --> U["business processing"]
+    U --> CM["commit -> doCommit"]
+```
+
+Provider 映射不是同一种确认：
+
+| Provider | poll/receive | `doCommit()` | 当前方法返回代表什么 |
+|---|---|---|---|
+| Kafka | `KafkaConsumer.poll` | `commitSync` | broker 已同步接受 offset commit，仍不覆盖业务事务 |
+| RabbitMQ | `basicGet(..., false)`；queue `durable=false` | `basicAck(0, true)`，无 broker response，`IOException` 仅记录 | producer 用默认 non-persistent properties；方法返回不是 broker 确认，重启可丢 queue/message |
+| AWS SQS | `receiveMessage` | executor 异步 `deleteMessageBatch` 后立即清 pending | 仅表示 delete task 已提交到本地 executor |
+| Google Pub/Sub | synchronous pull | 发起 `futureCall` 后立即清 ack requests | 未等待 acknowledge future |
+| Azure Service Bus | `receiveAsync` | 发起 `completeMessageAsync` 后清 pending | 未等待 complete future |
+| In-memory | storage `get` 已取出 | 空实现 | 进程级非持久，commit 无补充保护 |
+
+### 2.2 Rule Engine callback 入口
+
+[org.thingsboard.server.service.queue.ruleengine.TbRuleEngineQueueConsumerManager.consumerLoop(TbQueueConsumer&lt;TbProtoQueueMsg&lt;ToRuleEngineMsg&gt;&gt;)](../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L360) poll 后进入 `processMsgs`。每条记录由 [org.thingsboard.server.service.queue.ruleengine.TbRuleEngineQueueConsumerManager.submitMessage(TbMsgPackProcessingContext, UUID, TbProtoQueueMsg&lt;ToRuleEngineMsg&gt;)](../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L459) 包装成 `TbMsgPackCallback` 并投给 Actor。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    Q["queue record"] --> CB["TbMsgPackCallback"]
+    CB --> TA["TenantActor"]
+    TA --> RC["RuleChainActor"]
+    RC --> RN["RuleNodeActor"]
+    RN -->|"ack/failure"| CB
+    CB --> PC["pack context maps"]
+```
+
+`DefaultTbContext.ack(TbMsg)` 才调用 callback success；`tellFailure` 默认把消息沿 Failure relation 继续交给 Rule Chain，而不是立即把 queue record 标记失败。只有 Failure 分支最终 ack，pack 才成功；若无匹配关系或上层调用 callback failure，则进入 Processing Strategy。
+
+### 2.3 Actor、Transport、DB 与观测入口
+
+Actor 故障入口在 [org.thingsboard.server.actors.TbActorMailbox.tryInit(int)](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L105) 和 [org.thingsboard.server.actors.TbActorMailbox.processMailbox()](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L212)。Transport 恢复入口在 [org.thingsboard.server.actors.device.DeviceActorMessageProcessor.restoreSessions()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1328)，DB batch 在 [org.thingsboard.server.dao.sql.TbSqlBlockingQueue.init(ScheduledLogExecutorComponent, Consumer&lt;List&lt;E&gt;&gt;, Comparator&lt;E&gt;, int)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L82)。观测总开关和 endpoint 分别位于 [`metrics.enabled`](../../../application/src/main/resources/thingsboard.yml#L1653) 与 [`management.endpoints.web.exposure.include`](../../../application/src/main/resources/thingsboard.yml#L1687)。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    F{"failure surface"}
+    F --> A["Actor init/process"]
+    F --> T["Transport socket/session"]
+    F --> D["DB batch/future"]
+    F --> O["metrics/log/event/audit"]
+    A --> R["local recovery decision"]
+    T --> R
+    D --> R
+    O -. "evidence only" .-> R
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 Queue 到 Rule Engine commit
+
+正常链路是 poll、decode、构造 pack、submit、等待 callback、分析、commit。`pack-processing-timeout` 只结束本轮等待，不中断 Actor/Rule Node。[org.thingsboard.server.service.queue.TbMsgPackProcessingContext.cleanup()](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L244) 把 context 标记 canceled 并清 maps，但 [org.thingsboard.server.service.queue.TbMsgPackProcessingContext.isCanceled()](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L256) 返回 `skipTimeoutMsgsPossible && canceled`。RetryStrategy 与 `SKIP_ALL_FAILURES_AND_TIMED_OUT` 传 true，旧 callback 才会 invalid；默认 Main 的 `SKIP_ALL_FAILURES` 传 false，late callback 仍 valid，Actor/Rule Node 可在 pack 已 commit 后继续执行。此时 callback 对已清 map 不再改变该 pack decision，但业务副作用仍可能发生。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+sequenceDiagram
+    participant B as Broker
+    participant C as RE Consumer
+    participant P as Pack Context
+    participant A as Actor tree
+    B->>C: poll records
+    C->>P: create pendingMap
+    C->>A: tell QueueToRuleEngineMsg
+    A-->>P: onSuccess / onFailure
+    C->>P: await(timeout)
+    C->>C: analyze result
+    alt commit
+        C->>B: provider commit
+    else retry
+        C->>A: resubmit selected records
+    end
+```
+
+提交边界之后，broker 不再因该 consumer group 重投已确认记录；但 provider 异步确认可能在方法返回后失败。提交边界之前进程崩溃，持久 provider 通常会重投未确认记录；In-memory queue 不具备该能力。
+
+还有一个不是“重投”的 Kafka commit 异常窗口：`processMsgs` 已执行 `packCtx.cleanup()` 和 `submitStrategy.stop()`，随后 `commitSync()` 抛异常；异常到达 `consumerLoop` 外层后只 warn、sleep，再次 `poll()`，没有 seek 到该 pack 的起始 offset，也没有把原 `msgs` 重新交给 submit strategy。consumer position 已前移，后续较高 offset 若 commit 成功，可能跨过这个失败 pack；只有在更高 offset commit 前发生 rebalance/重启，才可能从旧 committed offset 重投。
+
+### 3.2 Rule Engine failure 与 reprocess
+
+[org.thingsboard.server.service.queue.TbMsgPackProcessingContext.onSuccess(UUID)](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L122) 和 [org.thingsboard.server.service.queue.TbMsgPackProcessingContext.onFailure(TenantId, UUID, RuleEngineException)](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L144) 把消息从 pending 移到 success/failed。Processing Strategy 选择 failed、pending、甚至 success 重新处理。`RETRY_ALL` 会重跑成功消息，因此最容易复制已经完成的副作用。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    M["pack maps"] --> S["success"]
+    M --> F["failed"]
+    M --> P["pending/timeout"]
+    S --> RA{"strategy"}
+    F --> RA
+    P --> RA
+    RA -->|"selected"| RP["in-memory reprocess"]
+    RA -->|"skip / limit"| CM["commit whole polled pack"]
+```
+
+这里的“whole pack commit”按 provider 的消费游标/待确认集合生效，并不逐条保存失败 payload。即使统计中有 `failedMsgs`，达到最终 iteration 后也可能随后 commit。
+
+### 3.3 Actor 初始化、process failure 与组件 restart
+
+初始化失败时 `TbActorMailbox` 根据 `TbActor.onInitFailure` 延迟重试；超过最大次数或遇到 unrecoverable `TbActorError` 后 destroy。process failure 则默认 `Exception -> resume`、`Error -> stop`，mailbox 已 poll 出的当前消息不会重新放回队列。Rule Node 配置 update/activate 的“restart”是 [org.thingsboard.server.actors.shared.ComponentMsgProcessor.restart(TbActorCtx)](../../../application/src/main/java/org/thingsboard/server/actors/shared/ComponentMsgProcessor.java#L162) 内的 processor `stop()` + `start()`，不是 Actor mailbox 的自动监督重启。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+stateDiagram-v2
+    [*] --> Initializing
+    Initializing --> Ready: init success
+    Initializing --> Initializing: retryWithDelay
+    Initializing --> Destroyed: max attempts / unrecoverable
+    Ready --> Ready: process Exception + resume
+    Ready --> Destroyed: process Error + stop
+    Destroyed --> Initializing: high-priority rule-node update after INIT_FAILED
+```
+
+`destroy(Throwable)` 会调用 Actor destroy，并对 mailbox 中尚未 poll 的消息执行 `onTbActorStopped(stopReason)`；当前正在处理、已从 mailbox poll 出的消息不在这两个队列遍历中。它能否最终触发 Rule Engine callback，取决于消息类型的 `onTbActorStopped` 实现，不是通用重放保证。
+
+### 3.4 Transport session 与 Core subscription 恢复
+
+协议连接建立时，Transport 先 [org.thingsboard.server.common.transport.service.DefaultTransportService.registerAsyncSession(TransportProtos.SessionInfoProto, SessionMsgListener)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L408) 保存本地 listener，再通过 Core queue 发送 OPEN/subscribe。DeviceActor 每次 session/订阅变化调用 `dumpSessions()`；仅非 local cache 且仅 ASYNC session 写共享 cache。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+sequenceDiagram
+    participant D as Device client
+    participant T as Transport JVM
+    participant Q as Core queue
+    participant A as DeviceActor
+    participant R as Shared cache
+    D->>T: connect
+    T->>T: register listener
+    T->>Q: OPEN / subscribe
+    Q->>A: session messages
+    A->>R: dump ASYNC metadata
+    Note over T,R: Transport death loses socket and listener
+    D->>T: reconnect required
+    A->>R: restore metadata on actor recreation
+```
+
+缓存恢复不会向新 Transport JVM 注入 listener；旧 nodeId 上的下行通知到达新进程时，本地 `sessions.get(sessionId)` 仍可能为空。`processToTransportMsg` 对无 session 的非 broadcast 下行没有 durable pending store。因此 RPC/attribute 下行恢复要结合客户端重订阅、RPC 持久表及超时状态分析，不能只看 DeviceActor cache。
+
+---
+
+## 四、消息流
+
+### 4.1 四类确认消息
+
+Rule Node `tellSuccess/tellFailure/ack` 是业务路由 API；`TbMsgPackCallback` 是 pack 记账；`TbQueueCallback` 常表示 producer send；`TbQueueConsumer.commit` 是消费确认。这四类 callback 名称相近，但作用域不同。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    N["Rule Node API"] --> R["Rule relation routing"]
+    R --> M["TbMsgPackCallback"]
+    M --> P["pack decision"]
+    P --> C["consumer commit"]
+    N -. "enqueue may use" .-> S["producer send callback"]
+```
+
+例如 [org.thingsboard.server.actors.ruleChain.DefaultTbContext.enqueue(TbMsg, Runnable, Consumer&lt;Throwable&gt;)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L272) 的 success 仅代表向目标 Rule Engine queue 的 producer send 成功，并不等待新消息在目标 Rule Chain 处理完成。把这个 callback 当成端到端成功会缩短确认边界。
+
+### 4.2 Decode poison 与 provider pending state
+
+公共模板先拿到 provider records，再串行 decode。第 N 条损坏时，前 N-1 条已构造成 Java 消息，但 `poll()` 整体抛错，consumer loop 不会调用 `processMsgs`/commit。Kafka 下下一次 poll 行为受 consumer position 影响，后续成功 commit 可能越过损坏 offset；其他 provider 则依赖 visibility/ack deadline/channel 重投。源码没有统一保存原始 record 的 DLQ。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    R1["record 1 decode"] --> R2["record 2 poison"]
+    R2 --> X["poll throws"]
+    X --> SL["consumer loop sleep"]
+    SL --> NP["next poll"]
+    NP -. "provider-specific" .-> SK["redeliver or position advances"]
+```
+
+因此“poison pill 会永久卡住”也不能一概而论：Kafka 当前 consumer position 已在 poll 时前移，但 committed offset 未动；若同一 consumer 后续 poll 并 commit 更高 offset，损坏记录可能被跨过。若在 commit 前 rebalance/重启，则从旧 committed offset 重投。准确结论是行为存在窗口且无应用级隔离。
+
+### 4.3 DB future 完成流
+
+[org.thingsboard.server.dao.sql.TbSqlBlockingQueue.add(E)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L165) 只把 element + `SettableFuture` 放进 JVM queue。消费者按 size/time drain，调用 save function；返回后才逐一 `future.set(null)`。异常则逐一 `setException(t)` 并 clear 当前 list。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    A["queue.add + future"] --> D["poll/drain batch"]
+    D --> TX["repository transaction"]
+    TX -->|"return"| OK["all batch futures success"]
+    TX -->|"throw"| ER["all batch futures exception"]
+    ER -. "no requeue" .-> DROP["caller decides"]
+```
+
+属性、latest timeseries、Event 的 repository SQL 与约束不同；批次失败粒度也取决于 save function 是否用单一 `TransactionTemplate`。不能从公共 queue 类推出每一种表都具有同样的去重行为。
+
+### 4.4 观测信号流
+
+运行时计数器同时写 AtomicInteger 与可选 Micrometer Counter；定时日志读取 AtomicInteger 后清零，Micrometer Counter 不清零。Kafka lag 是独立 AdminClient 定时查询。Debug Event/Audit 落 PostgreSQL，日志落 appender；这些时间轴没有公共 trace/span id。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    OP["runtime operation"] --> AI["AtomicInteger window"]
+    OP --> MC["Micrometer cumulative"]
+    OP --> LG["structured-ish log text"]
+    OP --> EV["Debug Event / Audit"]
+    KB["Kafka Admin offsets"] --> LAG["lag log"]
+    AI --> PL["periodic print + reset"]
+```
+
+---
+
+## 五、时序图
+
+完整跨组件时序见 [sequence.puml](sequence.puml)。该源文件分别画出 Rule Engine 成功/重试/崩溃窗口、Actor 初始化与 poison failure、Transport/Core 重启恢复以及 SQL/Cassandra future 和观测信号。
+
+### 5.1 副作用完成后、offset commit 前崩溃
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+sequenceDiagram
+    participant K as Kafka
+    participant C as Consumer
+    participant N as Rule Node
+    participant D as Database
+    K->>C: poll offset 42
+    C->>N: process TbMsg
+    N->>D: transaction commit
+    D-->>N: success
+    N-->>C: callback success
+    Note over C: process crashes before commitSync
+    K->>C: redeliver offset 42
+    C->>N: execute again
+```
+
+这是典型 at-least-once 重复窗口。若表使用 `(entity_id,key,ts)` upsert，重复可能覆盖；若外部 HTTP、邮件、RPC 或无唯一约束 insert，重复可能产生第二次副作用。幂等责任位于 Rule Node/目标系统和业务键设计，不在 Kafka key 或 `TbMsg.id` 本身。
+
+### 5.2 commit 后的 provider 差异
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+sequenceDiagram
+    participant C as TB Consumer
+    participant P as Provider client
+    participant B as Broker
+    C->>P: commit()
+    alt Kafka
+        P->>B: commitSync
+        B-->>P: ack or exception
+        P-->>C: return / throw
+    else SQS/PubSub/ServiceBus
+        P->>B: async delete/ack/complete
+        P-->>C: return before result
+        B-->>P: later success/failure
+    end
+```
+
+RabbitMQ 又不同：`basicAck` 是同步调用，但 `IOException` 被 `doCommit()` 内部捕获并仅写日志。所以上层“commit 没抛异常”也不是跨 provider 等价信号。
+
+### 5.3 Transport/Core 双侧恢复
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+sequenceDiagram
+    participant Z as Zookeeper
+    participant C as Core
+    participant T as Transport
+    participant D as Device
+    T--xZ: ephemeral node removed
+    Z-->>C: topology/shutdown event
+    Note over T: sockets and listeners disappear
+    D->>T: protocol reconnect
+    T->>C: new OPEN + subscriptions
+    C->>C: DeviceActor updates snapshot
+    C->>C: startup message repairs local subscriptions
+```
+
+Zookeeper 的 restart grace 只延迟 partition recalculation；CHILD_REMOVED 的 `OtherServiceShutdownEvent` 只让 SubscriptionManager 清理 ownership，不直接通知 DeviceActor。Actor 树通过 partition 重算后独立产生的 `PartitionChangeMsg` 调整归属。两条事件链都不会保留进程内请求、listener、mailbox 或 SQL queue；`CoreStartupMsg` 也只补目标 Core partitions 对应的 telemetry subscriptions，不能替代客户端 reconnect。
+
+---
+
+## 六、数据变化
+
+### 6.1 状态持久性矩阵
+
+| 状态 | 存放位置 | 进程重启 | 失败后典型结果 |
+|---|---|---|---|
+| Kafka record/committed offset | broker | 保留到 retention | 未 commit 可重投；已 commit 不再按该 group 重投 |
+| SQS/PubSub/ServiceBus/Rabbit pending delivery | provider | provider 管理 | 受 visibility/ack deadline/channel 和异步确认结果影响 |
+| In-memory queue record | JVM | 丢失 | 无恢复 |
+| Rule Engine pack maps/retry count | JVM | 丢失 | broker 是否重投取决于 commit |
+| Actor mailbox | JVM concurrent queue | 丢失 | destroy 可通知尚在 mailbox 的消息，进程崩溃不能 |
+| SQL batch queue/future | JVM | 丢失 | 已入队未 commit 的 element 消失 |
+| PostgreSQL/Cassandra committed data | DB | 保留 | replay 可能 upsert 或重复 insert |
+| Transport session listener/socket | Transport JVM | 丢失 | 客户端重连 |
+| DeviceActor ASYNC session snapshot | shared cache 或 local cache | Redis 模式可读；local 模式无恢复 | 仅元数据，不恢复连接 |
+| Debug Event/Audit | PostgreSQL 独立链 | 已 commit 保留到 TTL | 可能缺失、截断或延迟 |
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart LR
+    V["volatile state"] -->|"crash"| L["lost"]
+    B["broker state"] -->|"uncommitted"| RE["redelivery candidate"]
+    DB["DB state"] -->|"committed"| KE["kept"]
+    RE -->|"replay"| ID["idempotency required"]
+```
+
+### 6.2 Rule Engine pack 的状态转换
+
+pack 初始消息进入 `pendingMap`；callback 把它移动到 success/failed。timeout 不会把 pending 自动转移，只由 result 读取。decision 非 commit 时 selected map 回填 submit strategy；`cleanup()` 总会清 maps，但只在 `skipTimeoutMsgsPossible=true` 时使旧 callback invalid。默认 Main 为 false，因此 commit 是 pack 记账边界，不是仍在运行的 Actor/Rule Node 取消边界。最终没有 durable attempt 表。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Success: callback success / rate-limit
+    Pending --> Failed: callback failure
+    Pending --> TimedOut: await expires
+    Success --> Pending: RETRY_ALL
+    Failed --> Pending: retry failed
+    TimedOut --> Pending: retry timed out
+    Success --> Committed: final decision
+    Failed --> Committed: skip / retry limit
+    TimedOut --> Committed: skip / retry limit
+```
+
+`TbMsg.id` 在同一 pack reprocess 中保持，但应用没有全局“已处理 message id”表。Rule Nodes 若要幂等，应把可稳定重建的业务键写入目标存储唯一约束或目标 API idempotency key；只在本地内存记忆 id 无法跨进程恢复。
+
+### 6.3 观测状态与保留期
+
+Kafka consumer lag 日志只输出 lag 非零的 partition；Rule Engine 周期 stats 使用窗口 AtomicInteger 并 reset；Micrometer Counter 累积到进程重启；Debug Event/Audit 受 PostgreSQL partition TTL；普通日志受 rolling policy/采集器保留。各信号窗口不同，必须带时间和 serviceId 关联。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+timeline
+    title Signal lifetime
+    section Process
+      Atomic stats : print window : reset
+      Micrometer : cumulative until restart
+    section Broker
+      lag : sampled offsets
+    section Database
+      debug/audit : async commit : TTL cleanup
+    section Log
+      appender : rotation : external retention
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 commit 名称不等于相同语义
+
+公共 `TbQueueConsumer` 把 provider 操作压成 `poll/commit` 两个方法，但实现仍保留同步、异步和异常吞掉的差异。尤其 SQS 在 [org.thingsboard.server.queue.sqs.TbAwsSqsConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/sqs/TbAwsSqsConsumerTemplate.java#L176) 把 delete task 提交 executor 后立即清 `pendingMessages`；Pub/Sub 与 Service Bus 同样不等待 future。Rabbit 的 [org.thingsboard.server.queue.rabbitmq.TbRabbitMqAdmin.createTopicIfNotExists(String, String)](../../../common/queue/src/main/java/org/thingsboard/server/queue/rabbitmq/TbRabbitMqAdmin.java#L84) 用 `queueDeclare(..., false, false, false, ...)`，producer [org.thingsboard.server.queue.rabbitmq.TbRabbitMqProducerTemplate.send(TopicPartitionInfo, T, TbQueueCallback)](../../../common/queue/src/main/java/org/thingsboard/server/queue/rabbitmq/TbRabbitMqProducerTemplate.java#L128) 使用空 `AMQP.BasicProperties` 且未启用 publisher confirm；consumer `basicAck` 是直接发送 method frame，没有对应 broker 确认，`IOException` 又只记日志。上层无法从统一返回值推断远端 durable confirm。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    API["TbQueueConsumer.commit"] --> SY["synchronous call paths"]
+    SY --> K["Kafka: wait for commitSync"]
+    SY --> R["Rabbit: catch ack error"]
+    API --> AS["asynchronous call paths"]
+    AS --> S["SQS: enqueue delete"]
+    S -. "same return-before-result boundary" .-> G["PubSub: fire future"]
+    G -. "same boundary" .-> A["ServiceBus: fire future"]
+```
+
+这意味着统一告警不能只统计 `commit()` 异常。至少要同时观察 provider redelivery、consumer lag/oldest age、Rabbit channel 异常、SQS delete failure、Pub/Sub ack failure 与 Service Bus completion failure；release-3.6 的公共接口没有汇总这些远端结果。
+
+### 7.2 retry 阈值与最终提交
+
+RetryStrategy 第一次失败记录 initial total；每轮先 `retryCount++`。`maxRetries > 0 && retryCount > maxRetries` 才停止，因此配置 `retries=N` 对应最多 N 次额外 reprocess；`retries=0` 不触发次数上限，可能由 failure percentage 或永久重试结束。默认 High Priority 正是 `retries=0/failurePercentage=0`，会持续重试到成功、consumer stop 或进程终止；默认 Sequential By Originator 才是 `retries=3`。退避以秒为单位 `Thread.sleep`，按 2 倍增长到 max pause，占住当前 consumer loop。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    F["unsuccessful result"] --> N["retryCount++"]
+    N --> MX{"over max retries?"}
+    MX -->|"yes"| C["commit / skip remainder"]
+    MX -->|"no"| PC{"failure % over limit?"}
+    PC -->|"yes"| C
+    PC -->|"no"| SL["sleep backoff"]
+    SL --> RP["reprocess selected maps"]
+```
+
+failure percentage 比较使用 `(failed + pending) / initialTotalCount`；当前表达式是 double 除法。阈值是“超过”而不是“达到”。它是吞吐保护阀，不是 DLQ 条件。
+
+### 7.3 Metrics、Prometheus 与 JMX 实现边界
+
+[org.thingsboard.server.common.stats.DefaultStatsFactory.createStatsCounter(String, String, String...)](../../../common/stats/src/main/java/org/thingsboard/server/common/stats/DefaultStatsFactory.java#L108) 总会创建 AtomicInteger；`metrics.enabled=false` 时 Micrometer 部分用 `StubCounter`。[org.thingsboard.server.common.stats.DefaultStatsFactory.createGauge(String, T, String...)](../../../common/stats/src/main/java/org/thingsboard/server/common/stats/DefaultStatsFactory.java#L149) 与 [org.thingsboard.server.common.stats.DefaultStatsFactory.createTimer(String, String...)](../../../common/stats/src/main/java/org/thingsboard/server/common/stats/DefaultStatsFactory.java#L175) 没有同样判断。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    SF["DefaultStatsFactory"] --> SC["StatsCounter"]
+    SC --> AI["AtomicInteger"]
+    SC -->|"metrics enabled"| MC["Micrometer Counter"]
+    SC -->|"disabled"| ST["Stub Counter"]
+    SF --> G["Gauge always registers"]
+    SF --> T["Timer always registers"]
+```
+
+Prometheus endpoint 的安全配置允许 `/actuator/prometheus`，但默认 exposure 只有 `info`；`METRICS_ENDPOINTS_EXPOSE=prometheus` 才暴露。Hikari `registerMbeans` 默认 false；Cassandra 仅当 driver metrics 与 `cassandra.jmx` 都 true 时启动 `JmxReporter`。不要把 JVM 标准 MBeans、Hikari MBeans、Cassandra MBeans 和 Micrometer endpoint 当成一套自动开启的指标。
+
+---
+
+## 八、Actor 分析
+
+### 8.1 mailbox 的恢复能力与限制
+
+`TbActorMailbox` 使用高/普通两个 `ConcurrentLinkedQueue`，每轮最多处理 `actors.system.throughput` 条。Actor init 未 ready 时消息可继续排队；init retry 成功后开始消费。达到初始化上限则 destroy，mailbox 中剩余消息收到 stopped callback。整个 JVM 崩溃时两个队列都不存在，没有本地 journal。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    H["high-priority queue"] --> PM["processMailbox"]
+    N["normal queue"] --> PM
+    PM --> EX{"actor.process throws"}
+    EX -->|"Exception"| RS["resume next mailbox msg"]
+    EX -->|"Error"| SP["stop actor"]
+    SP --> CB["notify queued msgs stopped"]
+```
+
+“resume”不是重试当前消息；当前消息已经从 queue poll 出来。“stop”也不是创建新 Actor。后续业务路径可能按需 `getOrCreateChildActor` 重新建 Actor，但这是下一条消息触发的创建，不是监督树保证原消息恢复。
+
+### 8.2 Rule Node poison 与 Debug Event
+
+[org.thingsboard.server.actors.ruleChain.RuleNodeActor.onRuleChainToRuleNodeMsg(RuleChainToRuleNodeMsg)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleNodeActor.java#L138) 捕获 processor 普通异常并 `logAndPersist`。processor 内部还会把 `tbNode.onMsg` 抛错转到 Failure relation。真正能让 mailbox process 抛出的典型特殊路径是 `TbRuleNodeUpdateException`，它把 stopReason 设为 `INIT_FAILED` 并 destroy；高优先级 update 可重新 init。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    MSG["RuleChainToRuleNodeMsg"] --> RN["RuleNode processor"]
+    RN -->|"node Exception"| FR["Failure relation / callback failure"]
+    RN -->|"update exception"| DS["destroy INIT_FAILED"]
+    DS --> UP["high-priority update"]
+    UP --> RI["re-init actor"]
+    FR --> PS["pack processing strategy"]
+```
+
+Debug Event 只有 debugMode 打开才记录，且写入自己也可能失败；`logAndPersist` 还按 error persist frequency 抑制 Event。一个 poison message 可能只有普通日志、一个限频 Error Event，或最终 pack stats，不能期待每次 attempt 都有一条 durable debug record。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 at-least-once 的条件式结论
+
+Kafka 配置由 consumer template 使用手工 `commitSync`；正常 Rule Engine 路径是处理后提交，因此副作用成功后到 offset commit 前存在重投窗口。这支持“可能至少一次”，不支持“恰好一次”。若 Processing Strategy skip、rate limit 记 success、不存在显式 Rule Chain callback success，业务处理又可能是零次而 offset 被提交。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    K["Kafka record"] --> P["process"]
+    P -->|"effect + crash pre-commit"| DUP["redelivery / duplicate"]
+    P -->|"skip then commit"| ZERO["zero business effect"]
+    P -->|"effect + commit"| ONE["one observed run"]
+    ONE -. "not a theorem" .-> EO["exactly-once"]
+```
+
+Kafka key 只帮助 partition ordering，不是去重约束。`commitSync` 也不加入 PostgreSQL transaction。真正的幂等可依赖 telemetry/attribute upsert 主键、业务表唯一键、RPC request id、外部 API idempotency key，且要逐节点验证。
+
+`commitSync` 抛错也不等价于“该 pack 立即重试”。当前调用顺序已经 cleanup/stop，异常由 consumerLoop catch 后继续下一次 poll；没有 `seek`、没有保存本轮 `msgs`、没有重建 submit attempt。若同一 consumer 随后处理更高 offset 并成功 commit，失败 pack 可被跨过；若先 rebalance/重启，则旧 committed offset 使它和其后的记录一起重投。这是既可能丢业务处理又可能重复的窗口，不能只按 commit 成功/失败二分。
+
+### 9.2 lag 与 rebalance 信号
+
+[org.thingsboard.server.queue.kafka.TbKafkaConsumerStatsService.startLogScheduling()](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerStatsService.java#L116) 用 AdminClient 查 committed offsets，再用一个独立 consumer 查 end offsets，只在 INFO 开启且当前节点持有 SYS_TENANT Core/RE partition 时打印非零 lag。它是周期日志，不创建 Micrometer lag gauge。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart LR
+    AO["Admin group offsets"] --> CALC["end - committed"]
+    EO["consumer endOffsets"] --> CALC
+    CALC -->|"lag != 0"| INFO["INFO log"]
+    CALC -->|"lag == 0"| SIL["no line"]
+```
+
+lag=0 只能说明 offset 追上 end；它不能证明外部副作用成功，也看不到已 commit 后的丢弃。rebalance、长 retry sleep 和 `max.poll.interval.ms` 互相影响，详细 poll/rebalance 机制见第17章。
+
+### 9.3 Dead-letter 的存在范围
+
+release-3.6 的公共 queue API 没有 `deadLetter(record, cause)` 契约；Rule Engine 达到 retry 上限后直接 commit，decode failure 也没有 DLQ producer。`TenantActor` 的 dead letters 仍是 TODO。Rabbit/SQS/PubSub/Service Bus 产品本身可提供 broker dead-letter 能力，且某些 queue properties 可透传，但这属于部署/provider 配置，不等于 ThingsBoard 自动写入统一 payload、stack、tenant、Rule Node 与 attempt 的应用 DLQ。
+
+---
+
+## 十、数据库分析
+
+### 10.1 PostgreSQL batch future 与事务窗口
+
+`TbSqlBlockingQueue` 本身不声明事务；注入的 repository 决定事务。例如 [org.thingsboard.server.dao.sql.attributes.AttributeKvInsertRepository.saveOrUpdate(List&lt;AttributeKvEntity&gt;)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/attributes/AttributeKvInsertRepository.java#L90) 与 [org.thingsboard.server.dao.sql.event.EventInsertRepository.save(List&lt;Event&gt;)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/event/EventInsertRepository.java#L118) 使用 `TransactionTemplate`。save function 返回后才完成 futures。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+sequenceDiagram
+    participant U as Upstream
+    participant Q as SQL Queue
+    participant R as Repository
+    participant D as PostgreSQL
+    U->>Q: add(entity) -> future
+    Q->>R: save(batch)
+    R->>D: transaction
+    D-->>R: commit
+    Note over Q: crash here: DB committed, future not completed
+    R-->>Q: return
+    Q-->>U: future success
+```
+
+反向窗口也存在：element 已加入 JVM queue，但 consumer 还没执行时进程崩溃，DB 没有记录，future 也不会在原进程完成。若上游是 Kafka 且尚未 commit，重投可再次构造 element；若上游已经 ack 或来自 HTTP 且客户端不重试，就可能永久缺失。
+
+### 10.2 batch failure、retry 与幂等
+
+公共 SQL queue 捕获 batch Throwable 后把同一异常设置给所有当前 futures，并 clear list；没有自动 retry/backoff/DLQ。调用方是否因 future failure 触发 Rule Engine callback failure取决于 Rule Node 实现。有些旁路如 Debug Event 只记 future failure 日志，不改变原 TbMsg。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    BF["batch failure"] --> FF["future exception"]
+    FF --> RN{"caller observes?"}
+    RN -->|"Rule Node callback failure"| QR["queue strategy retry"]
+    RN -->|"ignored/side channel"| LOG["log only"]
+    QR --> RE["re-execute node"]
+    RE --> ID["target idempotency decides duplicate"]
+```
+
+Event 表没有按 event id 的唯一约束，重复插入可产生重复 Event；attributes/latest telemetry 使用 upsert 更接近状态覆盖，但旧/新值竞争和其他副作用仍需分析。`Futures.allAsList` 只聚合完成，不提供跨多个 DAO future 的共同事务。
+
+### 10.3 Cassandra buffered executor
+
+[org.thingsboard.server.dao.util.AbstractBufferedRateExecutor.submit(T)](../../../dao/src/main/java/org/thingsboard/server/dao/util/AbstractBufferedRateExecutor.java#L159) 在 tenant rate limit 或 bounded queue 满时立即令 task future 失败；排队已过期也会 `setException(new TimeoutException())`。[org.thingsboard.server.dao.util.AbstractBufferedRateExecutor.dispatch()](../../../dao/src/main/java/org/thingsboard/server/dao/util/AbstractBufferedRateExecutor.java#L241) 对成功安装的 driver/timeout future callback，在 `onFailure` 中完成 task future 为异常。
+
+但同一 `dispatch()` 中，`execute(finalTaskCtx)`、`Futures.withTimeout(...)` 或 `Futures.addCallback(...)` 在 callback 安装完成前同步抛出的 `Throwable` 会进入外层 catch：代码只记录 `totalFailed`、递减 concurrency 并写 debug log，没有对 `taskCtx.getFuture()` 调用 `setException`。因此该调用方 future 可能永久 pending；这既不是自动 retry，也不是可见失败。驱动内部 retry policy 的范围仍只是单次 Cassandra 请求，不能恢复 Rule Engine 上下文或保证业务副作用只执行一次。
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败恢复矩阵
+
+| 失败点 | 已完成状态 | 自动动作 | 仍需防护 |
+|---|---|---|---|
+| Kafka poll 异常 | 无新 commit | consumer loop sleep 后再 poll | broker/client 健康、lag |
+| decode poison | provider 已交付，未进入业务 | 外层 catch + sleep | 原始 payload 隔离、人工 DLQ |
+| Rule Node callback failure | 可能已有部分副作用 | Processing Strategy retry/skip | 幂等、有限重试、补偿 |
+| pack timeout | Actor 可能仍执行 | retry/skip；仅 `skipTimeoutMsgsPossible=true` 时旧 callback invalid | 默认 Main 可 commit 后继续，防并发重复 |
+| retry 上限 | failed/pending 仍存在于本轮 | commit | 应用 DLQ/告警/补偿 |
+| Actor init failure | mailbox 暂存 | 延迟 retry 到上限 | init 依赖监控、stopped callback |
+| Actor process Exception | 当前消息已出 mailbox | resume 下一条 | 当前消息 callback/路由完整性 |
+| Transport process death | socket/listener 丢失 | broker rebalance、客户端可能重连 | reconnect/backoff、重订阅 |
+| DeviceActor cache decode failure | 无恢复元数据 | warn 后返回 | stale session 清理、客户端重建 |
+| SQL batch exception | transaction 通常回滚 | futures exception | caller retry/幂等；无 SQL DLQ |
+| SQL queue process death | 未落库 elements 丢失 | 无本地恢复 | 上游重投、graceful drain |
+| DB commit 后进程死 | 数据已在 DB，future/offset 未完成 | 上游可能重投 | 唯一键/upsert/幂等 |
+| Kafka commitSync 异常 | pack 已 cleanup/stop，consumer position 已前移 | catch 后 sleep、继续 poll | 无 seek；更高 offset commit 可跨过 pack |
+| Cassandra callback 安装前同步 Throwable | task 已出队，future 未完成 | 外层 catch 仅统计/日志 | future 可永久 pending，需超时监控 |
+| Prometheus 未暴露 | 运行不受影响 | 无 | endpoint/config scrape 自检 |
+| Debug/Audit 写失败 | 主业务可能已完成 | 自身日志或 ignored future | 不把旁路当唯一证据 |
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    F["failure"] --> Q{"durable input remains?"}
+    Q -->|"yes"| RR["redelivery possible"]
+    Q -->|"no"| CP["compensation required"]
+    RR --> I{"side effect idempotent?"}
+    I -->|"yes"| RP["replay tolerable"]
+    I -->|"no"| DD["duplicate risk"]
+```
+
+### 11.2 Service restart 通知不是恢复屏障
+
+Zookeeper CHILD_REMOVED 立即发布 `OtherServiceShutdownEvent`，并可按 `zookeeper.recalculate_delay` 延迟 partition 重算；同 serviceId 及时回来会 cancel delayed task。[org.thingsboard.server.service.subscription.DefaultSubscriptionManagerService.onApplicationEvent(OtherServiceShutdownEvent)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L177) 消费 shutdown event，删除该 Core serviceId 对应的 subscription ownership；该事件不直接进入 DeviceActor。延迟重算产生 `PartitionChangeEvent` 后，[org.thingsboard.server.actors.service.DefaultActorService.onTbApplicationEvent(PartitionChangeEvent)](../../../application/src/main/java/org/thingsboard/server/actors/service/DefaultActorService.java#L192) 另向 AppActor 投递高优先级 `PartitionChangeMsg`：TenantActor 对 TB_CORE 停掉已不归本节点的 DeviceActor，对 TB_RULE_ENGINE 初始化/销毁 Rule Chain 并广播消息。新 Core ready 后 [org.thingsboard.server.service.partition.TbCoreStartupService.onApplicationEvent(ApplicationReadyEvent)](../../../application/src/main/java/org/thingsboard/server/service/partition/TbCoreStartupService.java#L63) 广播 partitions，其他 Core 异步补发 subscriptions。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    RM["ZK CHILD_REMOVED"] --> SE["OtherServiceShutdownEvent"]
+    SE --> SM["SubscriptionManager clears ownership"]
+    RM --> DL["delayed partition recalc"]
+    DL --> PE["PartitionChangeEvent"]
+    PE --> PM["Actor tree PartitionChangeMsg"]
+    AD["same serviceId CHILD_ADDED"] --> CA["cancel delay if possible"]
+    NR["new Core ready"] --> CS["CoreStartupMsg"]
+    CS --> RS["re-push subscriptions"]
+```
+
+这条链没有等待“所有订阅已补齐”的 ready barrier；`onCoreStartupMsg` 把工作 submit 到 executor 后就返回，Core consumer callback 随即 success。启动通知不能证明补发已完成。
+
+### 11.3 信号盲区与排障顺序
+
+最重要的盲区：没有统一 end-to-end trace；没有应用级 DLQ；没有每条消息 durable attempt；没有 Actor mailbox 通用 gauge；SQL queue 只有周期日志、无统一 oldest-age；provider async commit future 未统一统计；Debug/Audit 会被配置、限流、TTL 和自身故障过滤；Kafka lag 看不到已 commit 的业务丢弃；JMX 默认关闭且范围有限。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    S["symptom"] --> L1["provider lag/redelivery"]
+    L1 --> L2["RE final vs tmp failed/timeout"]
+    L2 --> L3["last Rule Node + logs/debug"]
+    L3 --> L4["DB commit/constraint/pool"]
+    L4 --> L5["transport sessions/reconnect"]
+    L5 --> L6["audit and compensation records"]
+```
+
+建议按以下证据链排障：
+
+1. 先固定 `service.id`、queue provider、topic/group/partition、Queue Processing Strategy 与故障时间窗。
+2. 看 broker committed/end offset、redelivery/ack failure，而不是只看“consumer running”。
+3. 对照 Rule Engine `tmpFailed/tmpTimeout` 与最终 `failed/timeout`；确认是否因 retry 上限、failure percentage、rate limit 或 skip 提交。
+4. 用 last visited Rule Node 日志、Rule Node Debug Event、Error Event 查执行位置；同时确认 debugMode/限流/TTL，不能把无记录解释成未执行。
+5. 查目标 DB transaction、unique/upsert、Hikari pool 和 SQL queue `totalAdded/totalSaved/totalFailed/queueSize`；用业务键判断重复。
+6. 传输问题同时查 open connections、协议 disconnect、Transport 本地 session、DeviceActor snapshot、client reconnect 和 subscriptions。
+7. Audit 只用于用户/实体动作旁证；外部 Rule Node 调用、broker commit 和 session reconnect 不一定产生 Audit。
+8. 最后建立人工补偿/DLQ 清单，记录原 payload hash、tenant、TbMsg id、业务幂等键、首次/末次 attempt 和处理决定。
+
+---
+
+## 十二、源码阅读路线
+
+建议按“确认边界 -> 失败策略 -> 易失状态 -> 持久副作用 -> 信号”阅读，避免从单个 metrics 名称反推可靠性：
+
+1. [org.thingsboard.server.queue.TbQueueConsumer&lt;T extends TbQueueMsg&gt;](../../../common/cluster-api/src/main/java/org/thingsboard/server/queue/TbQueueConsumer.java#L32)：先看公共 `subscribe/poll/commit/stop/unsubscribe` 契约。
+2. [org.thingsboard.server.queue.common.AbstractTbQueueConsumerTemplate.poll(long)](../../../common/queue/src/main/java/org/thingsboard/server/queue/common/AbstractTbQueueConsumerTemplate.java#L117)：看锁、subscribeQueue、provider poll 与 decode 顺序。
+3. [org.thingsboard.server.queue.kafka.TbKafkaConsumerTemplate.doPoll(long)](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerTemplate.java#L124) 与 [org.thingsboard.server.queue.kafka.TbKafkaConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerTemplate.java#L161)：固定 Kafka poll/commitSync 边界。
+4. [org.thingsboard.server.queue.rabbitmq.TbRabbitMqAdmin.createTopicIfNotExists(String, String)](../../../common/queue/src/main/java/org/thingsboard/server/queue/rabbitmq/TbRabbitMqAdmin.java#L84)、[org.thingsboard.server.queue.rabbitmq.TbRabbitMqProducerTemplate.send(TopicPartitionInfo, T, TbQueueCallback)](../../../common/queue/src/main/java/org/thingsboard/server/queue/rabbitmq/TbRabbitMqProducerTemplate.java#L128) 与 [org.thingsboard.server.queue.rabbitmq.TbRabbitMqConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/rabbitmq/TbRabbitMqConsumerTemplate.java#L140)：确认 non-durable queue、non-persistent message、无 broker ack response 与 IOException 吞掉。
+5. [org.thingsboard.server.queue.sqs.TbAwsSqsConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/sqs/TbAwsSqsConsumerTemplate.java#L176)：确认异步 delete 与 pending clear。
+6. [org.thingsboard.server.queue.pubsub.TbPubSubConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/pubsub/TbPubSubConsumerTemplate.java#L162) 和 [org.thingsboard.server.queue.azure.servicebus.TbServiceBusConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/azure/servicebus/TbServiceBusConsumerTemplate.java#L155)：确认不等待 ack/complete future。
+7. [org.thingsboard.server.service.queue.ruleengine.TbRuleEngineQueueConsumerManager.processMsgs(List, TbQueueConsumer, Queue)](../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L393)：跟踪 await、decision、cleanup、commit/reprocess。
+8. [org.thingsboard.server.service.queue.processing.TbRuleEngineProcessingStrategyFactory.newInstance(String, ProcessingStrategy)](../../../application/src/main/java/org/thingsboard/server/service/queue/processing/TbRuleEngineProcessingStrategyFactory.java#L52) 与 [org.thingsboard.server.service.install.DefaultSystemDataLoaderService.createQueues()](../../../application/src/main/java/org/thingsboard/server/service/install/DefaultSystemDataLoaderService.java#L788)：核对六种策略，以及默认 High Priority `retries=0`、Sequential `retries=3`。
+9. [org.thingsboard.server.service.queue.TbMsgPackProcessingContext.isCanceled()](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L256) 与 [org.thingsboard.server.service.queue.TbMsgPackCallback.onFailure(RuleEngineException)](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackCallback.java#L126)：特别看 conditional canceled、rate limit 转 success 和 late callback validity。
+10. [org.thingsboard.server.actors.ruleChain.DefaultTbContext.ack(TbMsg)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L535) 与 [org.thingsboard.server.actors.ruleChain.DefaultTbContext.tellFailure(TbMsg, Throwable)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L574)：区分 ack 与 Failure relation。
+11. [org.thingsboard.server.actors.TbActorMailbox.tryInit(int)](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L105)、[org.thingsboard.server.actors.TbActorMailbox.processMailbox()](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L212) 与 [org.thingsboard.server.actors.TbActorMailbox.destroy(Throwable)](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L362)：核对 init retry、resume/stop 和 queued callback。
+12. [org.thingsboard.server.actors.TbActor.onInitFailure(int, Throwable)](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java#L73) 与 [org.thingsboard.server.actors.TbActor.onProcessFailure(TbActorMsg, Throwable)](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActor.java#L84)：确认默认策略并非监督式 restart。
+13. [org.thingsboard.server.actors.tenant.TenantActor.onQueueToRuleEngineMsg(QueueToRuleEngineMsg)](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L240)：定位不存在 Rule Chain 的 dead-letter TODO + success。
+14. [org.thingsboard.server.common.transport.service.DefaultTransportService.start()](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L338)：看 transport notification 的逐条 catch 后整包 commit。
+15. [org.thingsboard.server.common.transport.service.DefaultTransportService.processToTransportMsg(ToTransportMsg)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1335)：看 session listener 本地边界和 missing session 分支。
+16. [org.thingsboard.server.actors.device.DeviceActorMessageProcessor.processSessionStateMsgs(SessionInfoProto, SessionEventMsg)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L998)：看 OPEN/CLOSED、subscription 与 snapshot 更新。
+17. [org.thingsboard.server.actors.device.DeviceActorMessageProcessor.restoreSessions()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1328) 与 [org.thingsboard.server.actors.device.DeviceActorMessageProcessor.dumpSessions()](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L1370)：确认 Redis/local cache 与 ASYNC/SYNC 范围。
+18. [org.thingsboard.server.dao.sql.TbSqlBlockingQueue.init(ScheduledLogExecutorComponent, Consumer&lt;List&lt;E&gt;&gt;, Comparator&lt;E&gt;, int)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L82)：看 drain、save、future completion、异常和 shutdownNow。
+19. [org.thingsboard.server.dao.util.AbstractBufferedRateExecutor.dispatch()](../../../dao/src/main/java/org/thingsboard/server/dao/util/AbstractBufferedRateExecutor.java#L241)：看 Cassandra queue limit、wait timeout、callback failure，以及 callback 安装前同步 Throwable 不完成 task future 的缺口。
+20. [org.thingsboard.server.service.partition.TbCoreStartupService.onApplicationEvent(ApplicationReadyEvent)](../../../application/src/main/java/org/thingsboard/server/service/partition/TbCoreStartupService.java#L63) 与 [org.thingsboard.server.service.subscription.DefaultTbLocalSubscriptionService.onCoreStartupMsg(CoreStartupMsg)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L195)：确认 startup 只补 subscription 且异步返回。
+21. [org.thingsboard.server.queue.discovery.ZkDiscoveryService.childEvent(CuratorFramework, PathChildrenCacheEvent)](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/ZkDiscoveryService.java#L408)、[org.thingsboard.server.service.subscription.DefaultSubscriptionManagerService.onApplicationEvent(OtherServiceShutdownEvent)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L177) 与 [org.thingsboard.server.actors.service.DefaultActorService.onTbApplicationEvent(PartitionChangeEvent)](../../../application/src/main/java/org/thingsboard/server/actors/service/DefaultActorService.java#L192)：分开 subscription ownership 清理与 Actor `PartitionChangeMsg`。
+22. [org.thingsboard.server.common.stats.DefaultStatsFactory](../../../common/stats/src/main/java/org/thingsboard/server/common/stats/DefaultStatsFactory.java#L41)：核对 counter/gauge/timer 的开关差异。
+23. [org.thingsboard.server.service.queue.TbRuleEngineConsumerStats.log(TbRuleEngineProcessingResult, boolean)](../../../application/src/main/java/org/thingsboard/server/service/queue/TbRuleEngineConsumerStats.java#L168)：区分 tmp 与 final failure/timeout，并看 reset。
+24. [org.thingsboard.server.queue.kafka.TbKafkaConsumerStatsService.startLogScheduling()](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerStatsService.java#L116)：确认 lag 只是条件式 INFO 日志。
+25. 最后回到 [sequence.puml](sequence.puml) 对照 crash-before-commit、async-provider-ack、Actor init/process、Transport restart、DB future 与观测盲区。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#ffffff","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#166534","tertiaryColor":"#FFF7ED"}}}%%
+flowchart TB
+    Q["Queue contract"] --> P["Provider impl"]
+    P --> RE["RE decision"]
+    RE --> A["Actor/session"]
+    A --> D["DB future"]
+    D --> O["Observability"]
+```
+
+---
+
+## 十三、常见面试题
+
+### 1. `poll()` 返回是否表示消息已提交？
+
+不是。`poll()` 只取得并 decode records；Rule Engine 要等 callback 和 Processing Strategy，随后才调用 `commit()`。provider 的 commit 又可能是同步或仅发起异步确认。
+
+### 2. Kafka `commitSync()` 是否提供 exactly-once？
+
+不提供。它只同步提交 consumer offset，不与 Rule Node 的数据库、HTTP、RPC 或其他副作用同事务。副作用后、commit 前崩溃会重投并可能重复；`commitSync` 自身抛错时当前实现也不 seek/re交已 cleanup 的 pack，后续更高 offset commit 还可能跨过它。
+
+### 3. 为什么只能条件式地说 at-least-once？
+
+持久 broker 未确认记录通常可重投，但 Processing Strategy 可 skip 后 commit，rate limit 可转 success，显式 Rule Chain 不存在也可 success；In-memory queue 进程崩溃还会直接丢数据。
+
+### 4. Rule Engine retry 会重新 poll broker 吗？
+
+不会。它在同一个 `processMsgs` 循环中更新 submit strategy，把 selected reprocess map 再投 Actor；进程重启后该 retry count 和 maps 都丢失。
+
+### 5. `RETRY_ALL` 为什么最容易产生重复副作用？
+
+因为它连 success map 也重提。pack 中只要另一些消息失败或超时，已经成功的消息也可能再次执行。
+
+### 6. `retries=0` 是否表示不重试？
+
+在 RetryStrategy 中不是。次数上限判断要求 `maxRetries > 0`；零会关闭次数上限。默认 High Priority 同时是 `retries=0/failurePercentage=0`，可持续重试；默认 Sequential By Originator 才限制为 3 次额外 reprocess。
+
+### 7. 达到 retry 上限后失败消息去哪？
+
+decision 返回 commit，当前实现没有应用级 DLQ 保存这些 payload。生产环境需自建 dead-letter/补偿链并保留幂等键和失败上下文。
+
+### 8. release-3.6 是否完全没有任何 dead-letter 能力？
+
+准确说法是公共 ThingsBoard Rule Engine/queue 链没有内建统一 DLQ。底层 Rabbit/SQS/PubSub/Service Bus 产品可配置 provider 级 dead-letter，但范围、格式和可观测性由部署决定。
+
+### 9. decode poison 一定会永久阻塞 Kafka partition 吗？
+
+不一定。poll 后 consumer position 已前移但 committed offset 未动；后续更高 offset commit 可能跨过它，重启/rebalance 又可能从旧 commit 重投。源码没有 seek/DLQ，行为存在丢弃与重复窗口。
+
+### 10. Actor process 抛普通 Exception 会自动重试当前消息吗？
+
+不会。默认策略是 resume，mailbox 继续下一条；当前消息已被 poll 出来。是否完成 Rule Engine callback 取决于 Actor/消息的异常处理路径。
+
+### 11. Actor stop 是否等于 restart？
+
+不等于。`Error` 可触发 stop/destroy；以后可能由业务 `getOrCreate` 再建。组件 update 的 restart 只是 processor `stop()+start()`，两者都不保证原消息重放。
+
+### 12. Actor init 失败如何恢复？
+
+默认以 `5000ms * attempt` 延迟重试，受 `max_actor_init_attempts` 限制；unrecoverable error 或超限后 destroy。INIT_FAILED 的 Rule Node 可由后续高优先级 update 触发 re-init。
+
+### 13. Rule Node Debug Event 能证明每次 attempt 吗？
+
+不能。它要求 debugMode，受 tenant 限流、字段截断、异步 SQL queue、TTL 和写入失败影响；late/poison 路径也未必经过相同 hook。
+
+### 14. Audit Log 能证明 queue commit 吗？
+
+不能。Audit 是用户/实体动作旁路，与 consumer offset 无共同事务；Rule Node 外部副作用和 transport reconnect 通常也没有对应 Audit。
+
+### 15. Transport 重启后 session 会自动恢复吗？
+
+真实连接不会。Transport 的 socket/listener 在 JVM 内；DeviceActor 的共享 cache 只能恢复 ASYNC session 元数据和订阅标志。客户端必须重连并通常重新订阅。
+
+### 16. `CoreStartupMsg` 会恢复所有服务状态吗？
+
+不会。它让其他 Core 对新 partitions 补发本地 subscriptions，而且处理是异步 submit；不恢复 Transport 连接、Actor mailbox、Rule Engine pack 或 SQL queue。
+
+### 17. PostgreSQL batch 写失败会自动 retry 吗？
+
+公共 `TbSqlBlockingQueue` 不会。它令当前 batch futures 失败并 clear list；是否重试由上游 future callback 和 Queue Processing Strategy 决定。
+
+### 18. DB commit 后、future success 前崩溃有什么后果？
+
+数据库已有副作用，但上游可能未 callback/未 commit offset，随后重放。是否变成覆盖或重复取决于表唯一约束、upsert 和业务幂等键。
+
+### 19. `Futures.allAsList` 能形成数据库事务吗？
+
+不能。它只聚合多个 future 的完成；各 DAO/batch 可能在不同事务中提交，部分成功后另一个 future 失败不会自动回滚已提交部分。
+
+### 20. Cassandra buffered executor 会做业务级重试吗？
+
+不会。异步 driver/timeout callback 失败会完成 future 为异常；但 `execute/withTimeout/addCallback` 安装阶段同步抛错时，外层 catch 没有完成 task future，future 还可能永久 pending。驱动 retry policy 仅覆盖 Cassandra 请求层。
+
+### 21. `metrics.enabled=false` 是否意味着所有 metrics 都不存在？
+
+不是。StatsCounter 的 Micrometer Counter 变 stub，但 AtomicInteger 日志窗口仍更新；当前 `createGauge/createTimer` 没有同样短路。endpoint exposure 仍是另一道配置。
+
+### 22. 开启 `METRICS_ENABLED=true` 后 Prometheus 为什么仍抓不到？
+
+默认 actuator exposure 是 `info`，还要把 `METRICS_ENDPOINTS_EXPOSE` 设为 `prometheus`，并确认网络、安全配置和 scraper 使用 `/actuator/prometheus`。
+
+### 23. Kafka lag=0 是否证明业务没有丢失？
+
+不能。它只表示 committed offset 追上 end offset；skip、rate limit、错误 Rule Chain callback success 或 commit 后下游失败都可能在 lag=0 时发生。
+
+### 24. JMX 能否补齐全部盲区？
+
+不能。Hikari 与 Cassandra JMX 默认关闭且各管自己的资源；Actor mailbox、Rule Engine durable attempts、provider async ack future、应用 DLQ 和端到端 trace 仍没有统一 MBean。
+
+### 25. 生产上怎样验证一条失败消息最终恢复？
+
+同时关联 provider record/offset、serviceId、Queue 策略与 final iteration、TbMsg id、最后 Rule Node、目标业务幂等键和 DB/外部回执；若最终 commit 但无副作用，进入人工 DLQ/补偿流程。任何单一日志、Debug Event、Audit 或 lag 都不足以单独证明恢复。
+
+---
+
+[上一篇：41 限流与 API Usage](../41-rate-limit-api-usage/) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [架构图 SVG](../../assets/architecture/42-failure-recovery-observability.svg) | [下一篇：全书目录](../../SUMMARY.md)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1600" viewBox="0 0 2200 1600" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Rule Node 外部集成架构</title>
+  <desc id="desc">展示 Rule Node Actor 进入 HTTP、MQTT、Kafka、邮件四条独立链路，各自的线程、资源、完成语义、回调、数据库和敏感配置边界。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#1f2937"/></marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#991b1b"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;fill:#111827;letter-spacing:0}
+      .title{font-size:42px;font-weight:700}.subtitle{font-size:20px;fill:#374151}.section{font-size:27px;font-weight:700}.label{font-size:22px;font-weight:700}.small{font-size:18px}.tiny{font-size:16px;fill:#374151}
+      .band{fill:#f8fafc;stroke:#334155;stroke-width:2}.blue{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}.green{fill:#dcfce7;stroke:#166534;stroke-width:3}.amber{fill:#fef3c7;stroke:#92400e;stroke-width:3}.red{fill:#fee2e2;stroke:#991b1b;stroke-width:3}.violet{fill:#ede9fe;stroke:#5b21b6;stroke-width:3}.gray{fill:#f3f4f6;stroke:#374151;stroke-width:3}
+      .line{fill:none;stroke:#1f2937;stroke-width:3;marker-end:url(#arrow)}.dash{fill:none;stroke:#1f2937;stroke-width:3;stroke-dasharray:10 8;marker-end:url(#arrow)}.risk{fill:none;stroke:#991b1b;stroke-width:3;stroke-dasharray:9 7;marker-end:url(#arrowRed)}
+    </style>
+  </defs>
+  <rect width="2200" height="1600" fill="#ffffff"/>
+  <text x="1100" y="58" text-anchor="middle" class="title">ThingsBoard 3.6 Rule Node 外部集成架构</text>
+  <text x="1100" y="92" text-anchor="middle" class="subtitle">Four independent protocol paths · Shared Actor/relation contract · No cross-system transaction</text>
+
+  <rect x="40" y="125" width="2120" height="240" rx="6" class="band"/>
+  <text x="1100" y="163" text-anchor="middle" class="section">公共入口：Actor 串行提交，协议回调异步返回</text>
+  <rect x="95" y="205" width="335" height="115" rx="5" class="gray"/>
+  <text x="262" y="245" text-anchor="middle" class="label">Rule Engine / RuleChainActor</text><text x="125" y="282" class="small">TbMsg + relation + TbMsgCallback</text>
+  <rect x="535" y="205" width="395" height="115" rx="5" class="blue"/>
+  <text x="732" y="245" text-anchor="middle" class="label">RuleNodeActorMessageProcessor</text><text x="565" y="282" class="small">partition · state · count · tbNode.onMsg</text>
+  <rect x="1035" y="205" width="390" height="115" rx="5" class="violet"/>
+  <text x="1230" y="245" text-anchor="middle" class="label">TbAbstractExternalNode</text><text x="1065" y="282" class="small">ackIfNeeded · tellSuccess · tellFailure</text>
+  <rect x="1530" y="192" width="565" height="140" rx="5" class="amber"/>
+  <text x="1812" y="232" text-anchor="middle" class="label">force_ack 边界</text><text x="1560" y="269" class="small">false：原 callback 等 relation 链收敛</text><text x="1560" y="302" class="small">true：先 ack，再用 callback=EMPTY 的消息回灌</text>
+  <path d="M430 262H535" class="line"/><path d="M930 262H1035" class="line"/><path d="M1425 262H1530" class="line"/>
+
+  <rect x="40" y="405" width="500" height="760" rx="6" class="band"/>
+  <text x="290" y="445" text-anchor="middle" class="section">HTTP 独立链</text>
+  <rect x="85" y="490" width="410" height="120" rx="5" class="blue"/><text x="290" y="530" text-anchor="middle" class="label">TbRestApiCallNode / TbHttpClient</text><text x="115" y="568" class="small">同步：pattern · headers · body · URI</text>
+  <rect x="85" y="665" width="410" height="145" rx="5" class="violet"/><text x="290" y="705" text-anchor="middle" class="label">AsyncRestTemplate factory</text><text x="115" y="742" class="small">Apache proxy / simple / Netty TLS</text><text x="115" y="778" class="tiny">pending 超限可在 Actor 等待旧 future</text>
+  <rect x="85" y="865" width="410" height="120" rx="5" class="green"/><text x="290" y="905" text-anchor="middle" class="label">External REST server</text><text x="115" y="943" class="small">2xx = Success；其余 = Failure</text>
+  <rect x="85" y="1030" width="410" height="90" rx="5" class="red"/><text x="290" y="1066" text-anchor="middle" class="label">关闭风险</text><text x="115" y="1099" class="tiny">只关自建 Netty group；proxy client 未显式 close</text>
+  <path d="M290 610V665" class="line"/><path d="M290 810V865" class="line"/><path d="M290 985V1030" class="dash"/>
+
+  <rect x="580" y="405" width="500" height="760" rx="6" class="band"/>
+  <text x="830" y="445" text-anchor="middle" class="section">MQTT 独立链</text>
+  <rect x="625" y="490" width="410" height="120" rx="5" class="green"/><text x="830" y="530" text-anchor="middle" class="label">TbMqttNode.initClient</text><text x="655" y="568" class="small">同步等待 CONNECT / CONNACK timeout</text>
+  <rect x="625" y="665" width="410" height="145" rx="5" class="blue"/><text x="830" y="705" text-anchor="middle" class="label">MqttClient + shared event loop</text><text x="655" y="742" class="small">Basic/PEM · clientId · clean session</text><text x="655" y="778" class="tiny">节点代码无 reconnect/message retry loop</text>
+  <rect x="625" y="865" width="410" height="120" rx="5" class="green"/><text x="830" y="905" text-anchor="middle" class="label">External MQTT broker</text><text x="655" y="943" class="small">QoS 1 future；retained 可配置</text>
+  <rect x="625" y="1030" width="410" height="90" rx="5" class="amber"/><text x="830" y="1066" text-anchor="middle" class="label">destroy</text><text x="655" y="1099" class="tiny">disconnect；无显式 flush / await</text>
+  <path d="M830 610V665" class="line"/><path d="M830 810V865" class="line"/><path d="M830 985V1030" class="dash"/>
+
+  <rect x="1120" y="405" width="500" height="760" rx="6" class="band"/>
+  <text x="1370" y="445" text-anchor="middle" class="section">Kafka 独立链</text>
+  <rect x="1165" y="490" width="410" height="120" rx="5" class="violet"/><text x="1370" y="530" text-anchor="middle" class="label">TbKafkaNode</text><text x="1195" y="568" class="small">节点级 producer · topic/key/header mapping</text>
+  <rect x="1165" y="665" width="195" height="145" rx="5" class="blue"/><text x="1262" y="704" text-anchor="middle" class="label">External pool</text><text x="1190" y="742" class="tiny">publish submit</text><text x="1190" y="775" class="tiny">work-stealing</text>
+  <rect x="1380" y="665" width="195" height="145" rx="5" class="violet"/><text x="1477" y="704" text-anchor="middle" class="label">Producer I/O</text><text x="1405" y="742" class="tiny">acks/retries</text><text x="1405" y="775" class="tiny">completion callback</text>
+  <rect x="1165" y="865" width="410" height="120" rx="5" class="green"/><text x="1370" y="905" text-anchor="middle" class="label">External Kafka broker</text><text x="1195" y="943" class="small">RecordMetadata = Success evidence</text>
+  <rect x="1165" y="1030" width="410" height="90" rx="5" class="red"/><text x="1370" y="1066" text-anchor="middle" class="label">release-3.6 gap</text><text x="1195" y="1099" class="tiny">send 同步异常只 debug；无 Failure relation</text>
+  <path d="M1370 610V640H1262V665" class="line"/><path d="M1360 737H1380" class="line"/><path d="M1477 810V865" class="line"/><path d="M1370 985V1030" class="risk"/>
+
+  <rect x="1660" y="405" width="500" height="760" rx="6" class="band"/>
+  <text x="1910" y="445" text-anchor="middle" class="section">邮件独立链</text>
+  <rect x="1705" y="490" width="410" height="120" rx="5" class="amber"/><text x="1910" y="530" text-anchor="middle" class="label">TbSendEmailNode</text><text x="1735" y="568" class="small">SEND_EMAIL + TbEmail 同步校验</text>
+  <rect x="1705" y="665" width="195" height="145" rx="5" class="blue"/><text x="1802" y="704" text-anchor="middle" class="label">Mail pool</text><text x="1730" y="742" class="tiny">outer node task</text><text x="1730" y="775" class="tiny">waits on inner</text>
+  <rect x="1920" y="665" width="195" height="145" rx="5" class="amber"/><text x="2017" y="704" text-anchor="middle" class="label">same pool</text><text x="1945" y="742" class="tiny">inner SMTP task</text><text x="1945" y="775" class="tiny">timeout wait</text>
+  <rect x="1705" y="865" width="410" height="120" rx="5" class="green"/><text x="1910" y="905" text-anchor="middle" class="label">External SMTP server</text><text x="1735" y="943" class="small">send return ≠ inbox delivery</text>
+  <rect x="1705" y="1030" width="410" height="90" rx="5" class="red"/><text x="1910" y="1066" text-anchor="middle" class="label">timeout window</text><text x="1735" y="1099" class="tiny">Failure relation 后 inner send 仍可能成功</text>
+  <path d="M1910 610V640H1802V665" class="line"/><path d="M1900 737H1920" class="line"/><path d="M2017 810V865" class="line"/><path d="M1910 985V1030" class="risk"/>
+
+  <path d="M1230 320V380H290V405" class="line"/><path d="M1230 320V380H830V405" class="line"/><path d="M1230 320V380H1370V405" class="line"/><path d="M1230 320V380H1910V405" class="line"/>
+
+  <rect x="40" y="1205" width="2120" height="345" rx="6" class="band"/>
+  <text x="1100" y="1245" text-anchor="middle" class="section">共同输出边界：relation 收敛、配置持久化与外部副作用不共享事务</text>
+  <rect x="85" y="1290" width="445" height="205" rx="5" class="blue"/><text x="307" y="1330" text-anchor="middle" class="label">DefaultTbContext / RuleChainActor</text><text x="115" y="1367" class="small">Success / Failure relation</text><text x="115" y="1402" class="small">有下游继续路由；无下游 callback 收敛</text><text x="115" y="1437" class="tiny">协议 callback 不等于 TbMsgCallback</text><text x="115" y="1470" class="tiny">force_ack 后结果是新队列消息</text>
+  <rect x="585" y="1290" width="445" height="205" rx="5" class="amber"/><text x="807" y="1330" text-anchor="middle" class="label">PostgreSQL 边界</text><text x="615" y="1367" class="small">运行时无业务 DB / outbox 写入</text><text x="615" y="1402" class="small">控制面保存 rule_node.configuration</text><text x="615" y="1437" class="tiny">debugMode 可旁路写 Debug Event</text><text x="615" y="1470" class="tiny">邮件成功仅先更新 JVM usage counter</text>
+  <rect x="1085" y="1290" width="445" height="205" rx="5" class="red"/><text x="1307" y="1330" text-anchor="middle" class="label">敏感配置 / 数据</text><text x="1115" y="1367" class="small">Basic / SMTP / proxy password</text><text x="1115" y="1402" class="small">PEM private key · Kafka SASL/SSL</text><text x="1115" y="1437" class="tiny">Kafka 可外发全部 metadata headers</text><text x="1115" y="1470" class="tiny">配置映射无字段级加密 / redactor</text>
+  <rect x="1585" y="1290" width="530" height="205" rx="5" class="violet"/><text x="1850" y="1330" text-anchor="middle" class="label">一致性结论</text><text x="1615" y="1367" class="small">force_ack=false：可能外部已接受后平台重投</text><text x="1615" y="1402" class="small">force_ack=true：可能原消息已 ack 后外部失败</text><text x="1615" y="1437" class="small">两种模式都不是 exactly-once</text><text x="1615" y="1470" class="tiny">业务幂等必须由稳定 key + 远端去重实现</text>
+  <path d="M530 1392H585" class="line"/><path d="M1030 1392H1085" class="line"/><path d="M1530 1392H1585" class="line"/>
+</svg>

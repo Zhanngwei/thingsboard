@@ -1,0 +1,222 @@
+@startuml
+title ThingsBoard 3.6 Debug Event 与 Audit Log 独立时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+ ArrowColor #1F2937
+ ActorBorderColor #111827
+ ActorBackgroundColor #F8FAFC
+ ActorFontColor #111827
+ LifeLineBorderColor #334155
+ LifeLineBackgroundColor #F8FAFC
+ ParticipantBorderColor #1F2937
+ ParticipantBackgroundColor #E8F4FD
+ ParticipantFontColor #111827
+ NoteBorderColor #92400E
+ NoteBackgroundColor #FFF7E6
+ NoteFontColor #111827
+}
+
+autonumber
+actor "Rule Engine queue consumer" as REConsumer
+participant "RuleChain / RuleNode Actor" as Actor
+participant "DefaultTbContext" as Context
+participant "ActorSystemContext" as ActorSystem
+participant "BaseEventService" as EventService
+participant "JpaBaseEventDao" as EventDao
+queue "TbSqlBlockingQueue" as EventQueue
+participant "EventInsertRepository" as EventRepo
+database "PostgreSQL event partitions" as EventDB
+
+== Debug Event：Actor 到无界 SQL queue ==
+REConsumer -> Actor : TbMsg / RuleNodeToSelfMsg
+alt debug mode input
+  Actor -> ActorSystem : persistDebugInput(tenant, node, msg, state)
+else debug mode output / failure / ack / next relation
+  Actor -> Context : tellNext / tellFailure / ack / output
+  Context -> ActorSystem : persistDebugOutput(...)
+else tenant debug limit exceeded
+  ActorSystem -> ActorSystem : persistRuleChainDebugModeEvent(...)
+end
+ActorSystem -> ActorSystem : build RuleNodeDebugEvent or RuleChainDebugEvent
+ActorSystem -> EventService : saveAsync(event)
+EventService -> EventService : validate and truncate each debug field
+EventService -> EventDao : saveAsync(event)
+EventDao -> EventDao : assign time UUID; sync partition check / possible DDL
+EventDao -> EventQueue : add(event wrapper)
+EventQueue --> ActorSystem : ListenableFuture returned
+ActorSystem --> Actor : return to Actor-thread caller after enqueue
+Actor -> Actor : output path then calls chainActor.tell / TbMsg callback / route
+loop queue pack by configured size/time
+  opt sql.batch_sort=true (default, configurable)
+    EventQueue -> EventQueue : sort batch by createdTime
+  end
+  EventQueue -> EventRepo : save(List<Event>)
+  EventRepo -> EventRepo : group by EventType
+  EventRepo -> EventDB : TransactionTemplate + JDBC batchUpdate
+  alt all type batches succeed
+    EventDB --> EventRepo : commit pack transaction
+    EventRepo --> EventQueue : complete futures
+    EventQueue -> EventQueue : direct callback usually runs inline here
+  else one batch fails
+    EventDB --> EventRepo : rollback pack transaction
+    EventRepo --> EventQueue : fail all pack futures, no retry
+    EventQueue -> EventQueue : direct callback usually logs inline here
+  end
+end
+note over Actor,EventDB
+  Only the JDBC batch after queue.add is asynchronous and best-effort.
+  Validation and partition DDL run on the Actor call path before enqueue.
+  directExecutor never posts to the Actor mailbox.
+  If already complete when registered, callback runs on the registering thread;
+  otherwise it usually runs inline on the SQL queue completion thread.
+  Later batch failure does not roll back or replay the Rule Engine message.
+end note
+
+actor "REST / domain service" as Business
+participant "BaseController / Entity service" as Entry
+participant "EntityActionService" as Action
+participant "AuditLogServiceImpl" as AuditService
+participant "shared JpaExecutorService" as JpaExecutor
+participant "JpaAuditLogDao" as AuditDao
+database "PostgreSQL audit_log" as AuditDB
+participant "AuditLogSink" as Sink
+queue "Rule Engine action queue" as ActionQueue
+
+== Audit Log：业务动作后的独立 JPA 事务 ==
+Business -> Entry : create/update/delete/login/RPC/etc.
+Entry -> Entry : execute business operation
+note over Entry,Action
+  BaseController helpers skip EntityAction and Audit for SYS_ADMIN.
+end note
+alt business succeeds
+  Entry -> Action : logEntityAction(user, action, entity, null)
+  Action -> ActionQueue : pushEntityActionToRuleEngine(TbMsg)
+  Action -> AuditService : then logEntityAction(...)
+else business throws
+  Entry -> Action : logEntityAction(user, action, entity, exception)
+  Action -> AuditService : logEntityAction(...); no Rule Engine push
+end
+AuditService -> AuditService : apply audit level filter
+AuditService -> AuditService : sync actionData / name lookup / stack
+alt uncaught producer construction error
+  AuditService --> Entry : exception propagates on caller thread
+  Entry --> Business : request may fail after entity was saved
+  note over Entry,AuditDB
+    The entity may already be saved while the HTTP request still fails.
+  end note
+else producer constructed
+  AuditService -> AuditService : validate before executor.submit
+  note over AuditService
+    Name lookup exceptions are ignored.
+  end note
+  alt ordinary validation failure
+    AuditService --> Action : immediate failed Future; no task submitted
+    Action --> Entry : return; failed Future is commonly ignored
+    Entry --> Business : business response may proceed
+  else validation passes or malformed-name fallback
+    alt executor.submit accepted
+      AuditService -> JpaExecutor : submit audit task
+      JpaExecutor --> Action : Future is returned and commonly ignored
+      Action --> Entry : return without waiting for Future
+      Entry --> Business : business response may proceed
+      note over JpaExecutor
+        Shared with Relation, Attributes, EntityView and other JPA work.
+        No Audit-specific capacity, backpressure or failure counter is guaranteed.
+      end note
+      JpaExecutor -> AuditDao : save(tenantId, auditLog)
+      AuditDao -> AuditDao : create partition if needed
+      AuditDao -> AuditDB : EntityManager.persist in independent transaction
+      alt DB save succeeds
+        AuditDB --> AuditDao : COMMIT
+        AuditDao --> JpaExecutor : persisted AuditLog
+        JpaExecutor -> Sink : logAction(auditLog) after dao.save returns
+        alt Elasticsearch executor accepts task
+          Sink -> Sink : executor.execute(task)
+          alt sink task or async HTTP fails
+            Sink -> Sink : log error/warning; no retry or DB rollback
+          end
+          Sink --> JpaExecutor : return after scheduling
+        else Elasticsearch executor.execute rejects
+          Sink --> JpaExecutor : RejectedExecutionException
+          JpaExecutor -> JpaExecutor : fail Audit Future; DB stays committed
+          note over Business,JpaExecutor
+            This async failure is not delivered synchronously to HTTP.
+          end note
+        end
+      else DB save fails
+        AuditDB --> AuditDao : ROLLBACK audit transaction
+        note over Entry,AuditDB
+          The async DB failure normally remains in the ignored Future
+          and does not roll back the already completed business operation.
+        end note
+      end
+    else executor.submit rejected
+      AuditService --> Entry : exception propagates on caller thread
+      Entry --> Business : request may fail after entity was saved
+      note over Entry,AuditDB
+        The entity may already be saved while the HTTP request still fails.
+      end note
+    end
+  end
+end
+note over EventDB,AuditDB
+  Event batch, audit row, business entity transaction,
+  Rule Engine message and external sink never form one transaction.
+end note
+
+== Event 与 Audit 查询 ==
+actor "Tenant administrator" as Admin
+participant "EventController / AuditLogController" as ReadController
+Admin -> ReadController : GET/POST with entity, time, filter and page
+alt event query
+  ReadController -> EventService : findEvents(tenant, entity, EventFilter, PageLink)
+  EventService -> EventDao : select EventType repository
+  EventDao -> EventDB : closed time range + type-specific predicates
+  EventDB --> Admin : PageData<Event>
+else audit query
+  ReadController -> AuditService : findAuditLogsByTenant/Customer/User/Entity
+  AuditService -> AuditDao : PageRequest offset pagination
+  AuditDao -> AuditDB : closed created_time range
+  AuditDB --> Admin : PageData<AuditLog>
+end
+
+== TTL scheduler and partition drop ==
+actor "Spring scheduler" as Scheduler
+participant "PartitionService" as Partition
+participant "EventsCleanUpService / AuditLogsCleanUpService" as Cleanup
+Scheduler -> Cleanup : fixed-delay cleanup tick
+Cleanup -> Partition : resolve SYS tenant Core owner
+alt current node owns partition
+  Cleanup -> EventDB : drop event/debug partitions with positive cutoff
+  Cleanup -> AuditDB : drop audit partitions with partitionEnd < cutoff
+else current node is not owner
+  Cleanup -> EventDao : cleanup local event caches for positive cutoffs
+  Cleanup -> AuditDao : cleanup local audit partition cache
+end
+note over Cleanup,AuditDB
+  Event TTL zero skips that event category inside JpaBaseEventDao.
+  A non-owner node cleans local partition caches instead of just returning.
+  Deletion is by whole partition, not row timestamp.
+  Actual retention extends by partition and scheduler intervals.
+end note
+
+== Shutdown and failure boundary ==
+alt Event SQL queue shutdown
+  EventQueue -> EventQueue : shutdownNow without explicit drain
+  note over EventQueue
+    Pending events may be lost or their futures may not complete.
+  end note
+else audit-log.enabled is false
+  AuditService -> AuditService : Dummy implementation returns empty pages / null writes
+else Elasticsearch task / HTTP unavailable after task accepted
+  Sink -> Sink : warning/error only; PostgreSQL audit row remains
+else Elasticsearch executor.execute rejects
+  Sink -> JpaExecutor : Audit Future fails; PostgreSQL row remains
+end
+
+@enduml

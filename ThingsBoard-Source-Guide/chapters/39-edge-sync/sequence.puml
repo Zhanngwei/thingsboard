@@ -1,0 +1,217 @@
+@startuml
+title ThingsBoard 3.6 Edge 双向同步、确认与恢复时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+ ArrowColor #1F2937
+ ActorBorderColor #111827
+ ActorBackgroundColor #F8FAFC
+ ActorFontColor #111827
+ LifeLineBorderColor #334155
+ LifeLineBackgroundColor #F8FAFC
+ ParticipantBorderColor #1F2937
+ ParticipantBackgroundColor #DBEAFE
+ ParticipantFontColor #111827
+ NoteBorderColor #92400E
+ NoteBackgroundColor #FFF7E6
+ NoteFontColor #111827
+ GroupBorderColor #334155
+ GroupBackgroundColor #F8FAFC
+}
+
+autonumber
+actor "ThingsBoard Edge" as Edge
+participant "EdgeGrpcClient" as Client
+participant "EdgeGrpcService" as GrpcService
+participant "EdgeGrpcSession" as Session
+participant "EdgeService / JpaEdgeDao" as EdgeDao
+database "PostgreSQL edge" as EdgeDB
+participant "AttributesService" as Attr
+queue "Rule Engine queue" as RE
+
+== Connect and session ownership ==
+Edge -> Client : connect(routingKey, secret, callbacks)
+Client -> GrpcService : handleMsgs() bidi stream + CONNECT
+GrpcService -> Session : new EdgeGrpcSession(...)
+Session -> EdgeDao : findEdgeByRoutingKey(SYS, routingKey)
+EdgeDao -> EdgeDB : SELECT edge WHERE routing_key = ?
+alt key found and secret equals
+  Session -> GrpcService : onEdgeConnect(edgeId, session)
+  GrpcService -> GrpcService : sessions.put(edgeId, session)\nnewEvents=true
+  GrpcService -> Attr : active=true, lastConnectTime
+  GrpcService -> RE : CONNECT_EVENT (best effort)
+  Session --> Client : ACCEPTED + EdgeConfiguration + maxInboundSize
+  Client --> Edge : configuration callback
+else invalid key or secret
+  Session --> Client : BAD_CREDENTIALS
+  Session -> Client : stream onError
+end
+note over GrpcService,Session
+  sessions, pending messages and scheduled tasks are local memory.
+  A stale session close removes the mapping only when sessionId still matches.
+end note
+
+participant "Business DAO" as Biz
+participant "EdgeEventSourcingListener" as Listener
+queue "TB Core main queue" as CoreQueue
+participant "BaseEdgeProcessor" as Processor
+participant "BaseEdgeEventService" as EventService
+participant "JpaBaseEdgeEventDao" as EventDao
+queue "Edge Event SQL queue" as SqlQueue
+participant "EdgeEventInsertRepository" as Insert
+database "PostgreSQL edge_event partitions" as EventDB
+queue "TB Core notification topics" as NotifyQueue
+participant "AppActor / TenantActor" as Actors
+
+== Cloud to Edge incremental event ==
+Biz -> Biz : commit entity save/delete transaction
+Biz -> Listener : transactional entity event after commit
+Listener -> Listener : filter OTA/rule-chain/user/alarm semantics
+Listener -> CoreQueue : EdgeNotificationMsgProto(type, action, entity, originatorEdgeId)
+CoreQueue -> Processor : processEntityNotification(...)
+alt allEdgesRelated
+  Processor -> Processor : page tenant edges and exclude originator
+else action/explicit edgeId direct target
+  Processor -> Processor : save for specified Edge without relation lookup
+else DELETED without explicit edgeId
+  Processor -> Processor : page tenant edges and exclude originator
+else relation path
+  Processor -> Processor : page related edges and exclude originator Edge
+end
+Processor -> Attr : read Edge active attribute
+alt active or offline-whitelisted
+  Processor -> EventService : saveAsync(EdgeEvent)
+  EventService -> EventService : tenant + per-edge rate limit, validate
+  EventService -> EventDao : saveAsync(event)
+  EventDao -> EventDao : time UUID, uid, create partition
+  EventDao -> SqlQueue : add(entity)
+  loop batch up to 1000 or 100 ms
+    SqlQueue -> Insert : save(List<EdgeEventEntity>) sorted by ts
+    Insert -> EventDB : TransactionTemplate + JDBC batch INSERT
+    alt batch commit
+      EventDB --> SqlQueue : seq_id identity values assigned
+      SqlQueue --> Processor : complete event future
+      Processor -> NotifyQueue : EdgeEventUpdate(edgeId), no callback
+    else batch rollback
+      EventDB --> SqlQueue : exception
+      SqlQueue --> Processor : fail every batch future, no retry
+    end
+  end
+else never activated or non-whitelisted while offline
+  Processor --> CoreQueue : skip increment
+end
+
+NotifyQueue -> Actors : notification consumer forwards and acks queue
+Actors -> GrpcService : onToEdgeSessionMsg(high priority)
+GrpcService -> GrpcService : edge-service executor sets newEvents=true
+GrpcService -> Session : scheduled processEdgeEvents()
+Session -> Attr : find queueStartTs + queueStartSeqId
+Session -> EventDB : page createdTime window, seqId > cursor\nORDER BY seqId, default size 50
+EventDB --> Session : PageData<EdgeEvent>
+Session -> Session : processor-specific conversion to DownlinkMsg ids
+loop pending downlink messages
+  Session -> Client : DownlinkMsg(id, entity/telemetry/RPC/...)
+  Client --> Edge : onDownlink callback
+  Edge -> Client : processing result
+  Client -> Session : DownlinkResponseMsg(id, success, error)
+  alt success
+    Session -> Session : remove id from pending map
+  else negative or no response, attempt < 10
+    Session -> Session : keep pending; schedule after sleep interval
+  else attempt 10 or message exceeds client max size
+    Session -> Session : discard remaining/oversize message\nraise communication-failure notification
+  end
+end
+Session -> Attr : save queueStartTs + queueStartSeqId\nfrom original page last row
+note over Session,Attr
+  Cursor update does not delete edge_event rows.
+  Conversion failure, oversize, or attempt exhaustion may still advance the cursor.
+end note
+
+participant "Edge processors" as UplinkProcessors
+database "Cloud business stores" as CloudDB
+queue "Telemetry / Rule Engine / RPC queues" as BusinessQueue
+
+== Edge to Cloud uplink ==
+Edge -> Client : local uplink pack
+Client -> Session : UplinkMsg(id, repeated payloads)
+Session -> Session : tenant and per-edge rate limits
+alt rate limit rejected
+  Session --> Client : UplinkResponse(id, false, Rate limit reached)
+else allowed
+  Session -> UplinkProcessors : processUplinkMsg(...)
+  UplinkProcessors -> UplinkProcessors : set ThreadLocal originator Edge where needed
+  par entity writes
+    UplinkProcessors -> CloudDB : create/update/delete by incoming UUID
+  else telemetry and device RPC
+    UplinkProcessors -> BusinessQueue : telemetry, attributes, Rule Engine or RPC
+  else dependent-data requests
+    UplinkProcessors -> EventService : save response as edge_event
+  end
+  UplinkProcessors -> UplinkProcessors : remove ThreadLocal originator
+  alt every collected future succeeds
+    Session --> Client : UplinkResponse(id, true)
+  else any future fails
+    Session --> Client : UplinkResponse(id, false, root cause + bounded stack)
+  end
+end
+note over UplinkProcessors,CloudDB
+  One UplinkMsg is not one database transaction.
+  Earlier writes remain committed when a later future fails.
+end note
+
+participant "EdgeSyncCursor / fetchers" as Cursor
+participant "Entity services" as EntityServices
+
+== Full or partial snapshot sync ==
+Edge -> Client : request sync(fullSync)
+Client -> Session : SyncRequestMsg(fullSync)
+Session -> Session : syncCompleted=false\ninterrupt normal pending send task
+Session -> Cursor : new EdgeSyncCursor(ctx, edge, fullSync)
+loop fixed fetcher order
+  Cursor -> EntityServices : page current entities
+  EntityServices --> Cursor : assigned/global snapshot page
+  Cursor -> Cursor : construct in-memory ADDED EdgeEvents
+  Cursor -> Session : DownlinkMsg pack
+  Session -> Client : send and retry until ack/discard
+end
+Cursor -> Session : no next fetcher
+Session -> Client : DownlinkMsg(SyncCompletedMsg)
+alt success ack
+  Client -> Session : DownlinkResponse(success)
+else retry limit exhausted
+  Session -> Session : stopCurrentSendDownlinkMsgsTask(false)
+end
+Session -> Session : normal task completion sets syncCompleted=true
+Session -> NotifyQueue : onEdgeEventUpdate(edgeId)
+note over Cursor,EventDB
+  Snapshot fetchers do not persist their temporary EdgeEvents.
+  Requests for attributes, relations, credentials and metadata may create new edge_event rows.
+end note
+
+== Disconnect and recovery ==
+Edge -> Client : stream close or network failure
+Client -> Session : onCompleted / onError
+Session -> GrpcService : onEdgeDisconnect(edge, sessionId)
+alt sessionId is still current
+  GrpcService -> GrpcService : remove session, flag and scheduled check
+  GrpcService -> Attr : active=false, lastDisconnectTime
+  GrpcService -> RE : DISCONNECT_EVENT (best effort)
+else stale session
+  GrpcService -> GrpcService : keep newer session
+end
+... later reconnect ...
+Client -> GrpcService : new CONNECT stream
+GrpcService -> Session : new session; newEvents=true
+Session -> Attr : reload persisted queueStartTs/queueStartSeqId
+Session -> EventDB : replay rows after persisted cursor
+note over Session,EventDB
+  If Edge processed a page but cursor persistence did not finish, the page is replayed.
+  If TTL dropped unconsumed partitions, snapshot sync is required and history may be unrecoverable.
+end note
+
+@enduml

@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1540" viewBox="0 0 2200 1540" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 Edge 双向同步架构</title>
+  <desc id="desc">展示实体通知、EdgeEvent SQL 队列、TB Core 路由、gRPC 双向会话、确认重试、游标恢复、全量同步和 TTL 边界。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#1f2937"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;fill:#111827;letter-spacing:0}.title{font-size:42px;font-weight:700}.sub{font-size:20px;fill:#374151}.section{font-size:28px;font-weight:700}.label{font-size:23px;font-weight:700}.body{font-size:19px}.tiny{font-size:17px;fill:#374151}
+      .band{fill:#f8fafc;stroke:#334155;stroke-width:2}.blue{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}.green{fill:#dcfce7;stroke:#166534;stroke-width:3}.amber{fill:#fef3c7;stroke:#92400e;stroke-width:3}.red{fill:#fee2e2;stroke:#991b1b;stroke-width:3}.violet{fill:#ede9fe;stroke:#5b21b6;stroke-width:3}.gray{fill:#f3f4f6;stroke:#374151;stroke-width:3}.line{fill:none;stroke:#1f2937;stroke-width:3;marker-end:url(#arrow)}.dash{fill:none;stroke:#1f2937;stroke-width:3;stroke-dasharray:10 8;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="2200" height="1540" fill="#ffffff"/>
+  <text x="1100" y="58" text-anchor="middle" class="title">ThingsBoard 3.6 Edge 双向同步架构</text>
+  <text x="1100" y="92" text-anchor="middle" class="sub">PostgreSQL durable increment · TB Core wake-up · gRPC bidi ack · attribute cursor recovery</text>
+
+  <rect x="35" y="125" width="1380" height="930" rx="6" class="band"/>
+  <text x="725" y="165" text-anchor="middle" class="section">Cloud → Edge：持久增量、通知与确认</text>
+
+  <rect x="75" y="215" width="280" height="190" rx="5" class="gray"/>
+  <text x="215" y="255" text-anchor="middle" class="label">业务事务</text>
+  <text x="105" y="300" class="body">Save/Delete/Action</text><text x="105" y="337" class="body">after-commit event</text><text x="105" y="374" class="tiny">Alarm/RuleChain/User 等过滤</text>
+
+  <rect x="415" y="215" width="300" height="190" rx="5" class="violet"/>
+  <text x="565" y="255" text-anchor="middle" class="label">TB Core + Processor</text>
+  <text x="445" y="292" class="body">allEdges: tenant, exclude source</text><text x="445" y="329" class="body">DELETED/no edgeId: same</text><text x="445" y="366" class="tiny">relation excludes; explicit edgeId direct</text>
+
+  <rect x="775" y="215" width="270" height="190" rx="5" class="red"/>
+  <text x="910" y="255" text-anchor="middle" class="label">Edge SQL Queue</text>
+  <text x="805" y="300" class="body">unbounded, one thread</text><text x="805" y="337" class="body">batch 1000 / 100 ms</text><text x="805" y="374" class="tiny">batch TX; no DAO retry</text>
+
+  <rect x="1105" y="215" width="270" height="190" rx="5" class="green"/>
+  <text x="1240" y="255" text-anchor="middle" class="label">edge_event</text>
+  <text x="1135" y="300" class="body">RANGE(created_time)</text><text x="1135" y="337" class="body">cycling seq_id</text><text x="1135" y="374" class="tiny">default TTL about one month</text>
+  <path d="M355 310H415" class="line"/><path d="M715 310H775" class="line"/><path d="M1045 310H1105" class="line"/>
+
+  <rect x="75" y="500" width="300" height="210" rx="5" class="amber"/>
+  <text x="225" y="540" text-anchor="middle" class="label">TB Core Notification</text>
+  <text x="105" y="585" class="body">EdgeEventUpdateMsg</text><text x="105" y="622" class="body">tenantId + edgeId only</text><text x="105" y="659" class="tiny">broadcast all Core service topics</text><text x="105" y="688" class="tiny">queue ack != Edge ack</text>
+
+  <rect x="435" y="500" width="280" height="210" rx="5" class="violet"/>
+  <text x="575" y="540" text-anchor="middle" class="label">Actor Dispatch</text>
+  <text x="465" y="585" class="body">AppActor high priority</text><text x="465" y="622" class="body">TenantActor → RPC</text><text x="465" y="659" class="tiny">payload remains in PostgreSQL</text>
+
+  <rect x="775" y="480" width="270" height="250" rx="5" class="blue"/>
+  <text x="910" y="520" text-anchor="middle" class="label">EdgeGrpcSession</text>
+  <text x="805" y="565" class="body">page default 50</text><text x="805" y="602" class="body">pending map + ids</text><text x="805" y="639" class="body">10 attempts / 60 s</text><text x="805" y="676" class="tiny">conversion/oversize may skip</text><text x="805" y="705" class="tiny">local memory only</text>
+
+  <rect x="1105" y="500" width="270" height="210" rx="5" class="green"/>
+  <text x="1240" y="540" text-anchor="middle" class="label">Cursor Attributes</text>
+  <text x="1135" y="585" class="body">queueStartTs</text><text x="1135" y="622" class="body">queueStartSeqId</text><text x="1135" y="659" class="tiny">saved after page completion</text><text x="1135" y="688" class="tiny">rows are not deleted on ack</text>
+  <path d="M1240 405V450H225V500" class="line"/><path d="M375 605H435" class="line"/><path d="M715 605H775" class="line"/><path d="M1045 605H1105" class="line"/>
+
+  <rect x="75" y="815" width="1300" height="185" rx="5" class="amber"/>
+  <text x="725" y="855" text-anchor="middle" class="label">可靠性边界</text>
+  <text x="105" y="900" class="body">成功 ack 才移除 pending；cursor 保存前崩溃会重放（at-least-once 倾向）</text>
+  <text x="105" y="937" class="body">第 10 次失败、单条超大或转换失败仍可能推进 cursor（不是 exactly-once）</text>
+  <text x="105" y="974" class="tiny">TTL 不读取每个 Edge cursor；长期离线会失去历史增量，只能用 snapshot 恢复当前态</text>
+  <path d="M910 730V815" class="line"/><path d="M1240 710V815" class="dash"/>
+
+  <rect x="1465" y="125" width="700" height="930" rx="6" class="band"/>
+  <text x="1815" y="165" text-anchor="middle" class="section">Edge ↔ Cloud：双向 gRPC 会话</text>
+
+  <rect x="1510" y="215" width="610" height="175" rx="5" class="blue"/>
+  <text x="1815" y="255" text-anchor="middle" class="label">Connect / Session</text>
+  <text x="1540" y="300" class="body">routing_key direct DB lookup + secret equality</text><text x="1540" y="337" class="body">one current local session per EdgeId</text><text x="1540" y="370" class="tiny">TLS optional · gzip · keepalive · max inbound negotiation</text>
+
+  <rect x="1510" y="465" width="280" height="260" rx="5" class="green"/>
+  <text x="1650" y="505" text-anchor="middle" class="label">DownlinkMsg</text>
+  <text x="1540" y="550" class="body">entities / profiles</text><text x="1540" y="587" class="body">telemetry / alarm</text><text x="1540" y="624" class="body">RPC / credentials</text><text x="1540" y="661" class="body">SyncCompleted</text><text x="1540" y="700" class="tiny">Edge returns per-id response</text>
+
+  <rect x="1840" y="465" width="280" height="260" rx="5" class="amber"/>
+  <text x="1980" y="505" text-anchor="middle" class="label">UplinkMsg</text>
+  <text x="1870" y="550" class="body">entity changes</text><text x="1870" y="587" class="body">telemetry / attributes</text><text x="1870" y="624" class="body">alarm / relation / RPC</text><text x="1870" y="661" class="body">dependent-data requests</text><text x="1870" y="700" class="tiny">Cloud responds after futures</text>
+  <path d="M1650 465V420H1980V465" class="dash"/><path d="M1980 725V775H1650V725" class="dash"/>
+
+  <rect x="1510" y="815" width="610" height="185" rx="5" class="red"/>
+  <text x="1815" y="855" text-anchor="middle" class="label">非原子上行</text>
+  <text x="1540" y="900" class="body">allAsList 决定整包 response</text><text x="1540" y="937" class="body">先成功的业务写入不会因后续失败回滚</text><text x="1540" y="974" class="tiny">Cloud 无统一 CRDT / vector clock；冲突由各 processor 处理</text>
+  <path d="M1980 725V815" class="line"/>
+
+  <rect x="35" y="1100" width="2130" height="385" rx="6" class="band"/>
+  <text x="1100" y="1140" text-anchor="middle" class="section">Snapshot Sync、恢复与运维观察</text>
+
+  <rect x="75" y="1190" width="470" height="235" rx="5" class="violet"/>
+  <text x="310" y="1230" text-anchor="middle" class="label">Full / Partial Sync</text>
+  <text x="105" y="1275" class="body">固定 fetcher 顺序扫描当前实体快照</text><text x="105" y="1312" class="body">关联实体始终；全局/tenant 数据仅 full</text><text x="105" y="1349" class="body">临时 EdgeEvent 不写 edge_event</text><text x="105" y="1386" class="tiny">依赖数据请求可再生成持久增量</text>
+
+  <rect x="605" y="1190" width="470" height="235" rx="5" class="green"/>
+  <text x="840" y="1230" text-anchor="middle" class="label">Restart / Reconnect</text>
+  <text x="635" y="1275" class="body">丢失 session / pending / flags</text><text x="635" y="1312" class="body">保留 edge_event 与 cursor attributes</text><text x="635" y="1349" class="body">从持久 cursor 重读并可能重放</text><text x="635" y="1386" class="tiny">stale session id 不删除新会话</text>
+
+  <rect x="1135" y="1190" width="470" height="235" rx="5" class="amber"/>
+  <text x="1370" y="1230" text-anchor="middle" class="label">Kafka / Actor 边界</text>
+  <text x="1165" y="1275" class="body">TB Queue 是抽象，Kafka 是常用实现</text><text x="1165" y="1312" class="body">wake-up 不承载 EdgeEvent payload</text><text x="1165" y="1349" class="body">Actor 只做高优先级 session 分派</text><text x="1165" y="1386" class="tiny">queue ack 不等于 gRPC ack</text>
+
+  <rect x="1665" y="1190" width="450" height="235" rx="5" class="red"/>
+  <text x="1890" y="1230" text-anchor="middle" class="label">必须监控</text>
+  <text x="1695" y="1275" class="body">SQL queue depth / batch failures</text><text x="1695" y="1312" class="body">notification delivery / active session</text><text x="1695" y="1349" class="body">pending retries / oversize / conversion</text><text x="1695" y="1386" class="tiny">cursor lag · TTL gap · full-sync outcome</text>
+  <path d="M545 1308H605" class="line"/><path d="M1075 1308H1135" class="line"/><path d="M1605 1308H1665" class="line"/>
+</svg>

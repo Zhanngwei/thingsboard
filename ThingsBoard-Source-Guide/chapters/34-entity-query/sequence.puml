@@ -1,0 +1,194 @@
+@startuml
+title ThingsBoard 3.6 Entity Query 完整时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+  ArrowColor #1F2937
+  ActorBorderColor #111827
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+  LifeLineBorderColor #334155
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1F2937
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantFontColor #111827
+  GroupBorderColor #374151
+  GroupBackgroundColor #F9FAFB
+  GroupHeaderFontColor #111827
+  NoteBorderColor #92400E
+  NoteBackgroundColor #FFF7E6
+  NoteFontColor #111827
+}
+
+autonumber
+actor "REST / WebSocket client" as Client
+participant "Security / WS handler" as Security
+participant "EntityQueryController" as Controller
+participant "DefaultEntityQueryService" as QueryService
+participant "WS Subscription Context" as WsCtx
+participant "BaseEntityService" as EntityService
+participant "JpaEntityQueryDao" as Dao
+participant "DefaultEntityQueryRepository" as Repository
+participant "EntityKeyMapping" as Mapping
+participant "QueryContext" as Context
+participant "NamedParameterJdbcTemplate" as Jdbc
+participant "Timeseries / Attributes services" as KeyServices
+database "PostgreSQL" as DB
+
+== REST 与 WebSocket 初始查询入口 ==
+alt POST /api/entitiesQuery/find
+  Client -> Security : JWT and role check
+  Security -> Controller : findEntityDataByQuery(EntityDataQuery)
+else POST /api/entitiesQuery/find/keys
+  Client -> Security : JWT and role check
+  Security -> Controller : findEntityTimeseriesAndAttributesKeysByQuery(...)
+else POST /api/entitiesQuery/count
+  Client -> Security : JWT and role check
+  Security -> Controller : countEntitiesByQuery(EntityCountQuery)
+else POST /api/alarmsQuery/find candidate entities
+  Client -> Security : JWT and role check
+  Security -> Controller : findAlarmDataByQuery(AlarmDataQuery)
+else WebSocket ENTITY_DATA / ENTITY_COUNT / ALARM_DATA initial query
+  Client -> Security : authenticated WS command
+  Security -> WsCtx : validated command to subscription context
+end
+alt REST find
+  Controller -> QueryService : findEntityDataByQuery(SecurityUser, query)
+  QueryService -> QueryService : resolve dynamic values even when userValue exists
+  QueryService -> EntityService : findEntityDataByQuery(tenantId, customerId, query)
+else REST keys
+  Controller -> QueryService : getKeysByQuery(SecurityUser, tenantId, query, ...)
+  QueryService -> QueryService : findEntityDataByQuery(SecurityUser, query)
+  QueryService -> QueryService : resolve dynamic values even when userValue exists
+  QueryService -> EntityService : find requested entity page first
+else REST count
+  Controller -> QueryService : countEntitiesByQuery without dynamic resolution
+  QueryService -> EntityService : countEntitiesByQuery(...)
+else REST Alarm candidate EntityDataQuery
+  Controller -> QueryService : findAlarmDataByQuery(SecurityUser, query)
+  QueryService -> EntityService : direct candidate find without dynamic resolution
+else new WebSocket ENTITY_DATA context
+  WsCtx -> WsCtx : createSubCtx calls setAndResolveQuery
+  WsCtx -> WsCtx : handler calls setAndResolveQuery a second time
+  WsCtx -> EntityService : findEntityDataByQuery directly
+else new WebSocket ENTITY_COUNT context
+  WsCtx -> WsCtx : createSubCtx calls setAndResolveQuery once
+  WsCtx -> EntityService : countEntitiesByQuery directly
+else new WebSocket AlarmData context
+  WsCtx -> WsCtx : createSubCtx and handler each call setAndResolveQuery
+  WsCtx -> EntityService : find candidate EntityDataQuery directly
+end
+EntityService -> EntityService : validate filter, relation query and page link
+EntityService -> Dao : find or count query
+Dao -> Repository : public find false; SYS count/internal may ignore permission
+
+== Mapping 与动态 SQL ==
+Repository -> Repository : resolveEntityType(entityFilter)
+Repository -> Context : create QueryContext(tenant, customer, entityType)
+Repository -> Repository : read EntityDataPageLink
+Repository -> Mapping : prepareKeyMapping(query)
+Mapping -> Mapping : preserve duplicate projections; merge sort/grouped filters
+Mapping -> Mapping : assign stable aliasN values
+Repository -> Repository : build permission + entity filter + entity-field WHERE
+Context -> Context : bind WHERE parameters
+
+Repository -> Mapping : buildLatestJoins(count=true, filter mappings only)
+Repository -> Mapping : buildLatestJoins(count=false, all latest mappings)
+Context -> Context : bind latest key and predicate parameters
+Repository -> Repository : buildTextSearchQuery(selection mappings, textSearch)
+Context -> Context : bind textSearch parameter when applicable
+
+alt simple/list/name/type filter
+  Repository -> Repository : choose registered entityTableMap entry for FROM
+else RelationsQueryFilter
+  Repository -> Repository : build WITH RECURSIVE source for FROM
+  Repository -> Repository : path starts at root; append current in_id
+  Repository -> Repository : cycle out_id may emit once, then expansion stops
+else Device/Asset/Edge/EntityView search
+  Repository -> Repository : recursive IDs then fixed target table for FROM
+end
+Repository -> Repository : assemble count/data FROM clauses
+
+== Count 与 data 是两个 statement ==
+Repository -> Jdbc : queryForObject(SELECT count(id), parameters)
+Jdbc -> DB : execute count SQL
+DB --> Jdbc : total count
+  Jdbc --> Repository : totalElements (find uses Integer; count uses long)
+alt total is zero or count-only request
+  Repository --> Dao : empty page or count
+else data query required
+  Repository -> Repository : add ORDER BY and LIMIT/OFFSET to data SQL
+  Repository -> Jdbc : query(SELECT fields/latest FROM result, parameters)
+  Jdbc -> DB : execute data SQL
+  DB --> Jdbc : rows
+  Jdbc --> Repository : map rows to EntityData
+  note over Repository,DB
+    Count and data do not share one database snapshot.
+    Without ORDER BY, offset pagination is unstable.
+  end note
+  Repository --> Dao : PageData<EntityData>
+end
+alt REST find/count/Alarm query
+  Dao --> EntityService : result
+  EntityService --> QueryService : result
+  QueryService --> Controller : result
+  Controller --> Client : JSON response
+else REST keys after entity page
+  Dao --> EntityService : entity page
+  EntityService --> QueryService : entity page
+  QueryService -> KeyServices : async TS/attribute key queries by entity IDs
+  KeyServices --> QueryService : distinct keys
+  QueryService --> Controller : complete DeferredResult
+  Controller --> Client : keys response
+else WebSocket initial query
+  Dao --> EntityService : result
+  EntityService --> WsCtx : PageData/count directly
+  WsCtx --> Client : initial WS update
+end
+
+== Relation CTE detail ==
+Client -> Controller : query with RelationsQueryFilter
+Controller -> QueryService : entity query
+QueryService -> EntityService : entity query
+EntityService -> Dao : entity query
+Dao -> Repository : execute dynamic entity query
+Repository -> DB : WITH RECURSIVE related_entities
+DB -> DB : seed from root or multi-root
+loop until effective max level or no rows
+  DB -> DB : follow FROM or TO edges in COMMON group
+  DB -> DB : require current edge in_id absent from path, then append it
+  DB -> DB : emit out_id; a cycle target may appear once
+end
+DB -> DB : apply relation type/entity type result filters after recursion
+note right of DB
+  Business relation/entity filters do not prune intermediate CTE edges.
+end note
+DB -> DB : apply fetchLastLevelOnly terminal condition
+DB --> Repository : related entity rows
+Repository --> Client : page result
+
+== 异常与资源边界 ==
+alt invalid filter/page parameters
+  EntityService --> Client : BAD_REQUEST_PARAMS
+else PostgreSQL/DataAccessException
+  DB --> Repository : exception
+  Repository --> Client : Database error
+else huge pageSize or deep offset
+  Repository -> DB : long query, no repository query timeout
+  note over Repository,DB
+    Generic /find has no maximum pageSize.
+    pageSize * page uses int and may overflow.
+  end note
+else WebSocket initial fetch throws before local catch
+  Repository --> WsCtx : RuntimeException
+  WsCtx -> WsCtx : outer command handler logs
+  note over WsCtx,Client
+    Neither a client error frame nor a close is guaranteed on this path.
+  end note
+end
+
+@enduml

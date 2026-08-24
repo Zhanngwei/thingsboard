@@ -45,6 +45,7 @@ const html = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
   <title>${title} | ThingsBoard Source Guide</title>
   <link rel="stylesheet" href="../../assets/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
@@ -62,7 +63,7 @@ const html = `<!doctype html>
     </aside>
     <article id="article" class="content" aria-live="polite"></article>
   </main>
-  <footer class="footer">Source baseline: ThingsBoard 3.6.4 · 0cb411fc90</footer>
+  <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
   <script id="markdown-source" type="text/plain">${htmlMarkdown}
 </script>
   <script src="../../assets/guide.js"></script>

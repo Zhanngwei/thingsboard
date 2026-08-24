@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>41 限流与 API Usage 流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航"><a href="README.md">Markdown</a><a href="../../index.html">全书目录</a><a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>41 限流与 API Usage 流程</strong>
+      <a href="#一-流程目标">一、流程目标</a><a href="#二-入口">二、入口</a><a href="#三-完整调用链">三、完整调用链</a><a href="#四-消息流">四、消息流</a><a href="#五-时序图">五、时序图</a><a href="#六-数据变化">六、数据变化</a><a href="#七-源码分析">七、源码分析</a><a href="#八-actor-分析">八、Actor 分析</a><a href="#九-kafka-分析">九、Kafka 分析</a><a href="#十-数据库分析">十、数据库分析</a><a href="#十一-异常处理">十一、异常处理</a><a href="#十二-源码阅读路线">十二、源码阅读路线</a><a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
+  <script id="markdown-source" type="text/plain"># 41 限流与 API Usage 流程
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章只陈述该基线中可由源码证明的 CE 行为：瞬时 Rate Limit、Transport 限流、月度 API Usage 计量与状态传播是不同机制；不能把它们合并成一个集群全局令牌桶，也不能把其他版本或 PE 的能力倒推到本章。
+
+[上一篇：40 服务启动与关闭流程](../40-service-lifecycle/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 时序源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/41-rate-limit-api-usage.svg) | [下一篇：42 失败恢复与可观测性](../42-failure-recovery-observability/index.html)
+
+[![限流与 API Usage 架构图](../../assets/architecture/41-rate-limit-api-usage.svg)](../../assets/architecture/41-rate-limit-api-usage.svg)
+
+[![限流与 API Usage 详细时序图](sequence.svg)](sequence.svg)
+
+---
+
+## 一、流程目标
+
+本章回答四个必须分开的提问：一次 REST/Transport 请求在哪里被即时拒绝；Tenant Profile 中哪些字段是速率配置、哪些是月度配额；Transport、Rule Engine、脚本、DB、邮件、短信和告警如何上报 usage；月度计数怎样变成 `ENABLED/WARNING/DISABLED` 并传播到执行点。核心结论是：即时限流在调用节点本地判定，API Usage 先异步计量再由 TB_CORE 分区 owner 计算状态，二者在窗口、键、持久化、通知和一致性上均不同。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    R["即时 Rate Limit"] --> B["本机 Bucket4j / 本机表"]
+    U["API Usage 计量"] --> Q["周期汇总 + usage queue"]
+    Q --> S["月度状态 + 硬拒绝"]
+    B -. "不同状态机" .- S
+```
+
+必须先固定二十条源码事实：
+
+1. [org.thingsboard.server.cache.limits.RateLimitService.checkRateLimit(LimitedApi, TenantId)](../../../common/cache/src/main/java/org/thingsboard/server/cache/limits/RateLimitService.java#L39) 只是通用瞬时限流接口；实现缓存键是 `(LimitedApi, level)`，不是全平台共享的一个桶。
+2. [org.thingsboard.server.cache.limits.DefaultRateLimitService.checkRateLimit(LimitedApi, Object, String)](../../../common/cache/src/main/java/org/thingsboard/server/cache/limits/DefaultRateLimitService.java#L136) 使用本 JVM Caffeine 中的 `TbRateLimits`；空配置会放行并移除该键，配置变化会创建新桶。
+3. [org.thingsboard.server.common.msg.tools.TbRateLimits.TbRateLimits(String, boolean)](../../../common/message/src/main/java/org/thingsboard/server/common/msg/tools/TbRateLimits.java#L68) 把每个 `capacity:duration` 解析为 Bucket4j `Bandwidth`；多个带宽同时约束，普通 profile/Transport 用 greedy refill，密码重置与 2FA 枚举要求 intervally refill。
+4. REST 的 tenant/customer 限流由 [org.thingsboard.server.config.RateLimitProcessingFilter.doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain)](../../../application/src/main/java/org/thingsboard/server/config/RateLimitProcessingFilter.java#L68) 在认证后执行；超限返回 HTTP 429，但源码不设置 `Retry-After` 或剩余额度响应头。
+5. `LimitedApi` 还覆盖 WebSocket 更新、Cassandra 查询、Edge、导入导出和通知请求；密码重置/2FA 使用显式字符串配置。不同调用方对失败采用 429、failed future、丢弃更新或业务异常，不能统一描述。
+6. [org.thingsboard.server.common.transport.limits.DefaultTransportRateLimitService.checkLimits(TenantId, DeviceId, int)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java#L103) 先检查 API Usage 的 transport 开关，再依次检查 tenant 与 device 的消息/遥测消息/数据点桶；这些表也只在当前 Transport JVM。
+7. Transport IP 防护不是令牌桶：[org.thingsboard.server.common.transport.limits.DefaultTransportRateLimitService.checkAddress(InetSocketAddress)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java#L209) 读取按 IP 的失败次数、blocked 和 lastActivity；认证成功清零，超时解除并清理。
+8. Tenant Profile 中 `transport*RateLimit`、REST/WS/Cassandra/Edge/通知字符串是瞬时速率配置；`maxTransportMessages`、`maxTransportDataPoints`、`maxREExecutions`、`maxJSExecutions`、`maxTbelExecutions`、`maxDPStorageDays`、`maxEmails`、`maxSms`、`maxCreatedAlarms` 是 API Usage 月度阈值；实体最大数和 `maxRuleNodeExecutionsPerMessage` 又是其他硬限制。
+9. [org.thingsboard.server.common.stats.TbApiUsageReportClient.report(TenantId, CustomerId, ApiUsageRecordKey, long)](../../../common/stats/src/main/java/org/thingsboard/server/common/stats/TbApiUsageReportClient.java#L42) 是计量入口，不返回“剩余额度”，也不在该次调用中同步写数据库。
+10. [org.thingsboard.server.queue.usagestats.DefaultTbApiUsageReportClient.report(TenantId, CustomerId, ApiUsageRecordKey, long)](../../../common/queue/src/main/java/org/thingsboard/server/queue/usagestats/DefaultTbApiUsageReportClient.java#L185) 在本机 `AtomicLong` 中按 tenant、SYS tenant 和可选 customer 聚合；默认每 10 秒发送 `ToUsageStatsServiceMsg`。
+11. `ApiUsageRecordKey` 中九项是累加 counter，`ACTIVE_DEVICES/INACTIVE_DEVICES` 是 gauge；counter 会同时报 SYS tenant，customer 级统计默认关闭，customer 状态不参与阈值禁用。
+12. usage 消息走 `tb_usage_stats` 队列抽象；默认 `queue.type=in-memory`，选择 Kafka 时才由 Kafka producer/consumer 承载，不能把 Kafka写成所有部署的必经组件。
+13. [org.thingsboard.server.service.apiusage.DefaultTbApiUsageStateService.process(TbProtoQueueMsg&lt;ToUsageStatsServiceMsg&gt;, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/apiusage/DefaultTbApiUsageStateService.java#L219) 在 TB_CORE owner 上解析 tenant/customer，并在单个 `updateLock` 下更新内存月度/小时计数。
+14. counter 直接相加；gauge 按 `serviceId` 保留最近值，达到 `gauge_report_interval` 后求和。月度周期与小时桶均按 `SchedulerUtils` 的 UTC 边界，而不是滑动窗口。
+15. [org.thingsboard.server.service.apiusage.TenantApiUsageState.checkStateUpdatedDueToThreshold(Set&lt;ApiFeature&gt;)](../../../application/src/main/java/org/thingsboard/server/service/apiusage/TenantApiUsageState.java#L158) 只对非 SYS tenant 计算状态：低于 warning 为 `ENABLED`，达到 warning 但低于阈值为 `WARNING`，达到阈值为 `DISABLED`；`threshold=0` 表示不按数值禁用。
+16. `WARNING` 只触发状态持久化、时序和通知，不拒绝业务；`DISABLED` 才在 Transport、DB、Rule Engine、JS/TBEL、邮件、短信和告警各自入口产生硬行为，而且各入口行为不同。
+17. 状态行写 `api_usage_state`；计数、Hourly、阈值和状态历史写该 `ApiUsageStateId` 对应的通用 timeseries。两类写入没有共同事务，usage consumer 也不等待计数时序 future 完成后才提交队列位置。
+18. [org.thingsboard.server.service.apiusage.DefaultTbApiUsageStateService.persistAndNotify(BaseApiUsageState, Map&lt;ApiFeature, ApiUsageStateValue&gt;)](../../../application/src/main/java/org/thingsboard/server/service/apiusage/DefaultTbApiUsageStateService.java#L485) 先更新状态行，再广播 Transport 与 component lifecycle，保存状态时序，触发 Notification Rule，并异步发送 tenant email。
+19. 集群一致性是“分区 owner + 数据库 + 异步广播/按需回读”的最终收敛，不是原子广播。超限到各执行点生效前存在 report interval、队列、owner 处理和通知传播造成的超额窗口。
+20. release-3.6 本源码没有分布式 Bucket4j/Redis 原子桶、全局精确 remaining quota、HTTP 标准限流头、逐请求强一致月度扣减或 customer 月度硬禁用。其他版本或 PE 可能扩展能力，但不属于本章结论。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    P["Tenant Profile"] --> A["速率字符串"]
+    P --> M["月度 max* 阈值"]
+    P --> O["实体数 / 每消息节点数"]
+    A --> L["本机即时拒绝"]
+    M --> W["WARNING / DISABLED"]
+    O --> H["独立业务校验"]
+```
+
+---
+
+## 二、入口
+
+### 2.1 REST、WebSocket 与通用 RateLimitService
+
+[org.thingsboard.server.config.ThingsboardSecurityConfiguration.filterChain(HttpSecurity)](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L289) 把 `RateLimitProcessingFilter` 放在 `UsernamePasswordAuthenticationFilter` 之后。Filter 只在取得非 SYS_ADMIN `SecurityUser` 时检查：所有非系统用户先消耗 tenant REST 桶，customer user 再消耗 customer 桶；tenant 通过而 customer 失败时，前一个 token 不会回滚。`TenantProfileNotFoundException` 被转换为 bad credentials 路径，不是 429。
+
+[org.thingsboard.server.exception.ThingsboardErrorResponseHandler.handleRateLimitException(HttpServletResponse, TbRateLimitsException)](../../../application/src/main/java/org/thingsboard/server/exception/ThingsboardErrorResponseHandler.java#L243) 固定返回 429 和 `TOO_MANY_REQUESTS`。WebSocket 则在 [org.thingsboard.server.controller.plugin.TbWebSocketHandler.send(WebSocketSessionRef, int, String)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L678) 超限后发送 `TOO_MANY_UPDATES` 一次并丢弃后续更新，直到桶再次允许；session 清理时调用 `cleanUp` 删除本机桶。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    HTTP["authenticated HTTP"] --> T{"tenant bucket"}
+    T -->|fail| E429["HTTP 429"]
+    T -->|pass| C{"customer user?"}
+    C -->|no| CTRL["Controller"]
+    C -->|yes| CB{"customer bucket"}
+    CB -->|pass| CTRL
+    CB -->|fail| E429
+```
+
+密码重置 token 校验在 [org.thingsboard.server.controller.AuthController.checkResetToken(String)](../../../application/src/main/java/org/thingsboard/server/controller/AuthController.java#L259) 以 user id 和 `server.rest.rate_limits.reset_password_per_user` 调用显式配置重载；2FA 分别以 `(userId, providerType)` 做发送和校验限流。显式配置重载不经过 Tenant Profile，也不会由 `DefaultRateLimitService` 自动生成 `RateLimitsTrigger`。
+
+### 2.2 Transport 入站入口
+
+协议 adaptor 最终调用 `DefaultTransportService.process(...)`。遥测、属性、RPC、订阅等方法先进入私有 [org.thingsboard.server.common.transport.service.DefaultTransportService.checkLimits(SessionInfoProto, Object, TransportServiceCallback, int)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1303)。返回的受限类型有三种：`API_USAGE_STATE` 代表月度 Transport feature 已禁用，`TENANT`/`DEVICE` 代表本机 profile 桶耗尽。
+
+只有 tenant/device 瞬时桶超限才构造 `RateLimitsTrigger`；API usage 状态本身已经在状态转换时触发 `ApiUsageLimitTrigger`，这里不重复。源码中的 TODO 明确写着 transport 禁用后尚未主动关闭全部 session，也没有跳过 credentials 检查；现有 session 的后续业务消息仍会在 `checkLimits` 被拒绝。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    MSG["Transport message"] --> AS{"transportAllowed"}
+    AS -->|false| AU["API_USAGE_STATE error"]
+    AS -->|true| TL{"tenant buckets"}
+    TL -->|fail| TE["TENANT error + trigger"]
+    TL -->|pass| DL{"device buckets"}
+    DL -->|fail| DE["DEVICE error + trigger"]
+    DL -->|pass| QUEUE["normal processing"]
+```
+
+### 2.3 API Usage 生产入口
+
+Transport 成功回调 [org.thingsboard.server.common.transport.service.DefaultTransportService.ApiStatsProxyCallback.onSuccess(T)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1879) 上报 message 与 datapoint；Rule Node 在 [org.thingsboard.server.actors.ruleChain.RuleNodeActorMessageProcessor.onRuleChainToRuleNodeMsg(RuleChainToRuleNodeMsg)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/RuleNodeActorMessageProcessor.java#L197) 真正调用节点前上报一次 RE execution；DB 在 [org.thingsboard.server.service.telemetry.DefaultTelemetrySubscriptionService.getCallback(TenantId, CustomerId, boolean, FutureCallback&lt;Void&gt;)](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L258) 保存成功且 `result>0` 后上报写入数据点数。
+
+JS/TBEL 在脚本提交前上报，所以脚本随后失败仍计数；邮件在同步发送成功后上报；短信在 `finally` 上报已成功发送的号码数；告警只在 `AlarmApiCallResult.isCreated()` 时上报。计量点的业务语义并不完全相同，不能把所有 key 都解释为“成功请求数”。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    SRC{"usage producer"}
+    SRC --> TR["Transport success"]
+    SRC --> RE["before Rule Node call"]
+    SRC --> DB["DB save success"]
+    SRC --> JS["before JS/TBEL execution"]
+    SRC --> IO["mail/SMS/alarm result"]
+    TR --> CLIENT["TbApiUsageReportClient"]
+    RE --> CLIENT
+    DB --> CLIENT
+    JS --> CLIENT
+    IO --> CLIENT
+```
+
+### 2.4 Tenant Profile 与 API Usage 读取入口
+
+系统管理员通过 [org.thingsboard.server.controller.TenantProfileController.saveTenantProfile(TenantProfile)](../../../application/src/main/java/org/thingsboard/server/controller/TenantProfileController.java#L206) 保存 profile；OpenAPI 说明明确把 `max*` 称为每月最大处理量，把 `*RateLimit` 定义为 `capacity:seconds` 列表。保存后 `DefaultTbTenantProfileService` 广播 profile change，通用 limiter 在下一次检查时比较配置字符串，Transport limiter 则对受影响 tenant/device 合并新 prototype；改变配置的桶会被重建，未改变的桶保留 token。
+
+API Usage 没有专用 Controller。`API_USAGE_STATE` 作为实体类型通过通用 telemetry API 读取，UI 的 API Usage dashboard 查询该 state id 的 timeseries。`AccessValidator` 仅允许非 SYS_ADMIN 对该实体执行 `READ_TELEMETRY`。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    SAVE["POST tenantProfile"] --> DBP["tenant_profile row"]
+    DBP --> NF["cluster profile notification"]
+    NF --> GL["generic limiter: lazy compare"]
+    NF --> TL["Transport limiter: merge"]
+    READ["generic telemetry REST"] --> AUS["API_USAGE_STATE timeseries"]
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 通用 Bucket4j 链
+
+[org.thingsboard.server.cache.limits.DefaultRateLimitService.checkRateLimit(LimitedApi, TenantId, Object)](../../../common/cache/src/main/java/org/thingsboard/server/cache/limits/DefaultRateLimitService.java#L104) 对 SYS tenant 直接放行；其他 tenant 从 `TenantProfileProvider` 取 profile，再通过 `LimitedApi.getLimitConfig` 取字符串。私有 Caffeine 默认 `expireAfterAccess=120min`、`maximumSize=200000`；空配置使当前键失效并放行，非空配置以 `compute` 原子替换配置不同的桶，再 `tryConsume(1)`。
+
+这里的原子性只覆盖一个 JVM 中一个 `TbRateLimits` 的多个 bandwidth。tenant REST 与 customer REST 是两个不同桶，tenant Transport 与 device Transport 也是两个不同对象，跨桶消费不构成事务。缓存 TTL、容量驱逐、进程重启和配置变化都会丢弃旧 token 状态并获得新桶初始容量。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+sequenceDiagram
+    participant C as Caller
+    participant R as DefaultRateLimitService
+    participant P as TenantProfileProvider
+    participant K as Caffeine key
+    participant B as TbRateLimits
+    C->>R: checkRateLimit(api, tenant, level)
+    R->>P: get(tenantId)
+    P-->>R: profile config
+    R->>K: compute(api, level)
+    K->>B: create/retain bucket
+    R->>B: tryConsume(1)
+    B-->>C: true / false
+```
+
+### 3.2 Transport 三层链
+
+Transport 的 [org.thingsboard.server.common.transport.limits.DefaultTransportRateLimitService.createRateLimits(TenantProfile, boolean)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java#L356) 为 tenant 与 device 分别构造 regular、telemetry message、telemetry datapoint 三个 limiter；空字符串使用总是放行的 `DummyTransportRateLimit`。`dataPoints>0` 时先扣 telemetry message token，再扣指定数量 datapoint token；`dataPoints=0` 的 RPC、subscribe 等消息只扣 regular-message token。telemetry datapoint 失败不会退还已扣的 telemetry message token，device 失败也不会退还 tenant token。
+
+IP 表是第四条独立路径：[org.thingsboard.server.common.transport.limits.DefaultTransportRateLimitService.onAuthFailure(InetSocketAddress)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java#L250) 在达到错误凭据次数时置 blocked；[org.thingsboard.server.common.transport.limits.DefaultTransportRateLimitService.invalidateRateLimitsIpTable(long)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/limits/DefaultTransportRateLimitService.java#L277) 以 `max(sessionInactivityTimeout, ipBlockTimeout)` 清理旧项。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    I["inbound message"] --> DP{"dataPoints > 0?"}
+    DP -->|yes| TM["tenant telemetry-msg -1"]
+    TM --> TD["tenant datapoint -N"]
+    TD --> DM["device telemetry-msg -1"]
+    DM --> DD["device datapoint -N"]
+    DP -->|no| TR["tenant regular-msg -1"]
+    TR --> DR["device regular-msg -1"]
+    DD --> OK["submit message"]
+    DR --> OK
+    TD -. "failure does not refund TM" .-> X["reject"]
+    DD -. "failure does not refund tenant" .-> X
+    DR -. "device failure does not refund tenant" .-> X
+```
+
+### 3.3 Usage 汇总与队列链
+
+[org.thingsboard.server.queue.usagestats.DefaultTbApiUsageReportClient.reportStats()](../../../common/queue/src/main/java/org/thingsboard/server/queue/usagestats/DefaultTbApiUsageReportClient.java#L123) 遍历每个 key 的本地 map，把 counter 的非零值或 gauge 值打包为 `ToUsageStatsServiceMsg`。一条消息对应一个 tenant 或 customer owner，携带当前 service id。路由用 `PartitionService.resolve(TB_CORE, tenantId, ownerId)`，再切换到 usage topic。
+
+生产端先读取并随后 `clear()` 本地 map，再逐 owner `send(..., null)`。因此这不是可靠账本：进程退出、读取与 clear 之间的并发更新、序列化/路由/发送失败都可能造成少计；源码只记录 warning，没有本地 WAL、重试队列或补偿扫描。反向重投也可能多计，因为消息没有业务幂等 id，owner 对 counter 只做加法。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    CALL["report(key, value)"] --> LOCAL["AtomicLong by key/level"]
+    LOCAL -->|fixed delay| BUILD["ToUsageStatsServiceMsg"]
+    BUILD --> ROUTE["resolve TB_CORE owner"]
+    ROUTE --> Q["tb_usage_stats"]
+    Q --> CORE["usage consumer"]
+```
+
+### 3.4 Owner 计算、持久化与广播链
+
+usage consumer 的单线程 poll 把每条消息交给 `DefaultTbApiUsageStateService.process`。`getOrFetchState` 按 owner 查询或创建 `api_usage_state`，再从 timeseries latest 恢复当前月和当前小时值；唯一约束 `(tenant_id, entity_id)` 处理并发创建竞争。owner 在 `updateLock` 中计算后，先调用 `saveAndNotifyInternal` 异步保存计数；状态变化则同步更新 JPA state row，随后广播。
+
+Transport 广播把完整 `ApiUsageState` 编码到每个 Transport service 的 notification topic；[org.thingsboard.server.common.transport.service.DefaultTransportService.processToTransportMsg(ToTransportMsg)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1335) 解码后更新本机 `tenantAllowed`。Core/Rule Engine notification 触发 cache eviction 并把 `ComponentLifecycleMsg` 高优先级发给 App Actor，TenantActor 再刷新状态并创建/销毁 rule chains。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    C["TB_CORE usage owner"] --> CALC["count + threshold"]
+    CALC --> TS["timeseries async save"]
+    CALC -->|state changed| ROW["api_usage_state update"]
+    ROW --> TN["Transport notification"]
+    ROW --> LN["Core/RE lifecycle"]
+    ROW --> NT["rule notification + email"]
+```
+
+---
+
+## 四、消息流
+
+### 4.1 report level 与 key
+
+[org.thingsboard.server.common.data.ApiUsageRecordKey](../../../common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageRecordKey.java#L29) 定义 11 个 key。Transport feature 由 message 与 datapoint 两个 counter 共同决定；其余月度 feature 各一个 counter。active/inactive device 是 gauge，没有 `ApiFeature`、limit key 或硬禁用状态。
+
+`report` 总是记录业务 tenant；counter 另记 SYS tenant；打开 `enabled_per_customer` 后才记 customer。customer row 和 timeseries 可用于展示，但 `processEntityUsageStats` 只对 tenant owner 且非 SYS tenant执行 threshold 计算，所以 customer 统计不是 customer quota enforcement。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    R["counter report"] --> T["tenant level"]
+    R --> S["SYS aggregate"]
+    R -->|optional| C["customer metrics"]
+    G["device gauge"] --> T
+    C -. "no threshold check" .-> N["not customer hard quota"]
+```
+
+### 4.2 counter 与 gauge 算法
+
+[org.thingsboard.server.service.apiusage.BaseApiUsageState.calculate(ApiUsageRecordKey, long, String)](../../../application/src/main/java/org/thingsboard/server/service/apiusage/BaseApiUsageState.java#L99) 对 counter 同时累加月值与小时值。gauge 先按 service id 覆盖最近值；从该 key 第一次 report 起达到 3 分钟默认周期时才求各 service 最近值之和，并把该轮 map 清空。小时切换会清空小时值与 gauge map；重分区也清 gauge map。
+
+因此 `*Hourly` 是 UTC 整点累计/最大值，不是最近 60 分钟滑窗；月值是 UTC 自然月累计，不是订阅开通日后的 30 天。gauge 的 service 数量变化、迟到和上报间隔会改变可见值，它不参与月度拒绝。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    K{"key.counter"}
+    K -->|true| MC["month += value"]
+    K -->|true| HC["hour += value"]
+    K -->|false| SG["last gauge by serviceId"]
+    SG -->|gauge interval elapsed| SUM["sum latest service gauges"]
+```
+
+### 4.3 warning、disabled 与多 key 合并
+
+[org.thingsboard.server.common.data.tenant.profile.DefaultTenantProfileConfiguration.getWarnThreshold(ApiUsageRecordKey)](../../../common/data/src/main/java/org/thingsboard/server/common/data/tenant/profile/DefaultTenantProfileConfiguration.java#L250) 计算 `(long)(threshold * ratio)`；`warnThreshold<=0` 使用 0.8。源码 validator 没有校验 ratio 必须位于 `(0,1)`，也没有验证 rate-limit 字符串，因此非法/异常配置可能在运行时产生跳过 WARNING、延后 DISABLED 或构桶异常。
+
+每个 key 先得一个状态，再用 [org.thingsboard.server.common.data.ApiUsageStateValue.toMoreRestricted(ApiUsageStateValue, ApiUsageStateValue)](../../../common/data/src/main/java/org/thingsboard/server/common/data/ApiUsageStateValue.java#L42) 取 feature 中最严格状态。例如 Transport message 达 warning、datapoint 达 disabled，则最终 Transport 为 disabled。`smsEnabled=false` 会无视计数直接使 SMS disabled。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+stateDiagram-v2
+    [*] --> ENABLED
+    ENABLED --> WARNING: value >= warn && value < limit
+    WARNING --> DISABLED: value >= limit
+    DISABLED --> WARNING: profile raises limit
+    WARNING --> ENABLED: new month / profile raises limit
+    DISABLED --> ENABLED: new month / limit=0
+```
+
+### 4.4 各 feature 的硬行为
+
+`WARNING` 不影响业务。`DISABLED` 的硬行为如下：Transport callback 收到 `TbRateLimitsException(API_USAGE_STATE)`；DB telemetry save callback 失败；TenantActor 对新 Rule Engine queue message直接 ack success 而不执行，并销毁已有 rule chains；JS/TBEL 返回 failed future；邮件/短信抛运行时异常；告警创建把 `alarmCreationEnabled=false` 传给 DAO，若无法只更新已有 active alarm 而需要创建，则抛 `ApiUsageLimitsExceededException`。
+
+这些行为不是同一种“HTTP 429”。尤其 Rule Engine 的 ack success 表示上游队列消息被确认但业务规则未执行；Transport 协议如何呈现异常由各 adaptor/callback 决定；DB/脚本/邮件错误是否转为规则节点 failure 取决于其调用上下文。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    D["feature DISABLED"] --> T["Transport callback error"]
+    D --> DB["telemetry save failure"]
+    D --> RE["RE ack without execute"]
+    D --> JS["script failed future"]
+    D --> IO["mail/SMS/alarm exception"]
+```
+
+---
+
+## 五、时序图
+
+完整可渲染源文件见 [sequence.puml](sequence.puml)。本节图只突出三个时间边界：本地立即判定、异步 usage 计量、最终状态传播。
+
+### 5.1 REST 与 Transport 即时限流
+
+REST 和 Transport profile 桶都在业务提交前同步判定，但不是同一实例。REST 的 Bucket4j 在 application JVM；独立 Transport 服务有自己的 tenant/device bucket maps；横向扩容会增加集群可消耗总速率，重启会恢复本机满桶。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+sequenceDiagram
+    participant U as Client
+    participant N as Node-local limiter
+    participant P as Profile cache
+    participant B as Business path
+    U->>N: request/message
+    N->>P: current config
+    alt local token available
+        N->>B: continue
+    else exhausted
+        N-->>U: 429 / callback error / drop
+    end
+```
+
+### 5.2 月度 usage 到状态转换
+
+业务成功/尝试与状态禁用之间不是一个同步 round trip。生产端最多等待本地 report interval 才发消息；owner 消费后计数时序仍异步保存。达到阈值的那批消息已经发生，且广播抵达执行点前的新业务仍可能通过，所以月度限额是异步硬停，不是精确 cap。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+sequenceDiagram
+    participant B as Business service
+    participant R as Local report client
+    participant Q as Usage queue
+    participant O as TB_CORE owner
+    participant D as DB/state
+    B->>R: report(key, n)
+    R-->>B: return immediately
+    R->>Q: periodic aggregate
+    Q->>O: ToUsageStatsServiceMsg
+    O->>O: add + threshold
+    O->>D: count async, update state when changed
+```
+
+### 5.3 状态传播与收敛
+
+[org.thingsboard.server.service.queue.DefaultTbClusterService.onApiStateChange(ApiUsageState, TbQueueCallback)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L463) 调用时 callback 为 `null`，所以 owner 不等待所有目标确认。Transport notification consumer 对每个 poll 批次处理后 commit；Core/RE component lifecycle 同样依赖通知队列。未收到通知的节点可在 profile cache 首次拉取或 `getApiUsageState` cache miss 时从 Core/DB取得状态，但没有线性一致读保证。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+sequenceDiagram
+    participant O as Usage owner
+    participant DB as api_usage_state
+    participant C as Cluster service
+    participant T as Transport nodes
+    participant A as TenantActor nodes
+    O->>DB: update state
+    O->>C: onApiStateChange(state, null)
+    par transport notification
+        C-->>T: encoded ApiUsageState
+    and lifecycle notification
+        C-->>A: API_USAGE_STATE UPDATED
+    end
+```
+
+---
+
+## 六、数据变化
+
+### 6.1 Tenant Profile 的三类限制字段
+
+[org.thingsboard.server.common.data.tenant.profile.DefaultTenantProfileConfiguration](../../../common/data/src/main/java/org/thingsboard/server/common/data/tenant/profile/DefaultTenantProfileConfiguration.java#L39) 把不同生命周期的限制放在一个 JSON configuration 中，阅读时必须重新分类：
+
+| 类别 | 代表字段 | 窗口/状态 | 持久化计数 |
+|---|---|---|---|
+| 瞬时 Bucket4j | `transportTenantMsgRateLimit`、`tenantServerRestLimitsConfiguration`、`wsUpdatesPerSessionRateLimit`、Cassandra/Edge/通知 rate limit | 配置相对 refill | 否，仅本机 token |
+| 月度 API Usage | `maxTransportMessages`、`maxTransportDataPoints`、`maxREExecutions`、`maxJSExecutions`、`maxTbelExecutions`、`maxDPStorageDays`、邮件/短信/告警 | UTC 自然月，三态 | 是，timeseries + state row |
+| 其他硬限制 | `maxDevices`、资源字节、WS session/subscription、`maxRuleNodeExecutionsPerMessage` | 保存时/会话时/单消息 | 各业务自有 |
+
+字段名 `maxDPStorageDays` 容易误导，但 [org.thingsboard.server.common.data.tenant.profile.DefaultTenantProfileConfiguration.getProfileThreshold(ApiUsageRecordKey)](../../../common/data/src/main/java/org/thingsboard/server/common/data/tenant/profile/DefaultTenantProfileConfiguration.java#L203) 直接把它作为 `STORAGE_DP_COUNT` 阈值返回；本章按代码解释为月度存储数据点计数阈值，不把 `Days` 推导成滚动天数。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    JSON["TenantProfile.profileData"] --> RATE["rate strings"]
+    JSON --> QUOTA["monthly max values"]
+    JSON --> HARD["entity/session/message caps"]
+    RATE --> MEM["local memory"]
+    QUOTA --> SQL["state + timeseries"]
+    HARD --> BIZ["domain validators"]
+```
+
+### 6.2 api_usage_state 行
+
+DDL [api_usage_state](../../../dao/src/main/resources/sql/schema-entities.sql#L693) 保存 id、tenant、owner entity type/id 与八个 feature state，主键为 id，另有 `(tenant_id, entity_id)` 唯一约束；没有到 tenant/customer 的外键。租户和可选 customer 各有自己的 state row，SYS tenant 也可有 row。
+
+[org.thingsboard.server.dao.usagerecord.ApiUsageStateServiceImpl.createDefaultApiUsageState(TenantId, EntityId)](../../../dao/src/main/java/org/thingsboard/server/dao/usagerecord/ApiUsageStateServiceImpl.java#L136) 初始把八个状态全部设为 `ENABLED`，保存 state row 后写状态时序和 tenant profile 阈值。创建行与两次 timeseries save 不在一个事务里，后段失败可留下只有 state row 的部分初始化。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+erDiagram
+    API_USAGE_STATE {
+      uuid id PK
+      uuid tenant_id
+      string entity_type
+      uuid entity_id
+      string transport
+      string db_storage
+      string re_exec
+      string js_exec
+    }
+    API_USAGE_STATE ||--o{ TS_KV : "entity_id = state.id"
+```
+
+### 6.3 timeseries 键与可见性
+
+月计数使用 `transportMsgCount` 等 `apiCountKey`，小时计数追加 `Hourly`；profile limit 使用 `transportMsgLimit` 等 `apiLimitKey`；状态使用 `transportApiState`、`dbApiState` 等 `ApiFeature.apiStateKey`。所有数据都挂在 `ApiUsageStateId` 上，而不是 tenant id 本身。
+
+[org.thingsboard.server.service.telemetry.DefaultTelemetrySubscriptionService.saveAndNotifyInternal(TenantId, EntityId, List&lt;TsKvEntry&gt;, FutureCallback&lt;Integer&gt;)](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L285) 使用 TTL 0 保存，并在 save future 成功后推 WebSocket。usage service 传入空操作 callback，因此数据库失败不会反向失败已提交的业务请求。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    ID["ApiUsageStateId"] --> COUNT["month count @ month start"]
+    ID --> HOUR["countHourly @ hour start"]
+    ID --> LIMIT["profile limit @ change time"]
+    ID --> STATE["feature state @ transition"]
+    STATE --> WS["WebSocket after TS save"]
+```
+
+### 6.4 月初、整点与配置重算
+
+`BaseApiUsageState` 初始化 `currentCycleTs=UTC 本月首日`、`nextCycleTs=UTC 下月首日`、`currentHourTs=UTC 整点`。消息到达时若小时变化就清空小时值；月度重置由默认每 60 秒运行的 [org.thingsboard.server.service.apiusage.DefaultTbApiUsageStateService.checkStartOfNextCycle()](../../../application/src/main/java/org/thingsboard/server/service/apiusage/DefaultTbApiUsageStateService.java#L594) 完成，并写零值、重算状态。
+
+重置条件额外要求 `now-nextCycleTs < 1h`。若该状态在月初后超过一小时仍保持在内存且错过检查，源码不会在后续 tick 更新它；重启/重分区重新构造 state 时会以当前月时间戳恢复，并把旧月 latest 当作 0。这个窄窗口条件应纳入月初故障排查。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    TICK["check tick"] --> PAST{"nextCycle < now"}
+    PAST -->|no| KEEP["keep current month"]
+    PAST -->|yes| ONE{"lateness < 1 hour"}
+    ONE -->|yes| RESET["clear + zero TS + recalc"]
+    ONE -->|no| MISS["no reset on this in-memory state"]
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 不是固定窗口计数器，也不只有一种桶
+
+`TbRateLimits` 的 profile/Transport 路径使用 Bucket4j greedy refill：token 按时间连续补充；配置 `1000:1,20000:60` 是同一 local bucket 的两个 bandwidth，消费必须同时满足。密码重置和 2FA 枚举把 `refillRateLimitIntervally=true`，每个 bandwidth 按相对创建时间整批补充。它们都不是数据库自然分钟窗口。
+
+另有完全不同的计数器：Transport IP 是失败次数 + block timeout；Rule Node 的 `maxRuleNodeExecutionsPerMessage` 是 `TbMsg` 内递增值；Debug Event 有 `ActorSystemContext` 自己的 tenant map；API Usage 是 UTC 月 counter。把这些机制都称为“令牌桶”会掩盖重置、持久化和集群语义。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    L{"limiter family"}
+    L --> G["greedy local bucket"]
+    L --> I["interval local bucket"]
+    L --> IP["IP failure blocker"]
+    L --> PM["per-message counter"]
+    L --> MU["monthly usage state"]
+```
+
+### 7.2 计量、软阈值、硬拒绝
+
+“计量”是 `report` 和 timeseries count；它本身不拒绝。“软阈值”是 `WARNING` transition，触发 state row、时序、notification rule 和直接 email，但所有 `is*Enabled()` 都只把 `DISABLED` 视为 false。“硬拒绝”由每个 feature 的业务入口读取传播后的 state 执行。
+
+由于 report 是分批异步的，单批可跨过 warning 与 hard threshold，owner 只看到最终状态，可能直接 `ENABLED -> DISABLED`。Notification Rule 也只对状态变化触发，不会为每次超限请求重复触发；通用 `RateLimitsTrigger` 则在每次本地桶失败时产生，但 trigger 自带 4 小时默认去重。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    M["meter report"] --> C["monthly count"]
+    C --> W{"warning crossed"}
+    W -->|yes| N["notify only"]
+    C --> H{"hard limit crossed"}
+    H -->|yes| D["state DISABLED"]
+    D --> E["distributed execution-point reject"]
+```
+
+### 7.3 本机桶与集群状态的一致性
+
+通用 RateLimitService 与 Transport limiter 都没有 Redis/数据库 token 状态。每个服务实例独立消费，扩容为 N 个相同实例时集群可见总吞吐近似增加到 N 倍，具体还受路由分布影响。Tenant Profile 通过 cluster notification 最终更新各节点配置，但这只传播配置，不合并已有 token。
+
+API Usage 使用 owner 分区避免多个 Core 同时更新同一 tenant 内存状态；repartition 时移除本机 state，新 owner 从 state row 与 latest timeseries 恢复。广播仍是异步通知，状态 row 与 time series 也不是同一事务，所以它提供可恢复的最终状态，而非跨 Transport/RE/DB 的原子开关。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    N1["node A local bucket"] --> A1["own tokens"]
+    N2["node B local bucket"] --> A2["own tokens"]
+    OWNER["one TB_CORE usage owner"] --> DB["shared state row / TS"]
+    DB --> NF["async cache invalidation"]
+    A1 -. "not merged" .- A2
+```
+
+### 7.4 release-3.6 / CE 边界
+
+本仓库能证明的能力包括 tenant profile、tenant/device Transport buckets、REST/customer request buckets、月度 tenant API feature state、可选 customer usage metrics、notification rules 和 direct email。源码不能证明“全局分布式速率精确值”“按 customer 月度硬禁用”“按 API key 独立账单”“标准 rate-limit headers”“管理员手工预留/借用额度”或“exactly-once usage accounting”。
+
+产品文档、后续 release 或 PE 可能存在更细 profile、许可证或计费能力；除非对应源码也在 `release-3.6` 工作树中，否则本章只把它们标为版本/版本线外能力，不把名称相似当作实现证据。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    BASE["release-3.6 source proof"] --> YES["documented here"]
+    DOC["newer docs / PE claim"] --> CHECK{"matching source?"}
+    CHECK -->|no| OUT["outside baseline"]
+    CHECK -->|yes| YES
+```
+
+---
+
+## 八、Actor 分析
+
+### 8.1 Actor 参与硬停，但不拥有 usage 聚合器
+
+API usage 的 report client、queue consumer、`DefaultTbApiUsageStateService` 和 DAO 都不是 Actor。Actor 只参与 Rule Engine 使用量生产与状态执行：RuleNodeActor processor 在调用节点前报告 `RE_EXEC_COUNT`；TenantActor 缓存 tenant `ApiUsageState`，在 queue message 入口检查 `isReExecEnabled()`。
+
+[org.thingsboard.server.actors.tenant.TenantActor.onQueueToRuleEngineMsg(QueueToRuleEngineMsg)](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L240) 在 `isReExecEnabled()==false` 时调用 callback success，消息不进 rule chain；[org.thingsboard.server.actors.tenant.TenantActor.onComponentLifecycleMsg(ComponentLifecycleMsg)](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L345) 比较更新前后的 `isReExecEnabled()` 布尔值：`true -> false` 销毁 rule chains，`false -> true` 初始化。由于 `WARNING` 与 `ENABLED` 都返回 true，`DISABLED -> WARNING` 会初始化，而 `WARNING -> ENABLED` 不会触发初始化。这是 Actor mailbox 内的执行开关，不是按三态枚举值直接分支。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    Q["QueueToRuleEngineMsg"] --> TA["TenantActor"]
+    TA --> EN{"RE enabled?"}
+    EN -->|yes| RC["RuleChain actor"]
+    EN -->|no| ACK["callback success; no execution"]
+    RN["RuleNode actor"] --> REP["report RE_EXEC_COUNT"]
+    UPD["API state update"] --> BOOL{"enabled boolean changed?"}
+    BOOL -->|true to false| DESTROY["destroy rule chains"]
+    BOOL -->|false to true| INIT["init: DISABLED to WARNING/ENABLED"]
+    BOOL -->|unchanged| KEEP["no action: includes WARNING to ENABLED"]
+```
+
+### 8.2 lifecycle 消息与缓存刷新
+
+`DefaultTbClusterService.broadcast(ComponentLifecycleMsg)` 向所有 Core 与 Rule Engine service notification topics 发送 `API_USAGE_STATE UPDATED`。`AbstractConsumerService` 先调用 `apiUsageStateService.onApiUsageStateUpdate(tenantId)` 删除 `otherUsageStates` 缓存，再发布 Spring event并高优先级 tell App Actor。TenantActor 随后调用 `getApiUsageState`，owner 本机可读 `myUsageStates`，非 owner 通常读 state row并缓存。
+
+Actor 消息没有携带新状态正文，只有 entity id/event；因此它依赖 cache eviction 后重新读取。Transport 的另一条通知直接携带编码后的 `ApiUsageState`。两条传播链可以先后到达，不存在跨服务全局 barrier。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    L["lifecycle notification"] --> EVICT["evict otherUsageStates"]
+    EVICT --> APP["high-priority App Actor"]
+    APP --> TEN["TenantActor"]
+    TEN --> GET["reload ApiUsageState"]
+    GET --> CHG["init/destroy rule chains"]
+```
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 Kafka 是可选实现，不是语义本体
+
+`thingsboard.yml` 默认 `queue.type=in-memory`；同一 `TbUsageStatsClientQueueFactory` 还有 Kafka、SQS、Pub/Sub、Service Bus、RabbitMQ 实现。Kafka 模式下 [org.thingsboard.server.queue.provider.KafkaTbCoreQueueFactory.createToUsageStatsServiceMsgConsumer()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L355) 使用 `tb_usage_stats`、group `tb-core-us-consumer`；monolith 使用自己的 `monolith-us-consumer` group。
+
+消息按 `PartitionService.resolve` 得到的 topic partition 路由，使负责 owner 的 Core consumer收到。Kafka 只承载异步汇总与通知，不承载 `DefaultRateLimitService` 或 Transport Bucket4j token，也不直接保存月度 state。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    API["TbQueueProducer/Consumer"] --> IM["in-memory default"]
+    API --> K["Kafka optional"]
+    API --> O["other queue providers"]
+    K --> US["tb_usage_stats"]
+    K -. "does not store bucket tokens" .-> B["local Bucket4j"]
+```
+
+### 9.2 poll、callback 与 commit 边界
+
+[org.thingsboard.server.service.queue.DefaultTbCoreConsumerService.launchUsageStatsConsumer()](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L564) 为 poll 批次建立 `TbPackProcessingContext`，调用每条 callback，最多等待 pack timeout，然后无条件执行 `usageStatsConsumer.commit()`。即使 failed map 非空或等待超时，源码也只记日志并提交；它没有把 failed message 留给下一轮重试。
+
+相反，如果 JVM 在 commit 前崩溃，Kafka 可重放已处理消息，而 counter 更新没有 message-id 去重，可能重复累计。故这条链既可能少计也可能多计，不具备 exactly-once。默认 in-memory queue 在进程退出时更没有 broker 持久性。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    POLL["poll pack"] --> PROC["process each + callbacks"]
+    PROC --> WAIT["await timeout"]
+    WAIT --> LOG["log failed/timeout"]
+    LOG --> COMMIT["commit whole pack"]
+    PROC -. "crash before commit" .-> REPLAY["possible duplicate add"]
+```
+
+---
+
+## 十、数据库分析
+
+### 10.1 状态行、时序计数与事务分离
+
+`api_usage_state` 是普通 JPA entity 表；状态 update 走 [org.thingsboard.server.dao.usagerecord.ApiUsageStateServiceImpl.update(ApiUsageState)](../../../dao/src/main/java/org/thingsboard/server/dao/usagerecord/ApiUsageStateServiceImpl.java#L198) 与 `JpaAbstractDao.save`。计数、Hourly、limit、state history 走通用 `TimeseriesService`，可按部署写 PostgreSQL/Timescale/Cassandra 对应 timeseries backend。
+
+一次 usage message 可产生三类独立效果：计数 time series future；状态 row JPA update；状态 history time series future。它们没有一个外层事务。state row 成功而 state history 失败时硬拒绝仍可传播；计数时序失败而内存 state 已 disabled 时，dashboard count可能落后于 state。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    MSG["usage message"] --> MEM["owner memory count"]
+    MEM --> CTS["count TS future"]
+    MEM -->|transition| ROW["JPA state row"]
+    ROW --> STS["state TS future"]
+    ROW --> BROAD["broadcast"]
+    CTS -. "no common transaction" .- ROW
+```
+
+### 10.2 初始化、恢复与删除
+
+`getOrFetchState` 先按 owner entity id 查询；没有时创建带新 `ApiUsageStateId` 的默认 row，若唯一键竞争失败则再次查询。随后只按当前 `storedState.getId()` 调用 `findAllLatest`：已有 row 可从同一 state id 恢复当前月/小时值；新 row 无法读取旧 state id 下的 timeseries，计数从内存 0 开始。该初始化路径也不调用全 feature 阈值重算，后续 usage 消息只检查本批涉及的 feature。分区转移时 row 保留，因此新 owner仍使用原 state id 恢复。
+
+tenant 删除调用 `deleteApiUsageStateByTenantId`，customer 删除调用 `deleteApiUsageStateByEntityId`；service 的 `deletedEntities` 还阻止迟到 usage 消息重新创建 state。数据库表无外键级联，真正的删除顺序由 tenant/customer service 调用链承担。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    GET["getOrFetch(owner)"] --> ROW{"state row exists?"}
+    ROW -->|no| CREATE["create ENABLED row with new state id"]
+    ROW -->|yes| LATEST["findAllLatest under existing state id"]
+    CREATE --> NEWTS["findAllLatest under new state id"]
+    NEWTS --> NEWZERO["old-id TS unreachable; counts start at 0"]
+    LATEST --> MATCH{"timestamp is current cycle?"}
+    MATCH -->|yes| RESTORE["restore count"]
+    MATCH -->|no| ZERO["set 0 + persist zero"]
+```
+
+### 10.3 系统、租户与 customer 粒度
+
+SYS tenant state聚合所有 counter，但不运行 profile threshold；tenant state既计量又执行 threshold；customer state只有在配置打开后收集，且不执行 threshold。三者可能共享同一个 usage queue 与 timeseries backend，但业务含义不同。
+
+`api_usage_state` row 只保存 feature 状态，不保存 count 和 limit。只备份 entity schema 而不备份 timeseries 会丢失本月计量恢复依据；只保留 timeseries 而丢失 state row 时，首次访问会创建新的 ENABLED row 和新 `ApiUsageStateId`，旧 id 下的 timeseries 不会被自动关联，count 从 0 开始。`getOrFetchState` 不在这里做全 feature 重算，只有后续 report 涉及的 feature 或 profile update 才触发相应检查。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    SYS["SYS owner"] --> SM["global counter metrics"]
+    TEN["tenant owner"] --> TM["metrics + threshold + hard state"]
+    CUS["customer owner"] --> CM["optional metrics only"]
+    TM --> DB["state row + TS"]
+    SM --> DB
+    CM --> DB
+```
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败与对外行为矩阵
+
+| 场景 | 源码行为 | 是否自动重试/补偿 |
+|---|---|---|
+| REST tenant/customer bucket耗尽 | 429 `TOO_MANY_REQUESTS` | 等本地 refill；无 header |
+| WS update bucket耗尽 | 一次错误消息，丢弃更新 | token 恢复后自动移出 blacklist |
+| Cassandra query bucket耗尽 | future 置 `TenantRateLimitException`，不入 buffer | 调用方决定 |
+| Transport profile bucket耗尽 | callback `TbRateLimitsException(TENANT/DEVICE)` + trigger | 当前消息不重试 |
+| Transport API usage disabled | callback `TbRateLimitsException(API_USAGE_STATE)` | 等状态重新 enabled |
+| DB usage disabled | callback RuntimeException | 上层决定 |
+| RE usage disabled | queue message ack success，不执行 | 不重放 |
+| JS/TBEL disabled | immediate failed future | 上层决定 |
+| Email/SMS disabled | RuntimeException | 上层决定 |
+| Alarm disabled | 需要新建时 `ApiUsageLimitsExceededException` | 上层决定 |
+| usage producer send失败 | warning；本地聚合已 clear | 无内建补偿 |
+| usage consumer item失败/超时 | warning 后 commit poll pack | 无重试 |
+| state TS save失败 | no-op callback | 无反向业务失败 |
+| notification/email失败 | queue callback未提供或 mail warning | state row不回滚 |
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    F{"failure phase"}
+    F --> PRE["pre-business limiter: reject"]
+    F --> REP["usage report: log/drop risk"]
+    F --> PERSIST["state/count persistence: divergence risk"]
+    F --> PROP["notification: delayed enforcement"]
+```
+
+### 11.2 配置与运行时异常
+
+`TbRateLimits` 直接 `split` 并 `Long.parseLong`，没有空白规范化、正数校验或友好错误包装；错误 profile 字符串会在第一次构桶或 Transport profile update 时抛运行时异常。`TenantProfileDataValidator` 只校验 profile/queue 基础结构，没有校验这些 rate strings、月度阈值非负或 warning ratio 范围。
+
+`DefaultRateLimitService` 找不到 profile 时抛 `TenantProfileNotFoundException`；REST filter 特判为 bad credentials，其他调用方可能直接失败。API usage `getOrFetchState` 恢复 timeseries 发生 interruption/execution exception 时只记 warning并仍返回 state 对象，调用方可能看到初始零计数或尚未加入 owner map 的对象。
+
+### 11.3 超额、少计、重复计与排障顺序
+
+看到“超过 max 仍处理”时先确认是 rate string 还是月度 max，再按 `report enabled -> 本机 AtomicLong -> usage queue -> owner partition -> current month TS -> state row -> transport/lifecycle notification -> 执行点 cache` 排查。超过一个 report batch 是设计窗口；持续超额通常是报告关闭、队列丢失、owner/TS 故障或传播未收敛。
+
+看到“过早禁用”时检查重复消费、多个 producer 是否重复上报、脚本计量点是否在执行前、profile threshold 与 warning ratio、当前 cycle timestamp。看到“月初未恢复”时检查月初一小时条件、owner 是否重建、zero timeseries 是否保存、旧节点是否仍缓存 disabled state。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    SYM["quota symptom"] --> CFG["profile field + threshold"]
+    CFG --> REP["local report accumulator"]
+    REP --> Q["usage queue/commit"]
+    Q --> OWN["TB_CORE owner memory"]
+    OWN --> DB["state row + current-cycle TS"]
+    DB --> NF["Transport/Actor propagation"]
+```
+
+---
+
+## 十二、源码阅读路线
+
+建议按下面顺序读，避免从某个 `is*Enabled` 反推整个系统：
+
+1. 限流枚举与算法：`LimitedApi` -> `TbRateLimits` -> `RateLimitService` -> `DefaultRateLimitService`。
+2. REST 入口：`ThingsboardSecurityConfiguration.filterChain` -> `RateLimitProcessingFilter` -> `ThingsboardErrorResponseHandler`。
+3. Transport 独立 limiter：`TransportRateLimitService` -> `DefaultTransportRateLimitService` -> `DefaultTransportService.checkLimits`。
+4. Profile 配额：`DefaultTenantProfileConfiguration.getProfileThreshold/getWarnThreshold` -> `TenantProfileController` 的 schema 示例。
+5. 计量 key 与生产者：`ApiUsageRecordKey` -> Transport/RuleNode/Telemetry/Script/Mail/SMS/Alarm 调用点。
+6. 本地汇总：`TbApiUsageReportClient` -> `DefaultTbApiUsageReportClient.report/reportStats`。
+7. 队列实现：`TbUsageStatsClientQueueFactory` -> 当前 queue provider -> `DefaultTbCoreConsumerService.launchUsageStatsConsumer`。
+8. owner 状态：`DefaultTbApiUsageStateService.process/processEntityUsageStats/getOrFetchState`。
+9. 计数算法：`BaseApiUsageState.calculate/calculateGauge/setHour/setCycles`。
+10. 阈值算法：`TenantApiUsageState.checkStateUpdatedDueToThreshold` -> `ApiUsageStateValue.toMoreRestricted`。
+11. 持久化：`ApiUsageStateServiceImpl` -> `JpaApiUsageStateDao` -> `api_usage_state` DDL -> `InternalTelemetryService`。
+12. 传播：`persistAndNotify` -> `DefaultTbClusterService.onApiStateChange` -> Transport notification / component lifecycle。
+13. 执行点：`TenantActor`、`DefaultTelemetrySubscriptionService`、`AbstractScriptInvokeService`、mail/SMS/alarm。
+14. 通知：`ApiUsageLimitTriggerProcessor` 与 `RateLimitsTriggerProcessor`，核对两类 trigger 不同去重语义。
+15. 最后读测试：`RateLimitServiceTest`、`DefaultTbApiUsageStateServiceTest`、`ApiUsageStateServiceTest`，再用本章异常矩阵补源码未覆盖的集成风险。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#083B66","primaryTextColor":"#FFFFFF","primaryBorderColor":"#001F33","lineColor":"#111827","secondaryColor":"#9A3412","tertiaryColor":"#166534"}}}%%
+flowchart TB
+    A["LimitedApi / TbRateLimits"] --> B["REST + Transport callers"]
+    B --> C["ApiUsageRecordKey producers"]
+    C --> D["report client + queue"]
+    D --> E["owner calculation"]
+    E --> F["DB + cluster propagation"]
+    F --> G["Actor/Transport/DB hard behavior"]
+```
+
+---
+
+## 十三、常见面试题
+
+### 1. 为什么不能把 ThingsBoard 3.6 的限流描述成一个全局令牌桶？
+
+因为至少有通用 `DefaultRateLimitService` 本机 Caffeine bucket、Transport tenant/device 本机 bucket、Transport IP 失败计数器、Rule Node 单消息计数器和 API Usage UTC 月计数状态。它们的 key、算法、存储和拒绝点均不同；Bucket4j token 也不在节点间共享。
+
+### 2. `1000:1,20000:60` 的准确含义是什么？
+
+它构造两个 `Bandwidth`：容量 1000、1 秒补充，以及容量 20000、60 秒补充；一次消费必须同时满足两者。普通 profile/Transport 使用 greedy refill，不是按自然秒/分钟清零。
+
+### 3. 哪些场景使用 intervally refill？
+
+`LimitedApi.PASSWORD_RESET`、`TWO_FA_VERIFICATION_CODE_SEND` 和 `TWO_FA_VERIFICATION_CODE_CHECK` 把 `refillRateLimitIntervally` 设为 true。Tenant Profile 提取型 limited API 与 Transport `SimpleTransportRateLimit` 使用默认 greedy。
+
+### 4. 通用 RateLimitService 的缓存键和重置条件是什么？
+
+键是 `(LimitedApi, level)`；level 可为 tenant、customer、rule id、edge id、user/provider pair 或 session string。空配置、显式 `cleanUp`、配置字符串变化、120 分钟默认 idle expiry、最大容量驱逐或 JVM 重启都会重建/删除桶并丢失旧 token 状态。
+
+### 5. REST tenant 与 customer 限流是否原子？
+
+不是。customer user 先扣 tenant bucket，再扣 customer bucket；customer 失败不会退还 tenant token。超限返回 429，但没有 `Retry-After` 或 remaining headers。
+
+### 6. Transport 为什么有三种受限 EntityType？
+
+`API_USAGE_STATE` 表示月度 Transport feature disabled；`TENANT` 表示 tenant profile 本机桶失败；`DEVICE` 表示 device profile 本机桶失败。只有后两种在该入口触发 `RateLimitsTrigger`。
+
+### 7. Transport 遥测消息的 message 与 datapoint token 是否一起回滚？
+
+否。代码先扣 telemetry-message token，再扣 N 个 datapoint token；后者失败不退前者。tenant 全部通过后 device 失败，也不退 tenant token。
+
+### 8. IP credential 防护是令牌桶吗？
+
+不是。它按本机 `InetAddress` 保存 failureCount、blocked 和 lastActivity；达到次数后 block，正确认证立即清零，block timeout 到期解除，周期任务清理旧项。
+
+### 9. Tenant Profile 的 rate limit 与 max usage 有何区别？
+
+`*RateLimit`/REST/WS/Cassandra 等字符串控制本机瞬时速率且不持久化 token；`maxTransportMessages` 等是 UTC 自然月阈值，先异步计量，再持久化 feature state 并传播硬停。实体数量与每消息 Rule Node 次数又是第三类限制。
+
+### 10. API Usage 的 WARNING 会拒绝业务吗？
+
+不会。WARNING 会保存状态、推时序/WS、触发匹配 notification rule 和 tenant email；所有 `is*Enabled` 只在状态为 DISABLED 时返回 false。
+
+### 11. 为什么月度 quota 可能被短时超过？
+
+业务先发生，计数在 producer JVM 按默认 10 秒汇总，再经过 queue、owner 计算、状态 row 写入和异步广播。整个链路没有逐请求原子预扣，因此至少存在一个汇总与传播窗口，批量流量还可一次跨过阈值。
+
+### 12. 哪些 API Usage key 是 counter，哪些是 gauge？
+
+Transport message/datapoint、storage datapoint、RE/JS/TBEL、email/SMS、created alarm 共九项是 counter；active/inactive devices 是 gauge。gauge 无 ApiFeature 和 quota，不会导致 disabled。
+
+### 13. JS 执行失败是否一定不计 usage？
+
+不一定。`AbstractScriptInvokeService.invokeScript` 在通过状态、存在性、blacklist 和参数大小检查后、真正 `doInvokeFunction` 前调用 `reportExecution`；之后的运行时错误、超时或结果过大仍已计数。
+
+### 14. DB storage usage 在何时计数和拒绝？
+
+保存前读取 `isDbStorageEnabled`，disabled 时 callback failure；enabled 时真正 timeseries save 成功且结果大于 0，才按返回的写入数据点数上报 `STORAGE_DP_COUNT`。
+
+### 15. Rule Engine disabled 时消息会失败并重试吗？
+
+TenantActor 对 `QueueToRuleEngineMsg` 调用 callback success但不转给 rule chain，因而队列视角已 ack，不会因 quota 自动重试。状态 transition 还会销毁/重建 tenant rule chains。
+
+### 16. customer 级 API usage 是否形成 customer 月度硬配额？
+
+在本基线不是。打开 `usage.stats.report.enabled_per_customer` 后会创建 customer state 与 timeseries用于指标，但 threshold 计算只对非 SYS 的 TENANT owner执行；customer states 不会按 tenant profile转为 disabled。
+
+### 17. SYS tenant usage 有什么作用？
+
+counter report 会额外汇总到 SYS tenant，用于平台总量指标；SYS owner不执行 tenant profile threshold，也不形成面向所有 tenant 的全局硬停。gauge 不自动报 SYS level。
+
+### 18. usage queue 使用 Kafka 时是否 exactly-once？
+
+否。producer 清本地聚合后发送失败可少计；consumer处理后 commit 前崩溃可重放并重复加；单条失败/超时后当前实现仍 commit 整个 poll pack又可少计。消息没有业务幂等键。
+
+### 19. api_usage_state 表是否保存月度 count？
+
+不保存。表只保存八个 feature state；月/小时 count、profile limit 和 state history 在该 `ApiUsageStateId` 的通用 timeseries 中。恢复必须同时依赖 row 与 latest timeseries。
+
+### 20. 状态更新怎样到达 Transport 与 Rule Engine？
+
+owner 更新 row 后，向每个 Transport service发送携带完整 state 的 entity update；同时向 Core/Rule Engine发送 `API_USAGE_STATE UPDATED` lifecycle。后者先清非 owner cache，再高优先级通知 App/TenantActor 重新读取状态。
+
+### 21. 这种集群传播是强一致的吗？
+
+不是。调用 `onApiStateChange` 时 callback 为 null，各 notification topic异步消费；不同 Transport/Core/RE 节点生效时间可不同。数据库 state row 是恢复依据，但缓存读取与通知没有全局 barrier或线性一致保证。
+
+### 22. 月初怎样重置，为什么可能出现未恢复？
+
+owner 默认每 60 秒检查 `nextCycleTs`，只在月初后不足一小时的窗口清月值、写零并重算。若常驻 state错过整整一小时，后续 tick不满足条件；重启/重分区重建 state 才会按当前月 timestamp把旧 latest视为 0。
+
+### 23. profile 更新会保留还是重置 token 与 usage count？
+
+通用 limiter 在字符串改变时换新桶；Transport 只为改变的子桶换新对象，未变子桶保留。月度 count不清零，而是用新 threshold立即重算状态并写新的 limit timeseries；提高阈值可重新 enabled，降低阈值可立即 disabled。
+
+### 24. RateLimitsTrigger 与 ApiUsageLimitTrigger 有何不同？
+
+前者来自本机瞬时桶失败，按 API/level构造并默认 4 小时去重；后者只在月度 feature状态转换时构造，携带 key、阈值、当前值和新状态，可按 feature/status过滤。API usage service还绕过 notification rule额外异步发 tenant email。
+
+### 25. 本章为什么不宣称具备 PE 或更高版本的高级配额能力？
+
+因为 `release-3.6` 当前源码只能证明本机 Bucket4j、异步月度 tenant state和可选 customer metrics；没有分布式原子桶、精确 remaining quota、标准响应头、customer 月度硬停或 exactly-once账本。产品版本线外的能力必须以对应版本源码重新核实。
+
+---
+
+[上一篇：40 服务启动与关闭流程](../40-service-lifecycle/index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 时序源文件](sequence.puml) | [架构图 SVG](../../assets/architecture/41-rate-limit-api-usage.svg) | [下一篇：42 故障恢复与可观测性](../42-failure-recovery-observability/index.html)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

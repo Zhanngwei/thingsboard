@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>39 Edge 同步流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航"><a href="README.md">Markdown</a><a href="../../index.html">全书目录</a><a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>39 Edge 同步流程</strong>
+      <a href="#一-流程目标">一、流程目标</a><a href="#二-入口">二、入口</a><a href="#三-完整调用链">三、完整调用链</a><a href="#四-消息流">四、消息流</a><a href="#五-时序图">五、时序图</a><a href="#六-数据变化">六、数据变化</a><a href="#七-源码分析">七、源码分析</a><a href="#八-actor-分析">八、Actor 分析</a><a href="#九-kafka-分析">九、Kafka 分析</a><a href="#十-数据库分析">十、数据库分析</a><a href="#十一-异常处理">十一、异常处理</a><a href="#十二-源码阅读路线">十二、源码阅读路线</a><a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
+  <script id="markdown-source" type="text/plain"># 39 Edge 同步流程
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章只解释本仓库能够证实的 Cloud 端与公共 Edge gRPC client：实体变更如何形成 `edge_event`、如何经 TB Core 通知唤醒会话、双向流如何确认，以及断线后怎样依靠持久化游标继续。ThingsBoard Edge 独立发行物中的本地持久队列不在此源码树内，因此不推断其实现。
+
+[上一篇：38 Notification 流程](../38-notification-flow/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/39-edge-sync.svg) | [下一篇：40 Service Lifecycle](../40-service-lifecycle/)
+
+[![Edge 双向同步架构图](../../assets/architecture/39-edge-sync.svg)](../../assets/architecture/39-edge-sync.svg)
+
+[![Edge 双向同步详细时序图](sequence.svg)](sequence.svg)
+
+---
+
+## 一、流程目标
+
+Edge 同步不是一个数据库事务，也不是一条 Kafka 消息直接穿透到 Edge。Cloud 侧的增量下行由三段组成：业务事务提交后产生实体通知，`BaseEdgeProcessor` 按 Edge 关系过滤并异步写 `edge_event`，写成功后才发送 `EdgeEventUpdateMsg`；持有 gRPC session 的 TB Core 节点再分页读取数据库、构造 `DownlinkMsg` 并等待 Edge 逐条确认。反向上行则不经过 Cloud 的 `edge_event`：Edge 在同一双向 gRPC stream 发送 `UplinkMsg`，Cloud processor 直接落业务服务，全部 future 成功后返回 `UplinkResponseMsg`。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E8F4FD','primaryTextColor':'#111827','primaryBorderColor':'#1D4ED8','lineColor':'#1F2937','secondaryColor':'#DCFCE7','tertiaryColor':'#FFF7E6'}}}%%
+flowchart TB
+    C[Cloud entity commit] --> N[Edge notification]
+    N --> F{related Edge filter}
+    F --> Q[(edge_event SQL queue)]
+    Q --> DB[(PostgreSQL edge_event)]
+    DB --> D[DownlinkMsg]
+    D <--> G[gRPC bidi stream]
+    G <--> U[UplinkMsg]
+    U --> P[Cloud processors]
+    P --> B[(business tables / telemetry / queues)]
+```
+
+先固定二十条源码事实：
+
+1. gRPC 协议只有一个双向流 RPC：`rpc handleMsgs(stream RequestMsg) returns (stream ResponseMsg)`。
+2. 连接以全局唯一 `routing_key` 查 `edge` 表，再以明文相等比较 `secret`；路由键查询不使用 Edge name cache。
+3. 一个 `EdgeId` 在单个 TB Core 实例的 `sessions` map 中只保留最后一次成功连接的 session；旧 session 断开时以 `sessionId` 防止误删新 session。
+4. Cloud 增量事件不是直接发 gRPC，而是先异步写 PostgreSQL `edge_event`。
+5. `edge_event.seq_id` 是 `INT GENERATED ALWAYS AS IDENTITY ... CYCLE`，会回绕；恢复算法同时使用 `created_time` 和 `seq_id`。
+6. SQL 入队前同步做 rate limit、校验、time UUID、分区创建；“async”不代表调用路径全程无阻塞。
+7. Edge Event SQL queue 是单个无界 `LinkedBlockingQueue`；`batch_size=1000` 是 drain 上限，不是容量。
+8. 每个 SQL batch 在一个 `TransactionTemplate` 中执行；失败令该批所有 future 失败，没有 DAO 级持久重试。
+9. batch 入库前按 `ts` 排序，但数据库读取固定追加 `seqId` 排序；这不是跨事务的全局因果顺序。
+10. `EdgeEventUpdateMsg` 仅是“可能有新数据”的唤醒通知，不携带实体 payload。
+11. 唤醒通知广播到所有 TB Core service-specific notification topics，以 `edgeId UUID` 作为 TB Queue message key；只有持有 session 的节点会处理数据。
+12. 常规下行读取默认每页 50 条，按页串行；每页转换成多个独立 `DownlinkMsg`，不是一个 protobuf batch envelope。
+13. Cloud 最多重发 pending downlink 10 次，默认每次间隔 60 秒；成功 ack 才从 pending map 删除。
+14. 达到第 10 次后 pending 消息被丢弃，但该页 future 仍以 `false` 完成，随后游标可能推进；因此不是无限重试，也不是 exactly-once。
+15. 游标 `queueStartTs/queueStartSeqId` 是 Edge 实体的 server-scope attributes，整页发送流程结束后写入，不删除 `edge_event` 行。
+16. 断线重连后 session 从持久化 attributes 继续；未写游标的已执行消息可能重放，processor 必须面对重复。
+17. 全量同步不读取 `edge_event` 历史作为主体，而是按固定 fetcher 顺序分页扫描当前实体快照，再发送 `SyncCompletedMsg`。
+18. `EdgeEventType.allEdgesRelated` 只决定顶层 tenant-wide 分支；`false` 分支还会按 action 和显式 `edgeId` 分流。显式目标可直接写指定 Edge；tenant-wide、无显式目标的 DELETED fan-out 和关系查询分支会在遍历时排除 `originatorEdgeId`。
+19. Edge 上行 processor 通过 `ThreadLocal<EdgeId>` 标记来源，让事务事件监听器携带 originator；它是回环抑制标记，不是分布式锁或事务上下文。
+20. Cloud 对冲突没有统一 CRDT/版本向量；同 UUID 通常覆盖当前记录，名称冲突对 device/asset/profile/entity view 等采用随机后缀，具体语义由 processor 决定。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1E40AF','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FEE2E2'}}}%%
+flowchart LR
+    A[Business transaction] -.after commit.-> E[edge_event]
+    E -.independent commit.-> R[gRPC delivery]
+    R -.ack boundary.-> O[server-scope cursor]
+    A -.no shared transaction.-> O
+```
+
+---
+
+## 二、入口
+
+### 2.1 gRPC 连接入口
+
+[org.thingsboard.server.service.edge.rpc.EdgeGrpcService.handleMsgs(StreamObserver&lt;ResponseMsg&gt;)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L268) 每条 transport stream 创建一个 `EdgeGrpcSession`。客户端入口 [org.thingsboard.edge.rpc.EdgeGrpcClient.connect(String, String, Consumer&lt;UplinkResponseMsg&gt;, Consumer&lt;EdgeConfiguration&gt;, Consumer&lt;DownlinkMsg&gt;, Consumer&lt;Exception&gt;)](../../../common/edge-api/src/main/java/org/thingsboard/edge/rpc/EdgeGrpcClient.java#L132) 建立 Netty channel，启用 gzip，并先发 `CONNECT_RPC_MESSAGE`。
+
+[org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.processConnect(ConnectRequestMsg)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L1028) 调用 [org.thingsboard.server.dao.edge.EdgeServiceImpl.findEdgeByRoutingKey(TenantId, String)](../../../dao/src/main/java/org/thingsboard/server/dao/edge/EdgeServiceImpl.java#L253)。虽然传入 `TenantId.SYS_TENANT_ID`，底层 [org.thingsboard.server.dao.sql.edge.JpaEdgeDao.findByRoutingKey(UUID, String)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/JpaEdgeDao.java#L298) 实际只按 routing key 查询；数据库约束也保证它全局唯一。认证成功后 Cloud 返回配置和服务端最大入站大小。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E8F4FD','primaryTextColor':'#111827','primaryBorderColor':'#1D4ED8','lineColor':'#1F2937','secondaryColor':'#DCFCE7','tertiaryColor':'#FFF7E6'}}}%%
+sequenceDiagram
+    participant E as EdgeGrpcClient
+    participant S as EdgeGrpcSession
+    participant D as EdgeService/JPA
+    E->>S: CONNECT(routingKey, secret, version, maxSize)
+    S->>D: findEdgeByRoutingKey(SYS, key)
+    D-->>S: Edge or empty
+    alt key exists and secret equals
+        S-->>E: ACCEPTED + EdgeConfiguration + maxSize
+    else invalid
+        S-->>E: BAD_CREDENTIALS
+    end
+```
+
+### 2.2 Cloud 实体变更入口
+
+[org.thingsboard.server.service.edge.EdgeEventSourcingListener.handleEvent(SaveEntityEvent&lt;?&gt;)](../../../application/src/main/java/org/thingsboard/server/service/edge/EdgeEventSourcingListener.java#L99) 使用 `@TransactionalEventListener(fallbackExecution = true)`：存在事务时在事务提交后接收，缺少事务时 fallback 直接执行。它过滤无可用数据的 OTA、非 EDGE Rule Chain、SYS_ADMIN、仅登录状态变化的 User，以及 Alarm 通用 save 事件，再调用 [org.thingsboard.server.service.queue.DefaultTbClusterService.sendNotificationMsgToEdge(TenantId, EdgeId, EntityId, String, EdgeEventType, EdgeEventActionType, EdgeId)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L808)。删除、Action 和 COMMON relation 分别有同类重载入口。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DCFCE7','primaryTextColor':'#111827','primaryBorderColor':'#166534','lineColor':'#1F2937','secondaryColor':'#DBEAFE','tertiaryColor':'#FEE2E2'}}}%%
+flowchart TB
+    TX[DAO save/delete transaction] --> TEL[TransactionalEventListener]
+    TEL --> V{valid for Edge?}
+    V -->|no| X[skip]
+    V -->|yes| C[sendNotificationMsgToEdge]
+    C --> TC[TB Core queue]
+    TC --> BP[BaseEdgeProcessor]
+```
+
+### 2.3 Edge 上行入口
+
+[org.thingsboard.edge.rpc.EdgeGrpcClient.sendUplinkMsg(UplinkMsg)](../../../common/edge-api/src/main/java/org/thingsboard/edge/rpc/EdgeGrpcClient.java#L285) 把聚合后的 `UplinkMsg` 写入同一 stream。Cloud 在 [org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.onUplinkMsg(UplinkMsg)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L345) 先检查 tenant 与 per-edge 两层 rate limit，再由 `processUplinkMsg` 分派。返回成功不是“已收到字节”，而是该 `UplinkMsg` 中收集到的所有 Cloud future 成功完成。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFF7E6','primaryTextColor':'#111827','primaryBorderColor':'#92400E','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#FEE2E2'}}}%%
+flowchart TB
+    U[UplinkMsg] --> RL{tenant + per-edge rate limit}
+    RL -->|reject| N[negative UplinkResponse]
+    RL -->|allow| P[processor futures]
+    P --> A{allAsList success?}
+    A -->|yes| Y[success response]
+    A -->|no| N
+```
+
+---
+
+## 三、完整调用链
+
+### 3.1 Cloud 到 Edge 增量链
+
+实体通知先进入 TB Core actor 路径，再由 [org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessor.processEntityNotification(TenantId, EdgeNotificationMsgProto)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/processor/BaseEdgeProcessor.java#L732) 决定目标 Edge。[org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessor.saveEdgeEvent(TenantId, EdgeId, EdgeEventType, EdgeEventActionType, EntityId, JsonNode)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/processor/BaseEdgeProcessor.java#L521) 先读 Edge `active` 属性：属性从未建立时跳过；离线时仅白名单类型/动作入队。私有 `doSaveEdgeEvent` 在 SQL future 成功后才调用 `tbClusterService.onEdgeEventUpdate`。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1D4ED8','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FFF7E6'}}}%%
+flowchart TB
+    N[EdgeNotificationMsgProto] --> T{allEdgesRelated?}
+    T -->|yes| ALL[page tenant edges and exclude source]
+    T -->|no| B{action or explicit edgeId?}
+    B -->|direct target| DIR[save for specified Edge]
+    B -->|DELETED without edgeId| DEL[page tenant edges and exclude source]
+    B -->|relation path| REL[page related edges and exclude source]
+    ALL --> OFF[active/offline filter]
+    DIR --> OFF
+    DEL --> OFF
+    REL --> OFF
+    OFF --> SQL[saveAsync EdgeEvent]
+    SQL --> W[onEdgeEventUpdate wake-up]
+    W --> S[session.processEdgeEvents]
+```
+
+[org.thingsboard.server.dao.edge.BaseEdgeEventService.saveAsync(EdgeEvent)](../../../dao/src/main/java/org/thingsboard/server/dao/edge/BaseEdgeEventService.java#L64) 同步 rate-limit 和 validate；[org.thingsboard.server.dao.sql.edge.JpaBaseEdgeEventDao.saveAsync(EdgeEvent)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/JpaBaseEdgeEventDao.java#L213) 生成 time UUID、创建分区并加入 SQL queue。DB future 成功后，通知经 TB Queue 到所有 Core 节点；持有 session 的节点将 `sessionNewEvents` 置为 true。定时检查调用 [org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.processEdgeEvents()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L469)，读取、转换、重发、确认，最后写游标。
+
+### 3.2 Edge 到 Cloud 上行链
+
+[org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.processUplinkMsg(UplinkMsg)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L897) 支持设备/资产/配置、EntityView、Telemetry、Alarm/Comment、Relation、Dashboard、Resource，以及 metadata/attributes/relation/credentials/RPC/widget/entity-view 请求。Cloud 端 processor 直接调用对应服务；例如 [org.thingsboard.server.service.edge.rpc.processor.device.DeviceEdgeProcessor.processDeviceMsgFromEdge(TenantId, Edge, DeviceUpdateMsg)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/processor/device/DeviceEdgeProcessor.java#L80) 保存设备、建立 Edge 关系、发 Rule Engine entity-created 旁路，并补发 credentials request。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFF7E6','primaryTextColor':'#111827','primaryBorderColor':'#92400E','lineColor':'#1F2937','secondaryColor':'#DCFCE7','tertiaryColor':'#DBEAFE'}}}%%
+flowchart TB
+    U[UplinkMsg repeated fields] --> D[Device/Asset/Profile processors]
+    U --> T[Telemetry processor]
+    U --> A[Alarm/Relation processors]
+    U --> R[Request service]
+    D --> DB[(Cloud business DB)]
+    T --> Q[Telemetry/Rule Engine paths]
+    A --> DB
+    R --> E[(new edge_event responses)]
+```
+
+### 3.3 全量/部分同步链
+
+Edge 发 `SyncRequestMsg.fullSync` 后，[org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.startSyncProcess(boolean)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L289) 暂停普通下行批次并创建 [org.thingsboard.server.service.edge.rpc.EdgeSyncCursor.EdgeSyncCursor(EdgeContextComponent, Edge, boolean)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeSyncCursor.java#L74)。`fullSync=true` 增加 tenant、queue、rule chain、admin settings、users、customers、widgets、OTA、resource 等 fetcher；`false` 仍同步 dashboard、默认 profile、关联 profile/device/asset/entity view。fetcher 扫描的是当前实体快照，并在内存中构造临时 `EdgeEvent`，不写 `edge_event`。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EDE9FE','primaryTextColor':'#111827','primaryBorderColor':'#5B21B6','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#DBEAFE'}}}%%
+flowchart TB
+    S[SyncRequest fullSync?] --> I[interrupt normal batch]
+    I --> C[EdgeSyncCursor]
+    C --> F1[global/tenant fetchers if full]
+    C --> F2[assigned entity fetchers always]
+    F1 --> P[page and send]
+    F2 --> P
+    P --> DONE[SyncCompletedMsg or retry exhaustion]
+    DONE --> INC[normal task completion sets syncCompleted and resumes wake-up]
+```
+
+---
+
+## 四、消息流
+
+### 4.1 Proto 双向消息类型
+
+[common/edge-api/src/main/proto/edge.proto](../../../common/edge-api/src/main/proto/edge.proto#L27) 定义 `RequestMsg` 与 `ResponseMsg` 外层。上行 `UplinkMsg` 的 repeated 字段包括 entity data、device/asset/profile/entity view/dashboard/resource、alarm/comment/relation 和各类 request；下行 `DownlinkMsg` 还包括 user/customer/widgets/admin/tenant/queue/OTA、Edge configuration 和 `SyncCompletedMsg`。`UplinkResponseMsg` 与 `DownlinkResponseMsg` 都以 int32 message id 关联，但方向相反。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1E40AF','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FFF7E6'}}}%%
+flowchart TB
+    REQ[RequestMsg Edge to Cloud] --> CONNECT[ConnectRequest]
+    REQ --> SYNC[SyncRequest]
+    REQ --> UP[UplinkMsg]
+    REQ --> DACK[DownlinkResponse]
+    RESP[ResponseMsg Cloud to Edge] --> CRES[ConnectResponse]
+    RESP --> UACK[UplinkResponse]
+    RESP --> DOWN[DownlinkMsg]
+    RESP --> CFG[EdgeUpdateMsg]
+```
+
+### 4.2 Routing key、session 与 TB Queue key
+
+必须区分三种 key：`edge.routing_key` 是连接凭据索引；`EdgeId` 是 Cloud 内部 session map key；TB Core notification 的 `TbProtoQueueMsg` key 也是 `edgeId UUID`。 [org.thingsboard.server.service.queue.DefaultTbClusterService.pushEdgeSyncMsgToCore(EdgeId, ToCoreNotificationMsg)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L679) 对所有 TB Core service id 各发一份通知，而不是依靠 routing key 定位进程。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DCFCE7','primaryTextColor':'#111827','primaryBorderColor':'#166534','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#FFF7E6'}}}%%
+flowchart LR
+    RK[routing_key] --> AUTH[(edge row lookup)]
+    AUTH --> ID[EdgeId]
+    ID --> SM[local sessions map]
+    ID --> QK[TB Queue message key]
+    QK --> CORES[all TB Core instances]
+    CORES --> SM
+```
+
+### 4.3 Ack 与 retry
+
+[org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.onDownlinkResponse(DownlinkResponseMsg)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L406) 仅在 `success=true` 时删除 pending；negative ack 留在 map 中等待下一轮。 [org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.scheduleDownlinkMsgsPackSend(int)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L621) 第一次立即发，后续按 `edges.storage.sleep_between_batches` 调度，最多 10 次。超过 Edge 声明的 inbound size 时，该消息直接从 pending 删除并发通信失败通知，也会允许该页继续完成。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FEE2E2','primaryTextColor':'#111827','primaryBorderColor':'#991B1B','lineColor':'#111827','secondaryColor':'#FFF7E6','tertiaryColor':'#DCFCE7'}}}%%
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Acked: success response
+    Pending --> Pending: negative/no response and attempt < 10
+    Pending --> Discarded: attempt = 10
+    Pending --> Discarded: message exceeds client max size
+    Acked --> BatchDone
+    Discarded --> BatchDone
+    BatchDone --> CursorUpdate
+```
+
+### 4.4 RPC 消息与 Edge 同步 RPC 的边界
+
+`DeviceRpcCallMsg` 是 Edge gRPC 内承载设备 RPC request/response 的 protobuf；它不等于 gRPC transport 本身的调用确认。Cloud 下行设备 RPC 仍先表现为 `EdgeEventActionType.RPC_CALL`，processor 构造 `DeviceRpcCallMsg`；Edge 上行 response 再由 Device processor 推入 Cloud RPC 服务/队列。`DownlinkResponseMsg` 只确认 Edge 是否处理了这个同步 envelope，不替代设备 RPC 的业务 response、expiration 或 retries。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFF7E6','primaryTextColor':'#111827','primaryBorderColor':'#92400E','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#DCFCE7'}}}%%
+flowchart TB
+    CE[edge_event RPC_CALL] --> DM[Downlink DeviceRpcCallMsg]
+    DM --> DA[DownlinkResponse transport ack]
+    DM --> DEV[Edge device RPC execution]
+    DEV --> UR[Uplink DeviceRpcCallMsg response]
+    UR --> CR[Cloud RPC service]
+    DA -.not business response.-> CR
+```
+
+---
+
+## 五、时序图
+
+详细可编辑版本见 [sequence.puml](sequence.puml)。下面三张窄图分别固定连接、增量下行与反向上行的完成边界。
+
+### 5.1 连接与 session 替换
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1D4ED8','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FFF7E6'}}}%%
+sequenceDiagram
+    participant E as Edge
+    participant G as EdgeGrpcSession
+    participant S as EdgeGrpcService
+    participant A as Attributes/Rule Engine
+    E->>G: ConnectRequest
+    G->>S: onEdgeConnect(edgeId, session)
+    S->>S: sessions.put overwrites old mapping
+    S->>A: active=true, lastConnect, CONNECT_EVENT
+    S->>S: newEvents=true, schedule check
+    G-->>E: ACCEPTED + config
+```
+
+注意 `processConnect` 先调用 `sessionOpenListener`，后设置 `connected=true`；映射建立与 client 收到 ACCEPTED 之间存在很短的窗口。旧 stream 随后关闭时，[org.thingsboard.server.service.edge.rpc.EdgeGrpcService.onEdgeDisconnect(Edge, UUID)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L547) 比较 session id，避免把新映射删掉。
+
+### 5.2 增量下行与游标提交
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DCFCE7','primaryTextColor':'#111827','primaryBorderColor':'#166534','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#FEE2E2'}}}%%
+sequenceDiagram
+    participant P as BaseEdgeProcessor
+    participant Q as SQL queue/DB
+    participant C as TB Core notification
+    participant S as EdgeGrpcSession
+    participant E as Edge
+    participant A as Attributes
+    P->>Q: saveAsync(EdgeEvent)
+    Q-->>P: batch commit future
+    P->>C: onEdgeEventUpdate(edgeId)
+    C->>S: processEdgeEvents()
+    S->>Q: page after cursor
+    loop each DownlinkMsg pending
+        S->>E: DownlinkMsg(id)
+        E-->>S: DownlinkResponse(id, success)
+    end
+    S->>A: save queueStartTs + queueStartSeqId
+```
+
+### 5.3 Edge 上行与响应
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFF7E6','primaryTextColor':'#111827','primaryBorderColor':'#92400E','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FEE2E2'}}}%%
+sequenceDiagram
+    participant E as Edge
+    participant S as EdgeGrpcSession
+    participant P as processors
+    participant B as business services
+    E->>S: UplinkMsg(id, repeated payloads)
+    S->>S: rate limits
+    S->>P: processUplinkMsg
+    P->>B: save/update/push queue
+    B-->>P: ListenableFutures
+    alt all futures succeed
+        S-->>E: UplinkResponse(id, true)
+    else any future fails
+        S-->>E: UplinkResponse(id, false, root cause)
+    end
+```
+
+---
+
+## 六、数据变化
+
+### 6.1 `edge_event` 行与 SQL queue
+
+`EdgeEvent` 包含 `seqId, tenantId, edgeId, action, entityId, uid, type, body`；实体 [org.thingsboard.server.dao.model.sql.EdgeEventEntity.EdgeEventEntity(EdgeEvent)](../../../dao/src/main/java/org/thingsboard/server/dao/model/sql/EdgeEventEntity.java#L133) 还派生 `ts`。表 DDL 位于 [dao/src/main/resources/sql/schema-entities.sql](../../../dao/src/main/resources/sql/schema-entities.sql#L745)：按 `created_time` RANGE 分区，没有 PK、UNIQUE 或 FK。 [org.thingsboard.server.dao.sql.edge.EdgeEventInsertRepository.save(List&lt;EdgeEventEntity&gt;)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/EdgeEventInsertRepository.java#L69) 使用 `ON CONFLICT DO NOTHING`，但基线 DDL 没有可触发的唯一约束，因此不能把它当作 uid/id 去重保证。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1E40AF','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FFF7E6'}}}%%
+erDiagram
+    EDGE ||--o{ EDGE_EVENT : targets
+    EDGE {
+      uuid id
+      string routing_key
+      string secret
+    }
+    EDGE_EVENT {
+      int seq_id_identity_cycle
+      uuid id
+      bigint created_time
+      bigint ts
+      uuid tenant_id
+      uuid edge_id
+      string edge_event_type
+      string edge_event_action
+      uuid entity_id
+      string edge_event_uid
+      json body
+    }
+```
+
+### 6.2 顺序、分页与批量
+
+[org.thingsboard.server.dao.sql.edge.JpaBaseEdgeEventDao.init()](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/JpaBaseEdgeEventDao.java#L172) 创建一个 SQL queue，按 entity id hash 但 `maxThreads=1`，batch sort comparator 为 `ts`。读取 [org.thingsboard.server.dao.sql.edge.JpaBaseEdgeEventDao.findEdgeEvents(UUID, EdgeId, Long, Long, TimePageLink)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/JpaBaseEdgeEventDao.java#L276) 在请求 sort 后固定追加 `seqId`；常规 fetcher 默认无显式 primary sort，因此以 `seqId ASC` 为主。SQL 对 `createdTime` 使用闭区间，对 seq 使用严格 `>`/`<`。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EDE9FE','primaryTextColor':'#111827','primaryBorderColor':'#5B21B6','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#DCFCE7'}}}%%
+flowchart TB
+    A[saveAsync calls] --> L[unbounded LinkedBlockingQueue]
+    L --> D[drain up to 1000 or 100 ms]
+    D --> S[sort batch by ts]
+    S --> TX[one JDBC transaction]
+    TX --> ID[DB assigns cycling seq_id]
+    ID --> R[read by createdTime window + seqId]
+```
+
+### 6.3 游标、断线恢复与重复
+
+[org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.getQueueStartTsAndSeqId()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L744) 读取 Edge server-scope attributes。若 seq 为 0，则以按 `createdTime` 升序查询的最老事件 seq 减 1 初始化。 [org.thingsboard.server.service.edge.rpc.fetch.GeneralEdgeEventFetcher.fetchEdgeEvents(TenantId, Edge, PageLink)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/fetch/GeneralEdgeEventFetcher.java#L89) 在当前 seq 区间无数据时向低 seq 区间探测 identity cycle；`createdTime` 防止把旧周期数据误当新数据。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DCFCE7','primaryTextColor':'#111827','primaryBorderColor':'#166534','lineColor':'#111827','secondaryColor':'#FFF7E6','tertiaryColor':'#FEE2E2'}}}%%
+flowchart TB
+    R[Reconnect] --> A[read queueStartTs/seqId attrs]
+    A --> Q[query createdTime >= startTs and seqId > startSeq]
+    Q --> Z{rows found?}
+    Z -->|yes| SEND[send and ack]
+    Z -->|no| CY[probe lower seq range for CYCLE]
+    SEND --> SAVE[save last row time + seq]
+    SAVE --> A
+```
+
+窗口含义是 at-least-once 倾向而非严格一次：Edge 已处理但 Cloud 在 attributes save 前崩溃，会重放；10 次失败后 Cloud 又可能推进到未处理成功的消息之后。`DownlinkMsgId` 由 [org.thingsboard.server.common.data.EdgeUtils.nextPositiveInt()](../../../common/data/src/main/java/org/thingsboard/server/common/data/EdgeUtils.java#L83) 随机生成，不是持久化幂等键。
+
+### 6.4 全量同步快照与派生请求
+
+[org.thingsboard.server.service.edge.rpc.fetch.BasePageableEdgeEventFetcher.fetchEdgeEvents(TenantId, Edge, PageLink)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/fetch/BasePageableEdgeEventFetcher.java#L60) 把当前实体页转换成临时 `ADDED` 事件。例如 [org.thingsboard.server.service.edge.rpc.fetch.DevicesEdgeEventFetcher.fetchPageData(TenantId, Edge, PageLink)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/fetch/DevicesEdgeEventFetcher.java#L58) 只查询已关联到该 Edge 的设备。Edge 收到实体后还可上行请求 metadata、attributes、latest timeseries、relations、credentials、widget types 或 entity views；[org.thingsboard.server.service.edge.rpc.sync.DefaultEdgeRequestsService.processAttributesRequestMsg(TenantId, Edge, AttributesRequestMsg)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/sync/DefaultEdgeRequestsService.java#L183) 会把响应重新写成 `edge_event`，随后走普通下行确认链。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFF7E6','primaryTextColor':'#111827','primaryBorderColor':'#92400E','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#DCFCE7'}}}%%
+flowchart TB
+    SNAP[current snapshot page] --> TEMP[in-memory ADDED EdgeEvents]
+    TEMP --> D[Downlink entity messages]
+    D --> REQ[Edge requests dependent data]
+    REQ --> RS[DefaultEdgeRequestsService]
+    RS --> EQ[(edge_event response rows)]
+    EQ --> D2[normal incremental downlink]
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 实体过滤与离线策略
+
+`EdgeEventType.allEdgesRelated=true` 的 profile、user、customer、tenant、widgets、admin、OTA、queue、resource 等按 tenant Edge fan-out并排除来源 Edge。`false` 不是“全部按关系查询”：processor 还先按 action 和显式 `edgeId` 分流，显式目标可直接写指定 Edge，无显式目标的 DELETED 可走 tenant-wide fan-out 并排除来源，关系分支 [org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessor.processNotificationToRelatedEdges(TenantId, EntityId, EdgeEventType, EdgeEventActionType, EdgeId)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/processor/BaseEdgeProcessor.java#L805) 也排除来源。离线并非“全部积压”：`doSaveIfEdgeIsOffline` 只允许关键状态、请求和全局配置类；设备普通 update 在离线时可被跳过，后续靠 snapshot sync 对齐当前态。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1D4ED8','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FEE2E2'}}}%%
+flowchart TB
+    E[entity event] --> G{allEdgesRelated}
+    G -->|yes| TE[tenant edges except source]
+    G -->|no| B{action or explicit edgeId?}
+    B -->|direct target| DE[specified Edge]
+    B -->|DELETED without edgeId| TD[tenant edges except source]
+    B -->|relation path| RE[related edges except source]
+    TE --> O{active or offline-whitelisted}
+    DE --> O
+    TD --> O
+    RE --> O
+    O -->|yes| SAVE[save edge_event]
+    O -->|no| SKIP[skip increment]
+```
+
+### 7.2 冲突语义与回环抑制
+
+上行不是基于时间戳的 last-write-wins 协议，也没有 vector clock。 [org.thingsboard.server.service.edge.rpc.processor.device.BaseDeviceProcessor.saveOrUpdateDevice(TenantId, DeviceId, DeviceUpdateMsg)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/processor/device/BaseDeviceProcessor.java#L50) 以传入 UUID 查记录：存在则按 incoming entity 更新，不存在则用该 UUID 创建；若同租户已有同名不同 UUID，则追加 15 位随机字母并把修正后的 update 再发回来源 Edge。Asset、Device/Asset Profile、EntityView、Resource 使用相似但各自独立的规则。Alarm 则按动作调用 create/update/ack/clear/delete，找不到 originator 时直接成功跳过。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FEE2E2','primaryTextColor':'#111827','primaryBorderColor':'#991B1B','lineColor':'#111827','secondaryColor':'#FFF7E6','tertiaryColor':'#DCFCE7'}}}%%
+flowchart TB
+    I[Incoming entity UUID] --> X{UUID exists?}
+    X -->|yes| UP[update Cloud record]
+    X -->|no| N{name used by another UUID?}
+    N -->|no| CR[create with incoming UUID]
+    N -->|yes| RN[random suffix rename then create]
+    RN --> FB[edge_event corrected update]
+    UP -.no version vector.-> C[processor-specific outcome]
+```
+
+[org.thingsboard.server.dao.edge.DefaultEdgeSynchronizationManager](../../../dao/src/main/java/org/thingsboard/server/dao/edge/DefaultEdgeSynchronizationManager.java#L34) 只有 `ThreadLocal<EdgeId>`。Device processor 在同步 save 周围 set/remove；`EdgeEventSourcingListener` 再把它写入 `originatorEdgeId`。这避免同一来源立即回送，但异步越过 ThreadLocal 边界的代码必须显式处理，源码注释也说明 listener 不能简单改成 async。
+
+### 7.3 转换失败、空消息与批次推进
+
+[org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.convertToDownlinkMsgsPack(List&lt;EdgeEvent&gt;)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L692) 对单条转换异常只记日志并跳过；不支持的 action/type 返回 null。发送 pack 的 pending map 只包含成功转换出的消息，但页尾游标取原始 `pageData` 最后一条。因此一条不可转换事件可能被永久越过。若整页都转换为空，`sendDownlinkMsgsPack` 会立即完成，游标同样推进。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FEE2E2','primaryTextColor':'#111827','primaryBorderColor':'#991B1B','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#FFF7E6'}}}%%
+flowchart TB
+    PAGE[DB page] --> CV[convert each event]
+    CV -->|ok| PM[pending map]
+    CV -->|exception/unsupported| LOG[log and omit]
+    PM --> ACK[retry/ack]
+    ACK --> LAST[cursor from original page last row]
+    LOG --> LAST
+```
+
+### 7.4 缓存边界
+
+Edge name 查询使用 Caffeine/Redis `EdgeCache`，默认 TTL 1440 分钟；但认证路径 `findEdgeByRoutingKey` 直接走 repository，不命中该 cache。session、新事件 flag、pending map 和 scheduled task 都是本机内存，不在 Redis；可恢复状态仅是 PostgreSQL/attributes 中的 `edge_event` 与 cursor。修改 Edge 后 [org.thingsboard.server.service.edge.rpc.EdgeGrpcService.updateEdge(TenantId, Edge)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L310) 只向本机存在的连接推配置，集群定位仍依赖 lifecycle/notification 路径。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EDE9FE','primaryTextColor':'#111827','primaryBorderColor':'#5B21B6','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#DBEAFE'}}}%%
+flowchart TB
+    NC[Edge name cache Caffeine/Redis] --> NAME[find by tenant + name]
+    RK[routing key auth] --> SQL[(direct edge repository)]
+    MEM[in-memory session/pending flags] --> LOST[lost on process restart]
+    DUR[(edge_event + cursor attributes)] --> REC[restart/reconnect recovery]
+```
+
+---
+
+## 八、Actor 分析
+
+Edge payload 不在 Actor mailbox 中长时间排队。实体通知经 `ToCoreMsg.edgeNotificationMsg` 由 Core consumer 进入 processor，生成 `edge_event`；而写成功后的轻量 `EdgeEventUpdateMsg` 经 notification consumer 送到 App Actor。 [org.thingsboard.server.actors.app.AppActor.onToEdgeSessionMsg(EdgeSessionMsg)](../../../application/src/main/java/org/thingsboard/server/actors/app/AppActor.java#L278) 高优先级转给 Tenant Actor；[org.thingsboard.server.actors.tenant.TenantActor.onToEdgeSessionMsg(EdgeSessionMsg)](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L408) 再调用 `EdgeRpcService`。`EdgeGrpcService` 立即转投自己的单线程 `edge-service` executor，因此 gRPC DB 扫描和重发不占 Tenant Actor mailbox。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1D4ED8','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#FFF7E6'}}}%%
+flowchart TB
+    KC[TB Core notification consumer] --> APP[AppActor high priority]
+    APP --> TEN[TenantActor high priority]
+    TEN --> RPC[EdgeRpcService.onToEdgeSessionMsg]
+    RPC --> EX[edge-service single-thread executor]
+    EX --> FLAG[set new-events flag]
+    FLAG --> SCH[edge-event-check scheduler]
+```
+
+Actor 只负责集群内分派，不提供下行 ack、DB 事务或顺序保证。`AppActor`/`TenantActor` 的成功处理意味着消息已交给 Edge service，不意味着 Edge 收到数据。连接/断开还会独立写 active/last timestamp，并向 Rule Engine 推 `CONNECT_EVENT`/`DISCONNECT_EVENT`；这些旁路失败不会回滚 gRPC session。
+
+---
+
+## 九、Kafka 分析
+
+ThingsBoard 通过 TB Queue 抽象传递两类内部消息：实体变化的 `ToCoreMsg.edgeNotificationMsg` 携带 type/action/entity/body；事件入库后的 `ToCoreNotificationMsg.edgeEventUpdate` 只携带 tenant/edge id。默认生产部署通常以 Kafka 实现 TB Queue，但源码契约是 `TbQueueProducer`，不能把 Kafka 当作 `edge_event` 的持久主队列。
+
+[org.thingsboard.server.service.queue.DefaultTbClusterService.onEdgeEventUpdate(TenantId, EdgeId)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L639) 调用 service-specific notification topic；[org.thingsboard.server.service.queue.DefaultTbCoreConsumerService.handleNotification(UUID, TbProtoQueueMsg&lt;ToCoreNotificationMsg&gt;, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L503) 转给 App Actor 后就 ack notification。这里的 queue ack 与 gRPC `DownlinkResponseMsg` 是两个独立完成点。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFF7E6','primaryTextColor':'#111827','primaryBorderColor':'#92400E','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#DCFCE7'}}}%%
+flowchart TB
+    EN[EdgeNotification payload] --> CORE[ToCore main queue]
+    CORE --> PROC[BaseEdgeProcessor]
+    PROC --> DB[(edge_event)]
+    DB --> W[EdgeEventUpdate id-only]
+    W --> NF[all TB Core notification topics]
+    NF --> ACK[queue consumer ack]
+    NF --> GS[gRPC session node]
+    GS --> GACK[separate Edge ack]
+```
+
+通知 producer 在 `pushEdgeSyncMsgToCore` 传 `callback=null`，所以调用方不等待 Kafka/TB Queue broker ack。即使唤醒通知丢失，连接时 `sessionNewEvents=true` 与周期检查仍会扫描 DB；但 session 存在期间 flag 为 false 且通知持续丢失，会延迟到下一次有效唤醒，源码没有无条件全表轮询。
+
+---
+
+## 十、数据库分析
+
+### 10.1 写事务与业务事务隔离
+
+业务实体事务、`edge_event` JDBC batch、Edge 上行各业务 service、cursor attributes、Rule Engine/TB Queue 都没有共同事务。`EdgeEventSourcingListener` 的 after-commit 语义避免业务回滚后常规 save 通知，但 `fallbackExecution=true` 的无事务调用不具备这一保证；此外监听器自己捕获异常，只记录日志。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FEE2E2','primaryTextColor':'#111827','primaryBorderColor':'#991B1B','lineColor':'#111827','secondaryColor':'#DCFCE7','tertiaryColor':'#DBEAFE'}}}%%
+flowchart LR
+    BTX[(business TX)] -.after commit.-> ETX[(edge_event batch TX)]
+    ETX -.after future.-> NQ[TB Queue notification]
+    NQ -.delivery.-> GRPC[gRPC]
+    GRPC -.after pack.-> ATX[(attribute cursor write)]
+```
+
+### 10.2 TTL、分区与未消费事件
+
+默认 `edge_event` 分区 168 小时，TTL 2,628,000 秒，清理周期 1 天。 [org.thingsboard.server.service.ttl.EdgeEventsCleanUpService.cleanUp()](../../../application/src/main/java/org/thingsboard/server/service/ttl/EdgeEventsCleanUpService.java#L98) 只有 SYS tenant TB Core partition owner 执行整分区 drop；其他节点只清本地 partition cache。TTL 不检查每个 Edge 的 cursor，所以离线超过保留期的增量会被删除，重连只能依靠 snapshot/full sync 恢复当前态，历史 telemetry/动作不一定可重建。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FEE2E2','primaryTextColor':'#111827','primaryBorderColor':'#991B1B','lineColor':'#111827','secondaryColor':'#FFF7E6','tertiaryColor':'#DCFCE7'}}}%%
+flowchart TB
+    TTL[TTL scheduler daily] --> OWN{SYS Core partition owner?}
+    OWN -->|yes| DROP[drop whole expired partitions]
+    OWN -->|no| CACHE[cleanup local partition cache]
+    DROP --> GAP{cursor behind dropped data?}
+    GAP -->|yes| SNAP[request snapshot/full sync]
+```
+
+### 10.3 游标 attributes 与连接状态
+
+`queueStartTs`/`queueStartSeqId`、`active`、`lastConnectTime`、`lastDisconnectTime` 都与 Edge 实体关联，但用途不同。前两者始终由 AttributesService 持久化为 server scope；连接状态可按 `edges.state.persistToTelemetry` 选择 telemetry 或 attributes。routing key/secret 存在 `edge` 表，认证不读取 attributes cache。源码没有自动在 TTL 清理时修正 cursor。
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败矩阵
+
+| 失败点 | 调用方可见结果 | 自动重试 | 持久化/推进影响 |
+|---|---|---|---|
+| routing key/secret 错误 | `BAD_CREDENTIALS` 并关闭 stream | client 本类不重连 | 无 session |
+| Edge Event rate limit | 同步抛 `TbRateLimitsException` | 无 | 不入 SQL queue |
+| SQL batch 失败 | 该批 futures 全失败 | 无 DAO retry | 不发 wake-up |
+| TB Queue wake-up 丢失 | producer 无 callback | 依赖后续通知/重连 | DB 行仍在 |
+| downlink negative/no ack | pending 保留 | 最多 10 次 | 第10次后仍可推进游标 |
+| downlink 过大 | 通信失败通知 | 不重试该条 | 从 pending 删除并可推进 |
+| 单条转换异常 | 只记日志 | 无 | 页游标可越过该条 |
+| cursor attributes 保存失败 | page future 失败 | 下次 scheduler 再扫 | 旧游标导致重放 |
+| uplink rate limit | negative response | Cloud 不重试 | 由 Edge 端上层决定 |
+| uplink 任一 future 失败 | negative response + error stack 摘要 | Cloud 不重试 | 先成功的同包操作不回滚 |
+| stream 断开 | 清 session/scheduler，写 disconnect 旁路 | client 类仅回调 onError | 新 session 从属性游标恢复 |
+| TTL 删除未消费分区 | 查询不到历史行 | 无 | 增量永久缺口 |
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FEE2E2','primaryTextColor':'#111827','primaryBorderColor':'#991B1B','lineColor':'#111827','secondaryColor':'#FFF7E6','tertiaryColor':'#DCFCE7'}}}%%
+flowchart TB
+    F{failure domain} --> DB[SQL queue / partition]
+    F --> IQ[TB Queue notification]
+    F --> NET[gRPC stream / size]
+    F --> PROC[processor / partial writes]
+    F --> CUR[cursor attributes]
+    DB --> OBS[future + logs]
+    IQ --> OBS
+    NET --> NOTI[communication notification]
+    PROC --> UACK[negative uplink response]
+    CUR --> DUP[replay on next scan]
+```
+
+### 11.2 非原子上行批次
+
+`processUplinkMsg` 逐字段调用多个 processor，然后 `Futures.allAsList` 聚合。它没有包围所有操作的统一 transaction：设备保存可能已成功，后续 relation 或 resource future 再失败，Cloud 会返回整个 uplink false，但不会回滚先前操作。Edge 若按包重试，Cloud processor 会再次执行，结果依赖各实体服务的幂等/冲突实现。
+
+### 11.3 下行“丢弃后成功完成”边界
+
+第 10 次未确认、单条超过 client max size、转换异常三种路径都可能让 pack future 最终非异常完成。随后 [org.thingsboard.server.service.edge.rpc.EdgeGrpcSession.processEdgeEvents(EdgeEventFetcher, PageLink, SettableFuture&lt;Pair&lt;Long,Long&gt;&gt;)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L552) 以原始页末事件设置新游标。这是本实现最重要的可靠性边界，监控必须把 communication failure notification、重发次数、cursor 增长与 Edge 实际业务状态分开。
+
+### 11.4 断线、关闭与调度器
+
+服务销毁和 SQL queue 都使用 `shutdownNow`，没有显式 drain/await；session pending map 仅在内存。 [org.thingsboard.server.service.edge.rpc.EdgeGrpcService.destroy()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L238) 关闭 server 与三个 executor。进程重启后 DB 行和已提交 cursor 保留，未提交 cursor 的 in-flight page 重放；尚未写入 DB 的 SQL queue 元素可能丢失且 future 未完成。
+
+### 11.5 排障顺序
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#DBEAFE','primaryTextColor':'#111827','primaryBorderColor':'#1D4ED8','lineColor':'#111827','secondaryColor':'#FFF7E6','tertiaryColor':'#FEE2E2'}}}%%
+flowchart TB
+    A[Edge not synchronized] --> C{session accepted and active?}
+    C -->|no| AUTH[routing key/secret/TLS/size]
+    C -->|yes| ROW{edge_event row exists?}
+    ROW -->|no| FIL[listener/filter/offline/rate-limit/SQL]
+    ROW -->|yes| WAKE[TB Core notification + owner session]
+    WAKE --> ACK[pending ack/retry/discard]
+    ACK --> CUR[queueStartTs/seqId attributes]
+    CUR --> TTL[TTL gap or seq cycle]
+```
+
+---
+
+## 十二、源码阅读路线
+
+1. 从协议开始：[edge.proto](../../../common/edge-api/src/main/proto/edge.proto#L27)，先分清 Request/Response 外层和两个方向的 ack。
+2. 看 client transport：[org.thingsboard.edge.rpc.EdgeGrpcClient](../../../common/edge-api/src/main/java/org/thingsboard/edge/rpc/EdgeGrpcClient.java#L61)，确认它只提供 stream、锁与 callback，不声明持久重试。
+3. 看 server 生命周期：[org.thingsboard.server.service.edge.rpc.EdgeGrpcService](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L89)，跟踪 session map、通知 flag、scheduler 与 actor 入口。
+4. 精读会话状态机：[org.thingsboard.server.service.edge.rpc.EdgeGrpcSession](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L114)，重点是 `startSyncProcess`、`processEdgeEvents`、`scheduleDownlinkMsgsPackSend`、两个 response handler 和 cursor。
+5. 看事件产生：[org.thingsboard.server.service.edge.EdgeEventSourcingListener](../../../application/src/main/java/org/thingsboard/server/service/edge/EdgeEventSourcingListener.java#L74) 与 [org.thingsboard.server.service.edge.rpc.processor.BaseEdgeProcessor](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/processor/BaseEdgeProcessor.java#L140)。
+6. 看持久化：[org.thingsboard.server.dao.edge.BaseEdgeEventService](../../../dao/src/main/java/org/thingsboard/server/dao/edge/BaseEdgeEventService.java#L45)、[JpaBaseEdgeEventDao](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/JpaBaseEdgeEventDao.java#L69)、[EdgeEventInsertRepository](../../../dao/src/main/java/org/thingsboard/server/dao/sql/edge/EdgeEventInsertRepository.java#L44)。
+7. 看集群分派：[DefaultTbClusterService.onEdgeEventUpdate](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L639)、[DefaultTbCoreConsumerService.handleNotification](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L503)、`AppActor` 与 `TenantActor`。
+8. 看快照同步：[org.thingsboard.server.service.edge.rpc.EdgeSyncCursor](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeSyncCursor.java#L57) 与 `fetch` 包，比较 full/partial fetcher 集合。
+9. 选三类 processor 对比：Device 的冲突与回送、Telemetry 的 queue/Rule Engine、Alarm 的动作语义。
+10. 最后核对配置与 TTL：[thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L1256) 和 [EdgeEventsCleanUpService](../../../application/src/main/java/org/thingsboard/server/service/ttl/EdgeEventsCleanUpService.java#L45)。
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#EDE9FE','primaryTextColor':'#111827','primaryBorderColor':'#5B21B6','lineColor':'#111827','secondaryColor':'#DBEAFE','tertiaryColor':'#DCFCE7'}}}%%
+flowchart LR
+    P[proto/client] --> S[service/session]
+    S --> E[event sourcing/processors]
+    E --> D[DAO/SQL schema]
+    D --> Q[TB Queue/Actors]
+    Q --> F[fetchers/full sync]
+    F --> X[exceptions/TTL/config]
+```
+
+---
+
+## 十三、常见面试题
+
+### 1. Edge 同步为什么不能概括成“Cloud 通过 gRPC 推实体”？
+
+增量下行先写 PostgreSQL `edge_event`，再用 TB Queue 轻量通知唤醒 session，最后才走 gRPC；上行则直接由 processor 写业务服务。两向持久化和完成点完全不同。
+
+### 2. `routing_key`、`EdgeId` 和 TB Queue message key 分别是什么？
+
+`routing_key` 是全局唯一连接查找键；认证后得到的 `EdgeId` 是 session map key；内部 Edge 同步通知又以 `EdgeId UUID` 作为 TB Queue key。routing key 不参与 Kafka 分区调用代码。
+
+### 3. gRPC session 如何防止旧连接断开误删新连接？
+
+新连接覆盖 `sessions[edgeId]`；断开 callback 携带 session UUID，`onEdgeDisconnect` 只有在当前映射 session id 相等时才 remove。
+
+### 4. Cloud 到 Edge 增量事件在何时产生？
+
+常规实体 save/delete 由 `@TransactionalEventListener` 在提交后产生通知；processor 过滤目标 Edge 后异步写 `edge_event`，SQL future 成功才发 wake-up。
+
+### 5. `saveAsync` 是否意味着生产路径完全非阻塞？
+
+不是。rate limit、validator、time UUID、partition create 均在入 SQL queue 前执行；分区不存在时可能同步 DDL。
+
+### 6. Edge Event SQL queue 是否有 1000 条容量限制？
+
+没有。底层是无界 `LinkedBlockingQueue`；1000 是一次 drain 的 batch 上限，最大等待默认 100 ms。
+
+### 7. `edge_event` 的顺序保证是什么？
+
+单 SQL queue 批内按 `ts` 排序并在一事务插入，DB 分配 cycling `seq_id`；读取追加按 `seqId` 排序。它不提供跨业务事务或双向消息的全局因果顺序。
+
+### 8. 为什么游标需要 `createdTime` 和 `seqId` 两个值？
+
+`seq_id` 是可回绕 int identity；时间窗口将新周期与历史低 seq 数据分开，算法在高区间为空时才探测低 seq 新周期。
+
+### 9. Downlink ack 成功后会删除 `edge_event` 吗？
+
+不会。Cloud 只从 session pending map 删除消息，并在整页结束后更新 Edge 的 server-scope cursor；行由 TTL 分区清理。
+
+### 10. Downlink 是 exactly-once 吗？
+
+不是。cursor 保存前崩溃会重放；message id 也不是持久幂等键；而达到 10 次失败、消息过大或转换失败时又可能跳过并推进 cursor。
+
+### 11. negative `DownlinkResponseMsg` 会怎样？
+
+该 id 不从 pending map 删除，后续调度会重发；最多 10 次，之后整批剩余 pending 被丢弃并发通信失败通知。
+
+### 12. Uplink success ack 的完成点是什么？
+
+Cloud 对该 `UplinkMsg` 收集到的 processor futures 全部成功。它不只是网络接收确认，但也不是跨所有 processor 的原子数据库提交。
+
+### 13. 一个 Uplink 包中前半成功、后半失败会回滚吗？
+
+不会。各 processor/服务独立提交，最终 response 为 false；Edge 若重试整个包，已经成功的操作会重复执行。
+
+### 14. Cloud 和 Edge 同时修改同一实体时如何解决冲突？
+
+没有统一版本向量或 CRDT。processor 通常按 incoming UUID create/update；同名不同 UUID 对若干实体采用随机后缀，并把修正后的实体回送，其他类型按各自服务语义处理。
+
+### 15. `originatorEdgeId` 解决了什么问题？
+
+它让 Cloud fan-out 排除产生该变化的 Edge，避免立即回环。来源通过 `ThreadLocal<EdgeId>` 从上行 processor 传到事务事件监听器，不是全局去重机制。
+
+### 16. 离线 Edge 的所有增量都会积压吗？
+
+不会。processor 根据 active 属性与白名单决定；关键 alarm、timeseries、credentials request、全局配置等可保存，普通关联实体 update 可能跳过，之后依赖快照同步当前态。
+
+### 17. Full sync 与普通增量读取相同数据源吗？
+
+不同。full/partial sync 的 fetcher 直接分页扫描当前业务实体并构造临时 `EdgeEvent`；普通增量读取持久 `edge_event`。
+
+### 18. Full sync 是否包含所有实体类型？
+
+不是无条件全库复制。fetcher 集合固定，关联实体按 Edge relation 查询；full=true 才加入 tenant/global 配置、用户、客户、widgets、OTA、resource 等，且 SYS_ADMIN 与非 EDGE Rule Chain 等仍被语义过滤。
+
+### 19. Kafka 中保存完整 Edge Event 吗？
+
+实体通知可携带 type/action/body，但落库后的 wake-up 只带 tenant/edge id；权威增量队列是 PostgreSQL `edge_event`。实现通过 TB Queue 抽象，Kafka 不是源码层强绑定。
+
+### 20. TB Queue ack 与 Edge ack 有什么区别？
+
+Core notification consumer ack 表示已转给 App Actor；`DownlinkResponseMsg` 表示 Edge 对具体 downlink id 的处理结果。前者成功不能证明网络或 Edge 业务成功。
+
+### 21. routing key 查询会使用 Redis/Caffeine Edge cache 吗？
+
+不会。cache 服务于 tenant+name 查询；`findEdgeByRoutingKey` 直接走 repository。session/pending/cursor flag 也不是 Redis cache，只有 cursor attributes 可持久恢复。
+
+### 22. TTL 对长期离线 Edge 有什么风险？
+
+TTL 按整分区删除且不看每个 Edge cursor。离线超过默认约一月后，未消费增量可能永久消失；快照只能恢复当前实体态，不能保证重建历史 telemetry 和瞬时动作。
+
+### 23. 单条 Edge Event 转换失败会阻塞后续消息吗？
+
+不会。异常被记录后该条从 downlink pack 省略，但页游标仍按原始页末行推进，所以它可能被永久跳过。
+
+### 24. Actor 在 Edge 同步中负责可靠投递吗？
+
+不负责。Actor 将轻量 session 消息高优先级转给 Edge service，后者再进入独立 executor/scheduler；SQL、gRPC retry、ack 和 cursor 都在 Actor 边界之外。
+
+### 25. 排查“Cloud 有变更但 Edge 未更新”的最短证据链是什么？
+
+依次检查 listener/filter 与 originator、目标关系和 active/offline 策略、`edge_event` 行及 SQL future、TB Core wake-up、session/pending 重试、negative/oversize/转换日志、cursor attributes，最后检查 TTL 是否已删除 cursor 之后的历史分区。
+
+---
+
+[上一篇：38 Notification 流程](../38-notification-flow/) | [PlantUML 源文件](sequence.puml) | [架构图 SVG](../../assets/architecture/39-edge-sync.svg) | [下一篇：40 Service Lifecycle](../40-service-lifecycle/)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

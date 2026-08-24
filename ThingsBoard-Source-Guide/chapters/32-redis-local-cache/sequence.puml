@@ -1,0 +1,198 @@
+@startuml
+title ThingsBoard 3.6 Redis 与本地缓存完整时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+  ArrowColor #1F2937
+  ActorBorderColor #111827
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+  LifeLineBorderColor #334155
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1F2937
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantFontColor #111827
+  BoxBorderColor #334155
+  BoxBackgroundColor #F8FAFC
+  GroupBorderColor #374151
+  GroupBackgroundColor #F9FAFB
+  GroupHeaderFontColor #111827
+  DividerBorderColor #334155
+  DividerBackgroundColor #E5E7EB
+  DividerFontColor #111827
+  NoteBorderColor #92400E
+  NoteBackgroundColor #FFF7E6
+  NoteFontColor #111827
+}
+
+autonumber
+
+actor "Service caller" as Caller
+participant "DeviceServiceImpl" as Device
+participant "TbTransactionalCache" as CacheApi
+participant "CaffeineTbTransactionalCache" as Caffeine
+participant "RedisTbTransactionalCache" as RedisCache
+database "Shared Redis" as Redis
+database "PostgreSQL" as DB
+participant "Spring transaction events" as Events
+
+== 通用 Cache-Aside 与负缓存 ==
+Caller -> Device : findDeviceById(tenantId, deviceId)
+Device -> CacheApi : getAndPutInTransaction(key, daoCall, true)
+CacheApi -> CacheApi : get(key)
+alt wrapper exists
+  alt wrapper contains entity
+    CacheApi --> Device : cached entity
+  else wrapper contains null
+    CacheApi --> Device : negative-cache hit: null
+  end
+else wrapper is absent
+  CacheApi -> CacheApi : newTransactionForKey(key)
+  CacheApi -> DB : DeviceDao.findById(...)
+  DB --> CacheApi : entity or null
+  CacheApi -> CacheApi : transaction.putIfAbsent(key, value)
+  CacheApi -> CacheApi : transaction.commit()
+  note over CacheApi
+    commit false only skips cache fill.
+    The caller still receives this DB result.
+  end note
+  CacheApi --> Device : DB result
+end
+Device --> Caller : Device or null
+
+== Caffeine：允许重复查库，CAS 防旧值回填 ==
+participant "Concurrent reader" as Reader
+participant "Concurrent writer" as Writer
+Reader -> Caffeine : get(key)
+Caffeine --> Reader : miss
+Reader -> Caffeine : newTransactionForKey(key)
+note over Caffeine
+  key-to-transaction and transaction maps,
+  locks and entries all live in this JVM.
+end note
+Reader -> DB : SELECT old row
+Writer -> DB : UPDATE row
+DB --> Writer : update executed
+Writer -> Caffeine : evict(key)
+Caffeine -> Caffeine : failAllTransactionsByKey(key)
+Caffeine -> Caffeine : invalidate local entry
+DB --> Reader : old value from earlier snapshot
+Reader -> Caffeine : transaction.putIfAbsent(old value)
+Reader -> Caffeine : commit()
+Caffeine --> Reader : false, old value is not cached
+note over Reader,Caffeine
+  This is not single-flight: multiple misses may run SELECT.
+  The transaction protects cache fill, not the DB read.
+end note
+
+== Redis：WATCH / MULTI / EXEC 跨节点 CAS ==
+Reader -> RedisCache : get(rawKey)
+RedisCache -> Redis : GET rawKey
+Redis --> RedisCache : nil
+RedisCache --> Reader : miss
+Reader -> RedisCache : newTransactionForKey(rawKey)
+RedisCache -> Redis : WATCH rawKey
+RedisCache -> Redis : MULTI
+Reader -> DB : SELECT old row
+Writer -> DB : UPDATE row
+DB --> Writer : update executed
+Writer -> RedisCache : evict(rawKey)
+RedisCache -> Redis : DEL rawKey
+Redis --> RedisCache : deleted count
+DB --> Reader : old value
+Reader -> RedisCache : putIfAbsent(rawKey, old value)
+RedisCache -> Redis : queue SET rawKey value PX cacheTtl
+Reader -> RedisCache : commit()
+RedisCache -> Redis : EXEC
+alt watched key changed
+  Redis --> RedisCache : null result
+  RedisCache --> Reader : false, skip stale fill
+else watched key did not change
+  Redis --> RedisCache : command results
+  RedisCache --> Reader : true
+end
+note over RedisCache,Redis
+  All ThingsBoard nodes access the same Redis keyspace.
+  DAO cache invalidation does not use Redis Pub/Sub.
+end note
+
+== Device 保存：数据库提交后失效 ==
+Caller -> Device : saveDeviceWithoutCredentials(device, doValidate)
+Device -> DB : find old value and saveAndFlush(device)
+DB --> Device : saved entity
+Device -> Events : publishEvictEvent(DeviceCacheEvictEvent)
+alt a Spring transaction is active
+  Events --> Device : defer listener until AFTER_COMMIT
+  alt transaction commits
+    DB --> Device : COMMIT
+    Events -> Device : handleEvictEvent(event)
+    Device -> CacheApi : evict new-name, old-name and id keys
+  else transaction rolls back
+    DB --> Device : ROLLBACK
+    Events --> CacheApi : no AFTER_COMMIT callback
+  end
+else no Spring transaction is active
+  Events -> Device : handleEvictEvent(event) immediately
+  Device -> CacheApi : evict affected keys
+end
+note over DB,CacheApi
+  DB commit and cache eviction are not atomic.
+  Readers may observe stale cache before commit and
+  during the commit-to-evict interval.
+end note
+
+== Attributes 保存：Redis absent-key 防旧回填 ==
+participant "CachedAttributesService" as Attributes
+participant "JpaExecutorService" as JpaExecutor
+participant "CacheExecutorService" as CacheExecutor
+Caller -> Attributes : save(tenantId, entityId, scope, kvList)
+Attributes -> JpaExecutor : submit DAO save task
+JpaExecutor -> DB : UPSERT attribute_kv
+DB --> JpaExecutor : Future success
+JpaExecutor -> Attributes : success callback
+alt Caffeine cache
+  Attributes -> Caffeine : evictOrPut(key, newValue)
+  Caffeine -> Caffeine : evict and fail local loads
+else Redis cache
+  Attributes -> CacheExecutor : submit cache callback
+  CacheExecutor -> RedisCache : evictOrPut(key, newValue)
+  RedisCache -> Redis : DEL rawKey
+  alt DEL returns 1
+    Redis --> RedisCache : existing value removed
+  else DEL returns 0 because key is absent
+    Redis --> RedisCache : no key removed
+    RedisCache -> Redis : SET rawKey newValue PX evictTtlInMs
+    note over RedisCache,Redis
+      The short-lived value changes an absent watched key,
+      aborting a concurrent stale EXEC.
+    end note
+  end
+end
+Attributes --> Caller : ListenableFuture result
+
+== 故障边界 ==
+alt Redis GET or serialization fails
+  Redis --> RedisCache : runtime exception
+  RedisCache --> Caller : exception propagates; no DB fallback
+else DB read fails after cache miss
+  DB --> CacheApi : exception
+  CacheApi -> CacheApi : rollback cache transaction
+  CacheApi --> Caller : rethrow
+else DB commit succeeds but cache eviction fails
+  DB --> Device : committed data
+  CacheApi --> Device : cache exception
+  note over DB,CacheApi
+    PostgreSQL cannot be rolled back now.
+    A stale key may remain until TTL or later eviction.
+  end note
+else process restarts in Caffeine mode
+  Caffeine -> Caffeine : all local entries and load transactions disappear
+else process restarts in Redis mode
+  RedisCache -> Redis : entries survive according to Redis and key TTL
+end
+
+@enduml

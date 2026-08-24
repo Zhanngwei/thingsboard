@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1280" viewBox="0 0 1800 1280" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard release-3.6 failure recovery and observability</title>
+  <desc id="desc">Architecture diagram separating durable queue state, volatile Rule Engine and Actor state, transport session recovery, database futures, and observability blind spots.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#111827"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#B91C1C"/>
+    </marker>
+    <style>
+      .bg{fill:#FFFFFF}.band{fill:#F8FAFC;stroke:#CBD5E1;stroke-width:2}.durable{fill:#083B66;stroke:#001F33;stroke-width:3}.process{fill:#166534;stroke:#052E16;stroke-width:3}.warn{fill:#FFF7ED;stroke:#9A3412;stroke-width:3}.risk{fill:#FEF2F2;stroke:#B91C1C;stroke-width:3}.signal{fill:#E0F2FE;stroke:#075985;stroke-width:3}.ghost{fill:#FFFFFF;stroke:#64748B;stroke-width:2;stroke-dasharray:8 7}
+      .title{font:700 30px Arial,sans-serif;fill:#111827}.section{font:700 22px Arial,sans-serif;fill:#111827}.label{font:700 18px Arial,sans-serif;fill:#FFFFFF}.dark{font:700 18px Arial,sans-serif;fill:#111827}.small{font:15px Arial,sans-serif;fill:#111827}.white{font:15px Arial,sans-serif;fill:#FFFFFF}.tiny{font:13px Arial,sans-serif;fill:#334155}.risktext{font:700 15px Arial,sans-serif;fill:#991B1B}.line{stroke:#111827;stroke-width:3;fill:none;marker-end:url(#arrow)}.dash{stroke:#111827;stroke-width:2.5;fill:none;stroke-dasharray:9 7;marker-end:url(#arrow)}.redline{stroke:#B91C1C;stroke-width:3;fill:none;stroke-dasharray:9 7;marker-end:url(#arrow-red)}
+    </style>
+  </defs>
+
+  <rect class="bg" width="1800" height="1280"/>
+  <text x="900" y="48" text-anchor="middle" class="title">ThingsBoard release-3.6 · Failure Recovery and Observability</text>
+  <text x="900" y="78" text-anchor="middle" class="tiny">Completion boundaries are separate: side effect · TbMsg callback · consumer commit · remote provider acknowledgement</text>
+
+  <rect x="40" y="105" width="1720" height="325" rx="6" class="band"/>
+  <text x="65" y="139" class="section">1. Queue and Rule Engine: durable input around volatile processing</text>
+
+  <rect x="75" y="175" width="245" height="135" rx="5" class="durable"/>
+  <text x="197" y="211" text-anchor="middle" class="label">Queue Provider</text>
+  <text x="100" y="245" class="white">Kafka: poll + commitSync</text>
+  <text x="100" y="273" class="white">Cloud/Rabbit: provider ack</text>
+  <text x="100" y="298" class="white">In-memory: not durable</text>
+
+  <rect x="395" y="175" width="245" height="135" rx="5" class="process"/>
+  <text x="517" y="211" text-anchor="middle" class="label">Consumer Pack</text>
+  <text x="420" y="245" class="white">pending / success / failed</text>
+  <text x="420" y="273" class="white">await timeout</text>
+  <text x="420" y="298" class="white">JVM-only retry count</text>
+
+  <rect x="715" y="175" width="245" height="135" rx="5" class="process"/>
+  <text x="837" y="211" text-anchor="middle" class="label">Actor Tree</text>
+  <text x="740" y="245" class="white">Tenant → Chain → Node</text>
+  <text x="740" y="273" class="white">mailbox is volatile</text>
+  <text x="740" y="298" class="white">callback marks pack</text>
+
+  <rect x="1035" y="175" width="245" height="135" rx="5" class="durable"/>
+  <text x="1157" y="211" text-anchor="middle" class="label">Business Effect</text>
+  <text x="1060" y="245" class="white">DB transaction / HTTP</text>
+  <text x="1060" y="273" class="white">RPC / notification</text>
+  <text x="1060" y="298" class="white">target-specific idempotency</text>
+
+  <rect x="1355" y="175" width="360" height="135" rx="5" class="warn"/>
+  <text x="1535" y="211" text-anchor="middle" class="dark">Processing Decision</text>
+  <text x="1380" y="245" class="small">retry: same pack, resubmit Actor</text>
+  <text x="1380" y="273" class="small">skip/limit: commit without app DLQ</text>
+  <text x="1380" y="298" class="small">provider commit completion differs</text>
+
+  <path d="M320 242 H395" class="line"/><path d="M640 242 H715" class="line"/><path d="M960 242 H1035" class="line"/><path d="M1280 242 H1355" class="line"/>
+  <path d="M1535 310 V365 H520 V310" class="dash"/>
+  <text x="1010" y="357" text-anchor="middle" class="tiny">reprocess selected pending/failed/success records in current JVM</text>
+  <path d="M1535 310 V398 H198 V310" class="line"/>
+  <text x="860" y="421" text-anchor="middle" class="tiny">final decision → provider commit; no transaction with the business effect</text>
+
+  <rect x="40" y="455" width="840" height="350" rx="6" class="band"/>
+  <text x="65" y="489" class="section">2. Actor and Transport restart boundaries</text>
+
+  <rect x="75" y="525" width="230" height="115" rx="5" class="warn"/>
+  <text x="190" y="558" text-anchor="middle" class="dark">Actor Init Failure</text>
+  <text x="95" y="590" class="small">retryWithDelay(5000 × attempt)</text>
+  <text x="95" y="617" class="small">max attempts → INIT_FAILED</text>
+
+  <rect x="355" y="525" width="230" height="115" rx="5" class="process"/>
+  <text x="470" y="558" text-anchor="middle" class="label">Process Failure</text>
+  <text x="375" y="590" class="white">Exception → resume next msg</text>
+  <text x="375" y="617" class="white">Error → stop, not replay</text>
+
+  <rect x="635" y="525" width="205" height="115" rx="5" class="risk"/>
+  <text x="737" y="558" text-anchor="middle" class="dark">Poison Gap</text>
+  <text x="655" y="590" class="risktext">no mailbox journal</text>
+  <text x="655" y="617" class="risktext">no common DLQ</text>
+
+  <rect x="75" y="675" width="230" height="95" rx="5" class="process"/>
+  <text x="190" y="708" text-anchor="middle" class="label">Transport JVM</text>
+  <text x="95" y="738" class="white">socket + SessionMsgListener</text>
+  <text x="95" y="760" class="white">lost on process death</text>
+
+  <rect x="355" y="675" width="230" height="95" rx="5" class="durable"/>
+  <text x="470" y="708" text-anchor="middle" class="label">Shared Session Cache</text>
+  <text x="375" y="738" class="white">ASYNC metadata only</text>
+  <text x="375" y="760" class="white">no socket / SYNC session</text>
+
+  <rect x="635" y="675" width="205" height="95" rx="5" class="warn"/>
+  <text x="737" y="708" text-anchor="middle" class="dark">Real Recovery</text>
+  <text x="655" y="738" class="small">client reconnect</text>
+  <text x="655" y="760" class="small">OPEN + resubscribe</text>
+
+  <path d="M305 582 H355" class="line"/><path d="M585 582 H635" class="redline"/>
+  <path d="M305 722 H355" class="line"/><path d="M585 722 H635" class="dash"/>
+
+  <rect x="920" y="455" width="840" height="350" rx="6" class="band"/>
+  <text x="945" y="489" class="section">3. Database futures and crash windows</text>
+
+  <rect x="955" y="525" width="220" height="110" rx="5" class="process"/>
+  <text x="1065" y="558" text-anchor="middle" class="label">SQL JVM Queue</text>
+  <text x="975" y="590" class="white">add → pending future</text>
+  <text x="975" y="617" class="white">poll/drain batch</text>
+
+  <rect x="1230" y="525" width="220" height="110" rx="5" class="durable"/>
+  <text x="1340" y="558" text-anchor="middle" class="label">Repository TX</text>
+  <text x="1250" y="590" class="white">commit then return</text>
+  <text x="1250" y="617" class="white">table-specific upsert</text>
+
+  <rect x="1505" y="525" width="220" height="110" rx="5" class="warn"/>
+  <text x="1615" y="558" text-anchor="middle" class="dark">Future Completion</text>
+  <text x="1525" y="590" class="small">success after save returns</text>
+  <text x="1525" y="617" class="small">failure: no auto requeue</text>
+
+  <path d="M1175 580 H1230" class="line"/><path d="M1450 580 H1505" class="line"/>
+
+  <rect x="955" y="675" width="365" height="90" rx="5" class="risk"/>
+  <text x="1137" y="708" text-anchor="middle" class="dark">Crash Before DB Save</text>
+  <text x="980" y="738" class="risktext">queued element and future disappear from JVM</text>
+
+  <rect x="1360" y="675" width="365" height="90" rx="5" class="risk"/>
+  <text x="1542" y="708" text-anchor="middle" class="dark">Crash After DB Commit</text>
+  <text x="1385" y="738" class="risktext">offset/future may be incomplete → replay duplicate</text>
+
+  <rect x="40" y="830" width="1720" height="405" rx="6" class="band"/>
+  <text x="65" y="864" class="section">4. Observable signals and the gaps between them</text>
+
+  <rect x="75" y="910" width="245" height="120" rx="5" class="signal"/>
+  <text x="197" y="945" text-anchor="middle" class="dark">Micrometer / Prometheus</text>
+  <text x="95" y="978" class="small">counter · timer · gauge</text>
+  <text x="95" y="1005" class="small">endpoint exposure is separate</text>
+
+  <rect x="365" y="910" width="245" height="120" rx="5" class="signal"/>
+  <text x="487" y="945" text-anchor="middle" class="dark">Periodic Logs</text>
+  <text x="385" y="978" class="small">RE tmp/final counters</text>
+  <text x="385" y="1005" class="small">SQL queue window + reset</text>
+
+  <rect x="655" y="910" width="245" height="120" rx="5" class="signal"/>
+  <text x="777" y="945" text-anchor="middle" class="dark">Kafka Lag Log</text>
+  <text x="675" y="978" class="small">end − committed offset</text>
+  <text x="675" y="1005" class="small">cannot see committed skips</text>
+
+  <rect x="945" y="910" width="245" height="120" rx="5" class="signal"/>
+  <text x="1067" y="945" text-anchor="middle" class="dark">JMX</text>
+  <text x="965" y="978" class="small">Hikari / Cassandra scopes</text>
+  <text x="965" y="1005" class="small">independent, default off</text>
+
+  <rect x="1235" y="910" width="245" height="120" rx="5" class="signal"/>
+  <text x="1357" y="945" text-anchor="middle" class="dark">Debug Event</text>
+  <text x="1255" y="978" class="small">debugMode · rate limit · TTL</text>
+  <text x="1255" y="1005" class="small">fallible async side channel</text>
+
+  <rect x="1525" y="910" width="200" height="120" rx="5" class="signal"/>
+  <text x="1625" y="945" text-anchor="middle" class="dark">Audit Log</text>
+  <text x="1545" y="978" class="small">mask + independent TX</text>
+  <text x="1545" y="1005" class="small">not queue receipt</text>
+
+  <rect x="160" y="1080" width="1480" height="115" rx="5" class="risk"/>
+  <text x="900" y="1118" text-anchor="middle" class="dark">Blind Spots Requiring Explicit Production Controls</text>
+  <text x="900" y="1152" text-anchor="middle" class="risktext">No unified application DLQ · no durable per-message attempt ledger · no end-to-end trace</text>
+  <text x="900" y="1179" text-anchor="middle" class="risktext">No common Actor mailbox gauge · no SQL oldest-age metric · no unified async provider-ack failure metric</text>
+
+  <path d="M197 1030 V1080" class="redline"/><path d="M487 1030 V1080" class="redline"/><path d="M777 1030 V1080" class="redline"/>
+  <path d="M1067 1030 V1080" class="redline"/><path d="M1357 1030 V1080" class="redline"/><path d="M1625 1030 V1080" class="redline"/>
+
+  <text x="900" y="1260" text-anchor="middle" class="tiny">Operational rule: correlate provider offset/delivery, final Rule Engine decision, last Rule Node, target idempotency key, and target receipt. No single signal proves recovery.</text>
+</svg>

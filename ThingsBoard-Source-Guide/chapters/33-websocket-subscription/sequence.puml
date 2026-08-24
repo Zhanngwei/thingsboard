@@ -1,0 +1,212 @@
+@startuml
+title ThingsBoard 3.6 WebSocket 订阅完整时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+  ArrowColor #1F2937
+  ActorBorderColor #111827
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+  LifeLineBorderColor #334155
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1F2937
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantFontColor #111827
+  BoxBorderColor #334155
+  BoxBackgroundColor #F8FAFC
+  GroupBorderColor #374151
+  GroupBackgroundColor #F9FAFB
+  GroupHeaderFontColor #111827
+  DividerBorderColor #334155
+  DividerBackgroundColor #E5E7EB
+  DividerFontColor #111827
+  NoteBorderColor #92400E
+  NoteBackgroundColor #FFF7E6
+  NoteFontColor #111827
+}
+
+autonumber
+
+actor "Browser / Dashboard" as Browser
+participant "Spring Security + WS config" as Config
+participant "TbWebSocketHandler" as Handler
+participant "JwtAuthenticationProvider" as Jwt
+participant "DefaultWebSocketService" as WsService
+participant "EntityDataSubscriptionService" as EntitySub
+participant "Entity / TS / Attribute / Alarm services" as QueryServices
+database "PostgreSQL / Timescale / Cassandra" as DB
+participant "DefaultTbLocalSubscriptionService" as LocalSub
+participant "PartitionService" as Partition
+participant "DefaultSubscriptionManagerService" as Manager
+queue "Core / notification queue" as Queue
+participant "DefaultTbCoreConsumerService" as Consumer
+participant "Remote LocalSubscriptionService" as RemoteLocal
+participant "Remote TbWebSocketHandler" as RemoteHandler
+
+== Upgrade 与 handler 内鉴权 ==
+Browser -> Config : HTTP Upgrade /api/ws[/...]
+note over Config
+  The security filter skips and permits this path.
+  Authentication is not complete at HTTP Upgrade.
+end note
+Config -> Handler : afterConnectionEstablished(internalSession)
+alt URL query contains token
+  Handler -> Jwt : authenticate(token)
+  Jwt --> Handler : SecurityUser or exception
+  Handler -> Handler : random external sessionId
+  Handler -> WsService : ESTABLISHED(sessionRef)
+else URL has no token
+  Handler -> Handler : put internal session in pending Caffeine cache
+  alt authCmd arrives before auth timeout
+    Browser -> Handler : first JSON frame with authCmd.token
+    Handler -> Jwt : authenticate(token)
+    Jwt --> Handler : SecurityUser
+    Handler -> Handler : remove pending, establish external session
+    Handler -> WsService : ESTABLISHED(sessionRef)
+  else entry is later observed expired after default 10-second policy
+    Handler -> Browser : close POLICY_VIOLATION
+  end
+end
+
+== 命令解析与 v2 Entity Data 初始结果 ==
+Browser -> Handler : WsCommandsWrapper JSON
+Handler -> Handler : enqueue inbound text and parse serially
+Handler -> WsService : handleCommands(sessionRef, wrapper)
+WsService -> WsService : dispatch by WsCmdType
+WsService -> EntitySub : handleCmd(sessionRef, EntityDataCmd)
+EntitySub -> QueryServices : find entity page
+QueryServices -> DB : dynamic EntityDataQuery SQL
+DB --> QueryServices : PageData<EntityData>
+QueryServices --> EntitySub : entity page
+par optional historyCmd with subscribe=false
+  EntitySub -> QueryServices : findAllByQueries(history)
+  QueryServices -> DB : history query
+  DB --> QueryServices : time series points
+else optional aggHistoryCmd
+  EntitySub -> QueryServices : aggregate history query
+  QueryServices -> DB : aggregate SQL/CQL query
+  DB --> QueryServices : aggregate points
+else optional aggTsCmd with subscribe=true
+  EntitySub -> QueryServices : aggregate initial query and subscription setup
+  QueryServices -> DB : aggregate initial query
+  DB --> QueryServices : aggregate points
+end
+EntitySub -> EntitySub : wait for preliminary command futures
+opt optional latestCmd / regular tsCmd
+  EntitySub -> QueryServices : handleRegularCommands after preliminary futures
+  QueryServices -> DB : latest or range initial query
+  DB --> QueryServices : latest / range points
+end
+par initial response after command setup returns
+  EntitySub -> WsService : initial EntityDataUpdate
+  WsService -> Handler : endpoint.send(sessionRef, cmdId, JSON)
+  Handler -> Browser : RemoteEndpoint.Async send
+else subscription registration and compensation
+  opt EntityDataCmd contains latestCmd, tsCmd or aggTsCmd
+    EntitySub -> LocalSub : addSubscription(each entity/key set)
+    LocalSub -> Partition : resolve(TB_CORE, tenantId, entityId)
+    alt aggregate subscription changed and manager owner is local
+      LocalSub -> Manager : onSubEvent(serviceId, event)
+      Manager --> LocalSub : callback(seqNumber, latest update timestamps)
+    else aggregate changed and manager owner is remote
+      LocalSub -> Queue : push ToCore event with null producer callback
+      Queue -> Consumer : poll owner Core message
+      Consumer -> Manager : onSubEvent(serviceId, event)
+      Manager --> LocalSub : callback over target Core notification
+    else aggregate subscription did not change
+      LocalSub -> LocalSub : checkMissedUpdates directly
+    end
+    LocalSub -> QueryServices : bounded checkMissedUpdates if needed
+    QueryServices -> DB : latest or [lastTs + 1, now], per-key limit 1000
+    DB --> QueryServices : missed values within limits
+    QueryServices --> LocalSub : compensation data
+    LocalSub -> EntitySub : updateProcessor
+  end
+end
+
+== 持久化成功后的实时遥测更新 ==
+actor "Rule Engine save node" as RuleNode
+RuleNode -> QueryServices : saveAndNotify(tenantId, entityId, entries)
+QueryServices -> DB : save history and latest
+DB --> QueryServices : persistence futures succeed
+QueryServices -> Partition : resolve entity Core owner
+alt owner local
+  QueryServices -> Manager : onTimeSeriesUpdate(...)
+else owner remote
+  QueryServices -> Queue : push ToCore subscription update
+  Queue -> Consumer : poll owner message
+  Consumer -> Manager : onTimeSeriesUpdate(...)
+end
+Manager -> Manager : filter target services and subscribed keys
+alt WebSocket session is on owner service
+  Manager -> LocalSub : onTimeSeriesUpdate(...)
+  LocalSub -> LocalSub : filter subscriptions and invoke updateProcessor
+  LocalSub -> WsService : DataUpdate / TelemetrySubscriptionUpdate
+  WsService -> Handler : send(sessionRef, update)
+  Handler -> Browser : async serialized frame
+else WebSocket session is on another Core service
+  Manager -> Queue : target Core notification topic
+  Queue -> Consumer : remote service polls notification
+  Consumer -> RemoteLocal : forwardToLocalSubMgrService(...)
+  RemoteLocal -> RemoteLocal : filter local subscriptions
+  RemoteLocal -> WsService : updateProcessor
+  WsService -> RemoteHandler : send(sessionRef, update)
+  RemoteHandler -> Browser : async serialized frame
+end
+note over RuleNode,Manager
+  Actor and Rule Engine may produce data changes.
+  They are not part of the WebSocket command path.
+end note
+
+== 出站背压、限流与关闭 ==
+alt non-atomic outbound size counter fails default 1000 threshold check
+  Handler -> Browser : close session
+else subscription update rate exceeds local bucket
+  Handler -> Browser : first TOO_MANY_UPDATES error
+  Handler -> Handler : blacklist external sessionId and drop later updates
+else RemoteEndpoint send exceeds timeout or fails
+  Handler -> Handler : async SendHandler failure
+  Handler -> Browser : close connection
+end
+alt actual CLOSED event with resolvable SessionMetaData
+  Handler -> Handler : remove internal/external maps and cleanupLimits
+  Handler -> WsService : CLOSED
+  WsService -> LocalSub : cancel all v1 subscriptions by session
+  WsService -> EntitySub : cancel all v2 contexts by session
+  LocalSub -> Partition : remove subscription event
+else transport ERROR without close
+  Handler -> WsService : ERROR
+  WsService -> WsService : log only, subscriptions remain
+else pending expiry or partial limit registration
+  note over Handler
+    Entry/map removal order may leave externalSessionMap
+    or previously-added limit set entries behind.
+  end note
+end
+
+== 故障与恢复边界 ==
+alt invalid JSON before authentication
+  Handler -> Browser : close connection
+else invalid JSON after authentication
+  Handler -> Browser : BAD_REQUEST update
+else v2 command throws RuntimeException
+  EntitySub -> Browser : close with SERVICE_RESTARTED
+else missed-update query fails
+  QueryServices --> LocalSub : failure
+  LocalSub -> LocalSub : log only; no durable replay record
+else socket-owning WebSocket service process restarts
+  Handler -> Handler : sessions and local subscriptions disappear
+  note over Browser,Manager
+    Browser reconnects, authenticates, repeats initial query and subscription.
+    There is no durable WebSocket offset or session migration.
+  end note
+else remote Subscription Manager owner restarts
+  LocalSub -> Queue : re-push in-memory subscriptions after topology/startup event
+  Queue -> Manager : rebuild owner interest state
+end
+
+@enduml

@@ -1,0 +1,207 @@
+@startuml
+title ThingsBoard 3.6 Notification 完整流程
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+  ArrowColor #1F2937
+  ActorBorderColor #111827
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+  LifeLineBorderColor #334155
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1F2937
+  ParticipantBackgroundColor #E8F4FD
+  ParticipantFontColor #111827
+  DatabaseBorderColor #166534
+  DatabaseBackgroundColor #DCFCE7
+  QueueBorderColor #92400E
+  QueueBackgroundColor #FEF3C7
+  NoteBorderColor #92400E
+  NoteBackgroundColor #FFF7E6
+  NoteFontColor #111827
+}
+
+autonumber
+actor "Tenant/SYS administrator" as Admin
+participant "NotificationController" as Controller
+participant "DefaultNotificationRuleProcessor" as RuleProcessor
+participant "TbNotificationNode" as RuleNode
+participant "DefaultNotificationCenter" as Center
+participant "NotificationExecutorService\nwork-stealing pool" as Executor
+participant "DefaultNotificationSchedulerService\nsingle timer thread" as Scheduler
+queue "TbQueue / TB Core topics" as Queue
+database "notification_request" as RequestDB
+database "notification / settings / config" as DomainDB
+participant "NotificationProcessingContext" as Context
+participant "NotificationTargetService" as TargetService
+participant "WEB channel" as Web
+participant "EMAIL / SMS / SLACK / TEAMS" as External
+participant "MOBILE_APP / FCM" as Mobile
+participant "SubscriptionManager / WebSocket" as WS
+
+== Four distinct entry families ==
+alt REST manual request
+  Admin -> Controller : createNotificationRequest(NotificationRequest, SecurityUser)
+  Controller -> Controller : reject id; set tenant/user; clear info/ruleId/status/stats
+  Controller -> Center : processNotificationRequest(tenantId, request, null)
+else Notification Rule from system/domain event
+  actor "Domain/system event source" as EventSource
+  EventSource -> RuleProcessor : process(NotificationRuleTrigger)
+  RuleProcessor -> Executor : submit rule matching task
+  Executor -> RuleProcessor : enabled rules from cache
+  RuleProcessor -> RuleProcessor : trigger/rule dedup + filter + per-rule limit
+  loop recipients escalation delay -> targets
+    RuleProcessor -> Center : processNotificationRequest(tenantId, rule request, null)
+  end
+else Rule Engine send-notification node
+  actor "RuleNode Actor" as Actor
+  Actor -> RuleNode : onMsg(TbContext, TbMsg)
+  RuleNode -> RuleNode : build RuleEngineOriginatedNotificationInfo
+  RuleNode --> Actor : ackIfNeeded before delivery finishes
+  RuleNode -> Executor : executeAsync(center call)
+  Executor -> Center : processNotificationRequest(..., callback)
+else internal general WEB helper
+  EventSource -> Center : sendGeneralWebNotification(tenantId, usersFilter, inlineTemplate)
+  Center -> RequestDB : save PROCESSING request with temporary NULL_UUID target
+end
+
+== Remote trigger routing when no local Core processor ==
+opt RemoteNotificationRuleProcessor bean is selected
+  EventSource -> Queue : NotificationRuleProcessorMsg(serialized trigger)
+  Queue -> RuleProcessor : Core consumer decode + process(trigger)
+  Queue <-- RuleProcessor : consumer callback success before async work completes
+end
+
+== Synchronous request preflight ==
+Center -> DomainDB : load template and all targets
+Center -> Center : enabled method -> channel.check(tenantId)
+alt manual/RuleNode method is unavailable
+  Center --> Controller : throw validation/config/rate-limit exception
+else rule-originated method is unavailable
+  Center -> Center : silently exclude that method
+end
+
+alt new request has sendingDelayInSec > 0
+  Center -> RequestDB : save SCHEDULED
+  Center -> Queue : push ToCoreMsg by tenant + requestId partition
+  Queue -> Scheduler : scheduleNotificationRequest(tenantId, requestId, messageTs)
+  Scheduler -> RequestDB : reload request
+  Scheduler -> Scheduler : ScheduledFuture(remaining delay)
+  Queue <-- Scheduler : ack after task is scheduled
+  ... delay expires ...
+  Scheduler -> Executor : executeAsync(center call)
+  Executor -> Center : process existing SCHEDULED request
+else immediate or scheduled request re-entry
+  Center -> DomainDB : load tenant settings and SYS mobile settings
+  Center -> RequestDB : save PROCESSING
+  Center -> Context : new context(request, methods, template, settings)
+  Context -> Context : pre-render info.templateData
+  Center -> Executor : submit request fan-out task
+end
+
+== Target, recipient and method fan-out ==
+loop targets are processed sequentially in one executor task
+  Executor -> TargetService : resolve recipients for target
+  alt PLATFORM_USERS
+    TargetService -> DomainDB : User pages of 256
+  else SLACK
+    TargetService --> Executor : one SlackConversation
+  else MICROSOFT_TEAMS
+    TargetService --> Executor : one webhook target config
+  end
+  loop each recipient then supported delivery method
+    Executor -> Executor : request-local method+recipient dedup
+    alt duplicate method+recipient
+      Executor -> Context : AlreadySentException; stats ignores it
+    else first occurrence
+    opt recipient is User
+      Executor -> DomainDB : get user notification settings
+      Executor -> Executor : type/method preference check
+    end
+    Executor -> Context : getProcessedTemplate(method, recipient)
+    Context -> Context : add recipientTitle/email/firstName/lastName
+    alt WEB
+      Executor -> Web : sendNotification(user, webTemplate, ctx)
+      Web -> DomainDB : INSERT notification(status=SENT)
+      Web -> WS : NotificationUpdate(created)
+      WS -> Queue : route only if subscription lives on another Core
+      Queue -> WS : local subscription update
+      WS --> Admin : unread partial/count update
+    else MOBILE_APP
+      Executor -> Mobile : sendNotification(user, mobileTemplate, ctx)
+      Mobile -> DomainDB : INSERT notification(status=SENT) first
+      Mobile -> DomainDB : load mobile sessions + unread count
+      loop each FCM token
+        Mobile -> Mobile : FirebaseMessaging.send(message)
+        opt UNREGISTERED or INVALID_ARGUMENT
+          Mobile -> DomainDB : remove mobile session
+        end
+      end
+    else EMAIL / SMS / SLACK / MICROSOFT_TEAMS
+      Executor -> External : blocking provider call
+      note right of External
+        No notification row.
+        EMAIL waits for mail executor with timeout.
+        Teams connect/read timeout is 15 seconds.
+      end note
+    end
+    alt channel returns
+      Executor -> Context : stats.reportSent(method, recipient)
+    else channel throws
+      Executor -> Context : stats.reportError(method, error, recipient)
+      Executor -> Executor : continue next method/recipient
+    end
+    end
+  end
+end
+
+Executor -> RequestDB : UPDATE status=SENT, stats (even when errors > 0)
+alt RuleNode callback exists
+  Executor --> RuleNode : onSuccess(stats) or outer-target onFailure(error)
+  RuleNode --> Actor : Success(result metadata) / Failure relation
+end
+
+note over RequestDB,External
+  Request insert/update, each notification row, queue ack and provider call
+  are separate commits/outcomes. Partial success is not rolled back.
+  Notification Center has no delivery retry, backoff or DLQ.
+end note
+
+== Read, mark-read and delete WebSocket flow ==
+Admin -> Controller : GET notifications / unread count
+Controller -> DomainDB : query WEB or MOBILE_APP rows by recipient
+Admin -> Controller : markNotificationAsRead / markAll / delete
+Controller -> Center : mutation(tenantId, userId, id/method)
+Center -> DomainDB : independent UPDATE/DELETE transaction
+opt WEB row changed
+  Center -> WS : NotificationUpdate(updated/deleted)
+  WS --> Admin : refresh unread list/count
+end
+
+== Request delete, scheduler recovery and TTL ==
+Admin -> Controller : DELETE notification/request/{id}
+Controller -> Center : deleteNotificationRequest(tenantId, requestId)
+Center -> RequestDB : DELETE request transaction
+Center -> DomainDB : DELETE notifications by requestId transaction
+alt request was SCHEDULED
+  Center -> Queue : lifecycle DELETED -> cancel ScheduledFuture
+else request was SENT
+  Center -> Queue : broadcast NotificationRequestUpdate to all Core services
+  Queue -> WS : refresh tenant user subscriptions from DB
+end
+
+actor "Partition/TTL scheduler" as TTL
+TTL -> DomainDB : drop notification partitions older than cutoff
+opt at least one partition was removed
+  TTL -> RequestDB : delete requests older than lastTs - 7d - 10m
+end
+note over Scheduler,RequestDB
+  On TB_CORE partition assignment, Scheduler scans all SCHEDULED requests,
+  keeps only requests owned by added partitions, and rebuilds JVM timers.
+end note
+
+@enduml

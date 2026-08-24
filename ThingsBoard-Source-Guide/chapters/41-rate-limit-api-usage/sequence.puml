@@ -1,0 +1,356 @@
+@startuml
+title ThingsBoard 3.6 限流与 API Usage 完整时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+ ArrowColor #1F2937
+ ActorBorderColor #111827
+ ActorBackgroundColor #F8FAFC
+ ActorFontColor #111827
+ LifeLineBorderColor #334155
+ LifeLineBackgroundColor #F8FAFC
+ ParticipantBorderColor #1F2937
+ ParticipantBackgroundColor #E8F4FD
+ ParticipantFontColor #111827
+ NoteBorderColor #92400E
+ NoteBackgroundColor #FFF7E6
+ NoteFontColor #111827
+ GroupBorderColor #334155
+ GroupBackgroundColor #F8FAFC
+}
+
+autonumber
+actor "REST client" as RestClient
+participant "RateLimitProcessingFilter" as RestFilter
+participant "DefaultRateLimitService\n(local JVM)" as GenericLimit
+participant "TenantProfileProvider" as ProfileProvider
+participant "Caffeine<(LimitedApi, level), TbRateLimits>" as GenericCache
+participant "Bucket4j LocalBucket" as GenericBucket
+participant "REST Controller" as Controller
+
+== 通用 REST 瞬时限流：本机 Bucket4j ==
+RestClient -> RestFilter : authenticated request
+RestFilter -> RestFilter : resolve SecurityUser
+alt SYS_ADMIN or no SecurityUser
+  RestFilter -> Controller : continue without tenant/customer check
+else non-system user
+  RestFilter -> GenericLimit : checkRateLimit(REST_REQUESTS_PER_TENANT, tenantId)
+  GenericLimit -> ProfileProvider : get(tenantId)
+  ProfileProvider --> GenericLimit : TenantProfile
+  GenericLimit -> GenericCache : compute(api, tenantId)
+  alt empty config
+    GenericCache -> GenericCache : invalidate key
+    GenericLimit --> RestFilter : true
+  else config present
+    GenericCache -> GenericBucket : create if absent/config changed
+    note right of GenericBucket
+      One LocalBucket can contain multiple Bandwidths.
+      Profile APIs use greedy refill.
+      Bucket state is not shared across JVMs.
+    end note
+    GenericLimit -> GenericBucket : tryConsume(1)
+    GenericBucket --> GenericLimit : true / false
+    alt tenant bucket exhausted
+      GenericLimit -> GenericLimit : process RateLimitsTrigger
+      GenericLimit --> RestFilter : false
+      RestFilter --> RestClient : HTTP 429; no Retry-After header
+    else tenant bucket passed and customer user
+      GenericLimit --> RestFilter : true
+      RestFilter -> GenericLimit : checkRateLimit(REST_REQUESTS_PER_CUSTOMER, tenant, customer)
+      GenericLimit -> GenericBucket : tryConsume(1) on separate customer bucket
+      alt customer bucket exhausted
+        GenericLimit --> RestFilter : false
+        RestFilter --> RestClient : HTTP 429
+        note over GenericLimit
+          The tenant token is not refunded.
+        end note
+      else customer bucket passed
+        GenericLimit --> RestFilter : true
+        RestFilter -> Controller : continue
+        Controller --> RestClient : normal response
+      end
+    end
+  end
+end
+
+actor "Device / gateway" as Device
+participant "Protocol adaptor" as Adaptor
+participant "DefaultTransportService" as Transport
+participant "DefaultTransportRateLimitService\n(local Transport JVM)" as TransportLimit
+participant "tenantAllowed map" as AllowedMap
+participant "Tenant buckets\nmsg / telemetry / DP" as TenantBuckets
+participant "Device buckets\nmsg / telemetry / DP" as DeviceBuckets
+participant "Transport business queue" as TransportQueue
+
+== Transport：API state 开关 + tenant/device 本机桶 ==
+Device -> Adaptor : telemetry / attributes / RPC / subscribe
+Adaptor -> Transport : process(sessionInfo, msg, callback)
+Transport -> TransportLimit : checkLimits(tenantId, deviceId, dataPoints)
+TransportLimit -> AllowedMap : getOrDefault(tenantId, true)
+alt monthly TRANSPORT state is DISABLED
+  AllowedMap --> TransportLimit : false
+  TransportLimit --> Transport : API_USAGE_STATE
+  Transport --> Adaptor : TbRateLimitsException(API_USAGE_STATE)
+  Adaptor --> Device : protocol-specific error
+else API state allows transport
+  AllowedMap --> TransportLimit : true
+  alt dataPoints > 0: telemetry
+    TransportLimit -> TenantBuckets : telemetryMsg.tryConsume(1)
+    TransportLimit -> TenantBuckets : telemetryDP.tryConsume(dataPoints)
+    alt tenant telemetry bucket fails
+      TransportLimit --> Transport : TENANT
+      Transport -> Transport : process RateLimitsTrigger
+      Transport --> Adaptor : TbRateLimitsException(TENANT)
+    else tenant telemetry buckets pass
+      TransportLimit -> DeviceBuckets : telemetryMsg.tryConsume(1)
+      TransportLimit -> DeviceBuckets : telemetryDP.tryConsume(dataPoints)
+      alt device telemetry bucket fails
+        TransportLimit --> Transport : DEVICE
+        Transport -> Transport : process RateLimitsTrigger
+        Transport --> Adaptor : TbRateLimitsException(DEVICE)
+        note over TenantBuckets,DeviceBuckets
+          Sequential telemetry-message/datapoint and tenant/device
+          buckets are not one transaction; earlier tokens are not refunded.
+        end note
+      else all telemetry buckets pass
+        TransportLimit --> Transport : null
+        Transport -> TransportQueue : submit telemetry
+        TransportQueue --> Transport : callback success
+        Transport -> Transport : ApiStatsProxyCallback.onSuccess
+      end
+    end
+  else dataPoints = 0: RPC / subscribe / other regular message
+    TransportLimit -> TenantBuckets : regularMsg.tryConsume(1)
+    alt tenant regular bucket fails
+      TransportLimit --> Transport : TENANT
+      Transport -> Transport : process RateLimitsTrigger
+      Transport --> Adaptor : TbRateLimitsException(TENANT)
+    else tenant regular bucket passes
+      TransportLimit -> DeviceBuckets : regularMsg.tryConsume(1)
+      alt device regular bucket fails
+        TransportLimit --> Transport : DEVICE
+        Transport -> Transport : process RateLimitsTrigger
+        Transport --> Adaptor : TbRateLimitsException(DEVICE)
+        note over TenantBuckets,DeviceBuckets
+          A device regular-bucket failure does not refund the tenant token.
+        end note
+      else both regular buckets pass
+        TransportLimit --> Transport : null
+        Transport -> TransportQueue : submit regular message
+      end
+    end
+  end
+end
+
+participant "RuleNodeActorMessageProcessor" as RuleNode
+participant "Telemetry / Script / Mail / SMS / Alarm" as Producers
+participant "DefaultTbApiUsageReportClient\n(local service JVM)" as ReportClient
+participant "AtomicLong maps\nkey x report level" as LocalStats
+queue "tb_usage_stats\nTbQueue/Kafka optional" as UsageQueue
+participant "DefaultTbCoreConsumerService" as UsageConsumer
+participant "DefaultTbApiUsageStateService\nTB_CORE partition owner" as UsageOwner
+
+== API Usage 生产、周期汇总与队列 ==
+par Transport successful processing
+  Transport -> ReportClient : report(tenant, customer, TRANSPORT_MSG_COUNT, 1)
+  Transport -> ReportClient : report(tenant, customer, TRANSPORT_DP_COUNT, N)
+else Rule Node before tbNode.onMsg
+  RuleNode -> ReportClient : report(tenant, customer, RE_EXEC_COUNT, 1)
+else DB save / external operation semantics
+  Producers -> ReportClient : report(key, value)
+end
+ReportClient -> LocalStats : tenant += value
+opt counter key
+  ReportClient -> LocalStats : SYS tenant += value
+end
+opt enabled_per_customer and customer present
+  ReportClient -> LocalStats : customer += value
+end
+ReportClient --> Transport : return immediately
+
+loop fixed delay; default 10 seconds
+  ReportClient -> LocalStats : read values by key/level
+  ReportClient -> ReportClient : build ToUsageStatsServiceMsg per owner
+  ReportClient -> LocalStats : clear each key map
+  ReportClient -> UsageQueue : send(owner partition, msg, callback=null)
+  note over LocalStats,UsageQueue
+    This is best-effort metering, not a billing ledger.
+    Process exit, read/clear races or send failure can undercount.
+  end note
+end
+
+UsageConsumer -> UsageQueue : poll pack
+UsageQueue --> UsageConsumer : List<ToUsageStatsServiceMsg>
+loop each message in pack
+  UsageConsumer -> UsageOwner : process(msg, TbPackCallback)
+end
+UsageConsumer -> UsageConsumer : await pack timeout
+UsageConsumer -> UsageQueue : commit whole poll pack
+note over UsageConsumer,UsageQueue
+  Failed/timed-out items are logged, then the pack is committed.
+  Crash after processing but before commit can replay and overcount.
+end note
+
+participant "BaseApiUsageState" as UsageMemory
+participant "TenantApiUsageState" as Threshold
+database "api_usage_state" as StateDB
+database "Timeseries latest/history" as TsDB
+participant "InternalTelemetryService" as InternalTs
+
+== Owner：月/小时计数、阈值与分离持久化 ==
+UsageOwner -> UsageOwner : resolve tenant/customer ownerId
+UsageOwner -> UsageOwner : updateLock.lock()
+UsageOwner -> UsageMemory : getOrFetchState(ownerId)
+alt state absent from owner memory
+  UsageMemory -> StateDB : find state row by owner entity id
+  alt persisted row exists
+    StateDB --> UsageMemory : storedState with existing ApiUsageStateId
+    UsageMemory -> TsDB : findAllLatest(existing state id)
+    TsDB --> UsageMemory : current/old cycle values
+  else persisted row is missing
+    UsageMemory -> StateDB : create ENABLED row with new ApiUsageStateId
+    UsageMemory -> TsDB : findAllLatest(new state id)
+    TsDB --> UsageMemory : no old-id counts; start from 0
+    note over UsageMemory,TsDB
+      Old ApiUsageStateId timeseries is not re-associated.
+      getOrFetchState does not recalculate every feature here.
+    end note
+  end
+end
+loop UsageStatsKVProto values
+  UsageOwner -> UsageMemory : calculate(key, value, serviceId)
+  alt counter
+    UsageMemory -> UsageMemory : month += value; hour += value
+  else gauge
+    UsageMemory -> UsageMemory : last value by serviceId; periodic sum
+  end
+end
+alt non-SYS tenant owner
+  UsageOwner -> Threshold : checkStateUpdatedDueToThreshold(features)
+  Threshold -> Threshold : ENABLED / WARNING / DISABLED
+else SYS or customer owner
+  UsageOwner -> UsageOwner : no profile threshold check
+end
+UsageOwner -> UsageOwner : updateLock.unlock()
+UsageOwner -> InternalTs : saveAndNotifyInternal(count entries, no-op callback)
+InternalTs -> TsDB : async save TTL=0
+UsageOwner --> UsageConsumer : callback.onSuccess after process returns
+
+participant "DefaultTbClusterService" as Cluster
+queue "Transport notification topics" as TransportNotifications
+queue "Core / Rule Engine lifecycle topics" as LifecycleNotifications
+participant "Transport nodes" as TransportNodes
+participant "AbstractConsumerService" as LifecycleConsumer
+participant "TenantActor" as TenantActor
+participant "NotificationRuleProcessor" as Notification
+participant "MailExecutorService" as MailExecutor
+
+== 状态变化：row、广播、时序、通知 ==
+alt feature state changed
+  UsageOwner -> StateDB : update ApiUsageState row
+  StateDB --> UsageOwner : committed state
+  UsageOwner -> Cluster : onApiStateChange(state, callback=null)
+  par transport broadcast
+    Cluster -> TransportNotifications : encoded ApiUsageState per Transport service
+    TransportNotifications -> TransportNodes : EntityUpdateMsg(API_USAGE_STATE)
+    TransportNodes -> TransportNodes : tenantAllowed.put(tenant, isTransportEnabled)
+    TransportNodes -> TransportNotifications : commit poll pack
+  else Core / Rule Engine lifecycle broadcast
+    Cluster -> LifecycleNotifications : ComponentLifecycleMsg(UPDATED)
+    LifecycleNotifications -> LifecycleConsumer : API_USAGE_STATE event
+    LifecycleConsumer -> UsageOwner : onApiUsageStateUpdate(tenant) / evict non-owner cache
+    LifecycleConsumer -> TenantActor : high-priority lifecycle message
+    TenantActor -> UsageOwner : getApiUsageState(tenant)
+    alt old.isReExecEnabled() and not new.isReExecEnabled()
+      TenantActor -> TenantActor : destroyRuleChains()
+      note right of TenantActor
+        ENABLED/WARNING -> DISABLED crosses true -> false.
+      end note
+    else not old.isReExecEnabled() and new.isReExecEnabled()
+      TenantActor -> TenantActor : initRuleChains()
+      note right of TenantActor
+        DISABLED -> WARNING also initializes (false -> true).
+        DISABLED -> ENABLED initializes as well.
+      end note
+    else enabled boolean unchanged
+      TenantActor -> TenantActor : no init/destroy
+      note right of TenantActor
+        WARNING -> ENABLED does not trigger initialization;
+        both states return isReExecEnabled() == true.
+      end note
+    end
+  else state telemetry
+    UsageOwner -> InternalTs : saveAndNotifyInternal(apiStateKey)
+    InternalTs -> TsDB : async state history/latest save
+  else tenant notifications
+    UsageOwner -> Notification : process(ApiUsageLimitTrigger)
+    UsageOwner -> MailExecutor : submit direct tenant state email
+  end
+end
+note over StateDB,TenantActor
+  State row, count/state timeseries, queue commits and notifications
+  do not share one transaction or a cluster-wide barrier.
+end note
+
+participant "DB telemetry entry" as DbEntry
+participant "JS/TBEL invoke entry" as ScriptEntry
+participant "Mail/SMS/Alarm entry" as IoEntry
+
+== DISABLED 在各执行点的不同硬行为 ==
+alt TRANSPORT disabled
+  TransportNodes -> Adaptor : TbRateLimitsException(API_USAGE_STATE)
+else RE disabled
+  Device -> TenantActor : QueueToRuleEngineMsg
+  TenantActor -> TenantActor : skip rule chain
+  TenantActor --> Device : callback.onSuccess (ack without execution)
+else DB disabled
+  DbEntry -> UsageOwner : getApiUsageState(tenant)
+  UsageOwner --> DbEntry : dbStorageState=DISABLED
+  DbEntry --> Device : callback failure RuntimeException
+else JS/TBEL disabled
+  ScriptEntry -> UsageOwner : getApiUsageState(tenant)
+  UsageOwner --> ScriptEntry : execution state=DISABLED
+  ScriptEntry --> ScriptEntry : immediate failed Future
+else mail/SMS/alarm disabled
+  IoEntry -> UsageOwner : getApiUsageState(tenant)
+  UsageOwner --> IoEntry : feature state=DISABLED
+  IoEntry --> IoEntry : RuntimeException / ApiUsageLimitsExceededException
+end
+
+actor "api-usage-scheduled" as Scheduler
+
+== UTC 小时/月重置与恢复 ==
+Scheduler -> UsageOwner : checkStartOfNextCycle() every 60s
+UsageOwner -> UsageOwner : updateLock.lock()
+alt nextCycleTs < now and lateness < 1 hour
+  UsageOwner -> UsageMemory : setCycles(nextCycle, startOfNextNextMonth)
+  UsageOwner -> InternalTs : save zero count entries
+  UsageOwner -> Threshold : recalculate all tenant features
+  Threshold -> StateDB : persist state transitions
+else not due or missed one-hour window
+  UsageOwner -> UsageOwner : keep in-memory cycle unchanged
+end
+UsageOwner -> UsageOwner : updateLock.unlock()
+note over Scheduler,TsDB
+  Hourly values reset lazily when a new usage message arrives.
+  Restart/repartition rebuilds current UTC cycle from latest timestamps.
+end note
+
+== 关闭和故障边界 ==
+alt report process exits before flush
+  LocalStats -> LocalStats : unreported counters lost
+else in-memory queue process exits
+  UsageQueue -> UsageQueue : no broker persistence
+else state row update fails
+  StateDB --> UsageOwner : exception; later broadcast is skipped
+else timeseries save fails
+  TsDB --> InternalTs : failed Future to no-op callback
+else notification delivery fails
+  Cluster -> Cluster : caller supplied no aggregate callback
+end
+
+@enduml

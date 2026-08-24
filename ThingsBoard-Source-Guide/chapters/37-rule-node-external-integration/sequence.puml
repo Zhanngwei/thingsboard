@@ -1,0 +1,267 @@
+@startuml
+title ThingsBoard 3.6 Rule Node 外部集成独立时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+ ArrowColor #1F2937
+ ActorBorderColor #111827
+ ActorBackgroundColor #F8FAFC
+ ActorFontColor #111827
+ LifeLineBorderColor #334155
+ LifeLineBackgroundColor #F8FAFC
+ ParticipantBorderColor #1F2937
+ ParticipantBackgroundColor #DBEAFE
+ ParticipantFontColor #111827
+ NoteBorderColor #92400E
+ NoteBackgroundColor #FEF3C7
+ NoteFontColor #111827
+ GroupBorderColor #334155
+ GroupBackgroundColor #F8FAFC
+ GroupHeaderFontColor #111827
+}
+
+autonumber
+actor "Rule Engine queue / upstream" as Upstream
+participant "RuleChainActor" as Chain
+participant "RuleNodeActor" as Actor
+participant "RuleNodeActorMessageProcessor" as Processor
+participant "DefaultTbContext" as Context
+participant "TbMsgCallback" as MsgCallback
+
+== 公共 Actor 入口与 force_ack 分叉 ==
+Upstream -> Chain : TbMsg + relation
+Chain -> Actor : RuleChainToRuleNodeMsg
+Actor -> Processor : onRuleChainToRuleNodeMsg(envelope)
+Processor -> MsgCallback : onProcessingStart(ruleNodeInfo)
+Processor -> Processor : state / execution-count / partition checks
+Processor -> Processor : optional persistDebugInput(...)
+Processor -> Actor : tbNode.onMsg(ctx, msg)
+note over Processor,MsgCallback
+  release-3.6 没有 TbNodeCallback 类型。
+  消息级契约是 TbMsgCallback；后续协议 callback 是另一层。
+end note
+alt actors.rule.external.force_ack = false
+  Actor -> Actor : keep original TbMsg callback
+else force_ack = true
+  Actor -> Context : ack(original msg)
+  Context -> MsgCallback : onProcessingEnd(ruleNodeId)
+  Context -> MsgCallback : onSuccess()
+  Actor -> Actor : copyWithNewCtx(); callback = EMPTY
+end
+
+participant "TbRestApiCallNode" as RestNode
+participant "TbHttpClient" as HttpClient
+participant "AsyncRestTemplate / request factory" as HttpAsync
+participant "External REST server" as RestServer
+
+== HTTP：不预连接，future 回调决定 2xx/Failure ==
+Actor -> RestNode : onMsg(ctx, msg)
+RestNode -> RestNode : ackIfNeeded(ctx, msg)
+RestNode -> HttpClient : processMessage(ctx,msg,onSuccess,onFailure)
+HttpClient -> HttpClient : process endpoint/header patterns
+HttpClient -> HttpClient : method + body + encoded URI
+HttpClient -> HttpAsync : exchange(uri,method,entity,String.class)
+HttpAsync -> RestServer : HTTP request
+HttpAsync --> HttpClient : ListenableFuture returned
+opt maxParallelRequestsCount > 0 and deque exceeds max
+  HttpClient -> HttpClient : Actor call path waits on old futures
+  alt old future timeout/error
+    HttpClient -> HttpAsync : cancel old future
+  end
+end
+HttpClient --> RestNode : processMessage returns
+RestNode --> Actor : onMsg returns
+alt HTTP 2xx
+  RestServer --> HttpAsync : ResponseEntity 2xx
+  HttpAsync --> HttpClient : callback.onSuccess(response)
+  HttpClient -> HttpClient : metadata += status/code/reason/headers
+  HttpClient -> HttpClient : payload = response body or {}
+  HttpClient -> RestNode : success.accept(transformed msg)
+  RestNode -> Context : tellSuccess or enqueueForTellNext(Success)
+else non-2xx response
+  RestServer --> HttpAsync : non-2xx response
+  HttpAsync --> HttpClient : response/callback
+  HttpClient -> HttpClient : metadata += status + error_body + headers
+  HttpClient -> RestNode : failure.accept(msg, null)
+  RestNode -> Context : tellNext/enqueue Failure relation
+else transport/client exception
+  HttpAsync --> HttpClient : callback.onFailure(Throwable)
+  HttpClient -> HttpClient : metadata += error; optional response status/body
+  HttpClient -> RestNode : failure.accept(msg, throwable)
+  RestNode -> Context : tellFailure/enqueueForTellFailure
+end
+note over HttpClient,HttpAsync
+  destroy() only shuts down a node-owned Netty EventLoopGroup.
+  Shared EventLoopGroup belongs to the application.
+  Proxy Apache async client is not explicitly closed by this class.
+end note
+
+participant "TbMqttNode" as MqttNode
+participant "MqttClient" as MqttClient
+participant "External MQTT broker" as MqttBroker
+
+== MQTT：init 同步连接，消息 publish future 异步 ==
+Processor -> MqttNode : init(ctx, configuration)
+MqttNode -> MqttNode : config + SSL/basic/clientId/cleanSession
+MqttNode -> MqttClient : create(config, externalCallExecutor)
+MqttNode -> MqttClient : setEventLoop(sharedEventLoop)
+MqttClient -> MqttBroker : CONNECT(host, port)
+MqttNode -> MqttNode : connectFuture.get(connectTimeoutSec)
+alt connected
+  MqttBroker --> MqttClient : successful CONNACK
+  MqttClient --> MqttNode : connect result success
+  MqttNode --> Processor : init success; node ACTIVE
+else timeout or refused
+  MqttNode -> MqttClient : cancel connect + disconnect
+  MqttNode --> Processor : throw; Actor init retry may rebuild node
+end
+Actor -> MqttNode : onMsg(ctx, msg)
+MqttNode -> MqttNode : topic pattern + ackIfNeeded
+MqttNode -> MqttClient : publish(topic,payload,QoS1,retained)
+MqttNode --> Actor : onMsg returns
+MqttClient -> MqttBroker : MQTT PUBLISH / QoS 1 protocol
+alt publish future succeeds
+  MqttClient --> MqttNode : future listener success
+  MqttNode -> Context : tellSuccess / enqueue Success
+else publish future fails
+  MqttClient --> MqttNode : future listener cause
+  MqttNode -> MqttNode : copy metadata + error
+  MqttNode -> Context : tellFailure / enqueue Failure
+end
+note over MqttNode,MqttBroker
+  Node code invokes publish once and defines no message retry/reconnect loop.
+  QoS 1 is protocol behavior, not Rule Engine exactly-once.
+  destroy() calls disconnect() without an explicit await/flush.
+end note
+
+participant "TbKafkaNode" as KafkaNode
+participant "ExternalCallExecutorService" as ExternalPool
+participant "KafkaProducer" as Producer
+participant "Kafka producer I/O thread" as KafkaIo
+participant "External Kafka broker" as KafkaBroker
+
+== Kafka：external-call pool + producer I/O callback ==
+Processor -> KafkaNode : init(ctx, configuration)
+KafkaNode -> KafkaNode : properties: acks/retries/batch/linger/buffer
+KafkaNode -> KafkaNode : otherProperties may override; PEM newline conversion
+KafkaNode -> Producer : new KafkaProducer(properties)
+KafkaNode -> KafkaIo : reflect ioThread + set uncaught handler
+Actor -> KafkaNode : onMsg(ctx, msg)
+KafkaNode -> KafkaNode : topic/key patterns + ackIfNeeded
+alt fatal initError already set
+  KafkaNode -> Context : tellFailure(initError)
+else producer usable
+  KafkaNode -> ExternalPool : executeAsync(publish)
+  KafkaNode --> Actor : onMsg returns
+  ExternalPool -> Producer : send(ProducerRecord, callback)
+  opt metadata headers enabled
+    ExternalPool -> ExternalPool : all TbMsg metadata -> tb_msg_md_* headers
+  end
+  Producer -> KafkaBroker : producer batch; retry per ProducerConfig
+  alt final broker acknowledgement
+    KafkaBroker --> KafkaIo : RecordMetadata
+    KafkaIo -> KafkaNode : processRecord(metadata, null)
+    KafkaNode -> KafkaNode : metadata += offset/partition/topic
+    KafkaNode -> Context : tellSuccess / enqueue Success
+  else final async producer failure
+    KafkaIo -> KafkaNode : processRecord(null, exception)
+    KafkaNode -> KafkaNode : metadata += error
+    KafkaNode -> Context : tellFailure / enqueue Failure
+  else producer.send throws synchronously
+    Producer --> ExternalPool : throw
+    ExternalPool -> KafkaNode : publish catches and logs debug only
+    note over KafkaNode,Context #FEE2E2
+      release-3.6 gap: no Failure relation and the executor future is not observed.
+      force_ack=false may leave the original callback open;
+      force_ack=true has already completed the original callback.
+    end note
+  end
+end
+opt Kafka I/O uncaught ThingsboardKafkaClientError
+  KafkaIo -> KafkaNode : initError = throwable; destroy()
+  KafkaNode -> Producer : close()
+end
+
+participant "TbSendEmailNode" as MailNode
+participant "MailExecutorService outer task" as MailOuter
+participant "DefaultMailService" as MailService
+participant "MailExecutorService inner task" as MailInner
+participant "JavaMailSender" as MailSender
+participant "External SMTP server" as Smtp
+
+== 邮件：同步校验，MailExecutor 同池嵌套 ==
+Processor -> MailNode : init(ctx, configuration)
+alt use system SMTP settings
+  MailNode -> MailNode : no node sender is created
+else custom SMTP
+  MailNode -> MailNode : create JavaMailSenderImpl + TLS/proxy properties
+end
+Actor -> MailNode : onMsg(ctx, msg)
+MailNode -> MailNode : validate type == SEND_EMAIL
+MailNode -> MailNode : JSON -> TbEmail; require nonblank to
+alt synchronous validation fails
+  MailNode -> Context : tellFailure(original msg, exception)
+else valid email
+  MailNode -> MailNode : ackIfNeeded(ctx, msg)
+  MailNode -> MailOuter : executeAsync(sendEmail)
+  MailNode --> Actor : onMsg returns
+  alt system SMTP selected
+    MailOuter -> Context : getMailService(true)
+    Context -> Context : enforce allow_system_mail_service
+    MailOuter -> MailService : send(tenant,customer,email)
+  else custom sender selected
+    MailOuter -> Context : getMailService(false)
+    MailOuter -> MailService : send(tenant,customer,email,sender,timeout)
+  end
+  MailService -> MailService : both overloads enter private sendMail
+  MailService -> MailService : API usage gate + build MimeMessage/images
+  MailService -> MailInner : submit(mailSender.send(message))
+  MailService -> MailService : innerFuture.get(timeout)
+  MailInner -> MailSender : send(message)
+  MailSender -> Smtp : SMTP submission
+  alt send returns before timeout
+    Smtp --> MailSender : accepted/return
+    MailInner --> MailService : future success
+    MailService -> MailService : report EMAIL_EXEC_COUNT in memory
+    MailService --> MailOuter : return
+    MailOuter --> MailNode : outer future success
+    MailNode -> Context : tellSuccess / enqueue Success
+  else SMTP error
+    Smtp --> MailSender : error
+    MailInner --> MailService : future failure
+    MailService --> MailOuter : ThingsboardException
+    MailOuter --> MailNode : outer future failure
+    MailNode -> Context : tellFailure / enqueue Failure
+  else timeout
+    MailService --> MailOuter : RuntimeException("Timeout!")
+    MailOuter --> MailNode : outer future failure
+    MailNode -> Context : tellFailure / enqueue Failure
+    note over MailInner,Smtp #FEE2E2
+      The submitted inner future is not canceled.
+      SMTP send may continue and succeed after the Failure relation.
+    end note
+  end
+end
+
+== relation 收敛与数据库边界 ==
+Context -> MsgCallback : onProcessingEnd(ruleNodeId) on direct tellNext path
+Context -> Chain : RuleNodeToRuleChainTellNextMsg
+alt matching downstream relation exists
+  Chain -> Actor : route to next Rule Node
+else terminal Success relation
+  Chain -> MsgCallback : onSuccess()
+else terminal Failure relation
+  Chain -> MsgCallback : onFailure(RuleEngineException)
+end
+note over Upstream,Smtp
+  Runtime HTTP/MQTT/Kafka/SMTP paths do not write a business DB row or outbox.
+  Rule Node configuration is separately stored in rule_node.configuration.
+  debugMode may separately persist Debug Event; successful email updates usage counters.
+  No database transaction spans the Rule Engine callback and any external side effect.
+end note
+
+@enduml

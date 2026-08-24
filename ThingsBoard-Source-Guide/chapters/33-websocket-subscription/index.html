@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>33 WebSocket 订阅流程 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航"><a href="README.md">Markdown</a><a href="../../index.html">全书目录</a><a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>33 WebSocket 订阅流程</strong>
+      <a href="#一-流程目标">一、流程目标</a><a href="#二-入口">二、入口</a><a href="#三-完整调用链">三、完整调用链</a><a href="#四-消息流">四、消息流</a><a href="#五-时序图">五、时序图</a><a href="#六-数据变化">六、数据变化</a><a href="#七-源码分析">七、源码分析</a><a href="#八-actor-分析">八、Actor 分析</a><a href="#九-kafka-分析">九、Kafka 分析</a><a href="#十-数据库分析">十、数据库分析</a><a href="#十一-异常处理">十一、异常处理</a><a href="#十二-源码阅读路线">十二、源码阅读路线</a><a href="#十三-常见面试题">十三、常见面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
+  <script id="markdown-source" type="text/plain"># 33 WebSocket 订阅流程
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。当前 `HEAD 21a9049239` 只包含后续指南提交，本章涉及的业务源码与该基线无差异。本章只分析 `/api/ws` 的 GENERAL WebSocket 订阅主链：连接认证、v1/v2 命令、初始查询、订阅注册、漏更补偿、跨节点通知和异步发送。
+
+[上一篇：32 Redis 与本地缓存流程](../32-redis-local-cache/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/33-websocket-subscription.svg) | [下一篇：34 Entity Query 流程](../34-entity-query/index.html)
+
+---
+
+## 一、流程目标
+
+WebSocket 订阅要把一个浏览器长连接转换为三类可定位状态：认证后的 `WebSocketSessionRef`、按外部 sessionId 管理的命令上下文、按实体 owner 路由的本地订阅。初始查询返回数据库快照，实时更新则在 `saveAndNotify` 成功后经 `SubscriptionManagerService` 路由；两者之间的竞态由 owner callback 和 `checkMissedUpdates` 补查缩小，而不是依靠数据库事务或持久化 session。
+
+[架构图 SVG：Upgrade、订阅 owner、Core notification 与异步发送](../../assets/architecture/33-websocket-subscription.svg)
+
+[![WebSocket 订阅架构图](../../assets/architecture/33-websocket-subscription.svg)](../../assets/architecture/33-websocket-subscription.svg)
+
+```mermaid
+flowchart LR
+    UI["Browser /api/ws"] --> HANDLER["TbWebSocketHandler"]
+    HANDLER --> WS["DefaultWebSocketService"]
+    WS --> V1["v1 attributes / timeseries"]
+    WS --> V2["v2 EntityData / AlarmData"]
+    V1 --> LOCAL["DefaultTbLocalSubscriptionService"]
+    V2 --> LOCAL
+    LOCAL --> OWNER["DefaultSubscriptionManagerService owner"]
+    DBWRITE["Telemetry saveAndNotify success"] --> OWNER
+    OWNER -->|"same service"| LOCAL
+    OWNER -->|"remote service"| CORE["Core notification topic"]
+    CORE --> LOCAL
+    LOCAL --> CALLBACK["subscription updateProcessor"]
+    CALLBACK --> ASYNC["async WebSocket send queue"]
+```
+
+必须先固定十二条源码事实：
+
+1. `/api/ws/**` 的 HTTP Upgrade 被 Spring Security `permitAll`，JWT filter 也显式跳过；这不是匿名业务访问，认证被后移到 WebSocket Handler。
+2. `/api/ws` 是 GENERAL 主入口；`/api/ws/plugins/telemetry` 使用 deprecated `TelemetryCmdsWrapper`，只为兼容旧报文后转换成 `WsCommandsWrapper`。
+3. URL `token` 在连接建立时认证；没有 URL token 的连接进入 `expireAfterWrite(10s)` 的 pending cache，第一帧必须带 `authCmd`。Caffeine 没有专用 scheduler，不能把 10 秒理解为精确到点关闭。
+4. Spring `WebSocketSession.getId()` 是内部连接 ID；Handler 另生成 UUID 作为外部 sessionId，订阅、服务路由和发送都使用后者。
+5. `WsCommandsWrapper` 用 `type` 做 Jackson 多态分发，v1 和 v2 命令可以同帧出现；认证首帧也可以同时携带订阅命令。
+6. v1 `TIMESERIES_HISTORY` 是独立一次性命令；v2 `historyCmd/aggHistoryCmd` 只是 `EntityDataCmd` 内不创建对应 TS 订阅的子命令，同一 wrapper 仍可携带 `latestCmd/tsCmd/aggTsCmd` 或 Alarm 订阅。
+7. 初始查询和订阅建立不是同一数据库事务；`queryTs`、订阅事件确认和 `checkMissedUpdates` 只做有范围的夹缝补偿，不提供 exactly-once 或完备回放。
+8. 实时更新的 WebSocket 命令链不进入 Actor；Actor/Rule Engine/Transport 可以是数据写入来源，但写成功后的订阅通知由服务层直接发起。
+9. 同节点 owner 直接调用 LocalSubscriptionService；远端 owner 通过目标 Core 服务的 notification topic 投递。
+10. session、v1/v2 上下文、实体订阅索引和更新时间都只在 JVM 内存；重启后客户端必须重连重订阅。
+11. 每 session 出站 `ConcurrentLinkedQueue` 使用默认 1000 的非原子计数阈值，阈值判断失败时关闭连接；队列数据结构本身与入站 `ConcurrentLinkedQueue` 都没有硬容量上限。
+12. v2 Handler 不调用 v1 的 `processSubscription` 租户/客户/用户订阅数限制；`allowedEntities`、未使用的 `maxDatapointLimit` 和 Alarm originator pageSize 也不能误写成统一的 v2 硬上限。
+
+```mermaid
+flowchart TB
+    SNAP["Initial DB snapshot"] --> LOCK["callback lock"]
+    LOCK --> ADD["addSubscription"]
+    ADD --> EVENT{"aggregated subscription changed"}
+    EVENT -->|"yes"| ACK["owner event and callback with update timestamps"]
+    EVENT -->|"no"| MISS
+    ACK --> MISS["checkMissedUpdates"]
+    MISS --> REALTIME["continuous updates"]
+    ADD --> INITIAL["send initial response"]
+    INITIAL --> REALTIME
+```
+
+本章明确排除五条非主链：REST Controller 调用的 EntityQuery、旧插件内部的 `TelemetryWebSocketTextMsg` 数据类型、一次性 `TIMESERIES_HISTORY`、Notifications 订阅、以及 Actor/Rule Engine 的规则处理。它们只在说明边界时出现，不用来证明 GENERAL WebSocket 遥测订阅行为。
+
+---
+
+## 二、入口
+
+### 2.1 Upgrade 注册与安全边界
+
+[org.thingsboard.server.config.WebSocketConfiguration.registerWebSocketHandlers(WebSocketHandlerRegistry)](../../../application/src/main/java/org/thingsboard/server/config/WebSocketConfiguration.java#L81) 把 `TbWebSocketHandler` 注册到 `/api/ws/**` 并允许任意 Origin pattern。容器在 [createWebSocketContainer()](../../../application/src/main/java/org/thingsboard/server/config/WebSocketConfiguration.java#L67) 配置文本/二进制缓冲区；这里没有读取 JWT。
+
+[org.thingsboard.server.config.ThingsboardSecurityConfiguration.buildJwtTokenAuthenticationProcessingFilter()](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L213) 把 `/api/ws/**` 加入 `pathsToSkip`，[filterChain(HttpSecurity)](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L288) 又对它执行 `permitAll`。因此 Upgrade 不经过常规 REST JWT filter，`X-Authorization` 头也不会在该 filter 中建立 WebSocket 用户上下文。
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Spring Security
+    participant R as WebSocket registry
+    participant H as TbWebSocketHandler
+    C->>S: GET /api/ws?token=... Upgrade
+    S->>S: SkipPathRequestMatcher skips JWT filter
+    S-->>R: permitAll handshake
+    R->>H: afterConnectionEstablished
+    H->>H: authenticate URL token or create pending session
+```
+
+### 2.2 URL token、首帧认证与两种 sessionId
+
+[org.thingsboard.server.controller.plugin.TbWebSocketHandler.afterConnectionEstablished(WebSocketSession)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L289) 先设置原生 JSR-356 `AsyncRemote.sendTimeout`，再调用 [toRef(WebSocketSession)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L416)。`toRef` 根据 path 选择 `GENERAL` 或插件类型，直接从 URI query 中截取 `token=` 后全部文本，认证后生成随机 UUID 外部 sessionId。
+
+| 标识 | 产生方 | 索引位置 | 用途 |
+|---|---|---|---|
+| internal sessionId | Spring/容器 `WebSocketSession.getId()` | `internalSessionMap`、session limit set | 找真实 socket 与 `SessionMetaData` |
+| external sessionId | `UUID.randomUUID().toString()` | `externalSessionMap`、`wsSessionsMap`、subscription | 跨服务定位订阅所属 WS 节点 |
+| cmdId | 客户端命令 | v1 响应 `subscriptionId`、v2 context key | 关联请求和响应 |
+| internal subscriptionId | `sessionSubIdSeq.incrementAndGet()` | LocalSubscriptionService | 区分同一 session 的实体级订阅 |
+
+没有 URL token 时，[TbWebSocketHandler.init()](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L162) 创建 `expireAfterWrite(authTimeoutMs)` 的 Caffeine pending cache，`server.ws.auth_timeout_ms` 默认值来自 [thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L79) 的 `10000ms`。该实例没有配置 scheduler 或专用维护线程，过期要等后续 cache 操作触发维护/发现才调用 removal listener，因此关闭时间不保证精确等于第 10 秒。首帧进入 [processMsg(SessionMetaData, String)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207)：缺 `authCmd` 用 `POLICY_VIOLATION` 关闭，认证失败用 `BAD_DATA` 关闭；成功后 invalidates pending entry、建立正式 session，再处理同一 wrapper 中的 commands。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Handshake
+    Handshake --> Authenticated: URL token valid
+    Handshake --> Pending: URL token absent
+    Handshake --> Closed: URL token invalid
+    Pending --> Authenticated: first frame authCmd valid
+    Pending --> Closed: authCmd absent or invalid
+    Pending --> Closed: Caffeine expiry maintenance after 10s policy
+    Authenticated --> Established: limits accepted
+    Established --> Closed: client/error/timeout/backpressure
+```
+
+### 2.3 GENERAL 与 deprecated telemetry wrapper
+
+[org.thingsboard.server.service.ws.WsCommandsWrapper](../../../application/src/main/java/org/thingsboard/server/service/ws/WsCommandsWrapper.java#L55) 是 `/api/ws` 的统一 envelope，字段是 `AuthCmd authCmd` 和按 `type` 反序列化的 `List<WsCmd> cmds`。`ATTRIBUTES`、`TIMESERIES` 是 v1；`ENTITY_DATA`、`ALARM_DATA` 等是 v2。
+
+[org.thingsboard.server.service.ws.telemetry.cmd.TelemetryCmdsWrapper](../../../application/src/main/java/org/thingsboard/server/service/ws/telemetry/cmd/TelemetryCmdsWrapper.java#L53) 已标记 `@Deprecated`。只有 session type 为 `TELEMETRY` 时，Handler 才解析它并调用 [toCommonCmdsWrapper()](../../../application/src/main/java/org/thingsboard/server/service/ws/telemetry/cmd/TelemetryCmdsWrapper.java#L116)；GENERAL 不先解析旧 wrapper。`TelemetryWebSocketTextMsg` 属于更旧的 telemetry service 模型，不在这条统一命令入口上。
+
+```mermaid
+flowchart LR
+    PATH{"Request path"}
+    PATH -->|"/api/ws"| GENERAL["GENERAL"]
+    GENERAL --> COMMON["WsCommandsWrapper"]
+    PATH -->|"/api/ws/plugins/telemetry"| OLD["TELEMETRY deprecated"]
+    OLD --> LEGACY["TelemetryCmdsWrapper"]
+    LEGACY --> CONVERT["toCommonCmdsWrapper"]
+    CONVERT --> COMMON
+    COMMON --> DISPATCH["WsCmdType handler map"]
+```
+
+输入是 UTF-8 JSON 文本帧；输出是 v1 `TelemetrySubscriptionUpdate` 或 v2 `EntityDataUpdate`/`AlarmDataUpdate` JSON。二进制业务命令不在 Handler 的文本消息入口中。
+
+---
+
+## 三、完整调用链
+
+### 3.1 wrapper 解析与命令分发
+
+[TbWebSocketHandler.processMsg(SessionMetaData, String)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207) 完成 session type 解码和认证门禁；[org.thingsboard.server.service.ws.DefaultWebSocketService.handleCommands(WebSocketSessionRef, WsCommandsWrapper)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L287) 校验 `wsSessionsMap`，再逐个按 `WsCmdType` 查 `cmdsHandlers`。单条 handler 抛出的异常被记录，循环继续处理 wrapper 中其他命令。
+
+[DefaultWebSocketService.init()](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L209) 固定映射：v1 `ATTRIBUTES/TIMESERIES/TIMESERIES_HISTORY` 在本类处理；v2 `ENTITY_DATA/ENTITY_COUNT/ALARM_DATA/ALARM_COUNT` 转给 `TbEntityDataSubscriptionService`；Notifications 转给独立 handler，本章不展开。
+
+```mermaid
+flowchart TB
+    FRAME["JSON text frame"] --> PARSE["WsCommandsWrapper"]
+    PARSE --> AUTH{"securityCtx exists"}
+    AUTH -->|"no"| AUTHCMD["authenticate authCmd"]
+    AUTHCMD --> EST["establishSession"]
+    AUTH -->|"yes"| COMMANDS["handleCommands"]
+    EST --> COMMANDS
+    COMMANDS --> TYPE{"WsCmdType"}
+    TYPE -->|"ATTRIBUTES / TIMESERIES"| V1["DefaultWebSocketService v1"]
+    TYPE -->|"ENTITY_DATA / ALARM_DATA"| V2["TbEntityDataSubscriptionService v2"]
+    TYPE -->|"TIMESERIES_HISTORY"| ONCE["one-shot query only"]
+```
+
+### 3.2 v1 Attributes 与 Timeseries
+
+[handleWsAttributesSubscriptionCmd(WebSocketSessionRef, AttributesSubscriptionCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L572) 与 [handleWsTimeseriesSubscriptionCmd(WebSocketSessionRef, TimeseriesSubscriptionCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L792) 都先调用 v1 专属 [processSubscription(WebSocketSessionRef, SubscriptionCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L493)，再做取消、参数校验和权限校验。
+
+Attributes 指定 keys 时经 `AttributesService.find` 取初值；未指定 keys 时按 scope 取全部。Timeseries 有 keys 且 `timeWindow > 0` 时执行区间聚合查询，有 keys 且窗口为 0 时查 latest；没有 keys 时查实体全部 latest。查询成功后构造 `TbAttributeSubscription` 或 `TbTimeSeriesSubscription`，其 `updateProcessor` 最终回到 `sendUpdate`。
+
+```mermaid
+flowchart TB
+    CMD["v1 subscription cmd"] --> LIMIT["processSubscription limits"]
+    LIMIT --> VALIDATE["validate cmd + access"]
+    VALIDATE --> KIND{"kind"}
+    KIND -->|"attributes keys"| AFIND["AttributesService.find"]
+    KIND -->|"attributes all"| AALL["AttributesService.findAll"]
+    KIND -->|"timeseries window"| THIST["TimeseriesService.findAll"]
+    KIND -->|"timeseries latest"| TLATEST["findLatest / findAllLatest"]
+    AFIND --> BUILD["build TbSubscription"]
+    AALL --> BUILD
+    THIST --> BUILD
+    TLATEST --> BUILD
+    BUILD --> ADD["oldSubService.addSubscription"]
+    ADD --> INITIAL["send initial update"]
+```
+
+### 3.3 v2 EntityData 与 AlarmData
+
+[handleWsEntityDataCmd(WebSocketSessionRef, EntityDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L315) 和 [handleWsAlarmDataCmd(WebSocketSessionRef, AlarmDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L341) 只做命令结构校验后转交服务，不调用 v1 `processSubscription`。
+
+[org.thingsboard.server.service.subscription.DefaultTbEntityDataSubscriptionService.handleCmd(WebSocketSessionRef, EntityDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L253) 用 `sessionId + cmdId` 找或建 `TbEntityDataSubCtx`。query 非空时同步解析 EntityDataQuery 并执行实体初查；`latestCmd` 建 latest 订阅，`tsCmd` 建实时窗口订阅，`historyCmd` 只是不创建该子命令对应的 TS 订阅。同一个 `EntityDataCmd` 可同时携带这些子命令，history Future 完成后还会继续执行 latest/ts。`aggHistoryCmd` 是一次性聚合子命令，`aggTsCmd` 则建立聚合实时订阅。发行配置的动态 page link 刷新默认值是 60 秒；Java 注解中的 6 秒只在配置项完全缺失时兜底。
+
+[handleCmd(WebSocketSessionRef, AlarmDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L523) 先解析实体集合，再经 `TbAlarmDataSubCtx.fetchAlarms()` 查询告警，随后为 query 的 latest values 建属性/遥测订阅，并创建 Alarm 订阅。v2 不受 v1 `processSubscription` 计数保护，而且几个看似限流的配置不能合并成“v2 硬上限”：`max_entities_per_data_subscription` 只写入响应 `allowedEntities`，没有截断原 EntityDataQuery；`maxDatapointLimit` 在该业务类中没有实际使用；`max_entities_per_alarm_subscription` 限制 Alarm query 的 originator 实体预查询页，不限制返回告警条数；动态 page-link 数量检查还有未实现分支。
+
+```mermaid
+flowchart LR
+    EDC["EntityDataCmd"] --> CTX["TbEntityDataSubCtx"]
+    CTX --> EQ["EntityDataQuery initial page"]
+    CTX --> EH["historyCmd / aggHistoryCmd: no corresponding TS subscription"]
+    CTX --> EL["latestCmd: latest subscriptions"]
+    CTX --> ET["tsCmd / aggTsCmd: realtime TS subscriptions"]
+    ADC["AlarmDataCmd"] --> ACTX["TbAlarmDataSubCtx"]
+    ACTX --> AE["resolve entity page"]
+    AE --> AQ["fetch alarms"]
+    ACTX --> AL["latest-value subscriptions"]
+    ACTX --> AS["alarm subscription"]
+```
+
+### 3.4 一次性历史与实时订阅
+
+v1 [handleWsHistoryCmd(WebSocketSessionRef, GetHistoryCmd)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L678) 只调用 `tsService.findAll` 并返回一次更新，没有 `addSubscription`。v2 [handleHistoryCmd(TbEntityDataSubCtx, EntityHistoryCmd)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L773) 把 `subscribe=false` 传给 `handleGetTsCmd`，语义仅是“该 history 子命令不建 TS 订阅”，不是整个 `EntityDataCmd` 变成一次性命令；同一命令还可携带实时子命令。`aggHistoryCmd/aggTsCmd` 也有相同的一次性/实时区分。相反，v1 `TimeseriesSubscriptionCmd.timeWindow` 虽会先查历史窗口，查询成功后仍会注册实时订阅；不能把“有历史区间”误判为“一次性”。
+
+```mermaid
+flowchart TB
+    REQUEST{"Command"}
+    REQUEST -->|"v1 TIMESERIES_HISTORY"| H1["DB range query"]
+    REQUEST -->|"v2 historyCmd / aggHistoryCmd"| H2["nested query with subscribe=false"]
+    H1 --> RESP1["one response; no subscription"]
+    H2 --> RESP2["one response; no TS subscription"]
+    REQUEST -->|"v1 TIMESERIES with timeWindow"| RT1["initial range query"]
+    REQUEST -->|"v2 tsCmd / aggTsCmd"| RT2["initial range / aggregate query"]
+    RT1 --> SUB1["register realtime subscription"]
+    RT2 --> SUB2["register realtime subscription"]
+```
+
+---
+
+## 四、消息流
+
+### 4.1 初始查询、owner callback 与漏更补偿
+
+v1 查询开始前记录 `queryTs`，成功后构建 key -> lastTs 状态，并在同一 `ReentrantLock` 中先 [DefaultTbLocalSubscriptionService.addSubscription(TbSubscription)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L217)、再发送初始包。该锁只串行化本订阅 callback 与初始发送，不锁数据库写入或 owner。
+
+`addSubscription` 同时写 `subscriptionsBySessionId`，再更新 `subscriptionsByEntityId`。只有当前 service 的聚合 key/scope 订阅状态实际变化时才生成 `TbEntitySubEvent`；没有变化时直接执行 missed-update 检查。实体分区在本节点时直接调用 owner；否则以 null producer callback 发往 Core topic。owner [onSubEvent(String, TbEntitySubEvent, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L142) 更新 `entitySubscriptions` 后，携带该实体最近 attribute/TS 更新时间回调 WS 节点。
+
+[DefaultTbLocalSubscriptionService.onSubEventCallback(EntityId, int, TbEntityUpdatesInfo, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L249) 清除 pending subscriptions 并调用 [checkMissedUpdates(TbSubscription)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L679)。补偿不是完备回放：Attributes 的 `ANY_SCOPE` 分支固定查询 `CLIENT_SCOPE`，不能补回 shared/server scope 夹缝更新；Timeseries latest 重查 latest，窗口订阅则按每 key 的 `lastTs + 1` 到当前时间，以固定 `limit=1000`、`Aggregation.NONE` 补查。
+
+```mermaid
+sequenceDiagram
+    participant WS as WS service
+    participant DB as DAO
+    participant Local as LocalSubscription
+    participant Owner as SubscriptionManager owner
+    WS->>DB: initial query, remember queryTs
+    DB-->>WS: snapshot + key timestamps
+    WS->>Local: addSubscription
+    alt aggregate subscription changed
+        Local->>Owner: TbEntitySubEvent(seq)
+        Owner->>Owner: register serviceId for entity
+        Owner-->>Local: callback(seq, entity update timestamps)
+        Local->>Local: clear pending subscription
+        Local->>DB: bounded checkMissedUpdates
+        DB-->>Local: newer values within compensation limits
+    else no aggregate change
+        Local->>Local: checkMissedUpdates directly
+    end
+    par initial update after addSubscription returns
+        WS-->>WS: send initial response
+    and callback may be synchronous or later over Core queue
+        Local-->>WS: updateProcessor compensation
+    end
+```
+
+### 4.2 saveAndNotify 后的 owner 路由
+
+[org.thingsboard.server.service.telemetry.DefaultTelemetrySubscriptionService.saveAndNotifyInternal(TenantId, EntityId, List, long, FutureCallback)](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L300) 先调用 `TimeseriesService.save`，在 Future 成功完成后调度 WebSocket notification callback。调用方 callback 与 WS callback 注册在同一 Future 上但使用不同 executor，源码不保证两者的相对先后。Attributes 对应方法是 [saveAndNotifyInternal(TenantId, EntityId, String, List, boolean, FutureCallback)](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L422)，同样只在 `AttributesService.save` Future 成功后调度通知。
+
+抽象父类最终把通知交给 `SubscriptionManagerService`。owner [onTimeSeriesUpdate(EntityId, List)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L265) 按 `entitySubscriptions` 中的 serviceId 和 keys 过滤；目标是本服务时直接调用 Local，远端时 [sendCoreNotification(String, EntityId, ToCoreNotificationMsg)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L527) 投递目标服务专属 notification topic。
+
+```mermaid
+flowchart LR
+    SOURCE["Transport / REST / Rule Engine source"] --> SAVE["saveAndNotify"]
+    SAVE --> DAO["TimeseriesService.save / AttributesService.save"]
+    DAO -->|"success"| MANAGER["SubscriptionManager owner"]
+    DAO -->|"failure"| FAIL["callback failure; no WS update"]
+    MANAGER --> FILTER["filter subscribed serviceIds and keys"]
+    FILTER -->|"local"| LOCAL["LocalSubscriptionService"]
+    FILTER -->|"remote"| NF["target Core notification topic"]
+    NF --> LOCAL
+```
+
+### 4.3 Local updateProcessor 到异步 socket
+
+[DefaultTbLocalSubscriptionService.onTimeSeriesUpdate(EntityId, List, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L348) 按 subscription type 和 keys 过滤，更新 key state，再把 `sub.getUpdateProcessor().accept` 提交到 `subscriptionUpdateExecutor`。Attributes 路径在 [onAttributesUpdate(EntityId, String, List, TbCallback)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L409)，还会校验 scope。
+
+v1 updateProcessor 调 `WebSocketService.sendUpdate(sessionId, cmdId, update)`；v2 context 把实体级内部 subscriptionId 映射回 entity/cmd。最终 [DefaultWebSocketService.sendUpdate(WebSocketSessionRef, int, Object)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L1129) JSON 序列化后提交 work-stealing executor，再调用 `WebSocketMsgEndpoint.send`，进入 session 出站队列和 JSR-356 `AsyncRemote.sendText`。
+
+```mermaid
+flowchart TB
+    OWNER["owner update"] --> LOCAL["LocalSubscriptionService"]
+    LOCAL --> MATCH["match entity/type/scope/keys"]
+    MATCH --> EXEC1["subscriptionUpdateExecutor"]
+    EXEC1 --> PROCESSOR["TbSubscription.updateProcessor"]
+    PROCESSOR --> V1V2["v1 sendUpdate or v2 context transform"]
+    V1V2 --> JSON["Jackson serialization"]
+    JSON --> EXEC2["WebSocketService executor"]
+    EXEC2 --> ENDPOINT["TbWebSocketHandler.send"]
+    ENDPOINT --> OUTQ["per-session outbound queue"]
+    OUTQ --> ASYNC["AsyncRemote.sendText"]
+```
+
+---
+
+## 五、时序图
+
+[PlantUML 源文件](sequence.puml) 与 [时序图 SVG](sequence.svg) 对应下面的主链；Mermaid 版本可在 Markdown 中直接渲染。
+
+[![WebSocket 订阅完整时序图](sequence.svg)](sequence.svg)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Browser
+    participant Sec as Spring Security
+    participant H as TbWebSocketHandler
+    participant WS as DefaultWebSocketService
+    participant DAO as Timeseries/Attributes DAO
+    participant Local as LocalSubscriptionService
+    participant Owner as SubscriptionManager owner
+    participant Q as Core notification topic
+    UI->>Sec: Upgrade /api/ws without REST JWT context
+    Sec-->>H: permitAll and JWT-filter skip
+    H->>H: URL token auth or pending cache with 10s expiry policy
+    UI->>H: WsCommandsWrapper(authCmd?, cmds)
+    H->>WS: handleCommands(sessionRef, wrapper)
+    WS->>DAO: initial query
+    DAO-->>WS: snapshot
+    WS->>Local: addSubscription(queryTs, keyStates, updateProcessor)
+    par initial update after addSubscription returns
+        WS-->>UI: initial update
+    and registration outcome
+        alt aggregate subscription changed
+            alt owner is local
+                Local->>Owner: onSubEvent and callback may be synchronous
+            else owner is remote
+                Local->>Q: ToCoreMsg with null producer callback
+                Q->>Owner: DefaultTbCoreConsumerService
+            end
+            Owner-->>Local: sub event callback + update timestamps
+            Local->>DAO: bounded checkMissedUpdates when needed
+        else aggregate subscription did not change
+            Local->>DAO: direct bounded checkMissedUpdates
+        end
+    end
+    Note over DAO,Owner: Later saveAndNotify succeeds
+    DAO->>Owner: onTimeSeriesUpdate / onAttributesUpdate
+    alt WS service is local to owner
+        Owner->>Local: direct update
+    else WS service is remote
+        Owner->>Q: target Core notification
+        Q->>Local: forwardToLocalSubMgrService
+    end
+    Local->>WS: updateProcessor
+    WS->>H: async endpoint.send
+    H-->>UI: queued WebSocket text frame
+```
+
+这张图的事务边界只有 DAO Future 成功回调：数据库保存和实时通知不是一个可回滚的分布式事务；notification queue 发送失败也不会回滚已经提交的数据。初始响应与补偿响应的顺序由订阅局部锁尽量约束，跨节点 queue 与异步 executor 仍可能改变到达时序，v2 因此另做 stale/duplicate 过滤。
+
+---
+
+## 六、数据变化
+
+### 6.1 session 与 subscription 状态
+
+| 阶段 | 内存状态 | 数据库/队列状态 | 客户端输出 |
+|---|---|---|---|
+| Upgrade 无 token | pending cache、external -> internal 映射 | 无 | 无 |
+| 认证成功 | internal/external maps、`wsSessionsMap`、limit sets | 无 | 同帧命令可继续执行 |
+| 初始查询 | v1 keyStates 或 v2 context | SELECT Entity/Alarm/Attributes/Timeseries | 初始 snapshot |
+| addSubscription | session -> subs、entity -> subs、pending seq | 本地调用或 Core subscription event | 暂无或紧随初始包 |
+| owner callback | entity update timestamps、pending 清除 | 必要时补查 | missed update |
+| saveAndNotify | owner 更新实体 update timestamp | DB 已成功；可能发 notification | realtime update |
+| 已登记 session 的正常 close | 删除 session、v1/v2 subscriptions 和可定位的 limits | 发 remove subscription event | socket close |
+| pending expiry / limit check 中途失败 | metadata 可能已从 pending 移除或尚未写 internal map | 无订阅；external map 或已登记 limit set 可能残留 | socket close |
+
+```mermaid
+stateDiagram-v2
+    [*] --> PendingAuth
+    PendingAuth --> WsSession: authentication
+    WsSession --> QueryContext: command accepted
+    QueryContext --> PendingOwnerAck: addSubscription
+    PendingOwnerAck --> Active: owner callback
+    PendingOwnerAck --> Active: early checkMissedUpdates
+    Active --> Active: realtime updates
+    Active --> Removed: unsubscribe or close
+    Removed --> [*]
+```
+
+[DefaultWebSocketService.handleSessionEvent(WebSocketSessionRef, SessionEvent)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L260) 在 `CLOSED` 时删除 `wsSessionsMap`、取消全部 v1/v2 session subscriptions 并清理 v1 subscription limits。Handler 的 [afterConnectionClosed(WebSocketSession, CloseStatus)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L374) 只有在仍能从 internal 或 pending map 找到 `SessionMetaData` 时，才继续删除 external map、session limits、rate-limit state 和 blacklist。
+
+这里有两个确定的清理缺口。pending EXPIRED listener 先移除 entry 再关闭 socket，`afterConnectionClosed` 随后可能找不到 metadata，留下 `externalSessionMap` 条目。`checkLimits` 又是逐层先向 tenant/customer/user set 加 session，再进行下一层检查；若后层失败，正式 `SessionMetaData` 尚未放入 internal map，close callback 同样无法 `cleanupLimits`，先前 set 项可能残留。Transport `ERROR` 事件本身也只记录日志，不取消订阅，必须等真正 `afterConnectionClosed`。
+
+### 6.2 v2 stale 与 duplicate 过滤
+
+[org.thingsboard.server.service.subscription.TbEntityDataSubCtx.sendWsMsg(String, TelemetrySubscriptionUpdate, EntityKeyType, boolean)](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbEntityDataSubCtx.java#L118) 先用内部 subscriptionId 查 entity；映射已被重建或取消时整包视为 stale 丢弃。latest 更新中，时间戳小于当前值或同 timestamp/value 的重复值被删除。AlarmData context 也在找不到映射时丢弃 stale update。
+
+需要注意 [TbEntityDataSubCtx.sendTsWsMsg(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbEntityDataSubCtx.java#L199) 对窗口时序的旧 timestamp 只记录日志，真正 `updateList.remove(update)` 已注释；同 timestamp/value 的重复值仍删除。这不是“v2 对所有旧时序点严格丢弃”。
+
+```mermaid
+flowchart TB
+    UPDATE["v2 entity-level update"] --> MAP{"subscriptionId still mapped"}
+    MAP -->|"no"| DROP1["drop stale context update"]
+    MAP -->|"yes"| MODE{"latest or timeseries"}
+    MODE -->|"latest"| CMP["compare current TsValue"]
+    CMP -->|"older or exact duplicate"| DROP2["remove value"]
+    CMP -->|"newer"| SEND["send EntityDataUpdate"]
+    MODE -->|"timeseries"| TSCMP["remove exact duplicates"]
+    TSCMP --> NOTE["older points logged but retained"]
+    NOTE --> SEND
+```
+
+### 6.3 纯内存、重启与拓扑变化
+
+`TbWebSocketHandler` maps、`DefaultWebSocketService.wsSessionsMap`、v2 `subscriptionsBySessionId`、Local `subscriptionsByEntityId` 和 owner `entitySubscriptions` 都是 `ConcurrentMap`，没有数据库表或 Redis 持久化。Core owner 重启或分区变化时，[DefaultTbLocalSubscriptionService.onApplicationEvent(ClusterTopologyChangeEvent)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L174) 会重推当前本地订阅；收到 Core startup message 也会把落到其分区的订阅重推。
+
+该机制依赖 WS 节点仍存活并持有本地订阅。WS 节点自身重启时 socket 已断、状态已失，不能从 Kafka replay 或数据库恢复；客户端必须重连。拓扑切换期间 owner 对外部分区事件会返回失败，存在事件重试/重订阅之前的漏更窗口，`checkMissedUpdates` 只能在订阅确认流程重新发生后补查。
+
+```mermaid
+flowchart LR
+    TOPO["Core topology change"] --> REPLAY["WS node re-pushes in-memory subscriptions"]
+    REPLAY --> NEWOWNER["new owner rebuilds entitySubscriptions"]
+    NEWOWNER --> ACK["callback + checkMissedUpdates"]
+    WSCRASH["WS node restart"] --> LOST["socket and subscriptions lost"]
+    LOST --> CLIENT["client reconnect + resubscribe"]
+    KAFKA["queue retention"] -. "does not restore session" .-> LOST
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 类型关系与职责边界
+
+```mermaid
+classDiagram
+    class TbWebSocketHandler {
+      +handleTextMessage(WebSocketSession, TextMessage)
+      +afterConnectionEstablished(WebSocketSession)
+      +afterConnectionClosed(WebSocketSession, CloseStatus)
+      +send(WebSocketSessionRef, int, String)
+    }
+    class WebSocketService {
+      +handleSessionEvent(WebSocketSessionRef, SessionEvent)
+      +handleCommands(WebSocketSessionRef, WsCommandsWrapper)
+      +sendUpdate(String, int, TelemetrySubscriptionUpdate)
+    }
+    class DefaultWebSocketService
+    class TbEntityDataSubscriptionService
+    class TbLocalSubscriptionService
+    class SubscriptionManagerService
+    WebSocketService <|.. DefaultWebSocketService
+    TbWebSocketHandler --> WebSocketService
+    DefaultWebSocketService --> TbEntityDataSubscriptionService
+    DefaultWebSocketService --> TbLocalSubscriptionService
+    TbEntityDataSubscriptionService --> TbLocalSubscriptionService
+    TbLocalSubscriptionService --> SubscriptionManagerService
+```
+
+`TbWebSocketHandler` 拥有网络连接和队列；`DefaultWebSocketService` 拥有 GENERAL command dispatch 与 v1；`DefaultTbEntityDataSubscriptionService` 拥有 v2 query context；`DefaultTbLocalSubscriptionService` 拥有当前 WS 服务的实体级订阅与 updateProcessor；`DefaultSubscriptionManagerService` 拥有按 Core 分区划分的全局 serviceId 路由视图。把后两者都简称为“SubscriptionManager”会掩盖 owner 与连接节点的区别。
+
+### 7.2 addSubscription 的设计原因
+
+[DefaultTbLocalSubscriptionService.modifySubscription(TenantId, EntityId, TbSubscription, boolean)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L616) 只在聚合后的 keys/type/scope 发生变化时产生 owner event，减少每个 UI widget 都跨节点注册的消息量。`TbEntityLocalSubsInfo` 聚合同一实体在本服务的多个订阅；owner 只需记录“哪个 serviceId 对哪些 key 感兴趣”，精细的 session/cmd fan-out 留在 Local 节点。
+
+```mermaid
+flowchart LR
+    S1["session A sub"] --> AGG["TbEntityLocalSubsInfo"]
+    S2["session B sub"] --> AGG
+    S3["v2 entity sub"] --> AGG
+    AGG --> EVENT["aggregated TbEntitySubEvent"]
+    EVENT --> OWNER["owner stores serviceId + key sets"]
+    OWNER --> ONE["one update per interested WS service"]
+    ONE --> FANOUT["Local node fans out to sessions"]
+```
+
+### 7.3 v1/v2 限制的不对称
+
+v1 `processSubscription` 维护 tenant/customer/regular-user/public-user sets，并在超过 tenant profile 的 max WS subscriptions 时关闭 session；它也不是严格的 Local subscription 数量计数：登记发生在后续参数/权限/DAO 成功之前，重复 cmdId 不增加 set 项，失败查询仍可能占项，regular/public user 的单 unsubscribe 分支也没有对称 remove。v2 handlers 从 command map 直接进入 `TbEntityDataSubscriptionService`，不经过该方法。
+
+这意味着把 tenant profile 的 `maxWsSubscriptionsPerTenant` 当成所有 GENERAL 命令的统一硬上限是不准确的。v2 一个 cmdId 可以展开为大量实体级 Local subscriptions；`max_entities_per_data_subscription` 只作为 `allowedEntities` 回传，没有截断原 query，`maxDatapointLimit` 也未被消费。其容量模型是“命令上下文数量 × 实际查询实体数 × latest/TS keys”，必须结合出站队列和数据库查询成本评估。
+
+```mermaid
+flowchart TB
+    GENERAL["GENERAL command"] --> TYPE{"v1 or v2"}
+    TYPE -->|"v1 ATTRIBUTES/TIMESERIES"| PSL["processSubscription"]
+    PSL --> PROFILE["tenant/customer/user subscription limits"]
+    TYPE -->|"v2 ENTITY_DATA/ALARM_DATA"| CTX["context directly"]
+    CTX --> ENTITYLIMIT["partial limits and response hints, not one hard cap"]
+    PROFILE --> LOCAL["Local subscriptions"]
+    ENTITYLIMIT --> LOCAL
+```
+
+### 7.4 关闭清理与潜在 ID 不对称
+
+对已经正式登记且 metadata 仍可定位的连接，关闭事件按 external sessionId 同时调用 v1 `cancelAllSessionSubscriptions` 和 v2 `cancelAllSessionSubscriptions`，这是最完整的清理路径；pending expiry 与 limit check 中途失败仍有前述 map/set 残留窗口。单个 v1 unsubscribe 在 [DefaultWebSocketService.unsubscribe(WebSocketSessionRef, SubscriptionCmd, String)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L977) 把客户端 `cmdId` 传给 Local service；而创建订阅使用 `sessionSubIdSeq.incrementAndGet()` 作为内部 subscriptionId。客户端 cmdId 若不与该序列一致，单订阅取消可能找不到内部条目，连接关闭仍会尝试全量清理。
+
+### 7.5 缓存边界
+
+本主链没有“把 WebSocket session 存 Redis”的能力。Caffeine 只用于带 10 秒过期策略的 pending auth 和 Attributes DAO cache 等局部用途；EntityData/AlarmData 查询本身不是结果缓存。v1/v2 初始 Attributes 指定 keys 时可能命中 `CachedAttributesService`，`findAll` 则直接查 DAO；Timeseries latest/历史由对应 DAO 决定，不使用本章 session map 作为数据缓存。
+
+---
+
+## 八、Actor 分析
+
+WebSocket 建连、JSON 命令、权限校验、初始 DAO 查询、订阅注册、owner 路由和 socket send 都是普通 Spring service/executor 调用，不向 `ActorSystem` 发送命令。`DefaultTbCoreConsumerService` 虽同时能转发 device actor 消息，但 subscription manager 分支在 [launchMainConsumers()](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L334) 直接调用 `forwardToSubMgrService`，notification 分支直接调用 LocalSubscriptionService。
+
+Actor/Rule Engine 的正确位置是“更新来源”：设备消息可先经 Device Actor 和规则链，规则节点也可写 telemetry；一旦调用 `saveAndNotify` 且 DAO Future 成功，后半段进入 SubscriptionManager，不再回 Actor。REST telemetry 写入同样可以触发完全相同的订阅后半链。
+
+```mermaid
+flowchart LR
+    DEVICE["Device transport"] --> ACTOR["Device Actor"]
+    ACTOR --> RULE["Rule Engine"]
+    REST["REST telemetry write"] --> SAVE["saveAndNotify"]
+    RULE --> SAVE
+    SAVE --> SUB["SubscriptionManager route"]
+    SUB --> WS["WebSocket LocalSubscription"]
+    CMD["WebSocket subscription command"] --> WSVC["WS services"]
+    WSVC --> DB["DAO initial query"]
+    WSVC --> SUB
+    WSVC -. "does not enter" .-> ACTOR
+```
+
+因此不能用 Actor mailbox 背压解释 WebSocket 入站/出站队列，也不能把 Rule Engine queue 的成功消费当成 WebSocket 已送达。两条链只在业务更新写入处相接。
+
+---
+
+## 九、Kafka 分析
+
+### 9.1 in-memory 与 Kafka 可选性
+
+[thingsboard.yml queue.type](../../../application/src/main/resources/thingsboard.yml#L1325) 默认是 `in-memory`。单体模式由 [org.thingsboard.server.queue.provider.InMemoryMonolithQueueFactory](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/InMemoryMonolithQueueFactory.java#L53) 提供 Core consumer；Kafka Core 服务由 [KafkaTbCoreQueueFactory](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L69) 条件装配。故“WebSocket 订阅依赖 Kafka”是错误结论；它依赖 TbQueue 抽象，单节点可完全使用内存队列。
+
+```mermaid
+flowchart TB
+    CONFIG{"queue.type / service.type"}
+    CONFIG -->|"in-memory + monolith"| IM["InMemoryMonolithQueueFactory"]
+    CONFIG -->|"kafka + tb-core"| KF["KafkaTbCoreQueueFactory"]
+    IM --> API["TbCoreQueueFactory"]
+    KF --> API
+    API --> MAIN["Core main consumer"]
+    API --> NF["per-service Core notification consumer"]
+```
+
+### 9.2 Core topic、notification topic 与 consumer
+
+`queue.core.topic` 默认 [tb_core](../../../application/src/main/resources/thingsboard.yml#L1558)，承载发给实体 owner 的 `ToCoreMsg`，包括 `SubscriptionMgrMsgProto`。`TopicService.getNotificationsTopic(ServiceType, String)` 在 [org.thingsboard.server.queue.discovery.TopicService](../../../common/queue/src/main/java/org/thingsboard/server/queue/discovery/TopicService.java#L62) 生成 `tb_core.notifications.<serviceId>`，用于 owner 把 callback/数据更新精确发回持有 WebSocket 的 Core 服务。
+
+[KafkaTbCoreQueueFactory.createToCoreMsgConsumer()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L247) 订阅 Core topic；[createToCoreNotificationsMsgConsumer()](../../../common/queue/src/main/java/org/thingsboard/server/queue/provider/KafkaTbCoreQueueFactory.java#L265) 订阅本 serviceId 的 notification topic。[DefaultTbCoreConsumerService.handleNotification(...)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L503) 将 `ToLocalSubscriptionServiceMsg` 转到 Local service，将 `ToSubscriptionMgrMsg` 转到 owner。
+
+```mermaid
+sequenceDiagram
+    participant W as WS Core service A
+    participant CT as tb_core partition
+    participant O as Owner Core service B
+    participant NT as tb_core.notifications.A
+    participant L as LocalSubscription A
+    W->>CT: subscription event keyed by entity
+    CT->>O: mainConsumer.poll
+    O->>O: onSubEvent / register service A
+    O->>NT: callback or entity update
+    NT->>W: notifications consumer
+    W->>L: forwardToLocalSubMgrService
+```
+
+Kafka 的 ack/commit 只证明 Core consumer 处理结果，不证明浏览器收帧。远端 notification producer 在 `sendCoreNotification` 中 callback 为 null；队列故障无法回滚 DB，最终一致性依赖重推订阅、后续更新和客户端重连。
+
+---
+
+## 十、数据库分析
+
+### 10.1 Entity 与 Alarm 查询
+
+v2 `TbAbstractDataSubCtx.findEntityData()` 调 [BaseEntityService.findEntityDataByQuery(TenantId, CustomerId, EntityDataQuery)](../../../dao/src/main/java/org/thingsboard/server/dao/entity/BaseEntityService.java#L111)，进入 [DefaultEntityQueryRepository.findEntityDataByQuery(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L460)。它用 `NamedParameterJdbcTemplate` 拼装 PostgreSQL count/data SQL、relation CTE、latest/attribute joins 和分页；WebSocket 与 REST 可以复用同一 DAO，但本章入口不是 REST EntityQuery Controller。
+
+AlarmData 在 [TbAlarmDataSubCtx.fetchAlarms()](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbAlarmDataSubCtx.java#L144) 调 [BaseAlarmService.findAlarmDataByQueryForEntities(...)](../../../dao/src/main/java/org/thingsboard/server/dao/alarm/BaseAlarmService.java#L246)，最终由 [DefaultAlarmQueryRepository.findAlarmDataByQueryForEntities(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultAlarmQueryRepository.java#L171) 对 PostgreSQL `alarm_info` 及已解析实体集合执行动态 SQL。
+
+```mermaid
+flowchart TB
+    V2["EntityData / AlarmData cmd"] --> ENT["resolve EntityDataQuery"]
+    ENT --> ESQL["DefaultEntityQueryRepository PostgreSQL SQL"]
+    ESQL --> PAGE["ordered entity page"]
+    PAGE --> ALARM{"AlarmData?"}
+    ALARM -->|"yes"| ASQL["DefaultAlarmQueryRepository alarm_info SQL"]
+    ALARM -->|"no"| DATA["EntityData initial result"]
+    ASQL --> ADATA["AlarmData page"]
+```
+
+### 10.2 Attributes 查询与 cache
+
+v1 初查和 v2 latest filter 最终调用 `AttributesService`。指定 key 集合时 [CachedAttributesService.find(TenantId, EntityId, String, Collection)](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/CachedAttributesService.java#L211) 先读所选 Caffeine/Redis DAO cache，miss 再查 PostgreSQL `attribute_kv`；全量 [findAll(TenantId, EntityId, String)](../../../dao/src/main/java/org/thingsboard/server/dao/attributes/CachedAttributesService.java#L294) 因 key 集未知而直接提交 DAO 查询。补偿查询同样遵循这条边界。
+
+### 10.3 Timeseries 的 SQL、TimescaleDB、Cassandra 选择
+
+[org.thingsboard.server.dao.timeseries.BaseTimeseriesService.findAllByQueries(TenantId, EntityId, List)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L128) 把历史/窗口查询交给注入的 `TimeseriesDao`；latest 则走独立的 `TimeseriesLatestDao`。历史由 `database.ts.type` 选择 SQL、TimescaleDB 或 Cassandra，latest 由 `database.ts_latest.type` 独立选择，hybrid 部署中两者可以不同；WebSocket service 不自行拼 SQL/CQL。
+
+| 类型 | 历史 DAO 入口 | 关键查询行为 |
+|---|---|---|
+| SQL/PostgreSQL | [JpaSqlTimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/sql/JpaSqlTimeseriesDao.java#L64) | 分块 SQL 聚合与 `ts_kv` 查询 |
+| TimescaleDB | [TimescaleTimeseriesDao.findAllAsync(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L149) | time_bucket/聚合 repository 或 limit 查询 |
+| Cassandra | [CassandraBaseTimeseriesDao.findAllAsync(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/CassandraBaseTimeseriesDao.java#L239) | 按分区顺序异步读取并在必要时聚合 |
+
+```mermaid
+flowchart LR
+    TSQ["TimeseriesService query"] --> KIND{"latest or history"}
+    KIND -->|"latest"| LTYPE{"database.ts_latest.type"}
+    KIND -->|"history"| TYPE{"database.ts.type"}
+    TYPE -->|"sql"| PG["JpaSqlTimeseriesDao"]
+    TYPE -->|"timescale"| TDB["TimescaleTimeseriesDao"]
+    TYPE -->|"cassandra"| CAS["CassandraBaseTimeseriesDao"]
+    LTYPE -->|"sql / timescale"| LSQL["SQL latest DAO"]
+    LTYPE -->|"cassandra"| LCAS["Cassandra latest DAO"]
+```
+
+初始查询可能较慢并消耗数据库 callback executor；实时通知本身携带已保存的 KV，不会为每条普通更新重新查历史库。只有 owner 注册补偿、v2 动态 query、Alarm 页面刷新或 latest 缺失补查会再次触发数据库读。
+
+---
+
+## 十一、异常处理
+
+### 11.1 失败矩阵
+
+| 失败点 | 源码行为 | 状态风险 |
+|---|---|---|
+| Upgrade 后 URL token 无效 | `BAD_DATA`/`SERVER_ERROR` 关闭 | 无正式订阅 |
+| 超过 10 秒 auth policy 后 entry 被维护/访问发现过期 | pending removal listener 关闭 | entry 已先移除，close 可能找不到 metadata 并留下 external map |
+| JSON 解析失败且未认证 | `BAD_DATA` 关闭 | 无命令执行 |
+| JSON 解析失败且已认证 | 返回 `BAD_REQUEST` update | session 保持 |
+| 权限/初始 DAO 查询失败 | v1/v2 error update；部分 runtime 会以 `SERVICE_RESTARTED` 关闭 | 无完整初始状态 |
+| addSubscription owner 路由失败 | producer 使用 null callback；依赖日志、拓扑重推或客户端重订阅 | 漏更窗口扩大 |
+| DB save 失败 | 不调用 WS update callback | 数据与订阅保持旧值 |
+| remote notification 失败 | 不回滚 DB | 客户端可能漏一批更新 |
+| JSON 序列化/endpoint IO 失败 | 记录日志；发送异常通常关闭 | 已提交数据不受影响 |
+| sendTimeout/异步 send result 失败 | `SESSION_NOT_RELIABLE` 关闭 | 出站队列清空 |
+| 出站非原子 size counter 未通过阈值检查 | `POLICY_VIOLATION` 关闭 | 队列本身无硬容量，客户端必须重连 |
+| ping 超时 | `SESSION_NOT_RELIABLE` 关闭 | 已登记 session 通常触发订阅清理 |
+| transport ERROR event | 业务层只记录 ERROR | 不主动取消订阅，等待实际 close |
+
+```mermaid
+flowchart TB
+    ERROR{"Failure"}
+    ERROR -->|"auth / malformed first frame"| CLOSE1["close before subscription"]
+    ERROR -->|"initial query / permission"| RESPONSE["error update or service-restarted close"]
+    ERROR -->|"DB save"| NOWS["no WebSocket notification"]
+    ERROR -->|"remote queue after DB save"| GAP["data committed, client may miss update"]
+    ERROR -->|"send / ping / queue overflow"| CLOSE2["close; clean metadata that remains resolvable"]
+    ERROR -->|"transport error only"| LOG["log ERROR; wait for actual close"]
+```
+
+### 11.2 背压、sendTimeout 与 ping
+
+[TbWebSocketHandler.SessionMetaData.sendMsg(TbWebSocketMsg)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L564) 在 `outboundMsgQueueSize < maxMsgQueueSize` 时入队，否则关闭。默认全局上限来自 [thingsboard.yml](../../../application/src/main/resources/thingsboard.yml#L78) 的 1000，tenant profile 可把单 session 上限调得更小。这个 size check 与 increment 不是一个原子操作，也不计已经在途的 frame；它只限制 Handler 队列，不覆盖上游 `subscriptionUpdateExecutor` 与 WebSocket work-stealing executor，因此不是端到端背压。`processNextMsg()` 用 `AtomicBoolean isSending` 保证每 session 至多一个异步文本 send 在途；`onResult` 再发送下一条。
+
+入站 [SessionMetaData.onMsg(String)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L641) 使用无界 `ConcurrentLinkedQueue`，只以 lock 串行 drain，没有消息数或字节数背压。攻击者在处理线程被慢查询占用时可继续堆积文本帧，容器文本缓冲区限制不等于 session 入站队列容量限制。
+
+原生 `AsyncRemote` 的默认 `send_timeout` 是 5000ms；超时通过 `SendResult` 或异常关闭 session。`DefaultWebSocketService` 每 `ping_timeout / 3` 扫描一次，默认 30 秒未收到 pong 就关闭；`lastActivityTime` 只在 session 构造和 `processPongMessage` 更新，普通文本命令不会续期。ping 也走发送路径，其中 JSR-356 `sendPing` 是阻塞调用。
+
+```mermaid
+flowchart LR
+    UPDATES["many updates"] --> RATE{"WS_UPDATES_PER_SESSION rate limit"}
+    RATE -->|"exceeded"| BLACK["blacklist + one TOO_MANY_UPDATES error"]
+    RATE -->|"allowed"| Q{"outbound size < limit"}
+    Q -->|"yes"| FIFO["ConcurrentLinkedQueue"]
+    Q -->|"no"| CLOSE["POLICY_VIOLATION close"]
+    FIFO --> ONE["one async send in flight"]
+    ONE -->|"timeout/failure"| UNRELIABLE["SESSION_NOT_RELIABLE close"]
+```
+
+### 11.3 rate-limit blacklist 与 session limits
+
+[TbWebSocketHandler.send(WebSocketSessionRef, int, String)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L678) 先检查 `LimitedApi.WS_UPDATES_PER_SESSION`。首次超限把 external sessionId 放进 `blacklistedSessions` 并尝试发送一次 `TOO_MANY_UPDATES`，后续超限更新直接丢弃；速率恢复后移出 blacklist。它是丢更新机制，不是排队降速。
+
+[checkLimits(WebSocketSession, WebSocketSessionRef)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L759) 在认证后按 tenant/customer/regular/public user 限制 session 数。正常建立后再关闭时，[cleanupLimits(...)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L837) 清理 set、rate limiter 和 blacklist；但逐层 limit check 先 add 后检查，后层失败且 metadata 未入 internal map 时，close 无法回收此前 set 项。限制状态也只在当前 JVM，部署总量取决于节点数和流量粘性。
+
+### 11.4 排障顺序
+
+1. 先确认 URL 是 `/api/ws` GENERAL，而不是 deprecated plugin 或 Notifications。
+2. 对照 internal/external sessionId，确认 external -> internal 映射仍存在。
+3. 确认首帧认证、`wsSessionsMap` 与 tenant profile session limits。
+4. 按 cmd type 区分 v1/v2，检查 v1 `processSubscription` 或 v2 entity/alarm 限制。
+5. 对比初始查询结果、`queryTs`、owner subscription event 和 callback seq。
+6. 确认实体 owner 分区及 local/remote serviceId，检查 Core main 与 notification consumer。
+7. 确认 `saveAndNotify` 的 DAO Future 成功，不能只看 Actor/Rule Engine 已处理。
+8. 检查 Local key/scope filter、v2 stale filter、rate-limit blacklist 和出站队列。
+9. 最后检查 `sendTimeout`、pong 时间、close status 和全量 subscription cleanup。
+
+---
+
+## 十二、源码阅读路线
+
+1. [WebSocketConfiguration.registerWebSocketHandlers(...)](../../../application/src/main/java/org/thingsboard/server/config/WebSocketConfiguration.java#L81)：确认 `/api/ws/**` 的 Handler 注册。
+2. [ThingsboardSecurityConfiguration.buildJwtTokenAuthenticationProcessingFilter()](../../../application/src/main/java/org/thingsboard/server/config/ThingsboardSecurityConfiguration.java#L213)：确认 Upgrade 绕过常规 JWT filter。
+3. [TbWebSocketHandler.afterConnectionEstablished(...)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L289)：看 sendTimeout、URL token 与 session 建立。
+4. [TbWebSocketHandler.processMsg(...)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L207)：看 GENERAL/legacy wrapper 和首帧 authCmd。
+5. [WsCommandsWrapper](../../../application/src/main/java/org/thingsboard/server/service/ws/WsCommandsWrapper.java#L55)：看 v1/v2 `type` 多态边界。
+6. [DefaultWebSocketService.init()](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L209)：看 command handler map。
+7. [DefaultWebSocketService.handleCommands(...)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L287)：看逐命令分发与异常隔离。
+8. [handleWsAttributesSubscriptionCmd(...)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L572)：跟一次 v1 Attributes 初查与注册。
+9. [handleWsTimeseriesSubscriptionCmd(...)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L792)：区分 latest、窗口初查和实时订阅。
+10. [DefaultTbEntityDataSubscriptionService.handleCmd(..., EntityDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L253)：跟 v2 EntityData context。
+11. [DefaultTbEntityDataSubscriptionService.handleCmd(..., AlarmDataCmd)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbEntityDataSubscriptionService.java#L523)：跟 v2 AlarmData 查询和订阅。
+12. [DefaultTbLocalSubscriptionService.addSubscription(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L217)：看 session/entity 双索引。
+13. [DefaultTbLocalSubscriptionService.modifySubscription(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L616)：看聚合 event、owner 路由与 pending subscription。
+14. [DefaultSubscriptionManagerService.onSubEvent(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L142)：理解实体 owner 和 callback。
+15. [DefaultTbLocalSubscriptionService.checkMissedUpdates(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultTbLocalSubscriptionService.java#L679)：核对初查/注册竞态补偿。
+16. [DefaultTelemetrySubscriptionService.saveAndNotifyInternal(...)](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L300)：确认 DB 成功后才通知。
+17. [DefaultSubscriptionManagerService.onTimeSeriesUpdate(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/DefaultSubscriptionManagerService.java#L265)：跟 owner 的 local/remote fan-out。
+18. [DefaultTbCoreConsumerService.handleNotification(...)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbCoreConsumerService.java#L503)：看 remote notification consumer。
+19. [DefaultWebSocketService.sendUpdate(...)](../../../application/src/main/java/org/thingsboard/server/service/ws/DefaultWebSocketService.java#L1129)：看 JSON 与 executor 切换。
+20. [TbWebSocketHandler.SessionMetaData](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L464)：看出站背压、无界入站、ping 与 send callback。
+21. [BaseTimeseriesService.findAllByQueries(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L128)：确认 SQL/Timescale/Cassandra DAO 选择点。
+22. [DefaultEntityQueryRepository.findEntityDataByQuery(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultEntityQueryRepository.java#L460)：阅读 v2 实体动态 SQL，但不要把 REST Controller 当入口。
+23. [DefaultAlarmQueryRepository.findAlarmDataByQueryForEntities(...)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/query/DefaultAlarmQueryRepository.java#L171)：阅读 AlarmData PostgreSQL 查询。
+24. [TbEntityDataSubCtx.sendWsMsg(...)](../../../application/src/main/java/org/thingsboard/server/service/subscription/TbEntityDataSubCtx.java#L118)：核对 v2 stale/duplicate 过滤细节。
+25. [TbWebSocketHandler.afterConnectionClosed(...)](../../../application/src/main/java/org/thingsboard/server/controller/plugin/TbWebSocketHandler.java#L374)：用关闭清理结束整条链。
+
+---
+
+## 十三、常见面试题
+
+### 1. `/api/ws/**` 为什么可以 `permitAll`，这是否意味着 WebSocket 匿名可订阅？
+
+`permitAll` 只允许 HTTP Upgrade 到达 Handler，常规 JWT filter 也显式跳过该路径。业务认证在 `TbWebSocketHandler` 中通过 URL token 或首帧 `authCmd` 完成，未认证 session 不能执行订阅命令。
+
+### 2. URL token 和首帧 `authCmd` 有什么差别？
+
+URL token 在 `afterConnectionEstablished` 中立即认证，成功后直接检查 session limits 并注册正式 session。无 URL token 时连接进入带默认 10 秒 `expireAfterWrite` 策略的 pending cache，第一帧必须带有效 `authCmd`；同一帧中的 commands 会在认证成功后继续处理。没有专用 scheduler，因此不保证第 10 秒准时触发关闭。
+
+### 3. internal sessionId 与 external sessionId 分别是什么？
+
+internal ID 是 Spring `WebSocketSession.getId()`，用于找到真实连接。external ID 是 Handler 生成的 UUID，存入 `WebSocketSessionRef`，供 `wsSessionsMap`、订阅和跨节点回推定位；`externalSessionMap` 负责二者转换。
+
+### 4. GENERAL 与 deprecated telemetry WebSocket 的边界是什么？
+
+`/api/ws` GENERAL 直接解析 `WsCommandsWrapper`，是统一主入口。`/api/ws/plugins/telemetry` 才解析 deprecated `TelemetryCmdsWrapper` 并转换为公共 wrapper；不能用旧 wrapper 的字段形状定义 GENERAL 协议。
+
+### 5. `WsCommandsWrapper` 如何同时支持 v1 和 v2？
+
+`cmds` 使用 Jackson `@JsonTypeInfo(property="type")` 和 subtype 表。`ATTRIBUTES/TIMESERIES` 映射 v1 command，`ENTITY_DATA/ALARM_DATA` 等映射 v2 command，随后由 `WsCmdType -> WsCmdHandler` map 分发。
+
+### 6. v1 Timeseries 与 Attributes 的初始查询有什么区别？
+
+Attributes 按 scope/keys 调 `AttributesService.find/findAll`，结果转换为带 `lastUpdateTs` 的 KV。Timeseries 根据 keys、`timeWindow` 和聚合参数选择历史 `findAll`、指定 keys 的 `findLatest` 或全部 `findAllLatest`。
+
+### 7. `TIMESERIES_HISTORY` 与带 `timeWindow` 的 `TIMESERIES` 是否等价？
+
+不等价。`TIMESERIES_HISTORY` 只返回一次数据库查询结果，不调用 `addSubscription`；`TIMESERIES` 即使先查时间窗口，成功后仍注册实时订阅。
+
+### 8. v2 `EntityDataCmd.historyCmd` 与 `tsCmd` 的核心区别是什么？
+
+两者都可执行区间查询，但 `historyCmd` 调 `handleGetTsCmd(..., false)`，只是不创建这个子命令对应的时序订阅；同一个 `EntityDataCmd` 仍可继续执行 `latestCmd/tsCmd`。`tsCmd` 传 `true` 建实时订阅，`aggHistoryCmd/aggTsCmd` 也有相同区分。
+
+### 9. v2 AlarmData 的初始数据来自哪里？
+
+先用 EntityDataQuery 解析有序实体页，再由 `AlarmService.findAlarmDataByQueryForEntities` 查询 PostgreSQL `alarm_info`。Alarm query 中声明的 latest values 会额外创建 Attributes/Timeseries 订阅。
+
+### 10. 为什么初始查询后还要 `checkMissedUpdates`？
+
+数据库快照与 owner 完成订阅注册之间存在时间窗口。owner callback 携带实体最近更新时间，Local service 据 `queryTs` 和 keyStates 决定是否补查；但 ANY_SCOPE 属性只补 CLIENT_SCOPE，窗口 TS 每 key 最多取 1000 点，因此只能缩小窗口，不能保证补全。
+
+### 11. owner callback 能提供严格 exactly-once 吗？
+
+不能。它缩小初查/注册竞态，但 queue、进程崩溃、拓扑切换和异步 executor 仍可造成重复或漏更；v2 会过滤部分 stale/duplicate。session 与补偿状态不持久化，因此没有 exactly-once 协议。
+
+### 12. `SubscriptionManagerService` 的 owner 是什么？
+
+实体按 TB_CORE 分区解析到一个 owner Core 服务。owner 维护 entity -> interested serviceIds/key sets，接收 `saveAndNotify` 更新后决定本地直调还是发目标服务 notification topic。
+
+### 13. 实时 telemetry 从保存到浏览器的完整链是什么？
+
+`TimeseriesService.save` Future 成功后，`DefaultTelemetrySubscriptionService` 调 SubscriptionManager owner；owner 路由到 LocalSubscriptionService，Local 按实体/keys 过滤并执行 updateProcessor，WebSocketService 序列化后进入 Handler 的 per-session 出站队列，最终 `AsyncRemote.sendText`。
+
+### 14. WebSocket 订阅命令会经过 Actor 或 Rule Engine 吗？
+
+不会。命令链是 Handler -> WebSocketService -> DAO/Subscription services；Actor/Rule Engine 只是可能的数据更新来源。规则处理写入 telemetry 后，成功的 `saveAndNotify` 才与订阅后半链汇合。
+
+### 15. Kafka 是 WebSocket 订阅的必选依赖吗？
+
+不是。默认单体 `queue.type=in-memory`，同节点 owner 甚至直接方法调用；Kafka 是微服务/集群可选 TbQueue 实现。跨 Core 节点时才需要所选 queue backend 承载 main/notification topic。
+
+### 16. Core topic 与 Core notification topic 分别承载什么？
+
+默认 `tb_core` 按实体分区送 subscription event 和 update 到 owner。`tb_core.notifications.<serviceId>` 是目标 Core 服务专属 topic，把 owner callback 或过滤后的数据送回持有 WebSocket 的服务。
+
+### 17. 每 session 的 WebSocket 背压如何工作？
+
+Handler 出站 `ConcurrentLinkedQueue` 使用默认 1000 的目标阈值，且每 session 只允许一个异步文本 send 在途；size counter 未通过阈值检查时关闭连接。队列数据结构本身无界，check/increment 并非原子且不计在途 frame，上游两个 executor 也不受该阈值约束，所以它不是端到端硬背压。`WS_UPDATES_PER_SESSION` 超限时先 blacklist 并丢更新。
+
+### 18. 入站队列是否有同样的容量保护？
+
+没有。入站也是 `ConcurrentLinkedQueue`，但源码没有 size counter 或上限，只用 lock 串行 drain。慢查询或命令洪峰期间它可能无界增长，这是独立于容器单帧大小的内存风险。
+
+### 19. `sendTimeout` 与 ping timeout 的作用有什么不同？
+
+`sendTimeout` 限制 JSR-356 异步发送完成时间，失败后按不可靠 session 关闭。ping timeout 只依据最后 pong 时间，默认每 10 秒检查、30 秒无 pong 关闭；普通文本 activity 不更新该时间。只有真正 close 且 metadata 仍可定位时，清理链才完整执行。
+
+### 20. v2 是否受 v1 `processSubscription` 的 tenant subscription limit 保护？
+
+不受。v2 handler 直接转到 `TbEntityDataSubscriptionService`，没有调用该方法。`allowedEntities` 不截断 EntityData query、`maxDatapointLimit` 未被使用，Alarm 配置限制的是 originator 实体预查询页而不是告警条数；因此 tenant profile 的 v1 count 与这些配置都不能代表 v2 总 fan-out。
+
+### 21. Entity、Alarm、Attributes、Timeseries 分别查什么存储？
+
+EntityQuery 与 AlarmData 都由 PostgreSQL JDBC 动态 SQL 查询；Attributes 权威表也在 PostgreSQL，指定 keys 可先过 Caffeine/Redis DAO cache。Timeseries 历史按 `database.ts.type` 选择后端，latest 按独立的 `database.ts_latest.type` 选择，在 hybrid 部署可不同。
+
+### 22. WebSocket session 或 subscriptions 会存进 Redis/数据库吗？
+
+不会。连接 maps、v1/v2 contexts、Local/owner subscription indexes 全在 JVM 内存；Redis 只可能参与 Attributes DAO cache，Caffeine 还用于 pending auth。节点重启后客户端必须重新连接和订阅。
+
+### 23. v2 会丢弃所有时间戳较旧的更新吗？
+
+不会。latest value 路径会删除更旧值和完全重复值，失效 subscriptionId 也会整包丢弃；但窗口 timeseries 路径对更旧点只记录 stale 日志，实际删除代码被注释，只删除同 timestamp/value 的重复点。
+
+### 24. 连接关闭时清理哪些状态？
+
+正常建立且 metadata 仍可定位的连接关闭时，Handler 删除 internal/external maps、limit/rate state，WebSocketService 删除 `wsSessionsMap` 并取消全部 v1/v2 subscriptions，Local 再向 owner 发 remove event。pending expiry 先移除 entry 再 close 可能残留 external map；limit check 中途失败也可能残留已加入的 set 项。Transport ERROR 本身不执行这套清理。
+
+### 25. 排查“数据库已更新但浏览器没收到”应先看哪里？
+
+先确认 `saveAndNotify` 的 DAO Future 成功，再确认实体 owner、serviceId 路由及 main/notification consumer；随后检查 Local key/scope/stale 过滤、external -> internal session 映射、rate-limit blacklist、出站队列、send result 和 ping close。只看 Rule Engine 成功日志不足以证明 WebSocket 已投递。
+
+---
+
+[上一篇：32 Redis 与本地缓存流程](../32-redis-local-cache/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/33-websocket-subscription.svg) | [下一篇：34 Entity Query 流程](../34-entity-query/index.html)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1580" viewBox="0 0 2200 1580" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard 3.6 WebSocket 订阅架构</title>
+  <desc id="desc">展示 WebSocket 鉴权、命令处理、初始查询、本地订阅、跨节点订阅管理、实时更新和会话背压。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0 0L0 6L9 3z" fill="#1f2937"/></marker>
+    <marker id="redArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0 0L0 6L9 3z" fill="#991b1b"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif;fill:#111827;letter-spacing:0}
+      .title{font-size:42px;font-weight:700}.subtitle{font-size:20px;fill:#374151}.section{font-size:28px;font-weight:700}.label{font-size:23px;font-weight:700}.small{font-size:19px}.tiny{font-size:17px;fill:#374151}.edge{font-size:17px;font-weight:600}
+      .band{fill:#f8fafc;stroke:#334155;stroke-width:2}.blue{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}.green{fill:#dcfce7;stroke:#166534;stroke-width:3}.amber{fill:#fef3c7;stroke:#92400e;stroke-width:3}.red{fill:#fee2e2;stroke:#991b1b;stroke-width:3}.violet{fill:#ede9fe;stroke:#5b21b6;stroke-width:3}.gray{fill:#f3f4f6;stroke:#374151;stroke-width:3}.white{fill:#fff;stroke:#374151;stroke-width:2}
+      .line{fill:none;stroke:#1f2937;stroke-width:3;marker-end:url(#arrow)}.dash{fill:none;stroke:#1f2937;stroke-width:3;stroke-dasharray:10 8;marker-end:url(#arrow)}.redline{fill:none;stroke:#991b1b;stroke-width:3;marker-end:url(#redArrow)}
+    </style>
+  </defs>
+  <rect width="2200" height="1580" fill="#fff"/>
+  <text x="1100" y="58" text-anchor="middle" class="title">ThingsBoard 3.6 WebSocket 订阅架构</text>
+  <text x="1100" y="92" text-anchor="middle" class="subtitle">Handler 鉴权 · 初始快照 · 漏更补偿 · Core owner 路由 · 异步出站背压</text>
+
+  <rect x="35" y="125" width="2130" height="430" rx="6" class="band"/>
+  <text x="1100" y="164" text-anchor="middle" class="section">连接、认证与命令入口</text>
+  <rect x="75" y="215" width="300" height="240" rx="5" class="gray"/>
+  <text x="225" y="255" text-anchor="middle" class="label">Browser / Dashboard</text>
+  <text x="105" y="300" class="small">HTTP Upgrade /api/ws/**</text>
+  <text x="105" y="337" class="small">URL token 或首帧 authCmd</text>
+  <text x="105" y="374" class="small">WsCommandsWrapper JSON</text>
+  <text x="105" y="411" class="small">cmdId 关联响应与订阅</text>
+
+  <rect x="470" y="215" width="330" height="240" rx="5" class="amber"/>
+  <text x="635" y="255" text-anchor="middle" class="label">Security / WS Config</text>
+  <text x="500" y="300" class="small">Upgrade path permitAll / skip JWT filter</text>
+  <text x="500" y="337" class="small">handler 内 JwtAuthenticationProvider</text>
+  <text x="500" y="374" class="small">pending auth 默认 10 秒</text>
+  <text x="500" y="411" class="small">frame 上限 32768 bytes</text>
+
+  <rect x="895" y="195" width="360" height="280" rx="5" class="blue"/>
+  <text x="1075" y="235" text-anchor="middle" class="label">TbWebSocketHandler</text>
+  <text x="925" y="280" class="small">internal ↔ external sessionId</text>
+  <text x="925" y="317" class="small">入站无界队列，锁内串行解析</text>
+  <text x="925" y="354" class="small">出站无界 CLQ + 非原子计数阈值</text>
+  <text x="925" y="391" class="small">session/rate limits 与 ping</text>
+  <text x="925" y="428" class="small">actual close 才清理；ERROR 只记录</text>
+
+  <rect x="1350" y="215" width="340" height="240" rx="5" class="violet"/>
+  <text x="1520" y="255" text-anchor="middle" class="label">DefaultWebSocketService</text>
+  <text x="1380" y="300" class="small">WsCmdType → handler map</text>
+  <text x="1380" y="337" class="small">v1 ATTRIBUTES / TIMESERIES</text>
+  <text x="1380" y="374" class="small">v2 ENTITY / ALARM DATA</text>
+  <text x="1380" y="411" class="small">ESTABLISHED / CLOSED / ERROR</text>
+
+  <rect x="1785" y="215" width="330" height="240" rx="5" class="green"/>
+  <text x="1950" y="255" text-anchor="middle" class="label">Subscription contexts</text>
+  <text x="1815" y="300" class="small">v1 single-entity subscription</text>
+  <text x="1815" y="337" class="small">v2 EntityDataSubCtx</text>
+  <text x="1815" y="374" class="small">v2 AlarmDataSubCtx</text>
+  <text x="1815" y="411" class="small">history 子命令不建对应 TS subscription</text>
+
+  <path d="M375 335H470" class="line"/><path d="M800 335H895" class="line"/><path d="M1255 335H1350" class="line"/><path d="M1690 335H1785" class="line"/>
+
+  <rect x="35" y="590" width="2130" height="490" rx="6" class="band"/>
+  <text x="1100" y="630" text-anchor="middle" class="section">初始查询、订阅注册与实时更新</text>
+  <rect x="75" y="690" width="335" height="300" rx="5" class="amber"/>
+  <text x="243" y="730" text-anchor="middle" class="label">初始快照查询</text>
+  <text x="105" y="775" class="small">EntityData 动态 SQL 与分页</text>
+  <text x="105" y="812" class="small">Alarm 查询与实体过滤</text>
+  <text x="105" y="849" class="small">Attributes cache / DB</text>
+  <text x="105" y="886" class="small">Timeseries history / latest DAO</text>
+  <text x="105" y="923" class="small">SQL / Timescale / Cassandra</text>
+  <text x="105" y="960" class="tiny">结果不是数据库 snapshot + subscription 的原子事务</text>
+
+  <rect x="500" y="670" width="360" height="340" rx="5" class="green"/>
+  <text x="680" y="710" text-anchor="middle" class="label">LocalSubscriptionService</text>
+  <text x="530" y="755" class="small">subscriptionsBySessionId</text>
+  <text x="530" y="792" class="small">subscriptionsByEntityId</text>
+  <text x="530" y="829" class="small">add / cancel / cancelAll</text>
+  <text x="530" y="866" class="small">pending sub + seq callback</text>
+  <text x="530" y="903" class="small">bounded checkMissedUpdates 补查</text>
+  <text x="530" y="940" class="small">updateProcessor work-stealing pool</text>
+  <text x="530" y="977" class="tiny">session 与订阅只在 WebSocket 节点内存</text>
+
+  <rect x="950" y="670" width="360" height="340" rx="5" class="blue"/>
+  <text x="1130" y="710" text-anchor="middle" class="label">Subscription Manager owner</text>
+  <text x="980" y="755" class="small">按 TB_CORE entity partition</text>
+  <text x="980" y="792" class="small">记录 serviceId 与 subscribed keys</text>
+  <text x="980" y="829" class="small">过滤 telemetry / attributes / alarm</text>
+  <text x="980" y="866" class="small">local direct 或 target Core notification</text>
+  <text x="980" y="903" class="small">拓扑变化重新发布 subscription</text>
+  <text x="980" y="940" class="tiny">manager 不持有浏览器 socket</text>
+
+  <rect x="1400" y="670" width="330" height="340" rx="5" class="violet"/>
+  <text x="1565" y="710" text-anchor="middle" class="label">Core Queue</text>
+  <text x="1430" y="755" class="small">ToCore subscription events</text>
+  <text x="1430" y="792" class="small">subscription data updates</text>
+  <text x="1430" y="829" class="small">per-service notification topic</text>
+  <text x="1430" y="866" class="small">in-memory 默认 / Kafka 可选</text>
+  <text x="1430" y="903" class="small">producer ack ≠ WebSocket send</text>
+  <text x="1430" y="940" class="tiny">不是 client command 的必经入口</text>
+
+  <rect x="1820" y="670" width="295" height="340" rx="5" class="red"/>
+  <text x="1968" y="710" text-anchor="middle" class="label">更新来源</text>
+  <text x="1850" y="755" class="small">Telemetry saveAndNotify</text>
+  <text x="1850" y="792" class="small">Attribute save notify</text>
+  <text x="1850" y="829" class="small">Alarm create/update/delete</text>
+  <text x="1850" y="866" class="small">Rule Engine / Service 产生变更</text>
+  <text x="1850" y="903" class="small">持久化成功后进入 manager</text>
+  <text x="1850" y="940" class="tiny">WebSocket command 链本身不走 Actor</text>
+
+  <path d="M410 840H500" class="line"/><path d="M860 840H950" class="line"/><path d="M1310 840H1400" class="line"/><path d="M1820 840H1730" class="line"/>
+  <path d="M1400 930H1350V1030H680V1010" class="dash"/><text x="1030" y="1054" class="edge">remote update returns to socket-owning service</text>
+
+  <rect x="35" y="1115" width="2130" height="410" rx="6" class="band"/>
+  <text x="1100" y="1155" text-anchor="middle" class="section">背压、限制、失败与恢复</text>
+  <rect x="75" y="1200" width="385" height="255" rx="5" class="red"/>
+  <text x="268" y="1240" text-anchor="middle" class="label">出站保护</text>
+  <text x="105" y="1283" class="small">Handler 队列目标上限默认 1000</text>
+  <text x="105" y="1320" class="small">RemoteEndpoint.Async 单帧串行</text>
+  <text x="105" y="1357" class="small">send timeout 默认 5000 ms</text>
+  <text x="105" y="1394" class="small">队列满 / send failure 关闭 session</text>
+  <text x="105" y="1431" class="tiny">不覆盖上游 executor，非端到端背压</text>
+
+  <rect x="520" y="1200" width="385" height="255" rx="5" class="amber"/>
+  <text x="713" y="1240" text-anchor="middle" class="label">速率与资源限制</text>
+  <text x="550" y="1283" class="small">节点本地 Caffeine token buckets</text>
+  <text x="550" y="1320" class="small">首次 TOO_MANY_UPDATES，后续丢弃</text>
+  <text x="550" y="1357" class="small">session / v1 subscription limits</text>
+  <text x="550" y="1394" class="small">v2 hints/partial limits 不是统一硬上限</text>
+  <text x="550" y="1431" class="tiny">不是 Redis 全局集群配额</text>
+
+  <rect x="965" y="1200" width="385" height="255" rx="5" class="violet"/>
+  <text x="1158" y="1240" text-anchor="middle" class="label">会话生命周期</text>
+  <text x="995" y="1283" class="small">pending auth / established / closed</text>
+  <text x="995" y="1320" class="small">正式 session close 清 v1/v2 与 limits</text>
+  <text x="995" y="1357" class="small">进程重启不迁移 socket/subscription</text>
+  <text x="995" y="1394" class="small">浏览器必须重连、重查、重订阅</text>
+  <text x="995" y="1431" class="tiny">pending/partial limit 路径存在 map/set 残留窗口</text>
+
+  <rect x="1410" y="1200" width="705" height="255" rx="5" class="blue"/>
+  <text x="1763" y="1240" text-anchor="middle" class="label">必须分开排查的确认点</text>
+  <text x="1440" y="1283" class="small">Upgrade 成功 ≠ JWT 已认证 ≠ command 已注册订阅</text>
+  <text x="1440" y="1320" class="small">初始 SQL 返回 ≠ manager owner 已确认 ≠ 漏更补偿成功</text>
+  <text x="1440" y="1357" class="small">数据库保存成功 ≠ Core queue 投递 ≠ remote local updateProcessor</text>
+  <text x="1440" y="1394" class="small">queue send / consumer ack ≠ 浏览器收到 async frame</text>
+  <text x="1440" y="1431" class="tiny">日志、queue lag、subscription maps、outbound queue 与客户端状态需联合观测</text>
+
+  <path d="M460 1328H520" class="redline"/><path d="M905 1328H965" class="line"/><path d="M1350 1328H1410" class="line"/>
+</svg>

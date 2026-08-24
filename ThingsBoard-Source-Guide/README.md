@@ -2,7 +2,9 @@
 
 > 源码基线：ThingsBoard `release-3.6`，工作区提交 `69124284c2`。本文档只记录能够从当前工作区源码、配置和建表脚本中核实的行为。
 
-[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md) | [第 20 章：Cassandra 写入流程](chapters/20-cassandra-write/README.md) | [第 21 章：TimescaleDB 写入流程](chapters/21-timescale-write/README.md) | [第 22 章：PostgreSQL 写入流程](chapters/22-postgresql-write/README.md) | [第 23 章：HTTP 设备 API 流程](chapters/23-http-device-api/README.md) | [第 24 章：CoAP 消息流程](chapters/24-coap-message-flow/README.md) | [第 25 章：LwM2M 注册与观测流程](chapters/25-lwm2m-registration-observe/README.md) | [第 26 章：MQTT Gateway 流程](chapters/26-mqtt-gateway/README.md) | [第 27 章：Device Provision 流程](chapters/27-device-provision/README.md) | [第 28 章：Device Claim 流程](chapters/28-device-claim/README.md) | [第 29 章：Session 与 Device State 流程](chapters/29-session-device-state/README.md) | [第 30 章：Telemetry 查询流程](chapters/30-telemetry-query/README.md) | [第 31 章：Timeseries TTL 清理流程](chapters/31-timeseries-ttl-cleanup/README.md)
+[浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md) | [第 20 章：Cassandra 写入流程](chapters/20-cassandra-write/README.md) | [第 21 章：TimescaleDB 写入流程](chapters/21-timescale-write/README.md) | [第 22 章：PostgreSQL 写入流程](chapters/22-postgresql-write/README.md) | [第 23 章：HTTP 设备 API 流程](chapters/23-http-device-api/README.md) | [第 24 章：CoAP 消息流程](chapters/24-coap-message-flow/README.md) | [第 25 章：LwM2M 注册与观测流程](chapters/25-lwm2m-registration-observe/README.md) | [第 26 章：MQTT Gateway 流程](chapters/26-mqtt-gateway/README.md) | [第 27 章：Device Provision 流程](chapters/27-device-provision/README.md) | [第 28 章：Device Claim 流程](chapters/28-device-claim/README.md) | [第 29 章：Session 与 Device State 流程](chapters/29-session-device-state/README.md) | [第 30 章：Telemetry 查询流程](chapters/30-telemetry-query/README.md) | [第 31 章：Timeseries TTL 清理流程](chapters/31-timeseries-ttl-cleanup/README.md) | [第 32 章：Redis 与本地缓存流程](chapters/32-redis-local-cache/README.md) | [第 33 章：WebSocket 订阅流程](chapters/33-websocket-subscription/README.md) | [第 34 章：Entity Query 流程](chapters/34-entity-query/README.md) | [第 35 章：Relation 流程](chapters/35-relation-flow/README.md) | [第 36 章：Event 与 Audit Log 流程](chapters/36-event-audit-log/README.md)
+
+[第 37 章：Rule Node 外部集成流程](chapters/37-rule-node-external-integration/README.md) | [第 38 章：Notification 流程](chapters/38-notification-flow/README.md) | [第 39 章：Edge 同步流程](chapters/39-edge-sync/README.md) | [第 40 章：服务启动与关闭流程](chapters/40-service-lifecycle/README.md) | [第 41 章：限流与 API Usage 流程](chapters/41-rate-limit-api-usage/README.md) | [第 42 章：失败恢复与可观测性](chapters/42-failure-recovery-observability/README.md)
 
 ## 阅读定位
 
@@ -63,6 +65,17 @@
 | 29 | Session 与 Device State 流程 | 已完成 | [Markdown](chapters/29-session-device-state/README.md) / [HTML](chapters/29-session-device-state/index.html) / [PlantUML](chapters/29-session-device-state/sequence.puml) / [时序图 SVG](chapters/29-session-device-state/sequence.svg) / [架构图 SVG](assets/architecture/29-session-device-state.svg) |
 | 30 | Telemetry 查询流程 | 已完成 | [Markdown](chapters/30-telemetry-query/README.md) / [HTML](chapters/30-telemetry-query/index.html) / [PlantUML](chapters/30-telemetry-query/sequence.puml) / [时序图 SVG](chapters/30-telemetry-query/sequence.svg) / [架构图 SVG](assets/architecture/30-telemetry-query.svg) |
 | 31 | Timeseries TTL 清理流程 | 已完成 | [Markdown](chapters/31-timeseries-ttl-cleanup/README.md) / [HTML](chapters/31-timeseries-ttl-cleanup/index.html) / [PlantUML](chapters/31-timeseries-ttl-cleanup/sequence.puml) / [时序图 SVG](chapters/31-timeseries-ttl-cleanup/sequence.svg) / [架构图 SVG](assets/architecture/31-timeseries-ttl-cleanup.svg) |
+| 32 | Redis 与本地缓存流程 | 已完成 | [Markdown](chapters/32-redis-local-cache/README.md) / [HTML](chapters/32-redis-local-cache/index.html) / [PlantUML](chapters/32-redis-local-cache/sequence.puml) / [时序图 SVG](chapters/32-redis-local-cache/sequence.svg) / [架构图 SVG](assets/architecture/32-redis-local-cache.svg) |
+| 33 | WebSocket 订阅流程 | 已完成 | [Markdown](chapters/33-websocket-subscription/README.md) / [HTML](chapters/33-websocket-subscription/index.html) / [PlantUML](chapters/33-websocket-subscription/sequence.puml) / [时序图 SVG](chapters/33-websocket-subscription/sequence.svg) / [架构图 SVG](assets/architecture/33-websocket-subscription.svg) |
+| 34 | Entity Query 流程 | 已完成 | [Markdown](chapters/34-entity-query/README.md) / [HTML](chapters/34-entity-query/index.html) / [PlantUML](chapters/34-entity-query/sequence.puml) / [时序图 SVG](chapters/34-entity-query/sequence.svg) / [架构图 SVG](assets/architecture/34-entity-query.svg) |
+| 35 | Relation 流程 | 已完成 | [Markdown](chapters/35-relation-flow/README.md) / [HTML](chapters/35-relation-flow/index.html) / [PlantUML](chapters/35-relation-flow/sequence.puml) / [时序图 SVG](chapters/35-relation-flow/sequence.svg) / [架构图 SVG](assets/architecture/35-relation-flow.svg) |
+| 36 | Event 与 Audit Log 流程 | 已完成 | [Markdown](chapters/36-event-audit-log/README.md) / [HTML](chapters/36-event-audit-log/index.html) / [PlantUML](chapters/36-event-audit-log/sequence.puml) / [时序图 SVG](chapters/36-event-audit-log/sequence.svg) / [架构图 SVG](assets/architecture/36-event-audit-log.svg) |
+| 37 | Rule Node 外部集成流程 | 已完成 | [Markdown](chapters/37-rule-node-external-integration/README.md) / [HTML](chapters/37-rule-node-external-integration/index.html) / [PlantUML](chapters/37-rule-node-external-integration/sequence.puml) / [时序图 SVG](chapters/37-rule-node-external-integration/sequence.svg) / [架构图 SVG](assets/architecture/37-rule-node-external-integration.svg) |
+| 38 | Notification 流程 | 已完成 | [Markdown](chapters/38-notification-flow/README.md) / [HTML](chapters/38-notification-flow/index.html) / [PlantUML](chapters/38-notification-flow/sequence.puml) / [时序图 SVG](chapters/38-notification-flow/sequence.svg) / [架构图 SVG](assets/architecture/38-notification-flow.svg) |
+| 39 | Edge 同步流程 | 已完成 | [Markdown](chapters/39-edge-sync/README.md) / [HTML](chapters/39-edge-sync/index.html) / [PlantUML](chapters/39-edge-sync/sequence.puml) / [时序图 SVG](chapters/39-edge-sync/sequence.svg) / [架构图 SVG](assets/architecture/39-edge-sync.svg) |
+| 40 | 服务启动与关闭流程 | 已完成 | [Markdown](chapters/40-service-lifecycle/README.md) / [HTML](chapters/40-service-lifecycle/index.html) / [PlantUML](chapters/40-service-lifecycle/sequence.puml) / [时序图 SVG](chapters/40-service-lifecycle/sequence.svg) / [架构图 SVG](assets/architecture/40-service-lifecycle.svg) |
+| 41 | 限流与 API Usage 流程 | 已完成 | [Markdown](chapters/41-rate-limit-api-usage/README.md) / [HTML](chapters/41-rate-limit-api-usage/index.html) / [PlantUML](chapters/41-rate-limit-api-usage/sequence.puml) / [时序图 SVG](chapters/41-rate-limit-api-usage/sequence.svg) / [架构图 SVG](assets/architecture/41-rate-limit-api-usage.svg) |
+| 42 | 失败恢复与可观测性 | 已完成 | [Markdown](chapters/42-failure-recovery-observability/README.md) / [HTML](chapters/42-failure-recovery-observability/index.html) / [PlantUML](chapters/42-failure-recovery-observability/sequence.puml) / [时序图 SVG](chapters/42-failure-recovery-observability/sequence.svg) / [架构图 SVG](assets/architecture/42-failure-recovery-observability.svg) |
 
 完整规划见 [SUMMARY.md](SUMMARY.md)。待分析章节只链接到目录锚点，避免产生指向不存在文件的失效链接。
 
@@ -251,6 +264,72 @@ Telemetry REST 查询直接沿 `TelemetryController -> AccessValidator -> BaseTi
 Timeseries cleanup 由 SYS tenant Core partition owner 的 Spring scheduler 同步触发，且只进入 history `TimeseriesDao`。普通 PostgreSQL 先按 system TTL DROP cutoff 之前的完整分区，再按 tenant/customer `TTL` 属性 DELETE 行；TimescaleDB 3.6 只执行相同的行 DELETE，没有 `drop_chunks` 或 retention policy；Cassandra `cleanup` 为空，history 在写入时使用 `USING TTL`。
 
 SQL/Timescale 的 request TTL 和 tenant profile `defaultStorageTtlDays` 不写入 `ts_kv`，只参与 datapoint-days 计算；latest 也不会随 history 自动过期。release-3.6 SQL procedure 的 `tenant_ttl_ts/customer_ttl_ts` 未在每轮 loop 清空，TTL=0 可能沿用上一实体 cutoff；属性查询还缺少 scope 条件。生产启用前必须验证这一过程，并联合观察 WAL、dead tuples、VACUUM、replica lag；Cassandra 则重点观察 tombstone、compaction 与 partition registry 先于活跃 cell 过期的风险。
+
+## 第 32 章关键结论
+
+ThingsBoard 的多数 DAO 缓存使用自定义 `TbTransactionalCache`，少数配置服务才使用 Spring Cache 注解。Cache miss 后的数据库读取不持有缓存锁，因此并发 miss 仍会重复查库；Caffeine 的本地 transaction map 或 Redis 的 `WATCH/MULTI/EXEC` 只负责阻止并发更新后的旧查询结果重新污染缓存。负缓存通过“存在但值为 null 的 wrapper”与真正 miss 区分。
+
+Caffeine entry、锁、回填事务和失效事件都局限于当前 JVM，不能自动保证多 Core 节点一致；Redis 模式没有 Caffeine L1 或 DAO Pub/Sub，而是所有节点直接读写共享 key。实体保存通常在 PostgreSQL `AFTER_COMMIT` 后失效缓存，DB commit 与 cache evict 不原子；Redis 故障也不会自动降级为直查数据库。生产排障必须区分 Spring 数据库事务、自定义 cache transaction 与 RedisCacheManager 的 transaction-aware 行为。
+
+## 第 33 章关键结论
+
+`/api/ws/**` 的 HTTP Upgrade 被 Security Filter 放行，真正 JWT 校验发生在 `TbWebSocketHandler`：token 可来自 URL 或默认 10 秒内的首帧 `authCmd`。认证后的 external session、v1/v2 subscription context、入站/出站队列与 rate-limit bucket 都是节点本地内存状态；进程退出不会迁移，浏览器必须重连、重查并重订阅。
+
+初始 Entity/Alarm/Telemetry 查询直接访问 Attributes、Timeseries、Entity Query 和 Alarm DAO；注册后按 entity 的 TB Core partition 交给 Subscription Manager owner。它通过本地调用或 Core/notification queue 把持久化成功后的更新送回持有 socket 的节点，并用有范围的 `checkMissedUpdates` 缩小注册窗口。命令链本身不走 Actor，Kafka也不是必经后端；出站 CLQ 以默认 1000 的非原子计数阈值保护且串行发送，入站队列和上游 executor 没有端到端硬背压。
+
+## 第 34 章关键结论
+
+Entity Query 把多态 filter、key predicates、projection、latest join 和分页拼为 PostgreSQL SQL；find 固定先 count 再 data，两条 statement 不共享快照。Relation filter 使用独立 `WITH RECURSIVE` CTE，latest/attributes 每 key 扩展 join；通用 ATTRIBUTE 只按更新时间跨 scope 取一条。Repository 没有 statement timeout或通用 pageSize 上限，无排序 offset 不稳定。
+
+源码还有多处非理想边界：projection 不去重、alias 前缀可误判 filter 参数、ALARM_FIELD 会落入属性分支、未知 ENTITY_FIELD predicate 可被忽略，WS 新 context 会解析两次 dynamic value。SYS count/internal find 可以绕过 SQL permission；multi-root 的 `result.id` 次排序也不是全序。
+
+## 第 35 章关键结论
+
+Relation 是 `(from,typeGroup,type,to)` 有向复合主键，PostgreSQL `ON CONFLICT` 只更新 `additional_info`。精确/列表查询走 RelationCache，递归 `EntityRelationsQuery` 在 Java executor 做 BFS，而 Entity Query 的 `RelationsQueryFilter` 是另一套 SQL CTE。表与 cache key 都没有 tenantId，也没有端点外键，隔离依赖全局 UUID 与上层权限。
+
+同步写入、cache eviction、Edge action、Audit 和 Rule Engine 消息不共享事务；异步 save/delete listener 甚至不读取 Future 结果，失败仍可能失效缓存或发虚假 action。`existsById -> deleteById` 还有 TOCTOU 和吞异常窗口，Java BFS 的 `maxLevel<=0` 实际近似无界且只受 Future timeout。
+
+## 第 36 章关键结论
+
+Debug Event 与 Audit Log 是两条独立旁路。Debug 从 Rule Actor 经 ActorSystemContext 进入无界 SQL blocking queue，以 EventType 分批写五张 range partition 表；Audit 从业务动作进入共享 JpaExecutor 的独立 JPA transaction，保存后才由同一 callable 调用可选 sink。两者都不与主业务或 Rule Engine/Edge 消息形成原子提交，但 Audit 的同步 producer 构造或 executor 提交异常仍可能改变 HTTP 结果。
+
+Debug data/metadata/error 和 Audit actionData/failure stack 都可能包含敏感明文，字段截断不等于脱敏。Event queue `shutdownNow` 不 drain、batch 失败无 retry；多数 Audit Future 被调用方忽略，ES 内部任务失败只记日志，而 sink executor 拒绝会令 Audit Future 失败但不回滚已保存记录。TTL 默认按 SYS owner 整分区删除，非 owner 清本机分区缓存。
+
+## 第 37 章关键结论
+
+REST、MQTT、Kafka 与邮件 Rule Node 共享 `TbAbstractExternalNode` 的 ack/relation 框架，但连接资源、线程、协议确认和错误传播完全独立。它们的运行时路径不写业务数据库或 outbox；节点配置中的凭据则随 Rule Node 配置 JSON 持久化，外部 Success 也不等于 exactly-once。
+
+HTTP 并发控制会在 Actor 调用路径等待旧 Future；MQTT QoS 1 不是 Rule Engine 重试；Kafka `producer.send` 同步异常只记 debug，可能不产生 Failure relation；邮件 timeout 不取消底层 SMTP 发送。系统 SMTP 与自定义 SMTP 使用不同公开重载，最终才汇入私有发送方法。
+
+## 第 38 章关键结论
+
+Notification 把 request、rule、template、target、per-user notification 和 provider 投递拆为多段。request 即使部分 recipient/provider 失败仍可进入 `SENT`，release-3.6 没有统一 FAILED/PARTIAL 状态、投递 attempt 表、dead letter 或自动重试；重复 recipient 被静默跳过，不计 sent 或 error。
+
+WEB/MOBILE_APP 会先保存 notification 行并推 WebSocket 更新；MOBILE_APP 在数据库状态已为 SENT 后才检查 session/调用 FCM，后续推送失败不会回写。EMAIL/SMS/Slack/Teams 属于外部副作用，数据库 request 状态不能证明终端实际收到。
+
+## 第 39 章关键结论
+
+Cloud 下行先把变化写入 PostgreSQL `edge_event`，成功后用 Core notification 唤醒持有 gRPC session 的节点；会话分页读取、发 Downlink 并按消息 ID 等待确认。上行 Uplink 不写 Cloud `edge_event`，而是直接调用业务 processor，多个 Future 成功后才返回 response。
+
+`allEdgesRelated=false` 仍会按 action、显式 edgeId 和关系查询继续分流：显式目标可直接写指定 Edge，tenant-wide、无显式目标的 DELETED fan-out 与关系遍历会排除来源 Edge。snapshot sync 的临时 EdgeEvent 不落表，成功 ack 与重试耗尽都可能正常完成 task、设置 `syncCompleted=true` 并恢复增量唤醒。独立 Edge 发行物的本地持久队列不在本仓库，文档不推测其实现。
+
+## 第 40 章关键结论
+
+ThingsBoard 安装/升级和 Java 主服务是不同进程入口；Spring Bean 初始化只由依赖边和显式 `@Order` 形成偏序，没有全局 `@PostConstruct` 顺序。相同 order 的 ready listener 与无依赖 destroy callback 默认逐个调用，但相互顺序没有合同；回调提交的 executor 工作才可能并发。
+
+`TbCoreStartupService` 经 PartitionService 和 TbClusterService 广播启动通知。ZK 正常销毁先显式删除 nodePath，再关闭 cache/client，ephemeral session 只是失败兜底。Node.js JS Executor 还支持多种 queue，Kafka connect/subscribe/run 与 Kafka 专属关闭步骤不能泛化为所有 provider。
+
+## 第 41 章关键结论
+
+瞬时 REST/Transport Rate Limit、Tenant Profile 速率字段和月度 API Usage 是不同机制。即时 limiter 在接收请求的节点本地判定；usage 先异步上报，再由 TB_CORE 分区 owner 汇总并传播 ENABLED/WARNING/DISABLED 状态，因此它不是集群原子全局令牌桶。
+
+排障时必须分别确认“计量是否产生”“状态是否持久化/传播”“执行点是否读取禁用状态”。软阈值通知、硬拒绝和计划配额不能互相代替，CE release-3.6 也不能套用其他版本或 PE 的集中配额能力。
+
+## 第 42 章关键结论
+
+业务副作用、`TbMsgCallback`、consumer `commit()` 返回和 broker 真正确认是四个完成点。不同 queue provider 的 commit 可能同步确认、异步发起确认或吞掉异常；进程崩溃窗口和重投意味着消费者及外部集成仍需业务幂等，不能从“调用过 commit”推出 exactly-once。
+
+Rule Engine retry、Actor restart、Transport session 重连和数据库 batch Future 互不构成统一恢复协议。日志、Micrometer/Prometheus、JMX、queue lag、Debug Event 与 Audit Log 也各有盲区；生产排障要把 broker offset、callback 状态、数据库事实和外部副作用放在同一时间线上核对。
 
 ## 图表约定
 

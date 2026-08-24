@@ -1,0 +1,222 @@
+@startuml
+title ThingsBoard 3.6 Relation 创建、查询与删除完整时序
+
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontColor #111827
+skinparam shadowing false
+skinparam roundcorner 4
+skinparam sequence {
+ ArrowColor #1F2937
+ ActorBorderColor #111827
+ ActorBackgroundColor #F8FAFC
+ ActorFontColor #111827
+ LifeLineBorderColor #334155
+ LifeLineBackgroundColor #F8FAFC
+ ParticipantBorderColor #1F2937
+ ParticipantBackgroundColor #E8F4FD
+ ParticipantFontColor #111827
+ NoteBorderColor #92400E
+ NoteBackgroundColor #FFF7E6
+ NoteFontColor #111827
+}
+
+autonumber
+actor "REST client" as Client
+participant "EntityRelationController" as Controller
+participant "DefaultTbEntityRelationService" as AppService
+participant "BaseRelationService" as RelationService
+participant "RelationCache" as Cache
+participant "JpaRelationDao" as Dao
+participant "SqlRelationInsertRepository" as InsertRepo
+participant "RelationRepository" as Repository
+database "PostgreSQL relation" as DB
+participant "Spring transaction event" as TxEvent
+participant "EdgeEventSourcingListener" as Edge
+participant "EntityActionService" as Action
+queue "Rule Engine Queue" as Queue
+
+== 创建或更新有向关系 ==
+Client -> Controller : POST /api/relation EntityRelation
+Controller -> Controller : parse from/to, default typeGroup COMMON
+Controller -> Controller : check WRITE permission on both endpoints
+Controller -> AppService : void save(relation, user)
+AppService -> RelationService : saveRelation(tenantId, relation)
+RelationService -> RelationService : validate six key fields
+RelationService -> Dao : saveRelation(tenantId, relation)
+Dao -> InsertRepo : saveOrUpdate(RelationEntity)
+InsertRepo -> DB : INSERT ... ON CONFLICT(six-column PK)
+DB -> DB : UPDATE additional_info on conflict
+DB --> InsertRepo : affected row
+InsertRepo --> Dao : RelationEntity
+Dao --> RelationService : boolean result
+alt outer Spring transaction active
+  RelationService -> TxEvent : register EntityRelationEvent for AFTER_COMMIT
+else no outer transaction
+  RelationService -> RelationService : handleEvictEvent immediately
+  RelationService -> Cache : evict exact/from/to list keys
+end
+RelationService -> Edge : publish RelationActionEvent(RELATION_ADD_OR_UPDATE)
+opt outer transaction commits later
+  TxEvent --> RelationService : AFTER_COMMIT handleEvictEvent
+  RelationService -> Cache : evict exact/from/to list keys
+end
+RelationService --> AppService : boolean result
+AppService -> AppService : ignore boolean result
+AppService -> Action : log actions for from and to
+Action -> Queue : push two entity action TbMsg records
+Action -> Action : submit audit log asynchronously
+AppService --> Controller : void
+Controller --> Client : 200, empty body
+note over DB,Queue
+  Relation DB, cache eviction, Edge event,
+  audit and Rule Engine messages are not one transaction.
+end note
+
+== 精确 GET /api/relation ==
+Client -> Controller : GET /api/relation
+Controller -> Controller : check READ on from, then to
+Controller -> RelationService : getRelation(exact six-column key)
+RelationService -> Cache : getAndPutInTransaction(cacheKey)
+alt cache hit
+  Cache --> RelationService : exact relation
+else cache miss
+  RelationService -> Dao : getRelation
+  Dao -> Repository : findById
+  Repository -> DB : SELECT
+  DB --> Repository : relation or null
+  Repository --> RelationService : exact result
+  alt relation exists
+    RelationService -> Cache : cache CAS fill
+  else null
+    RelationService -> Cache : rollback cache transaction; do not fill
+  end
+end
+RelationService --> Controller : result
+Controller --> Client : direct result; no per-edge post-filter
+
+== GET /api/relations/info FROM ==
+Client -> Controller : GET info with fromId/fromType
+Controller -> Controller : check root READ
+Controller -> RelationService : findInfoByFrom
+RelationService -> Dao : executor.submit(findAllByFrom)
+note over RelationService,Dao
+  FROM info bypasses RelationCache.
+end note
+Dao -> DB : SELECT outgoing relations
+DB --> Dao : relation list
+Dao --> RelationService : relation list
+RelationService -> RelationService : fetch toName for each relation
+RelationService --> Controller : EntityRelationInfo list
+Controller -> Controller : per-edge from/to READ post-filter
+Controller --> Client : silently filtered info list
+
+== GET /api/relations/info TO ==
+Client -> Controller : GET info with toId/toType
+Controller -> Controller : check root READ
+Controller -> RelationService : findInfoByTo
+RelationService -> RelationService : findByToAsync -> findByTo
+RelationService -> Cache : findByToAsync cache.get(TO key)
+alt TO cache hit
+  Cache --> RelationService : cached relation list
+else TO cache miss
+  RelationService -> Cache : executor -> findByTo -> getAndPutInTransaction
+  RelationService -> Dao : findAllByTo
+  Dao -> DB : SELECT incoming relations
+  DB --> RelationService : relation list or empty List
+  RelationService -> Cache : cache list, including empty List
+end
+RelationService -> RelationService : fetch fromName for each relation
+RelationService --> Controller : EntityRelationInfo list
+Controller -> Controller : per-edge from/to READ post-filter
+Controller --> Client : silently filtered info list
+
+== Java BFS EntityRelationsQuery ==
+Client -> Controller : POST /api/relations EntityRelationsQuery
+Controller -> RelationService : findByQuery(tenantId, query)
+RelationService -> RelationService : submit to relation query executor
+RelationService -> RelationService : visited ConcurrentHashMap + queue
+loop each BFS level until maxLevel/empty/timeout
+  RelationService -> Cache : find outgoing or incoming list by root/direction/group
+  Cache -> Dao : on miss
+  Dao -> DB : SELECT relation list
+  DB --> RelationService : edges
+  RelationService -> RelationService : select child by FROM/TO and deduplicate entityId
+  RelationService -> RelationService : add all / max-level / early-leaf edges to result Set
+end
+RelationService -> RelationService : queue empty -> complete Future<Set<EntityRelation>>
+RelationService -> RelationService : Futures.transform applies relationType/entityType filters
+RelationService --> Controller : Future<List<EntityRelation>>
+Controller --> Client : permission-filtered result
+note over RelationService
+  maxLevel <= 0 becomes effectively unbounded Java traversal.
+  The default 20-second Future timeout is not a DB statement timeout.
+end note
+
+== 单关系删除与竞态 ==
+Client -> Controller : DELETE /api/relation
+Controller -> AppService : deleteRelation(...)
+AppService -> RelationService : deleteRelation(...)
+RelationService -> Dao : deleteRelation(...)
+Dao -> Repository : existsById(compositeKey)
+Repository -> DB : SELECT existence
+DB --> Repository : true/false
+alt existed before delete
+  Dao -> Repository : deleteById
+  Repository -> DB : DELETE
+  alt delete throws concurrent exception
+    DB --> Dao : exception swallowed by deleteRelationIfExists
+    Dao --> RelationService : true from earlier existence check
+  else delete completes
+    DB --> Dao : deleted
+  end
+end
+RelationService -> TxEvent : publish cache eviction
+RelationService -> Edge : publish RelationActionEvent(RELATION_DELETED)
+RelationService --> AppService : existed flag
+note over RelationService,Edge
+  Cache eviction and RELATION_DELETED are published
+  even when the existed flag is false.
+end note
+alt existed flag is true
+  AppService -> Action : successful audit / Rule Engine action
+  AppService --> Controller : success
+else existed flag is false
+  AppService -> Action : failed audit action; no Rule Engine TbMsg
+  AppService --> Controller : ITEM_NOT_FOUND
+end
+Controller --> Client : 200 or 404
+
+== 实体删除联动 ==
+participant "Entity service transaction" as EntityDelete
+EntityDelete -> RelationService : deleteEntityRelations(tenantId, entityId)
+RelationService -> Dao : find all incoming and outgoing edges
+Dao -> DB : SELECT both directions
+DB --> Dao : edge lists
+RelationService -> Dao : bulk delete from and to
+Dao -> DB : DELETE relation rows
+RelationService -> TxEvent : publish one cache event per pre-read edge
+note over RelationService,Edge
+  deleteEntityRelations does not publish RelationActionEvent.
+  The relation table has no endpoint foreign keys or DB cascade.
+  A caught concurrency exception only proves that Java statements continue.
+  The transaction may be rollback-only, so final commit must be checked.
+end note
+EntityDelete -> DB : delete entity row in outer transaction
+
+== 异步 API failure edge ==
+RelationService -> Dao : saveRelationAsync / deleteRelationAsync
+Dao --> RelationService : ListenableFuture
+RelationService -> RelationService : addListener without future.get()
+alt EntityRelation overload: Future failed or delete returned false
+  RelationService -> Cache : listener still evicts
+  RelationService -> Edge : listener still publishes action event
+else endpoint deleteRelationAsync overload
+  RelationService -> Cache : listener evicts only
+  note right of RelationService
+    TbDeleteRelationNode single-delete uses this overload.
+    Bulk Rule Node delete uses the EntityRelation overload.
+  end note
+end
+
+@enduml
