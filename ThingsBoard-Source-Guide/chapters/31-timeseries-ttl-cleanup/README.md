@@ -1,6 +1,6 @@
 # 31 Timeseries TTL 清理流程
 
-> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章分析遥测历史数据如何在 PostgreSQL、TimescaleDB 与 Cassandra 三种后端中过期，重点区分 SQL 定时清理、租户/客户 `TTL` 属性、写入请求 TTL 与租户配置 `defaultStorageTtlDays`。结论只依据当前源码与安装 SQL，不把新版 ThingsBoard 或 TimescaleDB 的通用能力反推到 3.6。
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章分析遥测历史数据如何在 PostgreSQL、TimescaleDB 与 Cassandra 三种后端中过期，重点区分 SQL 定时清理、租户/客户 `TTL` 属性、写入请求 TTL 与租户配置 `defaultStorageTtlDays`。结论只依据当前源码与安装 SQL，不把新版 ThingsBoard 或 TimescaleDB 的通用能力反推到 3.6。
 
 [上一篇：30 Telemetry 查询流程](../30-telemetry-query/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/31-timeseries-ttl-cleanup.svg) | [下一篇：32 Redis 与本地缓存流程](../32-redis-local-cache/README.md)
 
@@ -876,4 +876,4 @@ PostgreSQL MVCC 先产生 dead tuples；VACUUM 通常只把空间标记为可复
 
 ---
 
-[上一篇：30 Telemetry 查询流程](../30-telemetry-query/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/31-timeseries-ttl-cleanup.svg) | [下一篇：32 Redis 与本地缓存流程](../../SUMMARY.md#chapter-32)
+[上一篇：30 Telemetry 查询流程](../30-telemetry-query/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/31-timeseries-ttl-cleanup.svg) | [下一篇：32 Redis 与本地缓存流程](../32-redis-local-cache/README.md)

@@ -24,7 +24,7 @@
   <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
   <script id="markdown-source" type="text/plain"># 32 Redis 与本地缓存流程
 
-> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章分析平台 DAO 和应用服务如何在 Caffeine 与 Redis 之间切换，重点追踪 Cache-Aside、负缓存、并发 miss 的 CAS 防护、数据库事务后的失效以及多节点一致性窗口。Device、Relation 和 Attributes 用作代表流程；Transport/Actor 自有运行时 map 只用于说明边界，不把所有名为 cache 的对象误认为同一套缓存。
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章分析平台 DAO 和应用服务如何在 Caffeine 与 Redis 之间切换，重点追踪 Cache-Aside、负缓存、并发 miss 的 CAS 防护、数据库事务后的失效以及多节点一致性窗口。Device、Relation 和 Attributes 用作代表流程；Transport/Actor 自有运行时 map 只用于说明边界，不把所有名为 cache 的对象误认为同一套缓存。
 
 [上一篇：31 Timeseries TTL 清理流程](../31-timeseries-ttl-cleanup/index.html) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/32-redis-local-cache.svg) | [下一篇：33 WebSocket 订阅流程](../33-websocket-subscription/index.html)
 

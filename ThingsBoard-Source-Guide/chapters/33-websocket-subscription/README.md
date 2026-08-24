@@ -1,6 +1,6 @@
 # 33 WebSocket 订阅流程
 
-> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。当前 `HEAD 21a9049239` 只包含后续指南提交，本章涉及的业务源码与该基线无差异。本章只分析 `/api/ws` 的 GENERAL WebSocket 订阅主链：连接认证、v1/v2 命令、初始查询、订阅注册、漏更补偿、跨节点通知和异步发送。
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章只分析 `/api/ws` 的 GENERAL WebSocket 订阅主链：连接认证、v1/v2 命令、初始查询、订阅注册、漏更补偿、跨节点通知和异步发送。
 
 [上一篇：32 Redis 与本地缓存流程](../32-redis-local-cache/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/33-websocket-subscription.svg) | [下一篇：34 Entity Query 流程](../34-entity-query/README.md)
 

@@ -209,8 +209,8 @@ tbody tr:nth-child(even) { background: #fafbfc; }
   .layout { grid-template-columns: minmax(0, 1fr); padding: 16px 12px 40px; }
   .sidebar { position: static; max-height: none; }
   .content { overflow-x: hidden; padding: 26px 18px 40px; }
-  .content h1 { font-size: 27px; }
-  .content h2 { font-size: 21px; }
+  .content h1 { overflow-wrap: anywhere; font-size: 27px; }
+  .content h2 { overflow-wrap: anywhere; font-size: 21px; }
   .catalog { grid-template-columns: 1fr; }
   .topbar { padding: 0 14px; }
   .topnav { gap: 10px; }

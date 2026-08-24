@@ -1,6 +1,6 @@
 # 28 Device Claim 流程
 
-> 源码基线：ThingsBoard `release-3.6` 当前工作树，版本 `3.6.4`，提交 `69124284c2`。本章链接行号按该工作树计算；只分析 3.6 实际存在的 Device Claim，不把 Provision 或普通“分配给客户”接口混作 Claim。
+> 源码基线：ThingsBoard `release-3.6`，版本 `3.6.4`，业务源码提交 `69124284c2`。本章链接行号按当前工作树计算；只分析 3.6 实际存在的 Device Claim，不把 Provision 或普通“分配给客户”接口混作 Claim。
 
 [上一篇：27 Device Provision 流程](../27-device-provision/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/28-device-claim.svg) | [下一篇：29 Session 与 Device State 流程](../29-session-device-state/README.md)
 

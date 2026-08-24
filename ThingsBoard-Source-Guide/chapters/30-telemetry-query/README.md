@@ -1,6 +1,6 @@
 # 30 Telemetry 查询流程
 
-> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章分析平台 REST API 与 Rule Engine 节点如何读取 latest、原始区间和聚合遥测，并比较 PostgreSQL、TimescaleDB、Cassandra 三种后端；WebSocket 实时订阅只说明边界，完整流程留给第 33 章。
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章分析平台 REST API 与 Rule Engine 节点如何读取 latest、原始区间和聚合遥测，并比较 PostgreSQL、TimescaleDB、Cassandra 三种后端；WebSocket 实时订阅只说明边界，完整流程留给第 33 章。
 
 [上一篇：29 Session 与 Device State 流程](../29-session-device-state/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/30-telemetry-query.svg) | [下一篇：31 Timeseries TTL 清理流程](../31-timeseries-ttl-cleanup/README.md)
 

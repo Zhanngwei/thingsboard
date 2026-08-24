@@ -1,6 +1,6 @@
 # 29 Session 与 Device State 流程
 
-> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章只讨论设备 Transport session、Device Actor 会话状态和 Core Device State，不把用户登录会话、WebSocket UI 会话或 Sparkplug 自定义 `ONLINE/OFFLINE` 遥测混入主流程。
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章只讨论设备 Transport session、Device Actor 会话状态和 Core Device State，不把用户登录会话、WebSocket UI 会话或 Sparkplug 自定义 `ONLINE/OFFLINE` 遥测混入主流程。
 
 [上一篇：28 Device Claim 流程](../28-device-claim/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/29-session-device-state.svg) | [下一篇：30 Telemetry 查询流程](../30-telemetry-query/README.md)
 

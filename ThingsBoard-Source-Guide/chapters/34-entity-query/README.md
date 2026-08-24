@@ -1,6 +1,6 @@
 # 34 Entity Query 流程
 
-> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。当前 `HEAD 21a9049239` 只包含后续指南变化；`application`、`common`、`dao` 与该业务基线一致。本章只分析 Entity Query 的 REST count/find/keys 与 WebSocket v2 初始实体查询，WebSocket 后续遥测、属性和实体集合刷新不属于 Entity Query 本身。
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章只分析 Entity Query 的 REST count/find/keys 与 WebSocket v2 初始实体查询，WebSocket 后续遥测、属性和实体集合刷新不属于 Entity Query 本身。
 
 [上一篇：33 WebSocket 订阅流程](../33-websocket-subscription/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/34-entity-query.svg) | [下一篇：35 Relation 流程](../35-relation-flow/README.md)
 

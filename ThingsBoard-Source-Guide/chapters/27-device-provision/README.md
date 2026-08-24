@@ -1,6 +1,6 @@
 # 27 Device Provision 流程
 
-> 源码基线：ThingsBoard `release-3.6`，当前提交 `69124284c2`。本章分析原生 HTTP、MQTT、CoAP `/provision` 控制面，以及与它容易混淆的 X.509 证书链自动注册旁路。
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章分析原生 HTTP、MQTT、CoAP `/provision` 控制面，以及与它容易混淆的 X.509 证书链自动注册旁路。
 
 [上一篇：26 MQTT Gateway 流程](../26-mqtt-gateway/README.md) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/27-device-provision.svg) | [下一篇：28 Device Claim 流程](../28-device-claim/README.md)
 

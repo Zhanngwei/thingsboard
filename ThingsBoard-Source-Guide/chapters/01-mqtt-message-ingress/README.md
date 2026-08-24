@@ -828,6 +828,4 @@ flowchart TD
 
 ---
 
-## 导航
-
 [返回知识库首页](../../README.md) | [返回全书目录](../../SUMMARY.md) | [下一章：02 Device 创建流程](../02-device-create/README.md)
