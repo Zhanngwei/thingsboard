@@ -17,7 +17,7 @@
   <main class="layout">
     <aside class="sidebar" aria-label="全书目录">
       <strong>ThingsBoard release-3.6 源码解析指南</strong>
-      <a href="#阅读定位">阅读定位</a><a href="#当前进度">当前进度</a><a href="#第-01-章关键结论">01-14 接入与实体</a><a href="#第-15-章关键结论">15-22 Actor 与存储</a><a href="#第-23-章关键结论">23-29 协议与会话</a><a href="#第-30-章关键结论">30-36 查询与实时</a><a href="#第-37-章关键结论">37-42 平台与运行时</a><a href="#图表约定">图表约定</a><a href="#版本边界">版本边界</a>
+      <a href="#阅读定位">阅读定位</a><a href="#当前进度">当前进度</a><a href="#第-01-章关键结论-mqtt-消息进入系统">01-14 接入与实体</a><a href="#第-15-章关键结论-actor-模型">15-22 Actor 与存储</a><a href="#第-23-章关键结论-http-设备-api-流程">23-29 协议与会话</a><a href="#第-30-章关键结论-telemetry-查询流程">30-36 查询与实时</a><a href="#第-37-章关键结论-rule-node-外部集成流程">37-42 平台与运行时</a><a href="#图表约定">图表约定</a><a href="#版本边界">版本边界</a>
     </aside>
     <article id="article" class="content" aria-live="polite"></article>
   </main>
@@ -110,253 +110,253 @@
 
 完整目录见 [SUMMARY.md](SUMMARY.md)。所有计划章节均已生成，目录直接链接到对应 Markdown、HTML、PlantUML 和 SVG 产物。
 
-## 第 01 章关键结论
+## 第 01 章关键结论：[MQTT 消息进入系统](chapters/01-mqtt-message-ingress/index.html)
 
 ThingsBoard 3.6.4 的 MQTT 遥测路径不能简单理解为“MQTT -> Device Actor -> Rule Engine”。连接打开、关闭、订阅和设备 RPC 等会话类消息会走 Core Queue 和 Device Actor；普通设备遥测 `PUBLISH` 则由 `DefaultTransportService` 直接转换为 `TbMsg` 并投递 Rule Engine Queue。队列消费者随后才把 `QueueToRuleEngineMsg` 送入 `AppActor -> TenantActor -> RuleChainActor -> RuleNodeActor`。
 
 另一个必须区分的边界是 MQTT `PUBACK`。在此版本源码中，Transport 回调在 Rule Engine Queue producer 写入成功时返回；它不等待 Save Timeseries 节点完成，更不等价于 `ts_kv`/`ts_kv_latest` 已经持久化。
 
-## 第 02 章关键结论
+## 第 02 章关键结论：[Device 创建流程](chapters/02-device-create/index.html)
 
 标准 REST 创建在 `DeviceServiceImpl` 的 Spring 事务中原子保存 `device` 与 `device_credentials`。事务提交后才执行缓存失效、Edge 事件、Transport/Core/Rule Engine Queue 传播和异步审计；这些动作与 PostgreSQL 没有共同事务，也不被 HTTP 请求逐项等待。
 
 Device `CREATED` 生命周期不会主动创建 Device Actor。它经 Rule Engine notification consumer 到达 `AppActor -> TenantActor` 后只投递给已经存在的实体 Actor；首次 session、RPC 或其他 device-aware 消息才触发 `getOrCreateDeviceActor(...)`。
 
-## 第 03 章关键结论
+## 第 03 章关键结论：[Device 删除流程](chapters/03-device-delete/index.html)
 
 标准 REST 删除在 `DefaultTbDeviceService.delete(Device, User)` 的外层事务中原子删除 originator Alarm、Credentials、Relations、entity-alarm 和 Device 元数据。但 Gateway、Transport、Core State、lifecycle 与 `ENTITY_DELETED` 消息在事务提交前发送，没有 transactional outbox；数据库回滚不能撤销已消费的运行时删除消息。
 
 Device 删除不会自动清理 `attribute_kv`、`ts_kv`、`ts_kv_latest`、Cassandra telemetry 或设备 RPC。3.6.4 的 SQL/Timescale TTL 过程依赖当前 `device` 表反查 tenant/customer 归属，Device 行删除后的 orphan history 可能无法再被该 TTL 路径命中。Lifecycle DELETED 还会 `getOrCreateDeviceActor(...)`，即使 Actor 原先不存在也可能临时创建后立即停止。
 
-## 第 04 章关键结论
+## 第 04 章关键结论：[Device Profile 流程](chapters/04-device-profile/index.html)
 
 标准 Device Profile 保存没有应用层外事务。Profile 行由 `JpaDeviceProfileDao.saveAndFlush(...)` 先提交，随后才同步兼容字段 `device.type`，并向 Transport、lifecycle、OTA、Rule Engine 和 Audit 传播；重命名失败可能留下已提交的 Profile 与部分 Device 更新。
 
 默认 Profile 切换把旧 Profile 的 `is_default` 改为 `false`、再把目标 Profile 改为 `true`，两次 DAO save 属于独立事务，建表脚本也没有“每租户唯一默认”的约束。Transport 收到完整 Profile 后会热更新匹配的在线 Session；Rule Engine 侧通过 Profile cache listener 和 Rule Node self message 刷新 Alarm Rule 状态，系统中不存在独立的 Device Profile Actor。
 
-## 第 05 章关键结论
+## 第 05 章关键结论：[Rule Chain 执行流程](chapters/05-rule-chain-execution/index.html)
 
 Rule Chain 本地单目标路由沿用原始 Queue record 的 `TbMsgCallback`；单目标跨分区和多目标 fan-out 会生成新 UUID 的 Queue 消息，父 callback 只等待 producer handoff，不等待子 Rule Chain 执行完成。Singleton Node 跨服务重路由甚至以 `callback=null` 发送后立即 ack 源消息。
 
 默认 Main Queue 使用 `BURST + SKIP_ALL_FAILURES`：一个 poll pack 并发进入 Actor，失败或超时最终 commit。超时 cleanup 后旧 callback 仍然 valid，业务 Node 可能在 offset commit 后继续完成；Retry Strategy 也无法回滚已经提交的数据库或外部副作用。Rule Chain metadata 的 Nodes、relations 和 first node 在一个 PostgreSQL transaction 中更新，但 lifecycle notification 与 Actor reload 在提交后异步发生。
 
-## 第 06 章关键结论
+## 第 06 章关键结论：[Alarm 创建流程](chapters/06-alarm-create/index.html)
 
 `createAlarm(...)` 实际由 PostgreSQL `create_or_update_active_alarm(...)` 按 `originator_id + type + cleared=false` 创建或更新 active Alarm。已有行通过 `FOR UPDATE` 串行更新，但 active partial index 不是 UNIQUE；首次并发创建时不存在可锁 tuple，因此 3.6 数据库不能强保证只有一条 active Alarm。
 
 Alarm 主体 `alarm`、可见性索引 `entity_alarm`、WebSocket、Alarm notification、Rule Engine action、audit 和 severity comment 没有共同事务。`entity_alarm` 保存失败只记录 warning，传播配置收缩也不会删除旧记录。REST、显式 Create Alarm Node 和 Device Profile Alarm Rule 共用持久化主线，但权限、审计、Actor callback 和下游消息语义不同。
 
-## 第 07 章关键结论
+## 第 07 章关键结论：[Alarm 清除流程](chapters/07-alarm-clear/index.html)
 
 `clear_alarm(...)` 按 `(tenant_id,id) FOR UPDATE` 串行化状态转换：首次调用写 `cleared/clear_ts`，重复调用成功但不修改时间或 details。`JpaAlarmDao` 只把首次清除映射为 `modified=true`，所以 WebSocket 和 `AlarmTrigger` 不会因重复清除再次触发；但 `BaseAlarmService` 仍会为重复调用发布 Edge `ActionEntityEvent`，REST 随后才返回 already-cleared 错误。
 
 REST、显式 Clear Alarm Node、Device Profile 自动清除和 Edge 上行的输出并不等价。只有 REST 生成用户 SYSTEM comment 与 audit；显式节点同时产生 root `ALARM_CLEAR` 和局部 `Cleared`；Device Profile 只产生 `Alarm Cleared` relation；Edge 上行绕过 Subscription，因此没有本地 WS、AlarmTrigger 或 Rule Engine clear 消息。
 
-## 第 08 章关键结论
+## 第 08 章关键结论：[Attributes 保存流程](chapters/08-attributes-save/index.html)
 
 `attribute_kv` 是按实体、scope、key 唯一的最新状态表，没有属性历史。Transport 只产生 `POST_ATTRIBUTES_REQUEST`，设备 MQTT PUBACK 仍停在 Rule Engine Queue producer；Save Attributes Node 才调用持久化服务。多 key 请求被拆成多个 DAO Future，SQL batch 虽有事务，但请求整体没有原子性保证。
 
 启用属性缓存后，上层等待 DB 后的 cache transform；缓存失败可能出现 PostgreSQL 已提交、REST/Rule Node 失败且所有订阅/action 被抑制。Shared Scope 下行仍只送在线且已订阅的 session；`notifyDevice=false` 只在 SubscriptionManager 本地路径可靠，3.6 的跨节点 update proto 不携带该字段。数据库、缓存、WebSocket、设备下行、`ATTRIBUTES_UPDATED` 和 audit 均无共同事务；`last_update_ts` 也不会阻止旧写后执行覆盖新值。
 
-## 第 09 章关键结论
+## 第 09 章关键结论：[Telemetry 保存流程](chapters/09-telemetry-save/index.html)
 
 Telemetry 保存由 `BaseTimeseriesService` 对每个 datapoint 组合 partition、history 和 latest Future。`database.ts.type` 与 `database.ts_latest.type` 独立选择后端，因此 hybrid 部署同样存在 history/latest 部分成功窗口。SQL latest 通过 batch 内最大 timestamp 和 SQL guard 防倒退；Cassandra latest 是无条件 INSERT，旧事件后执行仍可能覆盖新事件。
 
 ThingsBoard 3.6 只把 `ts_kv` 建成按 `ts` 的一维 Timescale hypertable，SQL latest 和 dictionary 仍是普通 PostgreSQL 表。当前 schema 没有 Continuous Aggregate、compression 或 Timescale retention policy；SQL/Timescale history 由 ThingsBoard procedure 按 system/tenant/customer TTL 策略批量 DELETE，与单次请求 TTL 无关。Cassandra history 可用逐写入原生 TTL，但任何后端的 latest 都不会随 history 自动过期。
 
-## 第 10 章关键结论
+## 第 10 章关键结论：[RPC 流程](chapters/10-rpc/index.html)
 
 REST server-side RPC 先进入规则引擎，只有 RPC Call Request Node 才把请求路由到 Core/Device Actor。持久化请求只有在到达 Actor 时仍未过期，才保存 QUEUED 并回调 `rpcId`；已过期请求保存 EXPIRED、无 rpcId callback，REST 最终超时。轻量 one-way 在找到 RPC subscription 并发向 Transport 后返回，轻量 two-way 才等待设备 payload；这些 HTTP 成功都不能外推设备业务已执行。
 
 Device Actor 按设备维护 session、subscription、int requestId、pending map、retry 和 submit strategy。持久化状态行、`RPC_<STATUS>` Queue message、MQTT delivery 与设备业务 response 是不同阶段。RPC Request Node 立即 ack 原 Queue record；callback 内只保证先调用 REST response 路径、再调用 Node consumer，跨服务时两条异步路径的实际完成顺序不保证。整个链路不具备 exactly-once 或 transactional outbox。
 
-## 第 11 章关键结论
+## 第 11 章关键结论：[OTA 流程](chapters/11-ota/index.html)
 
 OTA 分配同时维护 Device/Profile 指针、Shared Attributes、target/state Telemetry 和 binary cache 四类状态。Device 字段覆盖 Profile；Profile 更新只扫描 override 为空的设备。`send(...)` 以 `callback=null` 投递 OTA Queue，并独立写 `QUEUED` Telemetry；consumer 重查 current target 后只调度 `INITIATED` Future 即返回，Queue commit 可能早于 callback 中的 Shared Attributes，异步失败也不受 consumer catch 覆盖。
 
 MQTT/HTTP/CoAP binary 下载不经过 Device Actor，而是通过 Transport API request/reply 解析 effective package，再从 Caffeine/Redis data cache读取完整包或 range。Actor 只向已订阅 Shared Attributes 的在线 session 推送目标 metadata。PostgreSQL `ota_package.data` 是 OID，但 upload、checksum、首次回源和 Caffeine 都 materialize 完整 `byte[]`；微服务分离部署需要共享 Redis。release-3.6 的 URL checksum attribute、software MQTT error topic 和 LwM2M software temp URL 分支还存在需要专项回归的源码边界。
 
-## 第 12 章关键结论
+## 第 12 章关键结论：[Dashboard 流程](chapters/12-dashboard/index.html)
 
 Dashboard 是控制面配置与运行时数据面的组合：PostgreSQL `dashboard.configuration` 保存 Widget/alias/filter/timewindow 定义，实际属性、latest、history 和 Alarm 由 Widget 打开后通过 EntityData/WebSocket 查询。普通 Entity Widget使用同一 `cmdId` 的两阶段命令，先解析实体和 latest，再补发 history/realtime 命令；跨 Core 节点由 entity partition owner 的 SubscriptionManager 和目标 service notification topic 路由实时点。
 
 Customer assignment 同时写 `relation` 和 `dashboard.assigned_customers`，但 assign 与批量 Customer 编排没有覆盖两次写入的外层事务；列表依赖 relation、直接读取权限依赖 JSON 摘要，失败或并发整行更新会造成漂移。Dashboard 本身也没有 `@Version`。服务端没有 Dashboard Actor，WebSocket context 使用并发 Map/锁维护，并通过 update rate limit 和有界出站队列限制慢消费者。
 
-## 第 13 章关键结论
+## 第 13 章关键结论：[Login 流程](chapters/13-login/index.html)
 
 普通 `POST /api/auth/login` 由 Spring Security 的 `RestLoginProcessingFilter` 消费，不进入 `AuthController`。Provider 读取全局唯一的 `tb_user.email`、`user_credentials`、系统密码策略与可选 2FA 配置；成功登录同步重置失败次数和写 `lastLoginTs`，异步写 `audit_log`，随后签发不落数据库的 HS512 access/refresh JWT。2FA 第一阶段只返回 `PRE_VERIFICATION_TOKEN`，验证码通过后才创建最终 token pair 和成功审计。
 
 失败次数与 last-login 都保存在 `tb_user.additional_info`，采用无版本列的整 JSON 读改写，并发请求可能丢计数。密码修改/重置又通过两个独立 DAO 事务删除旧 `user_credentials` 再插新行。logout/改密依赖 `userSessionsInvalidation` cache 提前淘汰旧 JWT：Caffeine 只在当前 Core JVM 生效，多节点部署要使用 Redis 才能共享失效时间。
 
-## 第 14 章关键结论
+## 第 14 章关键结论：[JWT 认证流程](chapters/14-jwt-authentication/index.html)
 
 受保护 REST 由 JWT Filter解析 `X-Authorization/Authorization`，access Provider验证签名、exp和 user/session失效时间后，直接从 claims恢复 `SecurityUser`，不重读用户表。方法角色由 `@PreAuthorize` 判断，具体实体归属再由 `BaseController` 与 authority-specific `PermissionChecker` 判断。Refresh Provider则重读 `tb_user/user_credentials`，但不检查密码年龄；旧 refresh token也不会因换得新 token而被标记已使用。
 
 WebSocket跳过普通 REST JWT Filter，只在 query token或首个 `AuthCmd` 认证一次，之后连接不会因 token到期/logout自动关闭。JWT signing key更新通过异步 lifecycle通知各节点reload，没有双 key过渡。`userSessionsInvalidation` TTL又取启动时 YAML refresh lifetime，而实际 JWT lifetime可由数据库修改；多节点需共享 Redis并确保 marker TTL覆盖最长 refresh token寿命。
 
-## 第 15 章关键结论
+## 第 15 章关键结论：[Actor 模型](chapters/15-actor-model/index.html)
 
 ThingsBoard 3.6 使用 `common/actor` 中的自研 JVM 内 Actor，而不是 Akka。`DefaultTbActorSystem` 维护本地 Actor registry和parent-child关系；每个 `TbActorMailbox` 通过 high/normal 两条无界队列、`ready` 与 `busy` CAS保证同一业务对象串行执行，多个 Actor共享 App/Tenant/Device/Rule Dispatcher。`tell()` 只完成本地入队，不代表下游处理、Kafka commit或数据库提交。
 
 初始化失败会按策略重试并在 ready前积压消息；普通 process异常默认 resume但不会自动重放已poll消息。高优先级不能抢占当前消息，却可能长期饿死normal队列。分区迁移只停止旧owner本地 Actor，新owner从数据库和后续消息重建，Mailbox和session状态不迁移；全局 `system.stop()` 也不会逐个调用全部 Actor的 `destroy()`。
 
-## 第 16 章关键结论
+## 第 16 章关键结论：[Kafka 发送流程](chapters/16-kafka-producer/index.html)
 
 ThingsBoard 的逻辑 partition 不是 Kafka 原生 partition：entity UUID hash出的编号被追加到物理 topic 名，`ProducerRecord.partition` 实际传 `null`。消息value是Protobuf bytes，key是UUID字符串。第一次发送会同步通过 AdminClient确保topic存在；随后KafkaProducer异步合批和发送，callback运行在Kafka I/O线程。
 
 Producer success只表示broker按 `acks` 确认，不代表consumer、Actor、Rule Node或数据库完成。默认虽为 `acks=all`，但replication factor与min ISR均为1。同步异常会callback failure后再rethrow，异步失败在callback为null时只写warning；公共模板没有Kafka事务，Provider普通shutdown路径也未显示调用共享producer的 `stop()`。
 
-## 第 17 章关键结论
+## 第 17 章关键结论：[Kafka 消费流程](chapters/17-kafka-consumer/index.html)
 
 `KafkaConsumer.poll()` 在返回 records 时已经推进本地 position；Rule Engine consumer 等待整个 pack 的 callback/timeout，再由 Processing Strategy 决定内存重投或 `commitSync()`。这里的 retry 不会 `seek` 或重新 poll Kafka，也不会回滚此前已经完成的数据库、HTTP 或 Kafka 副作用。默认 Main Queue 使用 `BURST + SKIP_ALL_FAILURES`，失败和超时最终仍会提交；High Priority Queue 的 `retries=0` 在实现中表示不设上限。
 
 提交按 consumer 当前 assignment positions 进行，不是按成功 UUID 单条确认。长时间 await/retry 可超过 `max.poll.interval.ms` 并触发 rebalance，使旧异步工作与新 owner 重放并行；timeout cleanup 也不会取消 Actor、DB Future 或外部调用。decode `IOException` 被包装为运行时异常，但外层没有 `seek` 或公共 DLQ，后续成功 commit 可能越过坏 record，因此端到端既不是 exactly-once，也不能简单归类为纯 at-least-once。
 
-## 第 18 章关键结论
+## 第 18 章关键结论：[Queue 管理](chapters/18-queue-management/index.html)
 
 Queue 是 PostgreSQL 配置、物理 topic、`HashPartitionService` 路由、consumer manager 和每 pack 策略的组合，不等于单个 Kafka topic。ThingsBoard 逻辑 partition 被编码进 `topic[.isolated.tenantId].partitionNo`；`consumerPerPartition` 决定一个 consumer 订阅多 topic，还是每逻辑分区建立独立 task。poll/timeout/submit/processing strategy 在后续 pack 热读取，切换 `consumerPerPartition` 则会停止并重建消费者。
 
 普通 REST 保存按“Queue 行提交 -> 补建新增 topic -> null-callback 集群通知”执行；isolated Profile 批量更新的 topic/DB 顺序又不同。删除按“行删除 -> 通知 -> 远端异步 drain/delete topic”执行，均无共同事务或 outbox。分区缩容不会删除高编号 topic，通知丢失可留下 stale consumer/topic；`queue` schema 对 tenant+name/topic 也没有 UNIQUE constraint，应用层先查后插不能封闭并发创建竞态。
 
-## 第 19 章关键结论
+## 第 19 章关键结论：[Cluster 通信](chapters/19-cluster-communication/index.html)
 
 多节点发现由 ZooKeeper ephemeral-sequential `ServiceInfo` 节点完成；Kafka只承载跨节点数据与notification record。`HashPartitionService`按serviceId排序后取模分配owner：Core使用`partition % count`，Rule Engine使用`(hash(tenantId)+partition) % count`并可先过滤dedicated tenant-profile服务。源码中的`ConsistentHashCircle`在当前路径未被引用，因此扩缩容可能迁移大量partition，ServiceInfo中的CPU/memory也不参与负载权重。
 
 跨节点Actor调用实际是`ClusterService -> Queue producer -> broker -> owner consumer -> local Actor`，producer callback不等待远端应用。ZooKeeper remove立即发布shutdown事件、延迟重算owner，同serviceId及时返回可取消重算。PartitionChange由本地Spring事件分别驱动consumer订阅和高优先级Actor清理；Device/RuleChain Actor、mailbox、Session和旧异步副作用都不迁移，新owner从数据库/缓存和后续消息重建。
 
-## 第 20 章关键结论
+## 第 20 章关键结论：[Cassandra 写入流程](chapters/20-cassandra-write/index.html)
 
 Cassandra telemetry 的 registry、history 和 latest 是三个独立 Future，不存在跨表 batch 或回滚。History 主键为 `((entity_type, entity_id, key, partition), ts)`，默认按 UTC 月分桶并使用原生 `USING TTL`；registry 只使用系统 TTL，latest 不设置 TTL。默认读写一致性级别均为 `ONE`。
 
 `ts_kv_latest_cf` 使用无时间条件的普通 INSERT，较旧数据后到时可以覆盖较新的 latest。`set_null_values_enabled=true` 会清空旧类型列以避免类型切换残值。缓冲执行器虽有有界请求队列，但并发计数检查不是严格信号量；部分 history 查询和删除失败路径只记录日志，外层 Future 可能一直等待到上层超时。
 
-## 第 21 章关键结论
+## 第 21 章关键结论：[TimescaleDB 写入流程](chapters/21-timescale-write/index.html)
 
 ThingsBoard 3.6 只把 `ts_kv` 建成按bigint毫秒 `ts` 的一维hypertable，默认chunk interval为7天；dictionary和latest仍是普通PostgreSQL表。History按entity UUID hash进入默认3条无界SQL队列，以10000行/100ms合批并在独立事务中JDBC UPSERT；latest使用另一组事务和payload时间戳保护，二者的`allAsList`不是共同事务。
 
 当前schema没有Continuous Aggregate、compression policy、Timescale retention policy或`drop_chunks`。请求TTL不写入history行，只参与用量计算；Core定时任务调用PL/pgSQL按system/tenant/customer策略逐行DELETE history且不清latest，因此生产调优必须同时观察活动chunk索引、WAL/checkpoint、SQL queue、TTL DELETE和autovacuum。
 
-## 第 22 章关键结论
+## 第 22 章关键结论：[PostgreSQL 写入流程](chapters/22-postgresql-write/index.html)
 
 ThingsBoard的PostgreSQL写入不是单一JPA路径：实体CRUD主要走Spring Data/Hibernate，高频Attribute/Telemetry/Latest走按entity hash的无界SQL队列和JDBC batch，Alarm与TTL使用native query和PL/pgSQL。`saveAndFlush`只提前执行SQL而非提交；实际原子边界取决于从Spring代理进入的具体`@Transactional` Service方法，异步batch切换线程后必然使用独立事务。
 
 普通SQL telemetry使用按`ts`的RANGE partition和`ts_kv_indefinite` DEFAULT表；分区DDL以`NOT_SUPPORTED`脱离父事务。每实例Hikari默认16连接，而Web、JPA executor及多组SQL writer共同竞争该池。Attribute的`last_update_ts`没有更新条件保护；UPDATE/DELETE产生的dead tuple、WAL/checkpoint、autovacuum和TTL维护必须与Java queue积压一起排查。
 
-## 第 23 章关键结论
+## 第 23 章关键结论：[HTTP 设备 API 流程](chapters/23-http-device-api/index.html)
 
 HTTP Device API使用URL path中的Device access token，不走用户JWT；每次请求通过Transport API request/reply交给Core验证credentials、device与profile，再创建随机SessionInfo。Telemetry和Client Attributes直接进入Rule Engine Queue，HTTP 200只等待producer callback，不等待consumer、Rule Node或数据库提交。
 
 GET Attributes、RPC/Attribute长轮询会在持有请求的Transport实例创建一次性SYNC session，经Core Queue和Device Actor路由，response或timeout后注销。默认业务timeout 60秒、Tomcat async上限300秒；客户端断开或HTTP timeout不会取消已发送的Queue/Actor/DB工作。生产必须对URL token做日志脱敏，并按认证、producer、consumer、Rule Chain和DAO逐层排查“200但无数据”。
 
-## 第 24 章关键结论
+## 第 24 章关键结论：[CoAP 消息流程](chapters/24-coap-message-flow/index.html)
 
 CoAP 由 Californium 在 UDP 5683 和可选 DTLS 5684 上处理，不经过 Spring MVC。Plain CoAP 从 URI path 取 access token 并逐请求经 Transport API 交给 Core 验证；X.509 DTLS 在握手期用证书 SHA3 hash 查询设备凭据，再把 identity/profile 快照放入当前 Transport 实例的 peer-address 内存缓存。
 
 Telemetry 与 Client Attributes 的 `2.01 CREATED` 只确认 Rule Engine Queue producer callback；GET Attributes 和 client RPC 使用一次性 SYNC session，Attributes/RPC Observe 使用长期 ASYNC session。Observe relation、peer/token 索引、CON RPC 的 MID ACK map 与 PSM/eDRX sleeping 状态都驻留 Transport 内存，进程重启后设备必须重建 Observe；源码中的 sleeping 状态也明确尚未持久化。
 
-## 第 25 章关键结论
+## 第 25 章关键结论：[LwM2M 注册与观测流程](chapters/25-lwm2m-registration-observe/index.html)
 
 LwM2M 由 Eclipse Leshan 管理 Bootstrap、Registration、Update、Deregister 和 Observe，不进入原生 CoAP `/api/v1`。Bootstrap 与 Main Server 是两套独立服务；Leshan 返回 Registration 成功后，ThingsBoard 才异步创建 Transport session、通知 Device Actor，并按 Device Profile 发起 Read、Observe 与 Write Attributes。
 
 Observe 值先写入 Transport 侧对象缓存，只有进入 Profile 的 `attribute` 或 `telemetry` 映射才转换成平台 KV 并直接投递 Rule Engine Queue。协议 ACK、Queue producer、Rule Chain 和数据库没有端到端事务；默认 registration/client 状态留在当前进程，Redis 是集群恢复的可选实现。
 
-## 第 26 章关键结论
+## 第 26 章关键结论：[MQTT Gateway 流程](chapters/26-mqtt-gateway/index.html)
 
 MQTT Gateway 先用物理网关凭据认证，并要求 `additionalInfo.gateway=true`。每个虚拟设备拥有独立 `DeviceId`、Profile、随机 sessionId 和 Actor session；`gwSessionId` 只把它关联到物理连接，Transport 本地 map 才是实时下行 listener，数据库不存在 connectedDevices 表。
 
 显式 `gateway/connect` 不是源码硬前置，首条遥测、属性、查询或 RPC response 可以隐式创建虚拟设备。批量上报会拆成独立 Queue callbacks，没有跨设备原子性；下行依赖 `nodeId + virtual sessionId`，Gateway QoS 1 RPC 也没有物理 PUBACK 到虚拟设备 `DELIVERED` 的关联。
 
-## 第 27 章关键结论
+## 第 27 章关键结论：[Device Provision 流程](chapters/27-device-provision/index.html)
 
 HTTP、MQTT、CoAP Provision 最终都进入 `ProvisionDeviceRequestMsg -> DeviceProvisionServiceImpl`，不创建普通设备 session，也不经过 Device Actor。`ALLOW_CREATE_NEW_DEVICES` 新建设备，`CHECK_PRE_PROVISIONED_DEVICES` 返回预建设备的现有凭据；TLS/DTLS 的 X.509 chain 自动创建是另一条入口。
 
 新建路径把 `device` 与 `device_credentials` 放在同一个 DAO 事务，但 `provisionState`、Cluster、Rule Engine 和 Audit 位于事务之外。属性写失败可导致设备已经提交而客户端得到 FAILURE；create 策略没有幂等 requestId，响应丢失后的盲目重试会被同名约束拒绝。
 
-## 第 28 章关键结论
+## 第 28 章关键结论：[Device Claim 流程](chapters/28-device-claim/index.html)
 
 Device Claim 分为设备登记窗口和 Customer User 认领两段。设备协议 ACK 只确认 `ClaimDeviceMsg` 进入 Core Queue；Actor 后续把 ClaimData 写入 `claimDevices` cache，普通登记不会写持久 `claimingData` attribute。默认 Caffeine 是节点本地缓存，多 Core 部署需要 Redis、粘性路由或外部持久数据保证 REST 可见性。
 
 认领先提交 `device.customer_id`，再异步删除 Claim attributes/cache，两者没有共同事务。并发 Customer Claim 没有行锁、CAS 或版本列，多个请求可能都返回成功而后提交者覆盖前者；Reclaim 也可能先清空归属，再因 `claimingAllowed` 保存失败向调用方报错。
 
-## 第 29 章关键结论
+## 第 29 章关键结论：[Session 与 Device State 流程](chapters/29-session-device-state/index.html)
 
 Transport 本地 listener、Device Actor session map 与 Device State 是三套不同状态。`registerAsyncSession`/`registerSyncSession` 只登记 listener，`deregisterSession` 只清理本地状态；协议实现必须显式发送 OPEN/CLOSED。第一条 session OPEN 和最后一条 CLOSED 产生 connect/disconnect，而 `active` 由活动时间窗口决定，不等价于 socket 在线。
 
 Activity 经过 Transport 聚合后进入 Core Queue，Actor 再调用 Device State；producer callback、consumer commit、状态持久化和 Rule Engine 处理互不构成事务。六个状态键默认写 SERVER_SCOPE attributes；切换到 telemetry 时还必须同步调整 `device_info_view`，否则设备列表可能继续读取旧来源。
 
-## 第 30 章关键结论
+## 第 30 章关键结论：[Telemetry 查询流程](chapters/30-telemetry-query/index.html)
 
 Telemetry REST 查询直接沿 `TelemetryController -> AccessValidator -> BaseTimeseriesService -> DAO` 读取数据库，不经过 Actor 或 Kafka。keys 来自 latest 表而不是 history distinct scan；raw 使用 `[startTs,endTs)`，`limit` 按 key 生效且没有 offset/cursor。history 与 latest 可独立选择 PostgreSQL、TimescaleDB 或 Cassandra，查询层不做读时合并或一致性修复。
 
 普通 PostgreSQL 聚合按 key × bucket 产生 SQL Future，Timescale 固定 interval 运行时使用 `time_bucket`，Cassandra 每 bucket 并发读取相关 partitions 后在 Java 合并；3.6 未创建 Continuous Aggregate。默认 700 intervals 校验对亚秒 interval 存在实现缺口，SQL/Timescale 仍可能产生巨量 bucket。SQL/Timescale 查询未知 key 还会通过 `getOrSaveKeyId` 写 `ts_kv_dictionary`；Cassandra raw 某些失败 callback 只记录日志，Future 可能等到 Spring 30 秒异步超时。
 
-## 第 31 章关键结论
+## 第 31 章关键结论：[Timeseries TTL 清理流程](chapters/31-timeseries-ttl-cleanup/index.html)
 
 Timeseries cleanup 由 SYS tenant Core partition owner 的 Spring scheduler 同步触发，且只进入 history `TimeseriesDao`。普通 PostgreSQL 先按 system TTL DROP cutoff 之前的完整分区，再按 tenant/customer `TTL` 属性 DELETE 行；TimescaleDB 3.6 只执行相同的行 DELETE，没有 `drop_chunks` 或 retention policy；Cassandra `cleanup` 为空，history 在写入时使用 `USING TTL`。
 
 SQL/Timescale 的 request TTL 和 tenant profile `defaultStorageTtlDays` 不写入 `ts_kv`，只参与 datapoint-days 计算；latest 也不会随 history 自动过期。release-3.6 SQL procedure 的 `tenant_ttl_ts/customer_ttl_ts` 未在每轮 loop 清空，TTL=0 可能沿用上一实体 cutoff；属性查询还缺少 scope 条件。生产启用前必须验证这一过程，并联合观察 WAL、dead tuples、VACUUM、replica lag；Cassandra 则重点观察 tombstone、compaction 与 partition registry 先于活跃 cell 过期的风险。
 
-## 第 32 章关键结论
+## 第 32 章关键结论：[Redis 与本地缓存流程](chapters/32-redis-local-cache/index.html)
 
 ThingsBoard 的多数 DAO 缓存使用自定义 `TbTransactionalCache`，少数配置服务才使用 Spring Cache 注解。Cache miss 后的数据库读取不持有缓存锁，因此并发 miss 仍会重复查库；Caffeine 的本地 transaction map 或 Redis 的 `WATCH/MULTI/EXEC` 只负责阻止并发更新后的旧查询结果重新污染缓存。负缓存通过“存在但值为 null 的 wrapper”与真正 miss 区分。
 
 Caffeine entry、锁、回填事务和失效事件都局限于当前 JVM，不能自动保证多 Core 节点一致；Redis 模式没有 Caffeine L1 或 DAO Pub/Sub，而是所有节点直接读写共享 key。实体保存通常在 PostgreSQL `AFTER_COMMIT` 后失效缓存，DB commit 与 cache evict 不原子；Redis 故障也不会自动降级为直查数据库。生产排障必须区分 Spring 数据库事务、自定义 cache transaction 与 RedisCacheManager 的 transaction-aware 行为。
 
-## 第 33 章关键结论
+## 第 33 章关键结论：[WebSocket 订阅流程](chapters/33-websocket-subscription/index.html)
 
 `/api/ws/**` 的 HTTP Upgrade 被 Security Filter 放行，真正 JWT 校验发生在 `TbWebSocketHandler`：token 可来自 URL 或默认 10 秒内的首帧 `authCmd`。认证后的 external session、v1/v2 subscription context、入站/出站队列与 rate-limit bucket 都是节点本地内存状态；进程退出不会迁移，浏览器必须重连、重查并重订阅。
 
 初始 Entity/Alarm/Telemetry 查询直接访问 Attributes、Timeseries、Entity Query 和 Alarm DAO；注册后按 entity 的 TB Core partition 交给 Subscription Manager owner。它通过本地调用或 Core/notification queue 把持久化成功后的更新送回持有 socket 的节点，并用有范围的 `checkMissedUpdates` 缩小注册窗口。命令链本身不走 Actor，Kafka也不是必经后端；出站 CLQ 以默认 1000 的非原子计数阈值保护且串行发送，入站队列和上游 executor 没有端到端硬背压。
 
-## 第 34 章关键结论
+## 第 34 章关键结论：[Entity Query 流程](chapters/34-entity-query/index.html)
 
 Entity Query 把多态 filter、key predicates、projection、latest join 和分页拼为 PostgreSQL SQL；find 固定先 count 再 data，两条 statement 不共享快照。Relation filter 使用独立 `WITH RECURSIVE` CTE，latest/attributes 每 key 扩展 join；通用 ATTRIBUTE 只按更新时间跨 scope 取一条。Repository 没有 statement timeout或通用 pageSize 上限，无排序 offset 不稳定。
 
 源码还有多处非理想边界：projection 不去重、alias 前缀可误判 filter 参数、ALARM_FIELD 会落入属性分支、未知 ENTITY_FIELD predicate 可被忽略，WS 新 context 会解析两次 dynamic value。SYS count/internal find 可以绕过 SQL permission；multi-root 的 `result.id` 次排序也不是全序。
 
-## 第 35 章关键结论
+## 第 35 章关键结论：[Relation 流程](chapters/35-relation-flow/index.html)
 
 Relation 是 `(from,typeGroup,type,to)` 有向复合主键，PostgreSQL `ON CONFLICT` 只更新 `additional_info`。精确/列表查询走 RelationCache，递归 `EntityRelationsQuery` 在 Java executor 做 BFS，而 Entity Query 的 `RelationsQueryFilter` 是另一套 SQL CTE。表与 cache key 都没有 tenantId，也没有端点外键，隔离依赖全局 UUID 与上层权限。
 
 同步写入、cache eviction、Edge action、Audit 和 Rule Engine 消息不共享事务；异步 save/delete listener 甚至不读取 Future 结果，失败仍可能失效缓存或发虚假 action。`existsById -> deleteById` 还有 TOCTOU 和吞异常窗口，Java BFS 的 `maxLevel<=0` 实际近似无界且只受 Future timeout。
 
-## 第 36 章关键结论
+## 第 36 章关键结论：[Event 与 Audit Log 流程](chapters/36-event-audit-log/index.html)
 
 Debug Event 与 Audit Log 是两条独立旁路。Debug 从 Rule Actor 经 ActorSystemContext 进入无界 SQL blocking queue，以 EventType 分批写五张 range partition 表；Audit 从业务动作进入共享 JpaExecutor 的独立 JPA transaction，保存后才由同一 callable 调用可选 sink。两者都不与主业务或 Rule Engine/Edge 消息形成原子提交，但 Audit 的同步 producer 构造或 executor 提交异常仍可能改变 HTTP 结果。
 
 Debug data/metadata/error 和 Audit actionData/failure stack 都可能包含敏感明文，字段截断不等于脱敏。Event queue `shutdownNow` 不 drain、batch 失败无 retry；多数 Audit Future 被调用方忽略，ES 内部任务失败只记日志，而 sink executor 拒绝会令 Audit Future 失败但不回滚已保存记录。TTL 默认按 SYS owner 整分区删除，非 owner 清本机分区缓存。
 
-## 第 37 章关键结论
+## 第 37 章关键结论：[Rule Node 外部集成流程](chapters/37-rule-node-external-integration/index.html)
 
 REST、MQTT、Kafka 与邮件 Rule Node 共享 `TbAbstractExternalNode` 的 ack/relation 框架，但连接资源、线程、协议确认和错误传播完全独立。它们的运行时路径不写业务数据库或 outbox；节点配置中的凭据则随 Rule Node 配置 JSON 持久化，外部 Success 也不等于 exactly-once。
 
 HTTP 并发控制会在 Actor 调用路径等待旧 Future；MQTT QoS 1 不是 Rule Engine 重试；Kafka `producer.send` 同步异常只记 debug，可能不产生 Failure relation；邮件 timeout 不取消底层 SMTP 发送。系统 SMTP 与自定义 SMTP 使用不同公开重载，最终才汇入私有发送方法。
 
-## 第 38 章关键结论
+## 第 38 章关键结论：[Notification 流程](chapters/38-notification-flow/index.html)
 
 Notification 把 request、rule、template、target、per-user notification 和 provider 投递拆为多段。request 即使部分 recipient/provider 失败仍可进入 `SENT`，release-3.6 没有统一 FAILED/PARTIAL 状态、投递 attempt 表、dead letter 或自动重试；重复 recipient 被静默跳过，不计 sent 或 error。
 
 WEB/MOBILE_APP 会先保存 notification 行并推 WebSocket 更新；MOBILE_APP 在数据库状态已为 SENT 后才检查 session/调用 FCM，后续推送失败不会回写。EMAIL/SMS/Slack/Teams 属于外部副作用，数据库 request 状态不能证明终端实际收到。
 
-## 第 39 章关键结论
+## 第 39 章关键结论：[Edge 同步流程](chapters/39-edge-sync/index.html)
 
 Cloud 下行先把变化写入 PostgreSQL `edge_event`，成功后用 Core notification 唤醒持有 gRPC session 的节点；会话分页读取、发 Downlink 并按消息 ID 等待确认。上行 Uplink 不写 Cloud `edge_event`，而是直接调用业务 processor，多个 Future 成功后才返回 response。
 
 `allEdgesRelated=false` 仍会按 action、显式 edgeId 和关系查询继续分流：显式目标可直接写指定 Edge，tenant-wide、无显式目标的 DELETED fan-out 与关系遍历会排除来源 Edge。snapshot sync 的临时 EdgeEvent 不落表，成功 ack 与重试耗尽都可能正常完成 task、设置 `syncCompleted=true` 并恢复增量唤醒。独立 Edge 发行物的本地持久队列不在本仓库，文档不推测其实现。
 
-## 第 40 章关键结论
+## 第 40 章关键结论：[服务启动与关闭流程](chapters/40-service-lifecycle/index.html)
 
 ThingsBoard 安装/升级和 Java 主服务是不同进程入口；Spring Bean 初始化只由依赖边和显式 `@Order` 形成偏序，没有全局 `@PostConstruct` 顺序。相同 order 的 ready listener 与无依赖 destroy callback 默认逐个调用，但相互顺序没有合同；回调提交的 executor 工作才可能并发。
 
 `TbCoreStartupService` 经 PartitionService 和 TbClusterService 广播启动通知。ZK 正常销毁先显式删除 nodePath，再关闭 cache/client，ephemeral session 只是失败兜底。Node.js JS Executor 还支持多种 queue，Kafka connect/subscribe/run 与 Kafka 专属关闭步骤不能泛化为所有 provider。
 
-## 第 41 章关键结论
+## 第 41 章关键结论：[限流与 API Usage 流程](chapters/41-rate-limit-api-usage/index.html)
 
 瞬时 REST/Transport Rate Limit、Tenant Profile 速率字段和月度 API Usage 是不同机制。即时 limiter 在接收请求的节点本地判定；usage 先异步上报，再由 TB_CORE 分区 owner 汇总并传播 ENABLED/WARNING/DISABLED 状态，因此它不是集群原子全局令牌桶。
 
 排障时必须分别确认“计量是否产生”“状态是否持久化/传播”“执行点是否读取禁用状态”。软阈值通知、硬拒绝和计划配额不能互相代替，CE release-3.6 也不能套用其他版本或 PE 的集中配额能力。
 
-## 第 42 章关键结论
+## 第 42 章关键结论：[失败恢复与可观测性](chapters/42-failure-recovery-observability/index.html)
 
 业务副作用、`TbMsgCallback`、consumer `commit()` 返回和 broker 真正确认是四个完成点。不同 queue provider 的 commit 可能同步确认、异步发起确认或吞掉异常；进程崩溃窗口和重投意味着消费者及外部集成仍需业务幂等，不能从“调用过 commit”推出 exactly-once。
 
