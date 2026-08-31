@@ -26,7 +26,7 @@
 
 > 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章不把“队列存在”“调用了 commit”“有 metrics”推导成端到端可靠性保证，而是逐段核对失败后谁保留状态、谁重试、何时确认、进程崩溃后还能看到什么。队列提供者、Rule Engine 策略、Actor、Transport session、数据库 batch 和观测信号彼此没有统一事务。
 
-[上一篇：41 限流与 API Usage](../41-rate-limit-api-usage/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/42-failure-recovery-observability.svg) | [下一篇：全书目录](../../SUMMARY.md)
+[上一篇：41 限流与 API Usage](../41-rate-limit-api-usage/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/42-failure-recovery-observability.svg) | [下一篇：43 异步执行架构](../43-async-callback-execution/)
 
 [![失败恢复与可观测性架构图](../../assets/architecture/42-failure-recovery-observability.svg)](../../assets/architecture/42-failure-recovery-observability.svg)
 
@@ -865,7 +865,7 @@ decision 返回 commit，当前实现没有应用级 DLQ 保存这些 payload。
 
 ---
 
-[上一篇：41 限流与 API Usage](../41-rate-limit-api-usage/) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [架构图 SVG](../../assets/architecture/42-failure-recovery-observability.svg) | [下一篇：全书目录](../../SUMMARY.md)
+[上一篇：41 限流与 API Usage](../41-rate-limit-api-usage/) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [架构图 SVG](../../assets/architecture/42-failure-recovery-observability.svg) | [下一篇：43 异步执行架构](../43-async-callback-execution/)
 
 </script>
   <script src="../../assets/guide.js"></script>

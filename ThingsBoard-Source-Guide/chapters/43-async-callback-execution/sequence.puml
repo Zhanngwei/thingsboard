@@ -1,0 +1,438 @@
+@startuml
+title 43 ThingsBoard Async Execution - Unified Model
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1F2937
+  ActorBorderColor #334155
+  ActorBackgroundColor #FFFFFF
+  ActorFontColor #111827
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #EAF2F5
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #475569
+  GroupBackgroundColor #F8FAFC
+  GroupFontColor #111827
+  NoteBorderColor #9A5B13
+  NoteBackgroundColor #FFF7ED
+  NoteFontColor #111827
+}
+
+actor Caller
+participant "Entry thread" as Entry
+participant "Async object\nFuture / callback / message" as Async
+participant "Executor / Scheduler" as Exec
+participant "Work owner\nActor / Queue / DAO" as Owner
+participant "Completion callback" as Callback
+
+Caller -> Entry: request / message
+Entry -> Async: create pending state
+Entry -> Exec: submit / tell / send
+Entry --> Caller: return without end-to-end completion
+Exec -> Owner: execute work
+Owner --> Async: set / setException / response message
+Async -> Exec: schedule callback
+Exec -> Callback: onSuccess / onFailure
+Callback -> Owner: next relation / Actor message / commit decision
+
+note over Entry,Callback
+The callback thread is selected by the explicit Executor.
+directExecutor means the thread that completes or observes the Future.
+Method return, callback success, broker acknowledgement and DB commit
+are separate boundaries.
+end note
+
+@enduml
+
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1F2937
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #EAF2F5
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #475569
+  GroupBackgroundColor #F8FAFC
+  GroupFontColor #111827
+  NoteBorderColor #9A5B13
+  NoteBackgroundColor #FFF7ED
+  NoteFontColor #111827
+}
+
+title MQTT Telemetry - Producer ACK Before Database Completion
+
+actor Device
+participant "Netty EventLoop" as Netty
+participant MqttTransportHandler as Mqtt
+participant DefaultTransportService as Transport
+queue "Rule Engine producer" as Producer
+queue Kafka
+participant "transportCallbackExecutor" as TransportCb
+participant "tb-rule-engine-consumer" as Consumer
+participant "App/Tenant/Rule Actors" as Actors
+participant TbMsgTimeseriesNode as TsNode
+participant BaseTimeseriesService as TsService
+participant "SQL/Cassandra workers" as Database
+participant "ts-service-ts-callback" as TsCallback
+
+Device -> Netty: MQTT PUBLISH telemetry
+Netty -> Mqtt: processDevicePublish(...)
+Mqtt -> Transport: process(session, PostTelemetryMsg, callback)
+loop each timestamp group
+  Transport -> Producer: send(ToRuleEngineMsg, MsgPackCallback)
+  Producer -> Kafka: provider send
+  Kafka --> Producer: producer acknowledgement
+  Producer --> Transport: TbQueueCallback.onSuccess
+end
+Transport -> TransportCb: submit MQTT callback
+TransportCb -> Mqtt: onSuccess
+Mqtt -> Netty: write PUBACK when msgId > 0
+Netty --> Device: PUBACK (QoS 1 only)
+
+Consumer -> Kafka: poll records later
+Kafka --> Consumer: message pack
+Consumer -> Actors: tell QueueToRuleEngineMsg
+Actors -> TsNode: onMsg(ctx, msg)
+TsNode -> TsService: saveAndNotify(..., TelemetryNodeCallback)
+TsNode --> Actors: return; message remains pending
+TsService -> Database: partition + history + latest Futures
+Database --> TsService: aggregate Future success/failure
+TsService -> TsCallback: run main callback
+TsCallback -> Actors: tellSuccess / tellFailure
+Actors --> Consumer: terminal TbMsgCallback
+Consumer -> Consumer: analyze processing strategy
+Consumer -> Kafka: commitSync when decision is commit
+
+note over Device,Database
+QoS 1 PUBACK only confirms successful production to the Rule Engine queue.
+It does not wait for Rule Engine consumption or telemetry persistence.
+QoS 0 has no PUBACK completion point.
+end note
+
+@enduml
+
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1F2937
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #EAF2F5
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #475569
+  GroupBackgroundColor #F8FAFC
+  GroupFontColor #111827
+  NoteBorderColor #9A5B13
+  NoteBackgroundColor #FFF7ED
+  NoteFontColor #111827
+}
+
+title Rule Engine Node - Return, Relation and Terminal ACK
+
+participant "rule-dispatcher" as RuleThread
+participant RuleNodeActor as NodeActor
+participant TbMsgTimeseriesNode as Node
+participant DefaultTelemetrySubscriptionService as Telemetry
+participant BaseTimeseriesService as Service
+participant "DB Future" as DbFuture
+participant "ts-service-ts-callback" as CallbackThread
+participant "Rule Chain routing" as Routing
+participant TbMsgPackProcessingContext as Pack
+
+RuleThread -> NodeActor: process RuleChainToRuleNodeMsg
+NodeActor -> Node: onMsg(ctx, msg)
+Node -> Telemetry: saveAndNotify(..., callback)
+Telemetry -> Service: save(...)
+Service -> DbFuture: allAsList(partition, history, latest)
+Node --> NodeActor: return immediately
+
+alt all database Futures succeed
+  DbFuture -> CallbackThread: execute FutureCallback
+  CallbackThread -> Routing: ctx.tellSuccess(msg)
+else any database Future fails
+  DbFuture -> CallbackThread: execute FutureCallback
+  CallbackThread -> Routing: ctx.tellFailure(msg, t)
+end
+
+loop downstream relations
+  Routing -> NodeActor: next Rule Node message
+end
+Routing -> Pack: terminal TbMsgCallback success/failure
+
+note over Node,Pack
+Node.onMsg returning is not an ACK.
+TelemetryNodeCallback completes one node operation.
+Only terminal routing completes the original queue message callback.
+end note
+
+@enduml
+
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1F2937
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #EAF2F5
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #475569
+  GroupBackgroundColor #F8FAFC
+  GroupFontColor #111827
+  NoteBorderColor #9A5B13
+  NoteBackgroundColor #FFF7ED
+  NoteFontColor #111827
+}
+
+title REST Server-side RPC - DeferredResult, Actor Pending and Timeout
+
+actor User
+participant "Servlet request thread" as Http
+participant AbstractRpcController as Controller
+participant "access-validator" as Validator
+participant TbCoreDeviceRpcService as CoreRpc
+queue "Rule Engine/Core queues" as Queues
+participant "Rule Engine RPC service" as ReRpc
+participant "device-dispatcher" as DeviceDispatcher
+participant DeviceActorMessageProcessor as DeviceActor
+participant "Actor scheduler" as Scheduler
+participant "Transport callback / EventLoop" as Transport
+actor Device
+
+User -> Http: POST server-side RPC
+Http -> Controller: handleDeviceRPCRequest(...)
+Controller -> Controller: create DeferredResult
+Controller -> Validator: validate(..., callback)
+Controller --> Http: return DeferredResult
+Http --> User: connection remains async
+
+Validator -> CoreRpc: processRestApiRpcRequest
+CoreRpc -> CoreRpc: store local response callback
+CoreRpc -> Queues: RPC_CALL_FROM_SERVER_TO_DEVICE
+Queues -> ReRpc: Rule Engine processing
+ReRpc -> Queues: route to target Core
+Queues -> DeviceDispatcher: high-priority Actor message
+DeviceDispatcher -> DeviceActor: processRpcRequest
+DeviceActor -> DeviceActor: pendingMap.put(requestId, metadata)
+DeviceActor -> Scheduler: schedule timeout message
+DeviceActor -> Transport: ToTransportMsg
+Transport -> Device: protocol RPC request
+
+alt device responds before expiration
+  Device --> Transport: response payload
+  Transport -> Queues: response to Core
+  Queues -> DeviceDispatcher: response Actor message
+  DeviceDispatcher -> DeviceActor: remove pending request
+  DeviceActor -> CoreRpc: FromDeviceRpcResponse
+  CoreRpc -> ReRpc: route response callback
+  ReRpc -> Controller: reply callback
+  Controller -> Http: DeferredResult.setResult
+else timeout message wins
+  Scheduler -> DeviceDispatcher: tell(timeoutMsg)
+  DeviceDispatcher -> DeviceActor: remove pending request
+  DeviceActor -> CoreRpc: TIMEOUT / NO_ACTIVE_CONNECTION
+  CoreRpc -> Controller: reply callback
+  Controller -> Http: DeferredResult.setResult(error)
+end
+Http --> User: async dispatch writes HTTP response
+
+note over DeviceActor,Scheduler
+The scheduler submits a timeout message. State removal normally belongs
+to DeviceActor processing. Edge RPC contains blocking Future.get() calls
+inside the DeviceActor path and can occupy the shared dispatcher.
+end note
+
+@enduml
+
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1F2937
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #EAF2F5
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #475569
+  GroupBackgroundColor #F8FAFC
+  GroupFontColor #111827
+  NoteBorderColor #9A5B13
+  NoteBackgroundColor #FFF7ED
+  NoteFontColor #111827
+}
+
+title PostgreSQL / TimescaleDB - JVM Queue, Transaction and Future
+
+participant "DAO caller" as Dao
+participant TbSqlBlockingQueueWrapper as Wrapper
+queue TbSqlBlockingQueue as SqlQueue
+participant "sql-queue-* single worker" as Worker
+participant "Transactional insert repository" as Repository
+database "PostgreSQL / TimescaleDB" as Pg
+participant "ts-service-ts-callback" as TsCallback
+
+Dao -> Wrapper: add(entity)
+Wrapper -> SqlQueue: select queue by entity hash
+SqlQueue -> SqlQueue: create SettableFuture + enqueue
+SqlQueue --> Dao: pending Future
+
+Worker -> SqlQueue: poll(maxDelay) first element
+Worker -> SqlQueue: drainTo(batchSize - 1)
+Worker -> Repository: saveFunction.accept(batch)
+Repository -> Pg: JDBC batch in Spring transaction
+alt transaction commits
+  Pg --> Repository: commit
+  Repository --> Worker: return
+  Worker -> SqlQueue: future.set(null) for every element
+  SqlQueue -> TsCallback: aggregate Future callback
+else save or commit throws
+  Pg --> Repository: rollback/error
+  Repository --> Worker: Throwable
+  Worker -> SqlQueue: future.setException(t) for every element
+end
+
+opt batch was not full
+  Worker -> Worker: sleep remaining maxDelay after write
+end
+
+note over Dao,Pg
+add() means JVM enqueue only. A successful queue Future is set after
+the transactional repository method returns. Futures.allAsList across
+partition/history/latest does not create a cross-DAO transaction.
+end note
+
+@enduml
+
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1F2937
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #EAF2F5
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #475569
+  GroupBackgroundColor #F8FAFC
+  GroupFontColor #111827
+  NoteBorderColor #9A5B13
+  NoteBackgroundColor #FFF7ED
+  NoteFontColor #111827
+}
+
+title Cassandra - Dispatcher, Driver, Timeout and Callback Pools
+
+participant "DAO caller" as Dao
+queue "bounded task deque" as Buffer
+participant "nosql-Write-dispatcher" as Dispatcher
+participant "DataStax driver Future" as Driver
+participant "nosql-Write-timeout" as Timeout
+participant "nosql-Write-callback" as Callback
+participant "caller Future" as CallerFuture
+database Cassandra
+
+Dao -> Buffer: submit(task)
+alt tenant rate limited or queue full
+  Buffer -> CallerFuture: setException immediately
+  CallerFuture --> Dao: failed Future
+else accepted
+  Buffer --> Dao: pending wrapped Future
+  Dispatcher -> Buffer: take task
+  Dispatcher -> Dispatcher: remaining = createTime + maxWait - now
+  alt expired before execution
+    Dispatcher -> CallerFuture: setException(TimeoutException)
+  else launch
+    Dispatcher -> Driver: execute(task)
+    Driver -> Cassandra: async statement
+    Timeout -> Driver: withTimeout deadline
+    alt driver result
+      Cassandra --> Driver: result or failure
+      Driver -> Callback: FutureCallback
+      Callback -> CallerFuture: set / setException
+    else timeout wins
+      Timeout -> Callback: failure callback
+      Callback -> CallerFuture: setException(TimeoutException)
+    end
+  end
+end
+
+group synchronous installation failure gap
+  Dispatcher -> Dispatcher: execute / withTimeout / addCallback throws
+  Dispatcher -> Dispatcher: outer catch updates stats and in-flight
+  note right of CallerFuture
+  The source path does not setException on taskCtx.future here.
+  The caller Future may remain pending.
+  end note
+end
+
+@enduml
+
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #1F2937
+  ParticipantBorderColor #334155
+  ParticipantBackgroundColor #EAF2F5
+  ParticipantFontColor #111827
+  LifeLineBorderColor #64748B
+  LifeLineBackgroundColor #F8FAFC
+  GroupBorderColor #475569
+  GroupBackgroundColor #F8FAFC
+  GroupFontColor #111827
+  NoteBorderColor #9A5B13
+  NoteBackgroundColor #FFF7ED
+  NoteFontColor #111827
+}
+
+title Kafka Consumer - Poll, Actor Callback, Decision and Commit
+
+queue Kafka
+participant "tb-rule-engine-consumer" as Consumer
+participant TbMsgPackProcessingContext as Pack
+participant "Actor dispatchers" as Actors
+participant "Rule Node callback executor" as NodeCallback
+participant "Processing Strategy" as Strategy
+
+Consumer -> Kafka: poll
+Kafka --> Consumer: records
+Consumer -> Pack: create pendingMap and latch
+loop each record
+  Consumer -> Actors: tell QueueToRuleEngineMsg
+end
+Consumer -> Pack: await(packProcessingTimeout)
+
+Actors -> NodeCallback: start async side effect
+NodeCallback --> Pack: onSuccess / onFailure
+Pack -> Pack: pending -> success/failed; countDown
+Pack --> Consumer: all done or timeout
+Consumer -> Strategy: analyze(success, failed, pending)
+
+alt retry decision
+  Strategy --> Consumer: reprocessMap
+  Consumer -> Consumer: update submit strategy and optional sleep
+  Consumer -> Actors: resubmit current JVM pack subset
+else commit decision
+  Strategy --> Consumer: commit
+  Consumer -> Pack: cleanup
+  Consumer -> Kafka: commitSync
+end
+
+note over Consumer,Kafka
+Actor callback does not commit an offset. Retry is in-memory resubmission,
+not a new Kafka poll or retry topic. Long retry cycles can exceed
+max.poll.interval.ms. A crash between side effect and commit can replay.
+end note
+
+@enduml

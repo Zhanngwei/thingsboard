@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1840" height="1380" viewBox="0 0 1840 1380" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard release-3.6 asynchronous execution architecture</title>
+  <desc id="desc">Architecture diagram showing entry threads, futures and callbacks, executors and schedulers, actors and queues, database workers, and independent completion boundaries.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1F2937"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#B91C1C"/>
+    </marker>
+    <style>
+      .bg{fill:#FFFFFF}.band{fill:#F8FAFC;stroke:#94A3B8;stroke-width:2}.entry{fill:#0F4C5C;stroke:#062F38;stroke-width:3}.future{fill:#075985;stroke:#0C4A6E;stroke-width:3}.pool{fill:#166534;stroke:#052E16;stroke-width:3}.actor{fill:#5B21B6;stroke:#3B0764;stroke-width:3}.queue{fill:#92400E;stroke:#451A03;stroke-width:3}.db{fill:#334155;stroke:#0F172A;stroke-width:3}.complete{fill:#FFF7ED;stroke:#9A3412;stroke-width:3}.risk{fill:#FEF2F2;stroke:#B91C1C;stroke-width:3}.scenario{fill:#FFFFFF;stroke:#475569;stroke-width:2}
+      .title{font:700 31px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#111827}.subtitle{font:16px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#334155}.section{font:700 22px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#111827}.whiteTitle{font:700 19px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#FFFFFF}.white{font:15px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#FFFFFF}.darkTitle{font:700 18px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#111827}.dark{font:15px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#111827}.small{font:14px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#334155}.riskText{font:700 15px "Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#991B1B}.line{stroke:#1F2937;stroke-width:3;fill:none;marker-end:url(#arrow)}.dash{stroke:#1F2937;stroke-width:2.5;fill:none;stroke-dasharray:9 7;marker-end:url(#arrow)}.red{stroke:#B91C1C;stroke-width:3;fill:none;stroke-dasharray:9 7;marker-end:url(#arrow-red)}
+    </style>
+  </defs>
+
+  <rect class="bg" width="1840" height="1380"/>
+  <text x="920" y="48" text-anchor="middle" class="title">ThingsBoard release-3.6 异步执行架构</text>
+  <text x="920" y="78" text-anchor="middle" class="subtitle">Async means ownership transfer: thread, state, callback and acknowledgement boundaries must be traced separately.</text>
+
+  <rect x="40" y="105" width="1760" height="205" rx="6" class="band"/>
+  <text x="65" y="139" class="section">1. Entry threads: accept work and leave quickly</text>
+  <rect x="75" y="170" width="285" height="105" rx="5" class="entry"/>
+  <text x="217" y="204" text-anchor="middle" class="whiteTitle">Netty MQTT EventLoop</text>
+  <text x="100" y="237" class="white">decode PUBLISH · PostTelemetryMsg</text>
+  <text x="100" y="262" class="white">QoS 1 ack after queue callback</text>
+  <rect x="410" y="170" width="285" height="105" rx="5" class="entry"/>
+  <text x="552" y="204" text-anchor="middle" class="whiteTitle">Kafka Consumer Thread</text>
+  <text x="435" y="237" class="white">poll pack · await Actor callbacks</text>
+  <text x="435" y="262" class="white">analyze · retry or commit</text>
+  <rect x="745" y="170" width="285" height="105" rx="5" class="entry"/>
+  <text x="887" y="204" text-anchor="middle" class="whiteTitle">Servlet Request Thread</text>
+  <text x="770" y="237" class="white">create DeferredResult</text>
+  <text x="770" y="262" class="white">validation callback continues RPC</text>
+  <rect x="1080" y="170" width="285" height="105" rx="5" class="entry"/>
+  <text x="1222" y="204" text-anchor="middle" class="whiteTitle">Actor Dispatcher Thread</text>
+  <text x="1105" y="237" class="white">mailbox serializes one Actor</text>
+  <text x="1105" y="262" class="white">shared dispatcher runs many Actors</text>
+  <rect x="1415" y="170" width="350" height="105" rx="5" class="entry"/>
+  <text x="1590" y="204" text-anchor="middle" class="whiteTitle">DAO / Driver Completion Thread</text>
+  <text x="1440" y="237" class="white">SQL worker / Cassandra driver</text>
+  <text x="1440" y="262" class="white">may trigger direct callbacks</text>
+
+  <rect x="40" y="335" width="1760" height="300" rx="6" class="band"/>
+  <text x="65" y="369" class="section">2. Three coordination mechanisms</text>
+  <rect x="75" y="410" width="500" height="175" rx="5" class="future"/>
+  <text x="325" y="447" text-anchor="middle" class="whiteTitle">Future + Callback</text>
+  <text x="105" y="482" class="white">ListenableFuture / SettableFuture / DeferredResult</text>
+  <text x="105" y="512" class="white">FutureCallback / TransportServiceCallback / TbCallback</text>
+  <text x="105" y="542" class="white">directExecutor = run on future-completing thread</text>
+  <text x="105" y="572" class="white">Composition propagates result; it does not create a DB transaction</text>
+  <rect x="670" y="410" width="500" height="175" rx="5" class="pool"/>
+  <text x="920" y="447" text-anchor="middle" class="whiteTitle">Executor + Scheduler</text>
+  <text x="700" y="482" class="white">named work-stealing pools · fixed pools · single workers</text>
+  <text x="700" y="512" class="white">Actor dispatcher · DB callback pool · SQL queue thread</text>
+  <text x="700" y="542" class="white">scheduler creates timeout messages; it does not cancel side effects</text>
+  <text x="700" y="572" class="white">Pool isolation limits blast radius but increases tuning surfaces</text>
+  <rect x="1265" y="410" width="500" height="175" rx="5" class="actor"/>
+  <text x="1515" y="447" text-anchor="middle" class="whiteTitle">Actor + Message Queue</text>
+  <text x="1295" y="482" class="white">Actor mailbox owns mutable entity/rule state</text>
+  <text x="1295" y="512" class="white">TB Queue crosses process/service boundaries</text>
+  <text x="1295" y="542" class="white">mailbox order is not broker durability or exactly-once</text>
+  <text x="1295" y="572" class="white">callback returns completion into the queue processing context</text>
+
+  <path d="M217 275 V350 H325 V410" class="line"/>
+  <path d="M552 275 V350 H1515 V410" class="line"/>
+  <path d="M887 275 V385 H325 V410" class="line"/>
+  <path d="M1222 275 V385 H920 V410" class="line"/>
+  <path d="M1590 275 V385 H920 V410" class="line"/>
+
+  <rect x="40" y="660" width="1760" height="300" rx="6" class="band"/>
+  <text x="65" y="694" class="section">3. Work execution and independent completion boundaries</text>
+  <rect x="75" y="735" width="285" height="135" rx="5" class="queue"/>
+  <text x="217" y="770" text-anchor="middle" class="whiteTitle">Queue Producer</text>
+  <text x="100" y="805" class="white">local send accepted</text>
+  <text x="100" y="833" class="white">provider callback</text>
+  <text x="100" y="858" class="white">not downstream completion</text>
+  <rect x="410" y="735" width="285" height="135" rx="5" class="actor"/>
+  <text x="552" y="770" text-anchor="middle" class="whiteTitle">Actor / Rule Node</text>
+  <text x="435" y="805" class="white">mailbox dequeue</text>
+  <text x="435" y="833" class="white">async node returns</text>
+  <text x="435" y="858" class="white">tellSuccess / tellFailure later</text>
+  <rect x="745" y="735" width="285" height="135" rx="5" class="db"/>
+  <text x="887" y="770" text-anchor="middle" class="whiteTitle">DB Worker / Driver</text>
+  <text x="770" y="805" class="white">batch / async request</text>
+  <text x="770" y="833" class="white">transaction or consistency result</text>
+  <text x="770" y="858" class="white">future completes after return</text>
+  <rect x="1080" y="735" width="285" height="135" rx="5" class="complete"/>
+  <text x="1222" y="770" text-anchor="middle" class="darkTitle">Callback Result</text>
+  <text x="1105" y="805" class="dark">pack pending -> success/failed</text>
+  <text x="1105" y="833" class="dark">HTTP DeferredResult.setResult</text>
+  <text x="1105" y="858" class="dark">caller Future set / setException</text>
+  <rect x="1415" y="735" width="350" height="135" rx="5" class="complete"/>
+  <text x="1590" y="770" text-anchor="middle" class="darkTitle">External Acknowledgement</text>
+  <text x="1440" y="805" class="dark">QoS 1 PUBACK · Kafka offset commit</text>
+  <text x="1440" y="833" class="dark">device RPC response · DB commit</text>
+  <text x="1440" y="858" class="dark">each has a different durability meaning</text>
+  <path d="M360 802 H410" class="line"/><path d="M695 802 H745" class="line"/><path d="M1030 802 H1080" class="line"/><path d="M1365 802 H1415" class="line"/>
+  <path d="M552 870 V920 H217 V870" class="dash"/>
+  <text x="385" y="947" text-anchor="middle" class="small">Rule Engine processing strategy may resubmit the current JVM pack before commit.</text>
+
+  <rect x="40" y="985" width="1760" height="325" rx="6" class="band"/>
+  <text x="65" y="1019" class="section">4. Six source-level scenarios and their dominant risk</text>
+  <rect x="75" y="1060" width="500" height="90" rx="5" class="scenario"/>
+  <text x="100" y="1093" class="darkTitle">MQTT telemetry ingestion</text>
+  <text x="100" y="1125" class="dark">QoS 1 PUBACK can precede Rule Engine execution and persistence.</text>
+  <rect x="670" y="1060" width="500" height="90" rx="5" class="scenario"/>
+  <text x="695" y="1093" class="darkTitle">Rule Engine asynchronous node</text>
+  <text x="695" y="1125" class="dark">Node returns; TbMsg remains pending until callback routes success/failure.</text>
+  <rect x="1265" y="1060" width="500" height="90" rx="5" class="scenario"/>
+  <text x="1290" y="1093" class="darkTitle">REST RPC and timeout</text>
+  <text x="1290" y="1125" class="dark">DeferredResult, Actor pending map and device response are separate clocks.</text>
+  <rect x="75" y="1185" width="500" height="90" rx="5" class="scenario"/>
+  <text x="100" y="1218" class="darkTitle">PostgreSQL / TimescaleDB batch</text>
+  <text x="100" y="1250" class="dark">JVM queue batches writes; futures complete after save function returns.</text>
+  <rect x="670" y="1185" width="500" height="90" rx="5" class="scenario"/>
+  <text x="695" y="1218" class="darkTitle">Cassandra asynchronous write</text>
+  <text x="695" y="1250" class="dark">Dispatcher, driver, timeout and callback pools form four execution stages.</text>
+  <rect x="1265" y="1185" width="500" height="90" rx="5" class="scenario"/>
+  <text x="1290" y="1218" class="darkTitle">Kafka consume, retry and commit</text>
+  <text x="1290" y="1250" class="dark">poll, Actor callback, decision and offset commit are not one transaction.</text>
+
+  <rect x="250" y="1325" width="1340" height="42" rx="5" class="risk"/>
+  <text x="920" y="1352" text-anchor="middle" class="riskText">Production rule: never block an EventLoop/Actor dispatcher, and never infer end-to-end success from an upstream callback.</text>
+</svg>

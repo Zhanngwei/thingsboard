@@ -17,7 +17,7 @@
   <main class="layout">
     <aside class="sidebar" aria-label="全书目录">
       <strong>ThingsBoard release-3.6 源码解析指南</strong>
-      <a href="#阅读定位">阅读定位</a><a href="#当前进度">当前进度</a><a href="#第-01-章关键结论-mqtt-消息进入系统">01-14 接入与实体</a><a href="#第-15-章关键结论-actor-模型">15-22 Actor 与存储</a><a href="#第-23-章关键结论-http-设备-api-流程">23-29 协议与会话</a><a href="#第-30-章关键结论-telemetry-查询流程">30-36 查询与实时</a><a href="#第-37-章关键结论-rule-node-外部集成流程">37-42 平台与运行时</a><a href="#图表约定">图表约定</a><a href="#版本边界">版本边界</a>
+      <a href="#阅读定位">阅读定位</a><a href="#当前进度">当前进度</a><a href="#第-01-章关键结论-mqtt-消息进入系统">01-14 接入与实体</a><a href="#第-15-章关键结论-actor-模型">15-22 Actor 与存储</a><a href="#第-23-章关键结论-http-设备-api-流程">23-29 协议与会话</a><a href="#第-30-章关键结论-telemetry-查询流程">30-36 查询与实时</a><a href="#第-37-章关键结论-rule-node-外部集成流程">37-43 平台与运行时</a><a href="#图表约定">图表约定</a><a href="#版本边界">版本边界</a>
     </aside>
     <article id="article" class="content" aria-live="polite"></article>
   </main>
@@ -33,7 +33,7 @@
 
 [浏览 HTML 知识库](index.html) | [全书目录](SUMMARY.md) | [第 01 章：MQTT 消息进入系统](chapters/01-mqtt-message-ingress/README.md) | [第 02 章：Device 创建流程](chapters/02-device-create/README.md) | [第 03 章：Device 删除流程](chapters/03-device-delete/README.md) | [第 04 章：Device Profile 流程](chapters/04-device-profile/README.md) | [第 05 章：Rule Chain 执行流程](chapters/05-rule-chain-execution/README.md) | [第 06 章：Alarm 创建流程](chapters/06-alarm-create/README.md) | [第 07 章：Alarm 清除流程](chapters/07-alarm-clear/README.md) | [第 08 章：Attributes 保存流程](chapters/08-attributes-save/README.md) | [第 09 章：Telemetry 保存流程](chapters/09-telemetry-save/README.md) | [第 10 章：RPC 流程](chapters/10-rpc/README.md) | [第 11 章：OTA 流程](chapters/11-ota/README.md) | [第 12 章：Dashboard 流程](chapters/12-dashboard/README.md) | [第 13 章：Login 流程](chapters/13-login/README.md) | [第 14 章：JWT 认证流程](chapters/14-jwt-authentication/README.md) | [第 15 章：Actor 模型](chapters/15-actor-model/README.md) | [第 16 章：Kafka 发送流程](chapters/16-kafka-producer/README.md) | [第 17 章：Kafka 消费流程](chapters/17-kafka-consumer/README.md) | [第 18 章：Queue 管理](chapters/18-queue-management/README.md) | [第 19 章：Cluster 通信](chapters/19-cluster-communication/README.md) | [第 20 章：Cassandra 写入流程](chapters/20-cassandra-write/README.md) | [第 21 章：TimescaleDB 写入流程](chapters/21-timescale-write/README.md) | [第 22 章：PostgreSQL 写入流程](chapters/22-postgresql-write/README.md) | [第 23 章：HTTP 设备 API 流程](chapters/23-http-device-api/README.md) | [第 24 章：CoAP 消息流程](chapters/24-coap-message-flow/README.md) | [第 25 章：LwM2M 注册与观测流程](chapters/25-lwm2m-registration-observe/README.md) | [第 26 章：MQTT Gateway 流程](chapters/26-mqtt-gateway/README.md) | [第 27 章：Device Provision 流程](chapters/27-device-provision/README.md) | [第 28 章：Device Claim 流程](chapters/28-device-claim/README.md) | [第 29 章：Session 与 Device State 流程](chapters/29-session-device-state/README.md) | [第 30 章：Telemetry 查询流程](chapters/30-telemetry-query/README.md) | [第 31 章：Timeseries TTL 清理流程](chapters/31-timeseries-ttl-cleanup/README.md) | [第 32 章：Redis 与本地缓存流程](chapters/32-redis-local-cache/README.md) | [第 33 章：WebSocket 订阅流程](chapters/33-websocket-subscription/README.md) | [第 34 章：Entity Query 流程](chapters/34-entity-query/README.md) | [第 35 章：Relation 流程](chapters/35-relation-flow/README.md) | [第 36 章：Event 与 Audit Log 流程](chapters/36-event-audit-log/README.md)
 
-[第 37 章：Rule Node 外部集成流程](chapters/37-rule-node-external-integration/README.md) | [第 38 章：Notification 流程](chapters/38-notification-flow/README.md) | [第 39 章：Edge 同步流程](chapters/39-edge-sync/README.md) | [第 40 章：服务启动与关闭流程](chapters/40-service-lifecycle/README.md) | [第 41 章：限流与 API Usage 流程](chapters/41-rate-limit-api-usage/README.md) | [第 42 章：失败恢复与可观测性](chapters/42-failure-recovery-observability/README.md)
+[第 37 章：Rule Node 外部集成流程](chapters/37-rule-node-external-integration/README.md) | [第 38 章：Notification 流程](chapters/38-notification-flow/README.md) | [第 39 章：Edge 同步流程](chapters/39-edge-sync/README.md) | [第 40 章：服务启动与关闭流程](chapters/40-service-lifecycle/README.md) | [第 41 章：限流与 API Usage 流程](chapters/41-rate-limit-api-usage/README.md) | [第 42 章：失败恢复与可观测性](chapters/42-failure-recovery-observability/README.md) | [第 43 章：异步执行架构](chapters/43-async-callback-execution/README.md)
 
 </details>
 
@@ -107,6 +107,7 @@
 | 40 | 服务启动与关闭流程 | 已完成 | [Markdown](chapters/40-service-lifecycle/README.md) / [HTML](chapters/40-service-lifecycle/index.html) / [PlantUML](chapters/40-service-lifecycle/sequence.puml) / [时序图 SVG](chapters/40-service-lifecycle/sequence.svg) / [架构图 SVG](assets/architecture/40-service-lifecycle.svg) |
 | 41 | 限流与 API Usage 流程 | 已完成 | [Markdown](chapters/41-rate-limit-api-usage/README.md) / [HTML](chapters/41-rate-limit-api-usage/index.html) / [PlantUML](chapters/41-rate-limit-api-usage/sequence.puml) / [时序图 SVG](chapters/41-rate-limit-api-usage/sequence.svg) / [架构图 SVG](assets/architecture/41-rate-limit-api-usage.svg) |
 | 42 | 失败恢复与可观测性 | 已完成 | [Markdown](chapters/42-failure-recovery-observability/README.md) / [HTML](chapters/42-failure-recovery-observability/index.html) / [PlantUML](chapters/42-failure-recovery-observability/sequence.puml) / [时序图 SVG](chapters/42-failure-recovery-observability/sequence.svg) / [架构图 SVG](assets/architecture/42-failure-recovery-observability.svg) |
+| 43 | 异步执行、回调、线程池、Actor 与消息队列 | 已完成 | [Markdown](chapters/43-async-callback-execution/README.md) / [HTML](chapters/43-async-callback-execution/index.html) / [PlantUML](chapters/43-async-callback-execution/sequence.puml) / [时序图 SVG](chapters/43-async-callback-execution/sequence.svg) / [架构图 SVG](assets/architecture/43-async-callback-execution.svg) |
 
 完整目录见 [SUMMARY.md](SUMMARY.md)。所有计划章节均已生成，目录直接链接到对应 Markdown、HTML、PlantUML 和 SVG 产物。
 
@@ -361,6 +362,14 @@ ThingsBoard 安装/升级和 Java 主服务是不同进程入口；Spring Bean �
 业务副作用、`TbMsgCallback`、consumer `commit()` 返回和 broker 真正确认是四个完成点。不同 queue provider 的 commit 可能同步确认、异步发起确认或吞掉异常；进程崩溃窗口和重投意味着消费者及外部集成仍需业务幂等，不能从“调用过 commit”推出 exactly-once。
 
 Rule Engine retry、Actor restart、Transport session 重连和数据库 batch Future 互不构成统一恢复协议。日志、Micrometer/Prometheus、JMX、queue lag、Debug Event 与 Audit Log 也各有盲区；生产排障要把 broker offset、callback 状态、数据库事实和外部副作用放在同一时间线上核对。
+
+## 第 43 章关键结论：[异步执行、回调、线程池、Actor 与消息队列](chapters/43-async-callback-execution/index.html)
+
+ThingsBoard 的异步体系不是单一框架，而是三类机制协作：Future/Callback 传播结果，Executor/Scheduler 决定任务和超时在哪条线程执行，Actor/消息队列负责状态所有权与跨服务传递。`directExecutor`、Actor mailbox、Kafka callback 和数据库 Future 的完成线程、串行范围与持久化语义均不同。
+
+MQTT `PUBACK`、Rule Node `tellSuccess`、Rule Engine pack 完成、Kafka offset commit、SQL/Cassandra Future 完成和数据库事实是独立边界。生产分析必须逐段标注入口线程、线程切换、回调线程、等待对象和确认点；尤其不能在 Netty EventLoop 或 Actor dispatcher 中阻塞，也不能把 `Futures.allAsList` 当作跨 DAO 事务。
+
+本章用 MQTT 遥测、Rule Engine 节点、RPC、PostgreSQL/TimescaleDB batch、Cassandra async 和 Kafka 消费六条源码链统一说明背压、线程池隔离、回调错误传播、超时与幂等成本，并给出针对队列积压、线程饥饿和“Future 永不完成”的排障顺序。
 
 ## 图表约定
 

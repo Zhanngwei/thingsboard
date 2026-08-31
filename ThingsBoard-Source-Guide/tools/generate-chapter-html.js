@@ -23,21 +23,18 @@ if (!titleMatch) {
 
 const title = titleMatch[1].trim();
 const htmlMarkdown = markdown.replace(/(\.\.\/\d{2}-[^/)]+)\/README\.md/g, '$1/index.html');
-const sections = [
-  ['一、流程目标', '一-流程目标'],
-  ['二、入口', '二-入口'],
-  ['三、完整调用链', '三-完整调用链'],
-  ['四、消息流', '四-消息流'],
-  ['五、时序图', '五-时序图'],
-  ['六、数据变化', '六-数据变化'],
-  ['七、源码分析', '七-源码分析'],
-  ['八、Actor 分析', '八-actor-分析'],
-  ['九、Kafka 分析', '九-kafka-分析'],
-  ['十、数据库分析', '十-数据库分析'],
-  ['十一、异常处理', '十一-异常处理'],
-  ['十二、源码阅读路线', '十二-源码阅读路线'],
-  ['十三、常见面试题', '十三-常见面试题']
-];
+function slugify(text, index) {
+  const slug = text.trim().toLowerCase()
+    .replace(/[`.()（）]/g, '')
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return slug || `section-${index}`;
+}
+
+const sections = Array.from(markdown.matchAll(/^##\s+(.+)$/gm), (match, index) => [
+  match[1].trim(),
+  slugify(match[1], index)
+]);
 const sidebar = sections.map(([label, anchor]) => `<a href="#${anchor}">${label}</a>`).join('');
 
 const html = `<!doctype html>

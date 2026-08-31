@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>43 异步执行、回调、线程池、Actor 与消息队列 | ThingsBoard Source Guide</title>
+  <link rel="stylesheet" href="../../assets/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">ThingsBoard Source Guide</a>
+    <nav class="topnav" aria-label="文档导航"><a href="README.md">Markdown</a><a href="../../index.html">全书目录</a><a href="sequence.svg" target="_blank" rel="noopener noreferrer">时序图 SVG</a></nav>
+  </header>
+  <main class="layout">
+    <aside class="sidebar" aria-label="章节目录">
+      <strong>43 异步执行、回调、线程池、Actor 与消息队列</strong>
+      <a href="#一-流程目标">一、流程目标</a><a href="#二-入口">二、入口</a><a href="#三-完整调用链">三、完整调用链</a><a href="#四-消息流">四、消息流</a><a href="#五-时序图">五、时序图</a><a href="#六-数据变化">六、数据变化</a><a href="#七-源码分析">七、源码分析</a><a href="#八-actor-分析">八、Actor 分析</a><a href="#九-kafka-与-queue-分析">九、Kafka 与 Queue 分析</a><a href="#十-数据库分析">十、数据库分析</a><a href="#十一-异常处理">十一、异常处理</a><a href="#十二-源码阅读路线">十二、源码阅读路线</a><a href="#十三-典型场景-生产实践与面试题">十三、典型场景、生产实践与面试题</a>
+    </aside>
+    <article id="article" class="content" aria-live="polite"></article>
+  </main>
+  <footer class="footer">Source baseline: ThingsBoard release-3.6 · 69124284c2</footer>
+  <script id="markdown-source" type="text/plain"># 43 异步执行、回调、线程池、Actor 与消息队列
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章不把 `Future`、线程池、Actor 和 Kafka 分开讲成四套 API，而是沿着真实消息回答四个问题：当前代码由谁执行、状态归谁所有、结果由谁继续、什么时候才算完成。第 42 章已经讨论失败恢复保证，本章聚焦执行机制、线程所有权和回调语义。
+
+[上一篇：42 失败恢复与可观测性](../42-failure-recovery-observability/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/43-async-callback-execution.svg) | [下一篇：全书目录](../../SUMMARY.md)
+
+[![ThingsBoard 异步执行架构图](../../assets/architecture/43-async-callback-execution.svg)](../../assets/architecture/43-async-callback-execution.svg)
+
+[![ThingsBoard 异步执行详细时序图](sequence.svg)](sequence.svg)
+
+---
+
+## 一、流程目标
+
+### 1.1 本章解决的问题
+
+ThingsBoard 的“异步”不是一个统一框架。一次 MQTT 遥测会先后经过 Netty EventLoop、Queue producer callback、Kafka consumer、多个 Actor dispatcher、SQL queue 或 Cassandra driver、遥测 callback executor。每一层都可能返回 `Future` 或调用 callback，但它们表达的是不同完成点。
+
+对 Java/Spring Boot 开发者，最重要的迁移是停止把“方法返回”理解成“业务完成”。阅读异步源码时必须记录：
+
+1. **入口线程**：谁调用当前方法，能否阻塞。
+2. **异步对象**：Future、callback、mailbox message、queue record 还是 `DeferredResult`。
+3. **线程切换**：由哪个 `Executor.execute/submit`、queue poll 或 mailbox 调度触发。
+4. **状态所有者**：pending map、mailbox、broker offset、SQL queue 或数据库事务。
+5. **成功点**：只是接受任务、远端 ACK、数据库提交，还是端到端业务完成。
+6. **失败点**：异常是否进入调用方 Future，是否只写日志，超时是否取消底层副作用。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+flowchart TB
+    E["入口线程"] --> O["异步对象"]
+    O --> S["调度/线程切换"]
+    S --> W["执行工作"]
+    W --> C["完成 Future/callback"]
+    C --> A["业务 ACK"]
+    A --> D["broker/DB/设备确认"]
+```
+
+### 1.2 三类工具的统一模型
+
+| 工具 | 解决的问题 | ThingsBoard 代表类型 | 不提供什么 |
+|---|---|---|---|
+| Future / Callback | 把稍后产生的结果传播给调用方 | `ListenableFuture`、`SettableFuture`、`FutureCallback`、`TransportServiceCallback`、`TbCallback`、`DeferredResult` | 不自动切线程；不自动形成事务；不保证重试 |
+| Executor / Scheduler | 决定任务、回调、超时由哪些线程执行 | `AbstractListeningExecutor`、`ForkJoinPool`、single/fixed pool、Actor scheduler | 不拥有业务状态；定时触发不等于取消副作用 |
+| Actor / Message Queue | 串行化状态修改，跨线程或跨服务转交消息 | `TbActorMailbox`、`TbActorRef.tell`、`TbQueueProducer/Consumer`、Kafka | mailbox 不持久；Queue 不自动提供 exactly-once；Actor 不等于线程 |
+
+### 1.3 六条典型链路
+
+本章把工具放回六条源码链：MQTT 遥测、Rule Engine 异步节点、REST RPC、PostgreSQL/TimescaleDB batch、Cassandra async、Kafka Rule Engine 消费。相邻章节提供业务全貌，本章只放大线程与完成边界：
+
+- [第 01 章 MQTT 消息进入系统](../01-mqtt-message-ingress/index.html)
+- [第 05 章 Rule Chain 执行](../05-rule-chain-execution/index.html)
+- [第 09 章 Telemetry 保存](../09-telemetry-save/index.html)
+- [第 10 章 RPC](../10-rpc/index.html)
+- [第 15 章 Actor 模型](../15-actor-model/index.html)
+- [第 17 章 Kafka 消费](../17-kafka-consumer/index.html)
+- [第 20 章 Cassandra 写入](../20-cassandra-write/index.html)
+- [第 21 章 TimescaleDB 写入](../21-timescale-write/index.html)
+- [第 22 章 PostgreSQL 写入](../22-postgresql-write/index.html)
+- [第 42 章失败恢复与可观测性](../42-failure-recovery-observability/index.html)
+
+---
+
+## 二、入口
+
+### 2.1 网络、HTTP、Queue 与 Actor 入口
+
+| 场景 | 入口方法 | 初始线程 | 入口必须避免的工作 |
+|---|---|---|---|
+| MQTT 遥测 | [MqttTransportHandler.processDevicePublish(ChannelHandlerContext, MqttPublishMessage, String, int)](../../../common/transport/mqtt/src/main/java/org/thingsboard/server/transport/mqtt/MqttTransportHandler.java#L584) | Netty worker EventLoop | 阻塞 DAO、`Future.get()`、长 CPU 计算 |
+| Rule Engine | [TbRuleEngineQueueConsumerManager.consumerLoop(TbQueueConsumer)](../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L343) | `tb-rule-engine-consumer-*` | 在 poll 周期之外无限等待，导致超过 `max.poll.interval.ms` |
+| REST RPC | [AbstractRpcController.handleDeviceRPCRequest(boolean, DeviceId, String, HttpStatus, HttpStatus)](../../../application/src/main/java/org/thingsboard/server/controller/AbstractRpcController.java#L102) | Servlet request thread | 同步等待设备响应 |
+| Actor | [TbActorMailbox.processMailbox()](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L212) | 对应 dispatcher | 阻塞 I/O，长时间占用共享 dispatcher |
+| SQL batch | [TbSqlBlockingQueue.add(E)](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L165) | 任意 DAO 调用线程 | 把“入队成功”当成数据库成功 |
+| Cassandra | [AbstractBufferedRateExecutor.submit(T)](../../../dao/src/main/java/org/thingsboard/server/dao/util/AbstractBufferedRateExecutor.java#L159) | 任意 DAO 调用线程 | 忽略 queue full、tenant rate limit 的立即失败 |
+
+### 2.2 回调接口不是同一个协议
+
+[TransportServiceCallback.onSuccess(T)/onError(Throwable)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/TransportServiceCallback.java#L30) 面向协议层，[TbQueueCallback](../../../common/cluster-api/src/main/java/org/thingsboard/server/queue/TbQueueCallback.java#L27) 面向 producer，[TbCallback](../../../common/message/src/main/java/org/thingsboard/server/common/msg/queue/TbCallback.java#L27) 面向业务消息，[FutureCallback](https://guava.dev/releases/31.1-jre/api/docs/com/google/common/util/concurrent/FutureCallback.html) 面向 Future。它们方法名相似，但成功语义由调用位置定义。
+
+```java
+// MqttTransportHandler: QoS 1 queue producer callback 成功后才发 MQTT PUBACK。
+public void onSuccess(Void ignored) {
+    ack(ctx, msgId, ReturnCode.SUCCESS);
+}
+public void onError(Throwable e) {
+    closeCtx(ctx);
+}
+```
+
+### 2.3 Scheduler 入口
+
+Scheduler 只负责“到时间后提交一个动作”。Actor RPC timeout 在 [DeviceActorMessageProcessor.registerPendingRpcRequest(...)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L423) 中构造 timeout message，再通过 Actor scheduler 延迟 `tell`。真正从 pending map 删除、选择 `TIMEOUT` 或 `NO_ACTIVE_CONNECTION`，仍在 DeviceActor 消息处理逻辑中完成。
+
+---
+
+## 三、完整调用链
+
+### 3.1 场景一：MQTT 遥测上报
+
+#### 调用链
+
+1. `MqttTransportHandler.processDevicePublish(...)` 在 EventLoop 中解析 topic/payload。
+2. [DefaultTransportService.process(SessionInfoProto, PostTelemetryMsg, TbMsgMetaData, TransportServiceCallback)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L839) 为每个时间戳组构建 `TbMsg`。
+3. [DefaultTransportService.sendToRuleEngine(TenantId, TbMsg, TbQueueCallback)](../../../common/transport/transport-api/src/main/java/org/thingsboard/server/common/transport/service/DefaultTransportService.java#L1636) 解析 Rule Engine partition 并调用 producer。
+4. producer callback 进入 `MsgPackCallback`；所有组都成功后，任务被提交到 `transportCallbackExecutor`，再调用 MQTT callback。`ack(...)` 仅在 `msgId > 0` 时写 PUBACK，因此该确认点只适用于 QoS 1；QoS 0 没有 PUBACK。
+5. broker 中的记录随后才被 Rule Engine consumer poll。
+6. Consumer 把 `QueueToRuleEngineMsg` 投递到 App/Tenant/RuleChain/RuleNode Actor。
+7. Save Timeseries 节点调用 Telemetry service；数据库 Future 完成后 `TelemetryNodeCallback` 才 `tellSuccess/tellFailure`。
+8. 整条规则消息最终完成后，pack callback 更新 pending map，processing strategy 决定 retry/commit。
+
+```java
+// DefaultTransportService.MsgPackCallback
+public void onSuccess(TbQueueMsgMetadata metadata) {
+    if (msgCount.decrementAndGet() <= 0) {
+        transportCallbackExecutor.submit(() -> callback.onSuccess(null));
+    }
+}
+```
+
+#### 线程与完成点
+
+| 阶段 | 线程 | 完成含义 |
+|---|---|---|
+| MQTT decode | Netty EventLoop | payload 已转换，尚未写 queue |
+| Queue producer callback | provider callback 线程；随后显式转 `transportCallbackExecutor` | Rule Engine queue producer 已报告成功 |
+| MQTT PUBACK（仅 QoS 1） | `transportCallbackExecutor` 提交动作，Netty channel 实际 write 仍由 EventLoop 执行 | MQTT 客户端可停止 QoS 1 重发；不代表 Rule Engine/DB 成功 |
+| Rule Node callback | `ts-service-ts-callback` | 遥测聚合 Future 成功/失败，开始规则关系路由 |
+| Queue commit | Rule Engine consumer 线程 | processing strategy 最终允许提交消费位置 |
+
+### 3.2 场景二：Rule Engine 异步节点
+
+[TbMsgTimeseriesNode.onMsg(TbContext, TbMsg)](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TbMsgTimeseriesNode.java#L122) 在 `rule-dispatcher` 中解析 telemetry，然后调用 `saveAndNotify` 并立即返回。返回只释放当前 mailbox 调用栈，不会自动 ack 消息。
+
+```java
+if (config.isSkipLatestPersistence()) {
+    ctx.getTelemetryService().saveWithoutLatestAndNotify(...,
+            new TelemetryNodeCallback(ctx, msg));
+} else {
+    ctx.getTelemetryService().saveAndNotify(...,
+            new TelemetryNodeCallback(ctx, msg));
+}
+```
+
+[TelemetryNodeCallback](../../../rule-engine/rule-engine-components/src/main/java/org/thingsboard/rule/engine/telemetry/TelemetryNodeCallback.java#L38) 把数据库结果重新翻译成 Rule Engine 关系：
+
+```java
+public void onSuccess(Void result) { ctx.tellSuccess(msg); }
+public void onFailure(Throwable t) { ctx.tellFailure(msg, t); }
+```
+
+`tellSuccess` 可能继续下一个 Rule Node；只有消息到达终止点并 `ack`，原始 `TbMsgCallback` 才完成。故“Save Timeseries 节点成功”仍不一定等于“整个 Rule Chain 完成”。
+
+### 3.3 场景三：REST RPC 与 timeout
+
+#### 请求方向
+
+1. Controller 创建 `DeferredResult<ResponseEntity>`，返回 Servlet 容器，释放原请求线程。
+2. AccessValidator callback 继续构造 `ToDeviceRpcRequest`。
+3. `DefaultTbCoreDeviceRpcService` 保存本地 response consumer，把 RPC 投 Rule Engine queue，并安排 Core 兜底清理。
+4. `TbSendRPCRequestNode` 转给 `DefaultTbRuleEngineRpcService`；消息进入目标 Core，再送 DeviceActor high-priority mailbox。
+5. DeviceActor 把请求写入 `toDeviceRpcPendingMap`，通过 Transport queue 发往 MQTT/其他协议，并安排 timeout message。
+6. 设备响应逆向经过 Transport、Core queue、DeviceActor、Core RPC service、Rule Engine RPC service，最终调用 Controller `reply(...)`。
+7. `DeferredResult.setResult(...)` 触发 Spring MVC async dispatch，由容器线程写 HTTP 响应。
+
+```java
+final DeferredResult<ResponseEntity> response = new DeferredResult<>();
+deviceRpcService.processRestApiRpcRequest(rpcRequest,
+        deviceResponse -> reply(new LocalRequestMetaData(rpcRequest, currentUser, response),
+                deviceResponse, timeoutStatus, noActiveConnectionStatus), currentUser);
+return response;
+```
+
+#### 五类独立 timeout/截止时间
+
+| 时钟 | 配置/值 | 作用 |
+|---|---|---|
+| Spring MVC async timeout | `spring.mvc.async.request-timeout`，默认配置 30s | HTTP 异步请求生命周期；`DeferredResult` 未单独指定 timeout |
+| RPC expiration | request `expirationTime` 或 `now + max(min_timeout, timeout)` | 业务总截止时间 |
+| DeviceActor timeout message | 剩余 expiration | 从 Actor pending map 移除并返回 TIMEOUT/NO_ACTIVE_CONNECTION |
+| Core/Rule Engine 兜底 | expiration 后额外约 1s | 清理跨服务 callback map，避免永久驻留 |
+| MQTT RPC ACK timeout | `transport.mqtt.timeout` 与剩余 RPC 时间取较小值 | 设备下行 publish 的协议确认，不控制遥测 PUBACK |
+
+#### Actor 内的阻塞例外
+
+Edge 分支在 [DeviceActorMessageProcessor.processRpcRequest(...)](../../../application/src/main/java/org/thingsboard/server/actors/device/DeviceActorMessageProcessor.java#L242) 中调用 `isEdgeActiveAsync(...).get()` 和 `saveRpcRequestToEdgeQueue(...).get()`，且没有显式 timeout。它们发生在 DeviceActor dispatcher 上，会阻塞该设备 mailbox，并占用共享 device dispatcher 容量。这是排查 Edge RPC 卡顿时的源码级重点。
+
+### 3.4 场景四：PostgreSQL / TimescaleDB batch
+
+`TbSqlBlockingQueueWrapper` 按实体哈希把写入固定分配到多个 queue；每个 queue 有一个命名 single-thread executor。调用方获得 Future 时只完成了 JVM 入队。
+
+```java
+public ListenableFuture<Void> add(E element) {
+    SettableFuture<Void> future = SettableFuture.create();
+    queue.add(new TbSqlQueueElement<>(future, element));
+    stats.incrementTotal();
+    return future;
+}
+```
+
+worker 用 `poll(maxDelay)` 等第一条，随后 `drainTo(batchSize - 1)`。这里的 `batch_max_delay` 不是“从第一条开始等待直到凑满”：源码先执行 `saveFunction.accept(batch)`，不足满包时才 sleep 剩余 delay，因此低流量下延迟主要来自等待第一条与写后节流。
+
+Repository 的 `@Transactional` 方法同步 JDBC batch。Spring 事务代理成功返回后，queue 才 `future.set(null)`；写入或 commit 抛异常时，该 batch 全部 Future 失败。Future 聚合没有把 `ts_kv_dictionary`、history、latest 等多个 DAO 自动合成同一事务。
+
+```java
+saveFunction.accept(entities.stream().map(TbSqlQueueElement::getEntity).toList());
+entities.forEach(v -> v.getFuture().set(null));
+```
+
+### 3.5 场景五：Cassandra asynchronous write
+
+`AbstractBufferedRateExecutor` 把 Cassandra 的背压拆成三组线程和一个有界 queue：
+
+1. submit 线程检查 tenant rate limit，并入 `LinkedBlockingDeque(queueLimit)`。
+2. `nosql-Write-dispatcher-*` 从 queue 取任务，检查排队+执行的总时间预算。
+3. DataStax driver 线程完成底层 future；部分转换使用 `directExecutor`，所以就在 driver completion thread 执行。
+4. `nosql-Write-callback-*` 处理最终 success/failure，完成对外 `SettableFuture`。
+5. `nosql-Write-timeout-*` 触发 `Futures.withTimeout`；最终业务 callback 仍转 callback pool。
+
+```java
+ListenableFuture<V> result = execute(finalTaskCtx);
+result = Futures.withTimeout(result, timeout, TimeUnit.MILLISECONDS, timeoutExecutor);
+Futures.addCallback(result, callback, callbackExecutor);
+```
+
+严重边界位于 [AbstractBufferedRateExecutor.dispatch()](../../../dao/src/main/java/org/thingsboard/server/dao/util/AbstractBufferedRateExecutor.java#L241)：若 `execute(...)`、`withTimeout(...)` 或安装 callback 同步抛出 `Throwable`，外层 catch 只减 concurrency/stats，没有对 `taskCtx.getFuture()` 调用 `setException`，调用方 Future 可能永久 pending。超时 Future 失败也不证明 Cassandra 服务端一定没有完成写入。
+
+### 3.6 场景六：Kafka consume、callback、retry 与 commit
+
+Rule Engine consumer 的完整周期是：
+
+1. Consumer 线程 `poll` 得到 pack。
+2. 为每条消息创建 `TbMsgPackCallback`，提交 Actor。
+3. Consumer 线程在 `CountDownLatch` 等待 callback 或 pack timeout。
+4. Actor/Rule Node/DB callback 线程并发修改 `pendingMap/successMap/failedMap`。
+5. Consumer 线程执行 Processing Strategy。
+6. retry 时更新当前 JVM 中的 submit strategy 并重投，不重新 poll Kafka。
+7. commit 决策才调用 Kafka `commitSync()`。
+
+```java
+submitStrategy.submitAttempt((id, msg) -> submitMessage(packCtx, id, msg));
+boolean timeout = !packCtx.await(queue.getPackProcessingTimeout(), MILLISECONDS);
+TbRuleEngineProcessingDecision decision = ackStrategy.analyze(result);
+if (decision.isCommit()) {
+    submitStrategy.stop();
+    consumer.commit();
+} else {
+    submitStrategy.update(decision.getReprocessMap());
+}
+```
+
+`TbMsgPackProcessingContext.onSuccess(UUID)` 只把 record 从 pending 移到 success 并释放 latch；它没有权限提交 offset。`retries=0` 在 RetryStrategy 中代表不限制次数，因为只有 `maxRetries > 0` 才检查上限。长时间重试必须与 Kafka `max.poll.interval.ms` 一起评估。
+
+---
+
+## 四、消息流
+
+### 4.1 三类机制如何接力
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+flowchart TB
+    N["Netty / Servlet / Consumer"] --> Q["Queue or Actor tell"]
+    Q --> M["Mailbox / broker record"]
+    M --> X["Executor executes work"]
+    X --> F["Future completes"]
+    F --> C["Callback translates result"]
+    C --> Q2["next Actor / relation / response"]
+```
+
+### 4.2 MQTT 与数据库完成点
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+flowchart TB
+    P["MQTT PUBLISH"] --> PR["Rule Engine producer send"]
+    PR --> PA["producer callback"]
+    PA --> ACK["MQTT PUBACK (QoS 1 only)"]
+    PR --> K["broker record"]
+    K --> RE["Rule Engine Actor"]
+    RE --> DB["history + partition + latest Futures"]
+    DB --> NC["TelemetryNodeCallback"]
+    NC --> RC["Rule Chain terminal callback"]
+    RC --> CM["consumer commit"]
+    ACK -. "does not wait" .-> DB
+```
+
+### 4.3 Actor mailbox 调度
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+stateDiagram-v2
+    [*] --> FREE
+    FREE --> BUSY: enqueue + CAS
+    BUSY --> PROCESS: dispatcher.execute(processMailbox)
+    PROCESS --> PROCESS: up to actorThroughput messages
+    PROCESS --> BUSY: more messages, resubmit
+    PROCESS --> FREE: queues empty
+    FREE --> BUSY: race-check via tryProcessQueue(false)
+```
+
+### 4.4 RPC pending 状态
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+stateDiagram-v2
+    [*] --> Accepted
+    Accepted --> Pending: DeviceActor map + timeout msg
+    Pending --> Delivered: transport/device ack
+    Pending --> NoConnection: expiration and not sent
+    Pending --> Timeout: expiration after sent
+    Delivered --> Responded: device payload
+    Delivered --> Timeout: no response
+    Responded --> HttpReply
+    NoConnection --> HttpReply
+    Timeout --> HttpReply
+```
+
+### 4.5 SQL batch 队列
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+flowchart TB
+    A["DAO add(entity)"] --> J["JVM queue + pending Future"]
+    J --> P["single worker poll first"]
+    P --> D["drainTo batchSize-1"]
+    D --> TX["transactional JDBC batch"]
+    TX -->|"commit and return"| S["set all Futures success"]
+    TX -->|"throw/rollback"| E["set all Futures exception"]
+    S --> SL["if partial batch, sleep remaining delay"]
+```
+
+### 4.6 Cassandra 四阶段执行
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+flowchart TB
+    S["submit thread"] --> Q["bounded deque"]
+    Q --> D["nosql dispatcher"]
+    D --> DR["DataStax driver Future"]
+    DR --> T["withTimeout wrapper"]
+    T --> C["nosql callback pool"]
+    C --> O["caller Future"]
+    TO["single timeout scheduler"] --> T
+```
+
+### 4.7 Kafka pack 状态
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+flowchart TB
+    POLL["poll pack"] --> PEN["pendingMap"]
+    PEN --> A["Actor processing"]
+    A --> SUC["successMap"]
+    A --> FAIL["failedMap"]
+    PEN --> TIME["remaining pending at timeout"]
+    SUC --> DEC{"processing decision"}
+    FAIL --> DEC
+    TIME --> DEC
+    DEC -->|"retry"| MEM["in-memory resubmit"]
+    DEC -->|"commit"| OFF["Kafka commitSync"]
+    MEM --> PEN
+```
+
+---
+
+## 五、时序图
+
+### 5.1 总时序图
+
+完整多页 PlantUML 见 [sequence.puml](sequence.puml)。渲染结果按页拆分为：[统一异步模型](sequence.svg)、[MQTT 遥测](sequence_001.svg)、[Rule Engine 异步节点](sequence_002.svg)、[REST RPC](sequence_003.svg)、[PostgreSQL/TimescaleDB batch](sequence_004.svg)、[Cassandra async](sequence_005.svg) 和 [Kafka consume/retry/commit](sequence_006.svg)。每张图均可在浏览器新窗口独立缩放，重点标出线程切换和确认点。
+
+### 5.2 MQTT 遥测时序
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+sequenceDiagram
+    participant D as Device
+    participant N as Netty EventLoop
+    participant P as RE Producer
+    participant C as RE Consumer
+    participant A as Rule Actor
+    participant DB as DB worker
+    D->>N: MQTT PUBLISH
+    N->>P: send ToRuleEngineMsg
+    P-->>N: producer callback success
+    N-->>D: PUBACK (QoS 1 only)
+    C->>P: poll record later
+    C->>A: tell
+    A->>DB: save telemetry, return Future
+    DB-->>A: TelemetryNodeCallback
+    A-->>C: terminal TbMsgCallback
+    C->>C: processing decision + commit
+```
+
+### 5.3 RPC 时序
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+sequenceDiagram
+    participant H as HTTP thread
+    participant R as RPC services
+    participant A as DeviceActor
+    participant T as Transport
+    participant D as Device
+    H->>R: request + DeferredResult
+    H-->>H: release servlet thread
+    R->>A: high priority actor msg
+    A->>A: pendingMap + schedule timeout
+    A->>T: ToTransportMsg
+    T->>D: protocol RPC
+    alt response
+      D-->>T: payload
+      T-->>A: response actor msg
+      A-->>R: FromDeviceRpcResponse
+      R-->>H: DeferredResult.setResult
+    else timeout
+      A->>A: timeout msg removes pending
+      A-->>R: TIMEOUT or NO_ACTIVE_CONNECTION
+      R-->>H: DeferredResult.setResult
+    end
+```
+
+---
+
+## 六、数据变化
+
+### 6.1 状态所有权矩阵
+
+| 状态 | 所有者 | 并发控制 | 持久性 | 完成后如何释放 |
+|---|---|---|---|---|
+| Actor mailbox queues | `TbActorMailbox` | concurrent queue + `busy` CAS；单 Actor process 串行 | JVM 内存 | poll 后移除；进程退出丢失 |
+| Rule Engine pack maps | `TbMsgPackProcessingContext` | `ConcurrentMap` + latch | JVM 内存 | cleanup/pack 结束 |
+| RPC pending | DeviceActor `LinkedHashMap` | 依赖 Actor 串行约束 | 普通 RPC 仅内存；persistent RPC 另写 DB | response/timeout/remove |
+| SQL queue elements | `TbSqlBlockingQueue` | blocking queue + single worker | JVM 内存 | batch success/failure Future 完成 |
+| Cassandra task queue | `AbstractBufferedRateExecutor` | bounded deque + in-flight gauge | JVM 内存 | callback success/failure/timeout |
+| Kafka offset | broker consumer group | Kafka coordinator | broker 持久 | `commitSync()` 更新 |
+| HTTP response | Spring `DeferredResult` | Spring async request lifecycle | JVM/连接状态 | setResult/error/timeout |
+
+### 6.2 Future 生命周期
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#eef6f8","tertiaryColor":"#fff7e8"}}}%%
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Success: set(value) / delegate success
+    Pending --> Failure: setException(t)
+    Pending --> Cancelled: cancel
+    Pending --> Pending: callback installation
+    Success --> Callback: executor schedules callback
+    Failure --> Callback: executor schedules callback
+    Cancelled --> Callback: failure/cancel propagation
+    Callback --> [*]
+```
+
+`callback installation` 不会改变 Future 状态。`directExecutor` 也不是新线程：若 Future 已完成，callback 可在安装 callback 的当前线程立即执行；若稍后完成，则在完成 Future 的线程执行。
+
+### 6.3 `Futures.allAsList` 的真实边界
+
+[BaseTimeseriesService.doSave(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L317) 为每个 telemetry entry 注册 partition、history、latest Future，然后 `allAsList` 聚合。聚合只表达“所有 Future 均成功才成功”；它不回滚已成功的 Future，也不建立跨 repository 的数据库事务。
+
+```java
+futures.add(timeseriesDao.savePartition(...));
+futures.add(timeseriesDao.save(...));
+futures.add(Futures.transform(timeseriesLatestDao.saveLatest(...), v -> 0,
+        MoreExecutors.directExecutor()));
+return Futures.transform(Futures.allAsList(futures), SUM_ALL_INTEGERS,
+        MoreExecutors.directExecutor());
+```
+
+---
+
+## 七、源码分析
+
+### 7.1 `DonAsynchron`：callback 的薄适配层
+
+[DonAsynchron.withCallback(...)](../../../common/util/src/main/java/org/thingsboard/common/util/DonAsynchron.java#L46) 把两个 `Consumer` 适配为 `FutureCallback`。未传 executor 时使用 `directExecutor`；`onSuccess.accept` 自身抛错会转给 failure consumer。它解决的是调用风格，不是线程隔离。
+
+```java
+if (executor != null) {
+    Futures.addCallback(future, callback, executor);
+} else {
+    Futures.addCallback(future, callback, MoreExecutors.directExecutor());
+}
+```
+
+### 7.2 `AbstractListeningExecutor`：统一 Future 化线程池
+
+[AbstractListeningExecutor.init()](../../../common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java#L51) 用 `ThingsBoardExecutors.newWorkStealingPool` 创建命名 ForkJoinPool，再用 `listeningDecorator` 让 submit 返回 `ListenableFuture`。Mail、DB callback、notification、external call 等服务复用此模式，但各自 pool size 独立配置。
+
+### 7.3 Work-stealing pool 的语义
+
+[ThingsBoardExecutors.newWorkStealingPool(int, String)](../../../common/util/src/main/java/org/thingsboard/common/util/ThingsBoardExecutors.java#L57) 创建 async-mode `ForkJoinPool`。它适合大量短任务并降低局部队列争用，不保证全局提交顺序。任务若执行阻塞 JDBC/网络等待，会占住 worker，工作窃取不能凭空增加受控并行度。
+
+### 7.4 线程名是排障 API
+
+`ThingsBoardThreadFactory` 和自定义 ForkJoin worker factory把逻辑池名写入线程名。线程 dump 中应先按前缀归类：`rule-dispatcher`、`device-dispatcher`、`sql-queue-*`、`nosql-Write-dispatcher`、`nosql-Write-callback`、`ts-service-ts-callback`、`DefaultTransportService`、`tb-rule-engine-consumer`。`transportCallbackExecutor` 以 `getClass()` 创建 work-stealing pool，因此实际 worker 前缀来自 `DefaultTransportService` 类名。不要只搜索 `WAITING`；需结合队列长度、活跃数和 stack 判断正常等待还是饥饿。
+
+### 7.5 回调嵌套的异常传播
+
+只有框架捕获并调用 `setException/onFailure` 的异常才会到上游。callback 内再抛异常时，行为取决于包装器：`DonAsynchron` 显式捕获 success consumer 的异常；普通 Guava callback 若抛 RuntimeException，执行器通常只记录/吞到线程 uncaught 路径，不会逆向改写已经成功的源 Future。
+
+### 7.6 Executor 生命周期
+
+`@PostConstruct` 创建、`@PreDestroy` shutdown 是常见模式。注意 `shutdownNow()` 只尝试 interrupt worker；排队 Future 是否失败取决于组件有没有显式 drain/complete。`TbSqlBlockingQueue.destroy()` 和 `AbstractBufferedRateExecutor.stop()` 均没有统一完成尚未消费元素的 Future，关闭过程可能留下调用方 pending，详见[第 42 章](../42-failure-recovery-observability/index.html)。
+
+---
+
+## 八、Actor 分析
+
+### 8.1 Actor 不是一条专属线程
+
+`DefaultActorService` 创建 app、tenant、device、rule dispatcher。pool size 为 1 时使用 single-thread executor，否则使用 work-stealing pool。Actor 数量可以远大于线程数；mailbox 把 runnable 提交给共享 dispatcher。
+
+### 8.2 mailbox 如何保证单 Actor 串行
+
+[TbActorMailbox.tryProcessQueue(boolean)](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L191) 用 `busy.compareAndSet(FREE, BUSY)` 保证同一 mailbox 同时只有一个 `processMailbox` runnable。`processMailbox` 每轮最多处理 `actorThroughput` 条，再重新提交，避免一个繁忙 Actor 永久占据线程。
+
+```java
+if (busy.compareAndSet(FREE, BUSY)) {
+    dispatcher.getExecutor().execute(this::processMailbox);
+}
+```
+
+### 8.3 为什么 callback 可以从任意线程 `tell`
+
+`tell` 最终只是线程安全地 enqueue 并尝试调度 mailbox。callback 不应直接修改 Actor 私有集合；应构造消息送回 Actor，使状态变更重新进入串行边界。RPC 的某些 scheduler callback 直接操作 Actor map 是需要特别审查的例外，而不是推荐模式。
+
+### 8.4 Actor 中阻塞的放大效应
+
+阻塞一个 DeviceActor 不只延迟一个设备：它占住共享 `device-dispatcher` worker，其他设备 mailbox 也会等待。默认 `device_dispatcher_pool_size=4`，少量无 timeout 的 `.get()` 就可能显著降低节点吞吐。盲目增大 pool 只能缓解，不会修复下游耗尽或数据库连接池瓶颈。
+
+### 8.5 Actor throughput 的公平性
+
+throughput 越大，单次调度减少上下文切换，但热点 Actor 会连续处理更多消息；越小则公平性更好、调度开销更高。调优必须同时观察 mailbox backlog、处理耗时分位数和 dispatcher CPU，而不能只根据设备数计算线程数。
+
+### 8.6 Actor、Future 与 callback 的组合规则
+
+推荐模式是：Actor 发起异步操作 -> 立即返回 -> callback 构造不可变消息 -> `tell(self)` -> Actor 串行落状态。Rule Node 的 `ctx.tellSuccess/tellFailure` 是类似思想：异步结果重新进入规则路由，不在数据库 callback 线程里执行整套业务状态变更。
+
+---
+
+## 九、Kafka 与 Queue 分析
+
+### 9.1 producer callback 只确认生产阶段
+
+Queue producer callback 的精确保证由 provider 决定。Kafka callback 通常意味着 broker 已按 producer `acks` 接受记录；它不包含消费端处理。MQTT QoS 1 遥测据此发 PUBACK 是一种吞吐与解耦选择：设备无需等待完整 Rule Chain，但平台必须依赖 broker 与消费重试承接后续失败；QoS 0 没有 PUBACK 这一确认点。
+
+### 9.2 consumer 线程为何等待 callback
+
+Rule Engine 必须在业务消息到达终止状态后再选择 commit/retry，因此 consumer 使用 pack context + latch 汇聚异步 Actor 结果。代价是 poll 线程会等待 `packProcessingTimeout`，并且 retry sleep/重投也占用同一线程。
+
+### 9.3 callback 线程不固定
+
+同步 Rule Node 可能在 `rule-dispatcher` 上完成 callback；Telemetry 节点在 `ts-service-ts-callback` 上触发；外部集成可能用各自 executor；Actor 链路还会经过 app/tenant/rule dispatcher。因此 `TbMsgPackProcessingContext` 使用 concurrent maps，而非假设单线程回调。
+
+### 9.4 retry 与 Kafka 重投不同
+
+Processing Strategy retry 是同一 JVM 当前 pack 的内存重投。它不会 seek Kafka，也不会生成 retry topic；进程崩溃后，是否重投取决于最后 committed offset。retry 总时间过长还可能违反 Kafka `max.poll.interval.ms`，触发 rebalance。
+
+### 9.5 commit 边界
+
+callback success、processing decision 和 `commitSync()` 是三个点。callback 到 commit 前崩溃可重放已经执行过副作用的消息；commit 后业务旁路异步动作仍可能继续。幂等键应来自业务消息 ID/目标自然键，不应依赖线程或消费 attempt。
+
+### 9.6 Queue 参数来源
+
+Kafka 通用参数在 `thingsboard.yml`；实际 Rule Engine 数据 Queue 的 `pollInterval`、`packProcessingTimeout`、submit/processing strategy 是 `Queue` 实体配置，系统默认值由 `DefaultSystemDataLoaderService` 建立。不要只改 `queue.rule-engine.*` YAML 就假设所有自定义 Rule Engine Queue 已变化。
+
+---
+
+## 十、数据库分析
+
+### 10.1 PostgreSQL / Timescale 线程模型
+
+| 参数 | 默认配置示例 | 控制对象 | 风险 |
+|---|---:|---|---|
+| `sql.ts.batch_size` | 10000 | history 每次 JDBC batch 上限 | 太大增加事务、锁/WAL 峰值和失败重做范围 |
+| `sql.ts.batch_max_delay` | 100ms | worker poll/sleep 节奏 | 不是传统“首条后凑包窗口”，需按源码理解 |
+| `sql.ts.batch_threads` | 3 | SQL history queue 分片数 | 增大后需要更多 DB connection 与并行写能力 |
+| `sql.timescale.batch_threads` | 配置项 | Timescale history 分片数 | chunk 热点和连接池可能先成为瓶颈 |
+| `sql.ts_latest.batch_threads` | 配置项 | latest upsert queue 分片数 | latest 主键热点、死锁和乱序更新 |
+| `sql.batch_sort` | 配置项 | batch 内排序 | 降低锁顺序冲突，但增加 CPU/延迟 |
+
+TimescaleDB 并未替换应用侧异步模型；它复用 `TbSqlBlockingQueue`，差异位于 insert repository/SQL 与 hypertable。应用 Future 完成语义仍是事务方法返回后成功。
+
+### 10.2 SQL queue 的背压缺口
+
+`TbSqlBlockingQueue` 使用无界 queue。高峰时 producer 不会因 queue capacity 被拒绝，压力转化为 JVM heap、排队延迟和更老的 Future。生产上必须监控 queue size、写入速率与最老元素年龄；源码自带周期日志有 size/total/success/failed，但没有统一 oldest-age 指标。
+
+### 10.3 Cassandra 参数
+
+| 参数 | 默认值 | 作用 | 调优联动 |
+|---|---:|---|---|
+| `cassandra.query.buffer_size` | 200000 | 有界等待队列 | 满时 submit Future 立即失败；不能只增大内存缓冲 |
+| `concurrent_limit` | 1000 | in-flight 目标上限 | 与 driver connection、节点容量、tenant rate limit 联动 |
+| `permit_max_wait_time` | 120000ms | 从入队开始的总预算 | 覆盖排队与执行，不是纯 driver timeout |
+| `dispatcher_threads` | 2 | 从 queue 发 driver 请求 | 过小发不满并发，过大增加竞争 |
+| `callback_threads` | 4 | 完成外层 Future | callback 阻塞会导致 in-flight 释放慢 |
+| `result_processing_threads` | 50 | Cassandra 查询结果转换 | 主要影响读取与分页转换 |
+| `cassandra.socket.read_timeout` | 20s | driver request timeout | 通常早于 120s executor budget |
+
+### 10.4 超时与数据库事实
+
+SQL Future timeout 上层若自行实现，或 Cassandra `withTimeout` 触发，只说明客户端等待停止/取消被尝试。数据库可能已经收到请求并最终提交。任何重试都要依据表的 upsert/主键/时间戳条件判断幂等，而不能根据 `TimeoutException` 推断“肯定没写”。
+
+### 10.5 history、latest 与通知不是一个原子事务
+
+Telemetry service 在同一 save Future 上注册 main callback、WebSocket callback 和 entity-view callback，但执行线程被隔离：main callback 使用 `ts-service-ts-callback`，WebSocket 旁路由 `AbstractSubscriptionService` 的 `ts-service-ws-callback` 执行。history/latest 的 Future 聚合成功后两条 callback 可独立排队；客户端断线或 WS 通知失败不能回滚已提交 telemetry。业务需要的是最终一致通知，而非把 WebSocket 加进 DB 事务。
+
+---
+
+## 十一、异常处理
+
+### 11.1 异常矩阵
+
+| 故障点 | 谁观察 | Future/callback 结果 | 是否自动重试 | 主要后果 |
+|---|---|---|---|---|
+| MQTT payload 转换失败 | EventLoop | 发送错误 ACK/关闭 session | 设备按协议决定 | 不进入 Rule Engine queue |
+| Queue producer 失败 | provider callback -> transport callback | MQTT callback `onError` | provider/设备层决定 | 不发成功 PUBACK，连接关闭 |
+| Rule Node DB Future 失败 | `ts-service-ts-callback` | `tellFailure` | Failure relation/queue strategy | 可继续 Failure 链或最终 pack failed |
+| SQL batch 失败 | SQL queue worker | batch 全 Future exception | 无 queue 自动重入 | 上游可重投，需幂等 |
+| SQL worker shutdown | 调用方 | 排队 Future 可能 pending | 无 | 进程内任务丢失 |
+| Cassandra queue full | submit thread | 立即 Future exception | 无 | 明确背压 |
+| Cassandra 执行 timeout | callback pool | Future exception | 无业务自动重试 | 服务端写入结果可能不确定 |
+| Cassandra callback 安装前同步异常 | dispatcher | 外层 Future 可能永久 pending | 无 | pack/RPC 等待直到更外层 timeout |
+| Actor process 抛异常 | actor dispatcher | failure strategy | 当前消息不自动重放 | mailbox 继续或 Actor stop |
+| RPC device timeout | Actor timeout message | TIMEOUT/NO_ACTIVE_CONNECTION | persistent/策略相关 | DeferredResult 完成错误响应 |
+| Kafka pack timeout | consumer thread | pending records 留在 result | Processing Strategy | retry 或最终 commit/skip |
+| Kafka commitSync 失败 | consumer thread | 抛到 consumer loop | 没有完整 seek 恢复协议 | 可能重放或后续 offset 跨越风险 |
+
+### 11.2 回调必须恰好完成一次
+
+自定义异步组件应确保 success/failure/timeout/queue rejection/shutdown 每条路径恰好完成一次。`SettableFuture.set` 的返回值可检测竞争；Actor pending map 的 `remove` 可让迟到响应变 stale。不能只写成功路径，然后依赖调用方永久等待。
+
+### 11.3 Timeout 不是 cancellation barrier
+
+Actor timeout message、`Futures.withTimeout`、Spring MVC async timeout 都只关闭各自等待边界。底层 Queue record、数据库请求或设备响应可能继续到达。迟到结果必须可识别、可丢弃或幂等合并。
+
+### 11.4 排障顺序
+
+1. 先确定“卡住的完成点”：HTTP、PUBACK、Rule Node callback、pack latch、offset、DB Future。
+2. 用线程名和 thread dump 判断当前所有者：EventLoop、dispatcher、SQL worker、Cassandra callback 或 consumer。
+3. 检查对应内存队列/pending map/lag，而不是只看 CPU。
+4. 核对最早失败日志与 Future exception；不要从上游 timeout 倒推数据库没有副作用。
+5. 对照配置的多个时钟，找出最先触发的 timeout。
+6. 最后核对数据库事实和 broker committed offset，详见[第 42 章](../42-failure-recovery-observability/index.html)。
+
+---
+
+## 十二、源码阅读路线
+
+### 12.1 第一轮：掌握 Future 与线程池
+
+1. [DonAsynchron](../../../common/util/src/main/java/org/thingsboard/common/util/DonAsynchron.java#L36)：看 callback 适配和 `directExecutor`。
+2. [AbstractListeningExecutor](../../../common/util/src/main/java/org/thingsboard/common/util/AbstractListeningExecutor.java#L38)：看 executor 生命周期。
+3. [ThingsBoardExecutors](../../../common/util/src/main/java/org/thingsboard/common/util/ThingsBoardExecutors.java#L30)：看命名 work-stealing pool。
+4. [DefaultTelemetrySubscriptionService.addMainCallback(...)](../../../application/src/main/java/org/thingsboard/server/service/telemetry/DefaultTelemetrySubscriptionService.java#L823)：看显式 callback executor。
+
+### 12.2 第二轮：掌握 Actor 串行边界
+
+1. [DefaultActorService.initActorSystem()](../../../application/src/main/java/org/thingsboard/server/actors/service/DefaultActorService.java#L131)：dispatcher 类型与默认 pool。
+2. [TbActorMailbox.enqueue(...)](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L160)：线程安全入队。
+3. [TbActorMailbox.processMailbox()](../../../common/actor/src/main/java/org/thingsboard/server/actors/TbActorMailbox.java#L212)：throughput、公平性和失败策略。
+4. [DefaultTbContext.ack(TbMsg)](../../../application/src/main/java/org/thingsboard/server/actors/ruleChain/DefaultTbContext.java#L534)：Rule Engine callback 终点。
+
+### 12.3 第三轮：掌握 Queue 确认
+
+1. `DefaultTransportService.sendToRuleEngine` 与 `MsgPackCallback`：producer callback 到 PUBACK。
+2. [TbRuleEngineQueueConsumerManager.processMsgs(...)](../../../application/src/main/java/org/thingsboard/server/service/queue/ruleengine/TbRuleEngineQueueConsumerManager.java#L393)：poll pack 生命周期。
+3. [TbMsgPackProcessingContext](../../../application/src/main/java/org/thingsboard/server/service/queue/TbMsgPackProcessingContext.java#L47)：concurrent maps 与 latch。
+4. [TbKafkaConsumerTemplate.doCommit()](../../../common/queue/src/main/java/org/thingsboard/server/queue/kafka/TbKafkaConsumerTemplate.java#L160)：Kafka commit 实现。
+
+### 12.4 第四轮：掌握数据库执行器
+
+1. [BaseTimeseriesService.doSave(...)](../../../dao/src/main/java/org/thingsboard/server/dao/timeseries/BaseTimeseriesService.java#L317)：Future fan-out/fan-in。
+2. [TbSqlBlockingQueue](../../../dao/src/main/java/org/thingsboard/server/dao/sql/TbSqlBlockingQueue.java#L46)：无界队列、single worker 和 batch Future。
+3. [TimescaleTimeseriesDao](../../../dao/src/main/java/org/thingsboard/server/dao/sqlts/timescale/TimescaleTimeseriesDao.java#L107)：Timescale 如何复用 SQL queue。
+4. [AbstractBufferedRateExecutor](../../../dao/src/main/java/org/thingsboard/server/dao/util/AbstractBufferedRateExecutor.java#L70)：Cassandra 有界背压与三组线程。
+
+### 12.5 第五轮：掌握 RPC 多层异步
+
+按 `AbstractRpcController -> DefaultTbCoreDeviceRpcService -> DefaultTbRuleEngineRpcService -> DeviceActorMessageProcessor -> DefaultTransportService -> response reverse path` 阅读，同时画出三张 pending map 和三组 timeout。不要先陷入协议 payload 细节。
+
+---
+
+## 十三、典型场景、生产实践与面试题
+
+### 13.1 六场景线程矩阵
+
+| 场景 | 入口线程 | 首个异步对象 | 主要切换 | 最终 callback 常见线程 | 对上游的成功点 |
+|---|---|---|---|---|---|
+| MQTT 遥测 | Netty EventLoop | Queue producer request | provider -> transport callback pool -> consumer -> Actor | `ts-service-ts-callback` 后再 Actor/pack | QoS 1 PUBACK 在 producer callback 后；QoS 0 无 PUBACK |
+| Rule Node | `rule-dispatcher` | DB/external Future | node-specific callback executor | telemetry 为 `ts-service-ts-callback` | `tellSuccess/tellFailure`，未必终止 Rule Chain |
+| REST RPC | Servlet -> `access-validator` | `DeferredResult` + callback maps | Queue、DeviceActor、Transport、RPC scheduler | `rule-engine-rpc-scheduler`/容器 async dispatch | HTTP response 或 persistent RPC id |
+| SQL/Timescale | 任意 DAO caller | SQL queue `SettableFuture` | `sql-queue-*` single worker | SQL worker -> telemetry callback executor | Repository transaction 返回后 Future success |
+| Cassandra | 任意 DAO caller | buffered executor Future | dispatcher -> driver -> timeout/callback pool | `nosql-*-callback` | driver result 经 wrapper success |
+| Kafka消费 | `tb-rule-engine-consumer` | pack context + Actor messages | app/tenant/rule dispatcher、节点 executor | 任意业务 callback 线程更新 pack | processing decision 后 commit |
+
+### 13.2 核心线程池与配置
+
+| 执行器 | 创建方式/默认并行度 | 配置键 | 主要职责 | 调优风险 |
+|---|---|---|---|---|
+| app dispatcher | single thread，默认 1 | `actors.system.app_dispatcher_pool_size` | Actor 树根路由 | 阻塞会影响所有 tenant 路由 |
+| tenant dispatcher | work-stealing，默认 2 | `actors.system.tenant_dispatcher_pool_size` | TenantActor、StatsActor | 热租户和同步调用会争用 |
+| device dispatcher | work-stealing，默认 4 | `actors.system.device_dispatcher_pool_size` | DeviceActor session/RPC/state | RPC `.get()`、同步 DAO 会放大阻塞 |
+| rule dispatcher | work-stealing，默认 8 | `actors.system.rule_dispatcher_pool_size` | RuleChain/RuleNode Actor | CPU 节点与阻塞节点相互影响 |
+| Actor scheduler | scheduled pool，默认 1 | `actors.system.scheduler_pool_size` | 延迟 Actor message | 定时任务应短，只负责投消息 |
+| DB callback executor | work-stealing，默认 50 | `actors.rule.db_callback_thread_pool_size` | 通用 Rule/DAO callback | 它不负责 telemetry main callback；过大增加下游竞争 |
+| telemetry main callback | single thread，固定 | 无独立配置 | telemetry main callback 与相关完成编排 | 慢 callback 可串行积压 main completion |
+| telemetry WebSocket callback | single thread，固定 | 无独立配置 | `AbstractSubscriptionService` 实时订阅通知 | 慢订阅处理会积压 WS 旁路，不应与 main pool 混淆 |
+| Transport callback | work-stealing，代码固定 20 | 无独立 pool-size 配置 | producer/transport response callback | 与 `queue.transport_api.max_callback_threads` 不是同一个池 |
+| SQL history/latest | N 个 single worker | `sql.ts.batch_threads`、`sql.ts_latest.batch_threads` | JDBC batch | 必须与 Hikari/DB 写能力联动 |
+| Cassandra dispatcher/callback | fixed + work-stealing | `cassandra.query.dispatcher_threads/callback_threads` | 发请求与结果处理 | callback 慢会延迟 in-flight 释放 |
+
+`queue.transport_api.max_callback_threads` 控制的是 `TbCoreTransportApiService` 的 Transport API callback 执行规模，不应误当作 `DefaultTransportService.transportCallbackExecutor` 的 20 线程配置。
+
+### 13.3 生产调优原则
+
+1. **先隔离阻塞，再加线程。** EventLoop 和 Actor dispatcher 中的 `.get()`/JDBC 必须优先移除或加边界。
+2. **线程池与下游容量成对调整。** 增大 SQL/Cassandra/Actor 并行度前先核对 Hikari、driver connections、PostgreSQL IOPS/WAL 和 Cassandra coordinator capacity。
+3. **队列必须有容量或可观测年龄。** Cassandra 有界 queue 会拒绝；SQL queue 无界，需要额外监控 heap 与 oldest age。
+4. **统一 timeout 层级。** HTTP timeout 应不早于业务希望返回的 RPC 结果；driver timeout、executor budget、pack timeout 和 Kafka poll interval 要有明确大小关系。
+5. **回调必须短。** 重 CPU/阻塞操作应再次提交到专用 executor，否则 completion thread 会被反向拖慢。
+6. **按完成点做 SLI。** producer latency、Rule Engine processing、DB commit、offset lag、RPC end-to-end 必须分别测量。
+
+### 13.4 推荐的 timeout 次序
+
+不存在适用于所有部署的固定数字，但依赖关系应明确：单次 DB/外部调用 timeout < Rule Node/pack budget < Kafka `max.poll.interval.ms`；RPC 的协议 ACK timeout < RPC expiration；Spring MVC async timeout 若希望等待设备结果，应不早于业务 expiration，并预留跨 Queue/调度余量。
+
+### 13.5 典型问题一：PUBACK 很快但曲线没有数据
+
+对 QoS 1，先确认 producer callback 与 PUBACK 正常，再查 Rule Engine queue lag、pack pending/failed、Save Timeseries Failure relation、SQL/Cassandra Future 和数据库事实。PUBACK 只排除了“Transport 未成功生产消息”，不能排除后续任一阶段失败；QoS 0 应直接从 producer/queue 证据开始排查。
+
+### 13.6 典型问题二：Kafka lag 上升但 CPU 不高
+
+查看 `tb-rule-engine-consumer` 是否等待 pack latch/retry sleep，Actor dispatcher 是否被阻塞，SQL queue/Cassandra callback 是否堆积。低 CPU 可能是线程在等待 DB、锁或无 timeout Future，而不是容量富余。
+
+### 13.7 典型问题三：RPC 偶发 30 秒失败
+
+同时核对 `spring.mvc.async.request-timeout`、RPC request expiration、`actors.rpc.response_timeout_ms`、Transport MQTT timeout 和 DeviceActor timeout。默认 Spring 30s 可能比用户设置的更长 RPC expiration 先结束 HTTP；迟到设备响应仍可能走内部清理路径。
+
+### 13.8 典型问题四：Future 永不完成
+
+搜索 `SettableFuture.create()` 的所有退出路径，特别检查 queue rejection、shutdown、callback 安装同步异常。Cassandra buffered executor 外层 catch 未完成 task Future 是已知源码边界；SQL queue shutdown 对排队元素也没有统一 failure completion。
+
+### 13.9 面试题与标准答案
+
+#### 1. `ListenableFuture` 会自动把工作放到后台线程吗？
+
+不会。Future 是结果容器；工作在哪执行由创建 Future 的代码和 executor 决定。
+
+#### 2. `directExecutor` 是不是一个单线程池？
+
+不是。它在调用 `execute` 的线程直接运行任务；对 callback 而言通常是 Future 完成线程，Future 已完成时也可能是安装 callback 的线程。
+
+#### 3. 为什么 `directExecutor` callback 必须很短？
+
+它会占用 SQL worker、driver completion 或调用线程；阻塞 callback 会拖慢整个完成链。
+
+#### 4. `Futures.allAsList` 是否提供事务？
+
+不提供。它只聚合多个 Future 的完成状态，无法回滚先成功的独立数据库操作。
+
+#### 5. Actor 是否“一设备一线程”？
+
+不是。一设备通常对应 Actor 状态/mailbox，但大量 Actor 共享少量 dispatcher 线程。
+
+#### 6. mailbox 如何保证单 Actor 串行？
+
+通过 concurrent queues 加 `busy` CAS，确保同时只调度一个 `processMailbox` runnable。
+
+#### 7. `actorThroughput` 越大越好吗？
+
+不一定。大值降低调度开销但降低 Actor 间公平性；要结合热点和处理耗时。
+
+#### 8. 为什么 Actor 内不能调用无 timeout 的 `Future.get()`？
+
+它会阻塞 mailbox，并占用共享 dispatcher worker，影响其他 Actor。
+
+#### 9. MQTT PUBACK 表示 telemetry 已写数据库吗？
+
+不表示。release-3.6 中 QoS 1 的 PUBACK 在 Rule Engine queue producer callback 成功后发送；QoS 0 不发送 PUBACK。
+
+#### 10. Save Timeseries callback 成功是否等于整条 Rule Chain 完成？
+
+不等于。它触发 Success relation，后续节点结束并 terminal ack 后整条消息才完成。
+
+#### 11. Queue producer callback 与 consumer commit 有何区别？
+
+前者确认生产阶段，后者推进消费组位置；中间隔着消费、Actor、Rule Node 和副作用。
+
+#### 12. `TbMsgPackProcessingContext.onSuccess` 会 commit Kafka 吗？
+
+不会。它只更新 pack map/latch；consumer 线程经 Processing Strategy 决策后才 commit。
+
+#### 13. Rule Engine retry 会重新 poll Kafka 吗？
+
+不会。它在当前 JVM 对当前 pack 的选定消息做内存重投。
+
+#### 14. 为什么 retry 可能触发 Kafka rebalance？
+
+等待 callback、sleep 和多轮重投都发生在 consumer poll 周期内，可能超过 `max.poll.interval.ms`。
+
+#### 15. `retries=0` 在 Rule Engine RetryStrategy 中表示什么？
+
+表示不设次数上限，因为源码只在 `maxRetries > 0` 时检查。
+
+#### 16. SQL `add()` 返回 Future 时数据库处于什么状态？
+
+元素刚进入 JVM queue，尚不能推出 JDBC 已执行。
+
+#### 17. SQL Future 成功具体表示什么？
+
+`saveFunction` 的事务代理已成功返回，随后 queue worker 对该 batch 元素设 success。
+
+#### 18. `batch_max_delay` 是否总是首条后等待凑包？
+
+该实现不是。它 poll 第一条、立即 drain 和写库；不足满包后再 sleep 剩余 delay。
+
+#### 19. TimescaleDB 是否使用另一套 Java 异步框架？
+
+没有。它复用 SQL blocking queue，差别主要在 repository/SQL/hypertable。
+
+#### 20. Cassandra 为什么需要 dispatcher 和 callback 两个 pool？
+
+dispatcher 控制发请求/背压，callback pool 隔离结果处理与 in-flight 释放，避免 driver completion thread 承担业务回调。
+
+#### 21. Cassandra `withTimeout` 失败能否证明数据没落盘？
+
+不能。客户端 Future 超时/取消与服务端最终执行结果不是同一事实。
+
+#### 22. Cassandra queue full 如何表现？
+
+有界 deque `add` 抛 `IllegalStateException`，submit 立即把外层 Future 设为失败。
+
+#### 23. 什么情况下 Cassandra 外层 Future 可能永久 pending？
+
+dispatcher 中 `execute/withTimeout/addCallback` 安装阶段同步抛错，外层 catch 没有 `setException` 的源码路径。
+
+#### 24. `DeferredResult` 解决了什么？
+
+释放 Servlet 请求线程，让稍后的 RPC response callback 完成 HTTP 结果；它不持久化请求，也不替代业务 timeout。
+
+#### 25. RPC 为什么有多层 pending map？
+
+请求跨 Controller/Core、Rule Engine、目标 Core/DeviceActor，各服务需把异步 response 路由回原始 callback；每层有独立生命周期和兜底清理。
+
+#### 26. Scheduler timeout 是否直接并发修改 Actor 状态？
+
+推荐实现应只 `tell` timeout message，再由 Actor 串行处理。直接改 Actor 私有集合会破坏 confinement，需要特别审查。
+
+#### 27. 增大 Actor dispatcher pool 是否一定提升吞吐？
+
+不一定。若瓶颈是 DB connection、外部 I/O 或阻塞 callback，只会增加竞争和下游压力。
+
+#### 28. 如何证明一条异步链真正完成？
+
+先定义目标完成点，再关联消息 ID、producer metadata、Rule Engine terminal callback、offset、数据库事实或设备 response；没有单个 callback 能证明全部阶段。
+
+#### 29. 如何设计自己的 ThingsBoard 异步扩展？
+
+明确 executor、容量、timeout、所有 success/failure/shutdown 路径、回调线程、状态所有者和幂等键；在 Actor 中把结果作为消息送回，不直接跨线程改状态。
+
+#### 30. 本章与第 42 章的边界是什么？
+
+本章解释任务如何调度、在哪个线程继续和何时回调；第 42 章进一步判断崩溃、重试、commit 与观测能提供什么恢复保证。
+
+---
+
+[上一篇：42 失败恢复与可观测性](../42-failure-recovery-observability/) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/43-async-callback-execution.svg) | [下一篇：全书目录](../../SUMMARY.md)
+
+</script>
+  <script src="../../assets/guide.js"></script>
+</body>
+</html>
