@@ -26,7 +26,7 @@
 
 > 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章不把 `Future`、线程池、Actor 和 Kafka 分开讲成四套 API，而是沿着真实消息回答四个问题：当前代码由谁执行、状态归谁所有、结果由谁继续、什么时候才算完成。第 42 章已经讨论失败恢复保证，本章聚焦执行机制、线程所有权和回调语义。
 
-[上一篇：42 失败恢复与可观测性](../42-failure-recovery-observability/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/43-async-callback-execution.svg) | [下一篇：全书目录](../../SUMMARY.md)
+[上一篇：42 失败恢复与可观测性](../42-failure-recovery-observability/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/43-async-callback-execution.svg) | [下一篇：44 gRPC 通信与 Edge 同步](../44-grpc-edge-communication/)
 
 [![ThingsBoard 异步执行架构图](../../assets/architecture/43-async-callback-execution.svg)](../../assets/architecture/43-async-callback-execution.svg)
 
@@ -891,7 +891,7 @@ dispatcher 中 `execute/withTimeout/addCallback` 安装阶段同步抛错，外�
 
 ---
 
-[上一篇：42 失败恢复与可观测性](../42-failure-recovery-observability/) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/43-async-callback-execution.svg) | [下一篇：全书目录](../../SUMMARY.md)
+[上一篇：42 失败恢复与可观测性](../42-failure-recovery-observability/) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/43-async-callback-execution.svg) | [下一篇：44 gRPC 通信与 Edge 同步](../44-grpc-edge-communication/)
 
 </script>
   <script src="../../assets/guide.js"></script>

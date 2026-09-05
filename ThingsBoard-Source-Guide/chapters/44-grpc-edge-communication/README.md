@@ -1,0 +1,1098 @@
+# 44 gRPC 通信与 Edge 同步流程
+
+> 源码基线：ThingsBoard `release-3.6`，业务源码提交 `69124284c2`。本章只讨论 ThingsBoard 自建的 Cloud/Core 与 Edge 之间的 gRPC 通信，以及它和 Actor、TB Queue、PostgreSQL/`edge_event` 的边界。Google Pub/Sub 的 `GrpcSubscriberStub` 属于第三方客户端内部实现，不是本章主线。
+
+[上一篇：43 异步执行、回调、线程池、Actor 与消息队列](../43-async-callback-execution/) | [HTML 版](index.html) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/44-grpc-edge-communication.svg) | [下一篇：全书目录](../../SUMMARY.md)
+
+[![ThingsBoard gRPC 与 Edge 同步架构图](../../assets/architecture/44-grpc-edge-communication.svg)](../../assets/architecture/44-grpc-edge-communication.svg)
+
+[![ThingsBoard gRPC 详细时序图](sequence.svg)](sequence.svg)
+
+---
+
+## 一、流程目标
+
+### 1.1 这条 gRPC 链解决什么问题
+
+ThingsBoard Edge 不是一个普通 REST 客户端。Cloud 需要把分配给某个 Edge 的实体变更、凭据、规则链、告警和设备 RPC 送到远端；Edge 也要把本地发生的实体变更、请求和告警操作送回 Cloud。双方还需要在断线后根据游标继续同步。因此 release-3.6 用一个长期存在的 HTTP/2 双向流承载双向消息，而不是为每一种实体定义一个独立的 RPC 方法。
+
+对 Java/Spring Boot 开发者，可以把这条链看成四层契约：
+
+1. **传输层**：`ManagedChannel`、Netty、HTTP/2、TLS、keepalive 和 gRPC stream 是否可用。
+2. **会话层**：首条 `CONNECT_RPC_MESSAGE` 是否通过 routing key/secret 校验，业务 session 是否进入 `connected=true`。
+3. **消息层**：`RequestMsg`/`ResponseMsg` 的 envelope、uplink/downlink message id、ACK 和重试。
+4. **持久化层**：Cloud 的 `edge_event`、Edge 游标 attributes、实体 DAO 和 Rule Engine 旁路是否已经产生事实。
+
+`channel.build()`、`handleMsgs()` 返回、`StreamObserver.onNext()` 返回，都不能直接推出第四层已经完成。这个区分是阅读源码时最容易丢失的关键。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart LR
+    T["传输层\nHTTP/2 + Netty"] --> S["会话层\nCONNECT + session"]
+    S --> M["消息层\nUplink / Downlink + ACK"]
+    M --> D["持久化层\nedge_event / attributes / DAO"]
+    D --> R["业务结果\nEdge 当前态与 Cloud 当前态"]
+```
+
+### 1.2 ThingsBoard 为什么选择双向 streaming gRPC
+
+| 需求 | 双向流提供的能力 | 在源码中的落点 |
+|---|---|---|
+| 长连接 | 一个 stream 同时有入站和出站 observer | `EdgeRpcService.handleMsgs(stream RequestMsg) returns (stream ResponseMsg)` |
+| 多种消息 | 一个 envelope 携带 connect、uplink、sync request 和 downlink response | `edge.proto` 的 `RequestMsg` |
+| Cloud 主动推送 | Server 持有 `StreamObserver<ResponseMsg>` | `EdgeGrpcSession.outputStream` |
+| Edge 主动上报 | Client 持有 `StreamObserver<RequestMsg>` | `EdgeGrpcClient.inputStream` |
+| schema 演进 | Protobuf field number、deprecated 字段和版本枚举 | `EdgeVersion`、`optional` 字段 |
+| 断线探测 | keepalive 与 stream `onError/onCompleted` | Client/Server Netty builder |
+
+它解决的是连接和消息编码问题，不会自动提供 exactly-once、分布式事务、数据库回滚或跨节点会话迁移。后四者仍由 Edge session、pending map、游标 attributes、队列和业务幂等共同实现。
+
+### 1.3 阅读本章的源码地图
+
+| 角色 | 完整类名 | 关键职责 |
+|---|---|---|
+| 协议定义 | `common/edge-api/src/main/proto/edge.proto` | 定义 service、消息 envelope、版本和字段编号 |
+| Cloud gRPC server | `org.thingsboard.server.service.edge.rpc.EdgeGrpcService` | 启动 Netty server、创建 session、维护连接映射 |
+| Cloud 单连接状态 | `org.thingsboard.server.service.edge.rpc.EdgeGrpcSession` | 认证、收发消息、同步游标、ACK 和重试 |
+| Edge gRPC client | `org.thingsboard.edge.rpc.EdgeGrpcClient` | 建 channel、开 bidi stream、序列化发送和回调 |
+| Java 抽象边界 | `org.thingsboard.edge.rpc.EdgeRpcClient` / `org.thingsboard.server.service.edge.rpc.EdgeRpcService` | 解耦调用方与通信实现 |
+| Cloud 内部路由 | `org.thingsboard.server.actors.app.AppActor`、`TenantActor` | 将集群通知送到持有 Edge session 的服务 |
+| DB/事件游标 | `EdgeGrpcSession`、`EdgeEventService`、AttributesService | 读取 `edge_event`、更新 `queueStartTs/queueStartSeqId` |
+
+### 1.4 版本和范围声明
+
+本章所有行为以 `release-3.6` 工作区为准。不同 ThingsBoard 发行版可能新增 proto 字段、改变 Edge processor、拆分 executor 或修改默认 TLS 配置；阅读其他版本时必须重新核对 `edge.proto`、client、server 和配置文件，不能仅凭本章类名推断行为。
+
+当前仓库包含 Cloud 端完整实现、共享 proto/client 和 Edge 集成测试，但不包含独立 ThingsBoard Edge 发行物的全部本地业务实现与持久队列。因此本文只对能从本仓库验证的 Edge client contract 下结论，不推测 Edge 端未出现的重试、落库或调度细节。
+
+## 二、入口
+
+### 2.1 网络入口：gRPC generated service
+
+`edge.proto` 生成 Java 包 `org.thingsboard.server.gen.edge.v1`，使用 `java_multiple_files=true`。Cloud 的 `EdgeGrpcService` 继承生成的 `EdgeRpcServiceGrpc.EdgeRpcServiceImplBase`，覆盖 `handleMsgs(StreamObserver<ResponseMsg>)`；Edge 的 `EdgeGrpcClient` 使用生成的 `EdgeRpcServiceGrpc.newStub(channel)` 获取异步 stub。
+
+```protobuf
+syntax = "proto3";
+
+option java_package = "org.thingsboard.server.gen.edge.v1";
+option java_multiple_files = true;
+option java_outer_classname = "EdgeProtos";
+
+service EdgeRpcService {
+  rpc handleMsgs(stream RequestMsg) returns (stream ResponseMsg) {}
+}
+```
+
+这里的 `stream` 是双向 streaming RPC，不是 unary RPC。调用方法只在 stream 建立时执行一次，之后客户端和服务端分别通过各自的 `StreamObserver` 多次 `onNext()` 传消息。
+
+### 2.2 Edge 端入口：`EdgeGrpcClient.connect(...)`
+
+源码位置：[org.thingsboard.edge.rpc.EdgeGrpcClient.connect(String, String, Consumer<UplinkResponseMsg>, Consumer<EdgeConfiguration>, Consumer<DownlinkMsg>, Consumer<Exception>)](../../../common/edge-api/src/main/java/org/thingsboard/edge/rpc/EdgeGrpcClient.java#L132)。调用方传入 routing key、secret 和四类 callback。方法依次创建 `NettyChannelBuilder`、构建 `ManagedChannel`、创建 async stub、调用 `handleMsgs(...)`，最后主动发送第一条 CONNECT。
+
+```java
+NettyChannelBuilder builder = NettyChannelBuilder.forAddress(rpcHost, rpcPort)
+        .maxInboundMessageSize(maxInboundMessageSize)
+        .keepAliveTime(keepAliveTimeSec, TimeUnit.SECONDS)
+        .keepAliveTimeout(keepAliveTimeoutSec, TimeUnit.SECONDS)
+        .keepAliveWithoutCalls(true);
+
+channel = builder.build();
+EdgeRpcServiceGrpc.EdgeRpcServiceStub stub = EdgeRpcServiceGrpc.newStub(channel);
+inputStream = stub.withCompression("gzip").handleMsgs(initOutputStream(...));
+inputStream.onNext(connectRequest);
+```
+
+这段代码有三个阅读重点：
+
+1. `ManagedChannel` 建好不代表 TCP、TLS、业务认证都成功。
+2. `handleMsgs()` 返回的是客户端写入方向的 `StreamObserver<RequestMsg>`；传入 `initOutputStream(...)` 的 observer 负责读取 Cloud 响应。
+3. 当前 client 用一个 static `ReentrantLock` 串行化三个发送方法，锁的范围甚至大于单个 client 实例；不能默认认为多个 Edge client 可以完全并行写。
+
+### 2.3 Cloud 端入口：`EdgeGrpcService.handleMsgs(...)`
+
+源码位置：[org.thingsboard.server.service.edge.rpc.EdgeGrpcService.handleMsgs(StreamObserver<ResponseMsg>)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L268)。gRPC runtime 回调该方法时，服务只创建 `EdgeGrpcSession` 并返回其 input observer；真正的业务处理在 `EdgeGrpcSession.initInputStream()` 的 `onNext(RequestMsg)` 中发生。
+
+```java
+@Override
+public StreamObserver<RequestMsg> handleMsgs(StreamObserver<ResponseMsg> outputStream) {
+    return new EdgeGrpcSession(
+            ctx,
+            outputStream,
+            this::onEdgeConnect,
+            this::onEdgeDisconnect,
+            sendDownlinkExecutorService,
+            this.maxInboundMessageSize
+    ).getInputStream();
+}
+```
+
+因此阅读调用链时不要把 `EdgeGrpcService.handleMsgs()` 当成“处理完整 CONNECT”的方法。它只是把 transport callback 绑定到一个新 session 对象。
+
+### 2.4 非网络入口：Cloud 集群通知与管理 REST
+
+gRPC stream 之外还有两类会触发 Edge 流程的入口：
+
+| 入口 | 源码位置 | 作用 |
+|---|---|---|
+| Core notification | `DefaultTbClusterService.onEdgeEventUpdate(TenantId, EdgeId)` | 用 EdgeId 作为 queue key 唤醒持有 session 的节点 |
+| App/Tenant Actor | `AppActor.onToEdgeSessionMsg(EdgeSessionMsg)`、`TenantActor.onToEdgeSessionMsg(EdgeSessionMsg)` | 把 Edge event/sync request/response 送到 `EdgeRpcService` |
+| 管理 REST | `EdgeController.syncEdge(String)` | 创建 `ToEdgeSyncRequest`，用 `DeferredResult` 等待 20 秒内的本地响应 |
+| Edge 本地业务 | Edge 侧调用 `EdgeRpcClient.sendUplinkMsg(...)`、`sendSyncRequestMsg(...)` | 将本地数据或同步请求放进同一条 bidi stream |
+
+REST 的 `syncEdge` 并不直接调用 gRPC。它先经过本节点 `EdgeRpcService.processSyncRequest(...)`，再借助 TB Core notification 把请求路由到拥有对应 Edge session 的节点。
+
+## 三、完整调用链
+
+### 3.1 Cloud 到 Edge 的常规下行链
+
+一次已落库的实体变更，其核心路径是：
+
+1. 业务服务在事务/服务流程中产生实体变化。
+2. `EdgeEventSourcingListener` 或 Edge processor 把需要同步的变化写入 `edge_event`。
+3. 写入成功后通过 `TbClusterService.onEdgeEventUpdate(...)` 发送轻量通知。
+4. TB Core notification consumer 将通知送入 `AppActor`，再交给 `TenantActor`。
+5. `EdgeGrpcService.onToEdgeSessionMsg(...)` 切换到自己的单线程 `edge-service` executor。
+6. `onEdgeEvent(...)` 将对应 Edge 的 `sessionNewEvents` 标记为 true。
+7. `scheduleEdgeEventsCheck(...)` 周期调用 `EdgeGrpcSession.processEdgeEvents()`。
+8. session 从 attributes 读取游标，分页读 `edge_event`，转成 `DownlinkMsg`。
+9. `sendDownlinkMsgsPack(...)` 填充 pending map，立即发送，并按配置延迟重发。
+10. Edge 处理后回送 `DownlinkResponseMsg(success=true, downlinkMsgId)`。
+11. Cloud 删除对应 pending 项，游标更新到已处理页尾，并继续扫描。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart TB
+    B["业务实体变更"] --> L["EdgeEventSourcingListener\nafter commit / fallback"]
+    L --> E["edge_event\nPostgreSQL 分区表"]
+    E --> N["DefaultTbClusterService\nonEdgeEventUpdate"]
+    N --> Q["TB Core notification topic"]
+    Q --> A["AppActor -> TenantActor"]
+    A --> X["EdgeGrpcService\nonToEdgeSessionMsg"]
+    X --> F["sessionNewEvents = true"]
+    F --> P["EdgeGrpcSession.processEdgeEvents"]
+    P --> C["按 queueStartTs/SeqId 分页"]
+    C --> M["DownlinkMsg pending map"]
+    M --> G["gRPC ResponseMsg.downlinkMsg"]
+    G --> ACK["Edge DownlinkResponseMsg ACK"]
+    ACK --> U["更新 Edge server attributes 游标"]
+```
+
+### 3.2 Edge 到 Cloud 的完整上行链
+
+Edge 的 `sendUplinkMsg(UplinkMsg)` 只负责把 envelope 写入 stream。Cloud 端 `EdgeGrpcSession.onNext(...)` 先验证连接状态和 message type，再调用 `onUplinkMsg(...)`。该方法进行 Edge uplink rate-limit 检查，调用 `processUplinkMsg(...)`，后者按 protobuf 中的重复字段依次调用各类 Edge processor，最终用 `Futures.allAsList(result)` 聚合多个异步操作。聚合成功只意味着这些 processor 的 Future 成功，不意味着一个跨表数据库事务存在。
+
+```java
+private void onUplinkMsg(UplinkMsg uplinkMsg) {
+    if (isRateLimitViolated(uplinkMsg)) {
+        return;
+    }
+    ListenableFuture<List<Void>> future = processUplinkMsg(uplinkMsg);
+    Futures.addCallback(future, new FutureCallback<>() {
+        @Override
+        public void onSuccess(@Nullable List<Void> result) {
+            sendResponseMessage(uplinkMsg.getUplinkMsgId(), true, null);
+        }
+
+        @Override
+        public void onFailure(Throwable t) {
+            sendResponseMessage(uplinkMsg.getUplinkMsgId(), false,
+                    EdgeUtils.createErrorMsgFromRootCauseAndStackTrace(t));
+        }
+    }, ctx.getGrpcCallbackExecutorService());
+}
+```
+
+### 3.3 管理 REST 触发 Full Sync 的调用链
+
+`EdgeController.syncEdge(String)` 返回 `DeferredResult<ResponseEntity>`，但它等待的不是整批实体已经同步完成，而是等待当前节点收到 `FromEdgeSyncResponse`，确认“同步请求已交给目标 Edge session”。真正的 full sync 由 session 异步发送，控制器响应成功与 Edge 全量数据落地之间还有很长一段距离。
+
+| 层 | 类与方法 | 输入 | 输出/完成点 |
+|---|---|---|---|
+| Controller | `org.thingsboard.server.controller.EdgeController.syncEdge(String)` | Edge UUID | `DeferredResult` |
+| 本地服务 | `EdgeGrpcService.processSyncRequest(ToEdgeSyncRequest, Consumer<FromEdgeSyncResponse>)` | request id、tenant、edge | 本地 callback map |
+| 集群 | `DefaultTbClusterService.pushEdgeSyncRequestToCore(ToEdgeSyncRequest)` | protobuf notification | TB Core queue record |
+| Actor | `AppActor` -> `TenantActor` | `EdgeSessionMsg` | `EdgeRpcService.onToEdgeSessionMsg` |
+| gRPC session | `EdgeGrpcService.startSyncProcess(...)` | EdgeId、request id | session 开始 `startSyncProcess(true)` |
+| 同步游标 | `EdgeGrpcSession.doSync(EdgeSyncCursor)` | fetcher cursor | 多页 downlink 与最终 `SyncCompletedMsg` |
+
+### 3.4 按源码还原的调用链图
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart LR
+    C["EdgeController.syncEdge(String)"] --> DR["DeferredResult<ResponseEntity>"]
+    C --> S1["EdgeGrpcService.processSyncRequest"]
+    S1 --> Q1["DefaultTbClusterService\npushEdgeSyncRequestToCore"]
+    Q1 --> AC["Core notification consumer"]
+    AC --> AA["AppActor.onToEdgeSessionMsg"]
+    AA --> TA["TenantActor.onToEdgeSessionMsg"]
+    TA --> S2["EdgeGrpcService.onToEdgeSessionMsg"]
+    S2 --> ES["EdgeGrpcSession.startSyncProcess(true)"]
+    ES --> CUR["EdgeSyncCursor + fetchers"]
+    CUR --> DL["sendDownlinkMsgsPack"]
+    DL --> G["gRPC bidi stream"]
+    G --> ACK2["Downlink ACK / SyncCompleted"]
+    ACK2 --> S3["FromEdgeSyncResponse"]
+    S3 --> DR
+```
+
+## 四、消息流
+
+### 4.1 一个 bidi stream 中的 envelope
+
+```protobuf
+message RequestMsg {
+  RequestMsgType msgType = 1;
+  ConnectRequestMsg connectRequestMsg = 2;
+  UplinkMsg uplinkMsg = 3;
+  DownlinkResponseMsg downlinkResponseMsg = 4;
+  SyncRequestMsg syncRequestMsg = 5;
+}
+
+message ResponseMsg {
+  ConnectResponseMsg connectResponseMsg = 1;
+  UplinkResponseMsg uplinkResponseMsg = 2;
+  DownlinkMsg downlinkMsg = 3;
+  EdgeUpdateMsg edgeUpdateMsg = 4;
+}
+```
+
+`RequestMsgType` 只有 `CONNECT_RPC_MESSAGE`、`UPLINK_RPC_MESSAGE` 和 `SYNC_REQUEST_RPC_MESSAGE`。注意 `DownlinkResponseMsg` 没有单独的 request type，client 通过 `UPLINK_RPC_MESSAGE` 发送它，server 再用 `hasDownlinkResponseMsg()` 区分。这是阅读 protobuf one-of 风格代码时的实际细节，不能凭消息名字猜路由。
+
+```java
+public void sendDownlinkResponseMsg(DownlinkResponseMsg response) {
+    uplinkMsgLock.lock();
+    try {
+        inputStream.onNext(RequestMsg.newBuilder()
+                .setMsgType(RequestMsgType.UPLINK_RPC_MESSAGE)
+                .setDownlinkResponseMsg(response)
+                .build());
+    } finally {
+        uplinkMsgLock.unlock();
+    }
+}
+```
+
+### 4.2 Connect 消息
+
+```protobuf
+message ConnectRequestMsg {
+  string edgeRoutingKey = 1;
+  string edgeSecret = 2;
+  EdgeVersion edgeVersion = 3;
+  optional int32 maxInboundMessageSize = 4;
+}
+
+enum ConnectResponseCode {
+  ACCEPTED = 0;
+  BAD_CREDENTIALS = 1;
+  SERVER_UNAVAILABLE = 2;
+}
+```
+
+服务端 `processConnect(ConnectRequestMsg)` 以系统租户调用 `findEdgeByRoutingKey(...)`，再比较 `edge.getSecret().equals(request.getEdgeSecret())`。通过后调用 `sessionOpenListener.accept(edgeId, this)`，保存版本 attribute，返回 configuration 和 server max inbound size。client 只有收到 `ACCEPTED` 才执行正常的业务连接回调。
+
+这意味着 release-3.6 的认证事实位于 protobuf payload 内。TLS 未启用时 routing key/secret 会随明文连接发送；源码中的 SSL client 配置是 trust manager，未看到 mTLS client certificate/key 的配置。生产部署不能把 `ssl.enabled=false` 当作可接受的互联网暴露方案。
+
+### 4.3 Uplink、Downlink、ACK 的对应关系
+
+| 方向 | 载荷 | 关联 id | 响应 | Cloud 侧语义 |
+|---|---|---:|---|---|
+| Edge -> Cloud | `UplinkMsg` | `uplinkMsgId` | `UplinkResponseMsg` | processor Future 聚合完成后返回成功/失败 |
+| Cloud -> Edge | `DownlinkMsg` | `downlinkMsgId` | `DownlinkResponseMsg` | Edge 处理 envelope 后回 ACK |
+| Edge -> Cloud | `SyncRequestMsg` | 无业务 msg id | `SyncCompletedMsg` 在下行 | 请求 full/incremental sync |
+| Cloud -> Edge | `EdgeUpdateMsg` | 无独立 ack | 无 | 推送 Edge 配置变化 |
+
+`UplinkResponseMsg.success=true` 只表示 Cloud `processUplinkMsg` 的各个 Future 成功；`DownlinkResponseMsg.success=true` 只表示 Edge 处理了对应 downlink。二者都不是 Kafka commit、数据库跨表 commit 或设备最终执行结果。
+
+### 4.4 消息大小、gzip 与 keepalive
+
+client 在 channel 上设置 `maxInboundMessageSize`，并在 CONNECT 中把同一数值告知 server；server 返回自身的 max inbound size。发送下行时，`EdgeGrpcSession.scheduleDownlinkMsgsPackSend(int)` 会用 `downlinkMsg.getSerializedSize()` 对比 client 声明值，超限消息记录通信失败并从 pending map 移除。
+
+| 参数 | 当前默认值 | 所在端 | 作用 | 主要风险 |
+|---|---:|---|---|---|
+| `edges.rpc.max_inbound_message_size` | 4194304 | Cloud server | Cloud 接收 Edge 请求上限 | 过小导致大 uplink 被拒绝，过大增加内存压力 |
+| `cloud.rpc.max_inbound_message_size` | 4194304 | Edge client | Edge 接收 Cloud 响应上限 | 与 server 协商不一致时下行失败 |
+| `edges.rpc.keep_alive_time_sec` | 10 | Cloud server | HTTP/2 keepalive 周期 | 太激进可能触发代理/服务端限制 |
+| `edges.rpc.keep_alive_timeout_sec` | 5 | Cloud server | keepalive 应答等待 | 过小误判网络抖动 |
+| `edges.rpc.client_max_keep_alive_time_sec` | 1 | Cloud server | 允许 client 的 keepalive 下限约束 | client 更频繁探测可能被拒绝 |
+| `edges.storage.sleep_between_batches` | 60000 ms | Cloud session | 下行失败批次的后续重发间隔 | 太长增加同步延迟，太短放大网络与日志压力 |
+
+client 使用 `.withCompression("gzip")` 创建 stream，但压缩不是消息去重，也不是流量控制。压缩会增加 CPU，是否收益取决于 protobuf payload 中字符串和重复实体字段的比例。
+
+## 五、时序图
+
+本章 PlantUML 被拆成 7 个独立画布，避免浏览器把一张超宽图压缩到不可读：[连接与认证](sequence.svg) · [Uplink](sequence_001.svg) · [增量 Downlink](sequence_002.svg) · [Full Sync](sequence_003.svg) · [ACK 与重试](sequence_004.svg) · [断线重连](sequence_005.svg) · [线程切换](sequence_006.svg)。
+
+![连接与认证时序图](sequence.svg)
+
+![Uplink 时序图](sequence_001.svg)
+
+![增量 Downlink 时序图](sequence_002.svg)
+
+![Full Sync 时序图](sequence_003.svg)
+
+![ACK 与重试时序图](sequence_004.svg)
+
+![断线重连时序图](sequence_005.svg)
+
+![线程切换时序图](sequence_006.svg)
+
+### 5.1 建立 channel、stream 和业务 session
+
+下图区分了 transport 建立与业务认证。PlantUML 详细版本见 [`sequence.svg`](sequence.svg)；HTML 中的 SVG 缩略图可点击放大。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+sequenceDiagram
+    participant E as EdgeGrpcClient
+    participant N as NettyChannel
+    participant G as GeneratedStub
+    participant S as EdgeGrpcService
+    participant X as EdgeGrpcSession
+    participant DB as EdgeService/DB
+    E->>N: NettyChannelBuilder.build()
+    E->>G: newStub(channel).handleMsgs(outputObserver)
+    G->>S: handleMsgs(outputStream)
+    S->>X: new EdgeGrpcSession(...)
+    X-->>G: input StreamObserver<RequestMsg>
+    E->>X: onNext(CONNECT)
+    X->>DB: findEdgeByRoutingKey(SYS_TENANT, routingKey)
+    DB-->>X: Edge + secret
+    X->>X: compare secret and open session
+    X-->>E: ResponseMsg(CONNECT_RESPONSE)
+    E->>E: ACCEPTED -> normal session
+```
+
+### 5.2 Uplink：Edge 上报实体变化
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+sequenceDiagram
+    participant EP as Edge业务
+    participant EC as EdgeGrpcClient
+    participant CS as Cloud EdgeGrpcSession
+    participant P as Edge processors
+    participant D as DAO/事务
+    EP->>EC: sendUplinkMsg(UplinkMsg)
+    EC->>EC: uplinkMsgLock.lock()
+    EC->>CS: RequestMsg(UPLINK, UplinkMsg)
+    CS->>CS: rate-limit check
+    CS->>P: processUplinkMsg()
+    P->>D: save entity / relation / alarm / attributes
+    D-->>P: Future success or failure
+    P-->>CS: Futures.allAsList(result)
+    CS-->>EC: UplinkResponseMsg(success, uplinkMsgId)
+    EC-->>EP: onUplinkResponse.accept(response)
+```
+
+### 5.3 增量下行：event flag、分页、ACK、游标
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+sequenceDiagram
+    participant B as Cloud业务事务
+    participant Q as edge_event
+    participant N as Core通知
+    participant A as App/Tenant Actor
+    participant S as EdgeGrpcService
+    participant X as EdgeGrpcSession
+    participant E as Edge
+    B->>Q: insert EdgeEvent
+    Q-->>N: onEdgeEventUpdate(edgeId)
+    N->>A: notification queue + Actor
+    A->>S: onToEdgeSessionMsg(msg)
+    S->>S: sessionNewEvents=true
+    S->>X: processEdgeEvents()
+    X->>Q: read cursor page
+    Q-->>X: EdgeEvent page
+    X->>E: DownlinkMsg
+    E-->>X: DownlinkResponseMsg(success, id)
+    X->>X: remove pending id
+    X->>Q: save queueStartTs/queueStartSeqId
+```
+
+### 5.4 Full Sync：fetcher 链与 `SyncCompletedMsg`
+
+`EdgeGrpcSession.startSyncProcess(boolean)` 会先中断当前普通下行任务，再用 `EdgeSyncCursor` 依次驱动多个 `EdgeEventFetcher`。每个 fetcher 的 Future 完成后，通过 `GrpcCallbackExecutorService` 回调 `doSync(cursor)`；所有 fetcher 结束后发送一个带 `SyncCompletedMsg` 的 downlink。该过程不是单个数据库事务。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+sequenceDiagram
+    participant T as Trigger
+    participant X as EdgeGrpcSession
+    participant C as EdgeSyncCursor
+    participant F as EdgeEventFetcher
+    participant DB as PostgreSQL
+    participant E as Edge
+    T->>X: startSyncProcess(fullSync=true)
+    X->>X: interruptGeneralProcessingOnSync()
+    X->>C: new EdgeSyncCursor(...)
+    loop each fetcher
+        C->>F: getNext()
+        F->>DB: page query / current entity snapshot
+        DB-->>F: page
+        F-->>X: Future<Pair<ts, seq>>
+        X->>X: callback executor -> doSync(cursor)
+        X->>E: DownlinkMsg batch
+        E-->>X: DownlinkResponseMsg ACK
+    end
+    X->>E: DownlinkMsg(SyncCompletedMsg)
+    alt Edge returns success ACK
+        E-->>X: DownlinkResponseMsg ACK
+    else no ACK after maximum attempts
+        X->>X: stopCurrentSendDownlinkMsgsTask(false)
+    end
+    X->>X: callback completes and syncCompleted=true
+```
+
+### 5.5 Downlink 重发与 pending map
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart TD
+    S["sendDownlinkMsgsPack"] --> P["pendingMsgsMap.clear + put"]
+    P --> A1["attempt 1: submit immediately"]
+    A1 --> R{"all ACK received?"}
+    R -->|是| DONE["stopCurrentSendDownlinkMsgsTask(false)"]
+    R -->|否| A2["attempt 2..10: schedule after 60000ms"]
+    A2 --> SIZE{"serializedSize <= client max?"}
+    SIZE -->|否| DROP["记录 failure notification\n移除 pending"]
+    SIZE -->|是| SEND["outputStream.onNext"]
+    SEND --> R
+    A2 --> LIMIT{"attempt < 10?"}
+    LIMIT -->|否| DISCARD["丢弃剩余 pending\nstop task"]
+```
+
+源码有一个必须如实记录的边界：`onDownlinkResponse(...)` 只有在 `success=true` 时才移除 pending；失败 ACK 不会移除，后续仍可能重发。达到第 10 次后调用 `stopCurrentSendDownlinkMsgsTask(false)`，`sendDownlinkMsgsFuture` 以 `false` 正常完成，而不是以异常完成。因此“Future 完成”不能单独当成“Edge 已处理”。
+
+### 5.6 断线、旧 session 和重连
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+sequenceDiagram
+    participant O as old stream
+    participant S as EdgeGrpcService.sessions
+    participant N as new stream
+    participant E as EdgeGrpcSession
+    O-->>E: onError/onCompleted
+    E->>S: onEdgeDisconnect(edgeId, oldSessionId)
+    N->>S: onEdgeConnect(edgeId, newSession)
+    S->>S: sessions.put(edgeId, newSession)
+    O->>S: remove(edgeId) with old id
+    S->>S: compare sessionId
+    S-->>O: reject stale removal
+    N-->>S: remains current mapping
+```
+
+`onEdgeDisconnect(Edge, UUID)` 比较 session id，避免旧连接关闭时误删新连接。但 pending map、scheduled task 和 stream observer 都是 session 本地状态；重连后的恢复依赖数据库中的 `edge_event` 与游标，而不是 JVM 内存中的 pending map。
+
+### 5.7 线程切换图
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart LR
+    G["gRPC callback / Netty线程"] --> S["EdgeGrpcSession.onNext"]
+    S -->|直接| P["processConnect / onUplinkMsg"]
+    A["App/Tenant Actor线程"] -->|execute| E["EdgeGrpcService.edge-service\n单线程 scheduled executor"]
+    E --> W["processEdgeEvents / sync trigger"]
+    W -->|Future callback| C["GrpcCallbackExecutorService\n默认 1 个 work-stealing worker"]
+    C --> O["继续 doSync / 更新游标 / 发送 ACK"]
+    O -->|outputStream.onNext| H["HTTP/2 outbound stream"]
+```
+
+## 六、数据变化
+
+### 6.1 连接建立时的变化
+
+成功 CONNECT 后，`EdgeGrpcService.onEdgeConnect(...)`：
+
+1. 把 `EdgeGrpcSession` 放进本节点 `sessions: ConcurrentMap<EdgeId, EdgeGrpcSession>`。
+2. 把该 Edge 的 `sessionNewEvents` 标记为 true。
+3. 保存 active state 和 last connect time；位置由 `edges.state.persistToTelemetry` 决定是 telemetry 还是 attributes。
+4. 向 Rule Engine 推送 `CONNECT_EVENT`。
+5. 取消旧 event check，再为新 session 启动周期检查。
+
+`EdgeGrpcSession.processConnect(...)` 另外保存 `edgeVersion` 到 Edge 的 server-scope attributes，但调用 `AttributesService.save(...)` 返回的 Future 没有在这里等待。这是连接响应与版本属性落库之间的异步边界。
+
+### 6.2 Cloud 下行写哪些表
+
+Cloud 下行不是直接把所有 Java 对象放进 gRPC。实体变更先由 Edge processor 转换为 `EdgeEvent`，主要事实进入 `edge_event`；session 以 Edge 的 server-scope attributes 保存分页游标。根据业务类型，实体本身还会写对应的 PostgreSQL 基础表、latest/attributes 表、时序表或 Cassandra 表。
+
+| 数据 | 主要持久化事实 | gRPC 中的作用 |
+|---|---|---|
+| Edge 元数据 | `edge` 表及实体关系 | CONNECT 查 routing key/secret，生成 configuration |
+| 待同步事件 | `edge_event`，按 `created_time` 分区 | 增量下行的数据源 |
+| 同步游标 | Edge server-scope attributes：`queueStartTs`、`queueStartSeqId` | 断线后从上次页尾继续 |
+| 连接状态 | attributes 或 telemetry，取决于 `persistToTelemetry` | UI/Rule Engine 观察 Edge 在线状态 |
+| 业务实体 | Device、Asset、Alarm、Relation 等对应 DAO | Edge processor 构造 downlink/uplink payload |
+| session/pending | JVM 内存 map、observer、scheduled task | 当前连接的临时状态，重启丢失 |
+
+### 6.3 `edge_event`、游标和重复
+
+`EdgeGrpcSession.processEdgeEvents()` 读取 `getQueueStartTsAndSeqId().get()`，再用 `GeneralEdgeEventFetcher` 分页。读取页、向 Edge 发送、收到 ACK、保存游标不是一个数据库事务；通常只在一页处理成功后更新游标。
+
+因此存在以下窗口：
+
+| 故障窗口 | 可能结果 |
+|---|---|
+| Edge 已执行，Cloud 尚未保存游标 | 重连后同一事件再次下发 |
+| Cloud 保存游标，但 Edge 业务未完成 | 可能跳过该事件，取决于 ACK 返回时机 |
+| 通知丢失但 DB 写入成功 | 连接时初始 flag 或后续有效通知可能触发扫描；持久在线且 flag 未重新置位时会延迟 |
+| `edge_event` TTL 先于 Edge 重连 | 增量事件消失，full sync 只能恢复当前快照，不能恢复历史动作 |
+| 进程 `shutdownNow` | 尚未落库的内存任务/queue 元素可能丢失，pending map 不持久化 |
+
+### 6.4 Uplink 的数据变化不是原子批次
+
+`processUplinkMsg(UplinkMsg)` 为多个 repeated 字段分别调用 processor，再返回 `Futures.allAsList(result)`。例如设备更新、告警更新、关系更新可能已经分别写成功，后一个 processor 失败时 Cloud 返回一个失败的 `UplinkResponseMsg`，但源码没有一个包围所有动作的统一事务来回滚前面的写入。Edge 重试时必须依赖各 processor 的 UUID、冲突处理和业务幂等。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart TD
+    U["一个 UplinkMsg"] --> D["Device processor"]
+    U --> A["Alarm processor"]
+    U --> R["Relation processor"]
+    U --> X["Resource/Profile processor"]
+    D --> F["Future 1"]
+    A --> F2["Future 2"]
+    R --> F3["Future 3"]
+    X --> F4["Future 4"]
+    F --> ALL["Futures.allAsList"]
+    F2 --> ALL
+    F3 --> ALL
+    F4 --> ALL
+    ALL --> ACK["一个 UplinkResponse\n不等于跨表事务"]
+```
+
+### 6.5 缓存、Actor、Queue 和 session 的边界
+
+| 状态 | 所在位置 | 是否持久化 | 失败后恢复方式 |
+|---|---|---|---|
+| 当前 Edge session | `EdgeGrpcService.sessions` | 否 | Edge 重连并重新 CONNECT |
+| 下行 pending | `EdgeSessionState.pendingMsgsMap` | 否 | 重新读 `edge_event`，可能重复 |
+| 新事件标志 | `sessionNewEvents` | 否 | 连接初始置 true，通知/周期检查触发 |
+| Edge 事件 | PostgreSQL `edge_event` | 是，直到 TTL | 增量读取或 full sync |
+| 游标 | Edge server attributes | 是 | 重连读取 attributes |
+| 跨节点同步 request callback | `localSyncEdgeRequests` | 否 | 20 秒超时；调用方收到失败 |
+| 集群通知 | TB Core notification queue | 取决于 provider | queue provider 的重投/commit 策略 |
+| 连接事件 | Rule Engine message | 取决于 queue provider | 不与 gRPC session 原子绑定 |
+
+## 七、源码分析
+
+### 7.1 Proto 到 Java generated stub
+
+`common/edge-api/pom.xml` 引入 `grpc-netty-shaded`、`grpc-protobuf`、`grpc-stub`。根 `pom.xml` 的 `protobuf-maven-plugin` 执行 `compile` 和 `compile-custom`，使用 `protoc` 及 `protoc-gen-grpc-java` 生成消息类和 `EdgeRpcServiceGrpc`。生成代码在构建输出中，不应手工编辑。
+
+```xml
+<plugin>
+  <groupId>org.xolstice.maven.plugins</groupId>
+  <artifactId>protobuf-maven-plugin</artifactId>
+  <executions>
+    <execution>
+      <goals>
+        <goal>compile</goal>
+        <goal>compile-custom</goal>
+      </goals>
+    </execution>
+  </executions>
+</plugin>
+```
+
+源码位置：[common/edge-api/pom.xml](../../../common/edge-api/pom.xml#L90) 和 [root pom protobuf-maven-plugin](../../../pom.xml#L718)。阅读生成类时只需确认三件事：方法是 bidi stream、stub 是 async 还是 blocking、消息字段对应哪个 proto field number。
+
+### 7.2 Client 类、接口和继承关系
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+classDiagram
+    class EdgeRpcClient {
+        <<interface>>
+        +connect(String, String, Consumer, Consumer, Consumer, Consumer) void
+        +disconnect(boolean) void
+        +sendSyncRequestMsg(boolean) void
+        +sendUplinkMsg(UplinkMsg) void
+        +sendDownlinkResponseMsg(DownlinkResponseMsg) void
+    }
+    class EdgeGrpcClient {
+        -ManagedChannel channel
+        -StreamObserver~RequestMsg~ inputStream
+        -ReentrantLock uplinkMsgLock
+        +connect(...) void
+        +sendUplinkMsg(UplinkMsg) void
+        +sendSyncRequestMsg(boolean) void
+        +sendDownlinkResponseMsg(DownlinkResponseMsg) void
+    }
+    class EdgeRpcServiceGrpc.EdgeRpcServiceStub {
+        +handleMsgs(StreamObserver~ResponseMsg~) StreamObserver~RequestMsg~
+    }
+    EdgeRpcClient <|.. EdgeGrpcClient
+    EdgeGrpcClient ..> EdgeRpcServiceGrpc.EdgeRpcServiceStub
+```
+
+接口位置：[org.thingsboard.edge.rpc.EdgeRpcClient](../../../common/edge-api/src/main/java/org/thingsboard/edge/rpc/EdgeRpcClient.java#L35)。它把调用方和 gRPC 依赖隔开，测试可以替换接口实现；但它返回 `void`，所以发送成功只能说明 `onNext()` 调用路径没有同步抛错，不能说明 Cloud 已处理。
+
+### 7.3 Server 类、session map 和生命周期
+
+`EdgeGrpcService` 的 `@PostConstruct init()` 用 `NettyServerBuilder.forPort(rpcPort)` 配置 keepalive、inbound size、可选 TLS 和 `addService(this)`，随后创建三个执行器：
+
+| executor | 创建方式 | 代码职责 |
+|---|---|---|
+| `edgeEventProcessingExecutorService` | `newScheduledThreadPool(schedulerPoolSize, ...)` | 周期检查是否有 edge event |
+| `sendDownlinkExecutorService` | `newScheduledThreadPool(sendSchedulerPoolSize, ...)` | 首次和延迟重发 downlink |
+| `executorService` | `newSingleThreadScheduledExecutor(...)` | 串行化 gRPC service 内的 session/Edge 事件路由 |
+
+源码位置：[EdgeGrpcService.init()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L198) 和 [destroy()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L237)。`destroy()` 对 server 和三个 executor 使用 `shutdownNow()`，没有统一 drain/await 语义，生产关闭期间应把未完成同步视为可能需要重连恢复。
+
+### 7.4 `EdgeGrpcSession` 的状态机
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+stateDiagram-v2
+    [*] --> STREAM_OPEN: handleMsgs
+    STREAM_OPEN --> AUTHENTICATING: first RequestMsg CONNECT
+    AUTHENTICATING --> CONNECTED: ACCEPTED
+    AUTHENTICATING --> CLOSED: BAD_CREDENTIALS / SERVER_UNAVAILABLE
+    CONNECTED --> SYNCING: SyncRequest(fullSync)
+    SYNCING --> CONNECTED: sync pack task completes
+    CONNECTED --> UPLINK_PROCESSING: UplinkMsg
+    UPLINK_PROCESSING --> CONNECTED: UplinkResponse sent
+    CONNECTED --> DOWNLINK_RETRYING: pending DownlinkMsg
+    DOWNLINK_RETRYING --> CONNECTED: all ACK or retry task stopped
+    DOWNLINK_RETRYING --> CLOSED: stream error
+    CONNECTED --> CLOSED: onError / onCompleted
+    CLOSED --> [*]
+```
+
+这里是“源码状态机”，不是框架提供的显式 enum。`connected`、`syncCompleted`、`pendingMsgsMap`、scheduled task 和 `sessionId` 共同表达状态。因为多个 callback 和 scheduler 都能触碰这些字段，阅读时要同时看锁、executor 和 Future callback，不能只看 `connected` 的赋值。
+
+### 7.5 `StreamObserver` 的并发规范
+
+gRPC Java 的 `StreamObserver` 写方向不应由多个线程并发调用 `onNext()`。release-3.6 client 用 static `uplinkMsgLock` 包住 `sendUplinkMsg`、`sendSyncRequestMsg` 和 `sendDownlinkResponseMsg`；server session 用 static `downlinkMsgLock` 包住 `outputStream.onNext()`。
+
+```java
+downlinkMsgLock.lock();
+try {
+    outputStream.onNext(downlinkMsg);
+} catch (Exception e) {
+    connected = false;
+    sessionCloseListener.accept(edge, sessionId);
+} finally {
+    downlinkMsgLock.unlock();
+}
+```
+
+这个锁解决的是 observer 写入的并发安全和消息顺序问题，不解决：
+
+1. 两条消息已经被对端处理但 ACK 丢失的问题。
+2. 数据库提交与 gRPC 发送之间的原子性问题。
+3. 多节点之间同一个 Edge session 的重复路由问题。
+4. static 锁造成的不同 client/session 全局串行化成本。
+
+### 7.6 Callback executor 的真实角色
+
+`GrpcCallbackExecutorService` 继承 `org.thingsboard.common.util.AbstractListeningExecutor`，通过 `@Value("${edges.grpc_callback_thread_pool_size}")` 提供线程数。父类 `init()` 调用 `ThingsBoardExecutors.newWorkStealingPool(getThreadPollSize(), getClass())`，再包装成 Guava `ListeningExecutorService`。
+
+session 在 `doSync`、`onUplinkMsg`、`processEdgeEvents` 的 `Futures.addCallback(..., ctx.getGrpcCallbackExecutorService())` 中显式指定该 executor。它承担的是 Future 回调，不是 gRPC Netty EventLoop，也不是数据库连接池。默认值为 1，若回调中出现阻塞，可能把同步推进、ACK 组装和游标更新全部串行堵住。
+
+还有两个需要从源码直接识别的阻塞点：CONNECT 的 `findEdgeByRoutingKey(...)` 是同步查询，发生在 server 的 gRPC 入站 callback 路径；`EdgeGrpcSession.processEdgeEvents()` 又在 `edge-event-check-scheduler` 上调用 `getQueueStartTsAndSeqId().get()`。后者会等待 attributes Future，默认 scheduler 只有一个线程时，一次慢查询即可推迟其他 Edge 的 event check。调大线程数只能扩大等待并发，不能替代数据库和 callback 根因分析。
+
+### 7.7 Deadline、flow control 与完成通知的缺口
+
+`EdgeGrpcClient` 的 `cloud.rpc.timeout` 用在 `disconnect()` 的 `awaitTermination(...)`，当前 stream 创建没有调用 `withDeadlineAfter(...)`，因此它不是每条 Uplink 或整个 stream 的业务 deadline。keepalive 只探测 HTTP/2 连接活性，也不能终止一个迟迟不完成的 processor Future。
+
+client/server 都把生成 stub 暴露的普通 `StreamObserver` 保存下来；本章源码没有使用 `ClientCallStreamObserver.isReady()`、`ServerCallStreamObserver.isReady()` 或 `setOnReadyHandler(...)` 建立显式 outbound flow-control 门控。`maxInboundMessageSize` 防止单条消息过大，static lock 防止并发写，二者都不等于端到端背压。扩展高吞吐场景时应把“可写状态、单 stream 队列容量、超时、拒绝和重连”作为一套设计。
+
+server 正常完成 stream 时，client 的 `StreamObserver<ResponseMsg>.onCompleted()` 当前只写 info 日志，不调用业务 `onError` callback，也不在该方法中自动重连。相反，`onError()` 会同步调用 `disconnect(true)`；该方法内部等待 channel termination，可能占用 gRPC callback 线程。Edge 上层必须明确负责连接状态机，不能仅依赖 client 封装自动恢复。
+
+### 7.8 版本兼容和 proto 演进规范
+
+release-3.6 的 proto 已经保留 deprecated 字段，并用较高 field number 增加新字段，说明兼容性主要依赖 Protobuf 的编号规则。修改协议时遵守：
+
+1. 永不复用已经删除或 deprecated 的 field number。
+2. 新字段使用新编号，并优先使用 optional/repeated 的兼容形式。
+3. 不改变已有 enum 数字含义；零值 `ACCEPTED` 是当前 `ConnectResponseCode` 的默认值，扩展时尤其要审查默认语义。
+4. 保留旧字段的读取能力，直到所有 Edge 版本都完成升级。
+5. 同步增加 `EdgeVersion`、processor 分支和集成测试，不能只改 `.proto`。
+6. 评估新增 repeated 字段对 `max_inbound_message_size`、gzip CPU 和 batch retry 的影响。
+
+## 八、Actor 分析
+
+### 8.1 Actor 在 gRPC 链中的位置
+
+Actor 不是 gRPC 实现的一部分。它负责把 Core notification 根据 tenant/Edge 的路由关系送到本 JVM 的 `EdgeRpcService`，使跨节点消息最终触达到持有网络 session 的节点。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart TB
+    Q["TB Core notification consumer"] --> A["AppActor"]
+    A -->|tellWithHighPriority| T["TenantActor"]
+    T -->|onToEdgeSessionMsg| R["EdgeRpcService"]
+    R -->|executorService.execute| E["EdgeGrpcService 单线程执行器"]
+    E --> S["EdgeGrpcSession / observer"]
+    S --> G["HTTP/2 gRPC stream"]
+```
+
+源码位置：[AppActor.onToEdgeSessionMsg(EdgeSessionMsg)](../../../application/src/main/java/org/thingsboard/server/actors/app/AppActor.java#L278) 和 [TenantActor.onToEdgeSessionMsg(EdgeSessionMsg)](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L408)。`TenantActor` 调用 `systemContext.getEdgeRpcService().onToEdgeSessionMsg(...)`，service 再投递到 `edge-service` executor。
+
+### 8.2 为什么不是普通 Java 方法直调
+
+Cloud 是集群部署的：产生 `edge_event` 的 Core 节点不一定持有 Edge gRPC TCP session。TB Queue 负责跨节点消息传递，App/Tenant Actor 负责本地分层路由和顺序边界，`EdgeGrpcService.sessions` 只存在于当前 JVM。直接在产生事件的业务线程调用一个本地 `EdgeGrpcSession` 会绕过节点定位，也会把网络发送混入业务事务线程。
+
+但 Actor 不提供 gRPC ACK。Actor message 成功处理只代表消息交给 service；真正的远端确认仍是 `DownlinkResponseMsg`。同样，Actor 不提供 DB 事务回滚，`edge_event` 写入与通知发送也不是一个跨组件事务。
+
+### 8.3 Actor 相关的性能边界
+
+`EdgeGrpcService.onToEdgeSessionMsg(...)` 使用单线程 `edge-service` executor 处理三类 session 消息。这样可以缩小 `sessionNewEvents`、sync request callback 和 session 操作的竞争面，但如果在这个线程中执行阻塞的 `Future.get()`、大量 DB 转换或同步日志，就会延迟所有 Edge 的本地路由。
+
+排查时分开观察：Actor mailbox lag、Core notification lag、`edge-service` executor queue、gRPC outbound pending 和 Edge ACK latency。只看 gRPC channel active 不能解释前四层排队。
+
+## 九、Kafka 与 Queue 分析
+
+### 9.1 gRPC 和 TB Queue 不是同一条队列
+
+| 层 | 典型对象 | 是否跨节点 | 是否有 broker offset | 完成含义 |
+|---|---|---|---|---|
+| gRPC | HTTP/2 stream、`StreamObserver` | Edge 与 Cloud | 否 | transport 写入/远端业务 ACK |
+| Core notification | `TbProtoQueueMsg<ToCoreNotificationMsg>` | 是 | 由 queue provider 决定 | 通知送到目标服务/consumer |
+| Rule Engine | `ToRuleEngineNotificationMsg` 等 | 是 | 由 Rule Engine consumer 决定 | Rule message 的处理和 commit |
+| Edge event | `edge_event` SQL 行 | 通过 DB 共享 | 否 | 可分页、可按游标重读 |
+
+`DefaultTbClusterService.pushEdgeSyncMsgToCore(...)` 遍历 TB Core service id，并发送到各自 notification topic；它传入 `callback=null`，所以调用方并不等待 broker ACK。Core consumer 解析 notification 后进入 App Actor。这个完成点与 gRPC `DownlinkResponseMsg` 完全独立。
+
+### 9.2 Edge 同步 request 的跨节点 callback
+
+`EdgeGrpcService.processSyncRequest(...)` 先把 `requestId -> responseConsumer` 放进 `localSyncEdgeRequests`，再调用 `clusterService.pushEdgeSyncRequestToCore(request)`。目标节点通过 Edge session 处理后，发送 `FromEdgeSyncResponse`，本节点再用 request id 查 map 回调 REST `DeferredResult`。
+
+本地 map 是易失的：节点重启、超时先发生、重复 response 迟到，都会导致 `processSyncResponse(...)` 只记录 unknown/stale response。固定 20 秒 timeout 是源码事实，不等于完整同步 20 秒超时。
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+sequenceDiagram
+    participant H as EdgeController
+    participant L as localSyncEdgeRequests
+    participant Q as Core notification queue
+    participant O as owner node Actor
+    participant G as Edge gRPC session
+    H->>L: put(requestId, responseConsumer)
+    H->>Q: pushEdgeSyncRequestToCore(request)
+    Q->>O: deliver EdgeSessionMsg
+    O->>G: startSyncProcess
+    G-->>Q: pushEdgeSyncResponseToCore
+    Q-->>L: processSyncResponse(requestId)
+    L-->>H: DeferredResult.setResult/error
+    Note over L: 20s timeout removes callback first
+```
+
+### 9.3 Queue 配置对 gRPC 的影响
+
+gRPC 自身没有 Kafka partition/consumer group，但其端到端延迟可能由 Queue lag 主导。生产分析应关联：
+
+1. `tb-core` notification topic 的 producer/consumer lag。
+2. App/Tenant Actor mailbox 的处理时间。
+3. `edge-service` 单线程 executor 是否排队。
+4. `edge_event` SQL 查询、连接池和 cursor 更新耗时。
+5. gRPC stream 的 network RTT、outbound flow control 和 Edge ack latency。
+
+不要把“gRPC 是异步的”作为吞吐保证。上游 Queue 持续快于 Edge 端处理时，`edge_event` 和 session pending 仍会形成背压或内存压力。
+
+## 十、数据库分析
+
+### 10.1 PostgreSQL：Edge 事件和实体事实
+
+在 release-3.6 的 SQL 实现中，`edge_event` 是 Cloud 增量同步的持久化队列。业务实体变更与 `edge_event` 的生成由 Edge processor/listener 连接，但不是 gRPC stream 内的 JDBC 事务。`edge_event` 按 `created_time` 做 range partition，读取按时间和 `seqId` 游标分页。
+
+为什么写 PostgreSQL：
+
+1. Edge event 需要按租户、Edge、时间、sequence 查询和排序。
+2. 需要与基础实体的 SQL 事务/after-commit 语义衔接。
+3. 需要 TTL 分区清理和游标 attributes 的一致存储体系。
+
+这些是 Edge sync 的 SQL 选择，不是 gRPC 的要求。若业务实体是其他 DAO 后端，gRPC 只接收 processor 产出的 protobuf，不直接知道具体数据库。
+
+### 10.2 TimescaleDB：不是 gRPC 的传输后端
+
+ThingsBoard 的 TimescaleDB 用于时序数据。Edge gRPC payload 可以携带实体或设备 RPC 等消息，但 `EdgeGrpcSession` 不通过 Timescale API 发送网络消息。只有当 Edge processor 或状态持久化配置调用 telemetry service 时，相关 active/last-connect 或业务遥测才可能落到时序表/hypertable。
+
+因此排查“Edge gRPC 延迟”时不能默认去看 Timescale：先确认慢的是 stream、Core Queue、`edge_event` 查询、属性游标，还是 processor 内真正的 telemetry DAO。
+
+### 10.3 Cassandra：可作为业务 DAO 后端，不是 Edge stream 队列
+
+release-3.6 支持不同的遥测/属性存储配置。Edge uplink 的 processor 可能调用 Cassandra DAO 保存某类业务数据，但 gRPC server 本身不把请求写入 Cassandra 作为 transport inbox，也没有 Cassandra ACK 直接映射成 gRPC ACK。`Futures.allAsList` 的成功取决于本次 processor 返回的 Future；具体是否 Cassandra、SQL 或其他实现，必须沿接口注入和配置继续追踪。
+
+### 10.4 Redis、缓存和集群定位
+
+本章主线中，session、pending map、event flag、sync callback map 都是 JVM 本地状态，不是 Redis。Redis/Caffeine 可能参与 Edge 实体的查询缓存或集群组件的其他缓存，但源码中的 `EdgeGrpcService.sessions` 不由 Redis 共享。
+
+这解释了为什么单纯把 Cloud gRPC server 扩容后，Edge 仍需要由集群 notification 定位到正确节点；也解释了为什么节点宕机后不能从 Redis 找回一个可继续写的 `StreamObserver`。
+
+### 10.5 数据库选择矩阵
+
+| 数据库/组件 | gRPC 相关写入 | 主要原因 | 不能推导出的结论 |
+|---|---|---|---|
+| PostgreSQL | `edge_event`、Edge/基础实体、游标属性 | 事务、分页、关系、分区 TTL | gRPC ACK 不等于 SQL commit |
+| TimescaleDB | telemetry 或配置选择的 Edge 状态 | 时间范围查询、时序保留 | gRPC 不直接依赖 hypertable |
+| Cassandra | 某些业务 processor 的遥测/属性实现 | 高写入、按设备时间查询 | Cassandra success 不等于 Edge ACK |
+| Redis/Caffeine | 可选实体缓存/本地缓存 | 减少热点查询 | 不持有网络 session 或 pending durable state |
+| TB Queue/Kafka | Core notification、Rule Engine 消息 | 跨节点与服务解耦 | Queue commit 不等于远端设备执行 |
+
+## 十一、异常处理
+
+### 11.1 连接和认证失败
+
+| 故障 | 源码行为 | 观察点 | 恢复方式 |
+|---|---|---|---|
+| TLS context 初始化失败 | client/server 抛 RuntimeException，服务启动或 connect 失败 | cert 路径、私钥、证书链 | 修正证书并重启/重连 |
+| routing key 找不到 | 返回 `BAD_CREDENTIALS` | `findEdgeByRoutingKey`、Edge 表 | 修正 Edge 凭据 |
+| secret 不匹配 | 返回 `BAD_CREDENTIALS`，发失败通知 | secret 配置与日志安全 | 重新配置 secret |
+| server 处理异常 | 返回 `SERVER_UNAVAILABLE` | server log、failure trigger | 重试 CONNECT |
+| stream `onError` | client disconnect，server close session | status code、网络、keepalive | client 重连、按游标恢复 |
+| client 正常 completed | server `closeSession` | Edge graceful shutdown | 重新建立 stream |
+
+client 的 `disconnect(boolean)` 调用 `channel.shutdown()` 后最多可能执行约 7 轮 `awaitTermination(timeoutSecs)`，最终 `shutdownNow()`。不要在需要快速释放的共享线程上调用它；这是同步阻塞释放流程，`onError()` 当前也会直接进入这条路径。
+
+认证失败分支还会把“调用方提供的 secret”拼进 `failureMsg` 并送入通信失败通知。生产环境必须限制该通知和日志的可见范围，并在二次开发中移除 secret 明文；TLS 只能保护链路，不能消除应用日志泄露。
+
+### 11.2 Uplink 失败
+
+Cloud 在 rate-limit 失败时直接回送 negative `UplinkResponseMsg`；processor 异常通过 `Futures.allAsList` 聚合到失败回调，再发送 negative response。源码没有在 gRPC 层持久化 uplink inbox，也没有自动以同一个 UplinkMsg 在 Cloud 端重试。
+
+Edge 是否重试、重试是否造成重复写，取决于 Edge 调用方和各 processor 的幂等实现。建议将 `uplinkMsgId` 作为日志关联字段，而不要把它误认为数据库唯一键。
+
+### 11.3 Downlink ACK 丢失、负 ACK 和重试
+
+Downlink 发送后进入 `pendingMsgsMap`。成功 ACK 删除对应 id；失败 ACK 保留；断线时 session 本地 pending 丢失，重连后从 `edge_event`/cursor 重新读取。每次发送都受 client max inbound message size 检查。
+
+需要特别注意“失败后看起来成功”的路径：超限消息会被移除，重试到上限时会停止当前 task；`stopCurrentSendDownlinkMsgsTask(false)` 设置 Future 为 false，而不是 `setException`。监控必须同时看 communication failure notification、pending 数量、游标推进和 Edge 业务事实。
+
+### 11.4 同步请求超时和迟到响应
+
+`EdgeGrpcService.scheduleSyncRequestTimeout(...)` 固定 20 秒后从 `localSyncEdgeRequests` 移除 callback，并调用失败响应。若真实响应稍后到达，`processSyncResponse(...)` 找不到 consumer，只记录 stale response。这个 timeout 只约束本节点 REST/同步请求 callback，不会取消已在目标 Edge session 中启动的同步任务。
+
+### 11.5 重复 session 和旧连接
+
+同一个 Edge 重连时，`sessions.put(edgeId, newSession)` 替换旧映射；旧 stream 关闭回调携带自己的 UUID。server 只在 map 中当前 session id 与回调 id 相同时移除。这个比较保护新连接，但旧 session 可能仍在网络层尚未完全停止，发送失败和关闭日志需要用 session id 区分。
+
+当前 `onEdgeDisconnect(...)` 先执行 `sessions.get(edgeId)`，随后直接访问 `toRemove.getSessionId()`，没有显式 null guard。如果 Edge 已被管理流程删除、映射已被其他路径移除，迟到关闭 callback 存在空指针风险；而 `closeSession()` 对 `sessionCloseListener.accept(...)` 的异常又选择忽略。生产排障不能只看“stream closed”日志，还要检查映射清理、disconnect telemetry 和 scheduler 是否真正取消。
+
+### 11.6 生产排障顺序
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#111827","primaryBorderColor":"#334155","lineColor":"#253746","secondaryColor":"#e8f3f6","secondaryTextColor":"#111827","secondaryBorderColor":"#176b87","tertiaryColor":"#fff3df","tertiaryTextColor":"#111827","tertiaryBorderColor":"#9a5b13"}}}%%
+flowchart TD
+    A["Edge 无法同步"] --> B{"CONNECT ACCEPTED?"}
+    B -->|否| C["TLS / routing key / secret / port"]
+    B -->|是| D{"Core notification 有 lag?"}
+    D -->|是| E["检查 queue topic / consumer / Actor"]
+    D -->|否| F{"sessionNewEvents 被置位?"}
+    F -->|否| G["检查 onEdgeEventUpdate / edge-service executor"]
+    F -->|是| H{"edge_event 可读?"}
+    H -->|否| I["检查 PostgreSQL、连接池、分区、TTL"]
+    H -->|是| J{"Downlink ACK?"}
+    J -->|否| K["检查 max size、网络、Edge处理、重试"]
+    J -->|是| L{"游标推进?"}
+    L -->|否| M["检查 attributes Future / callback executor"]
+    L -->|是| N["看 Edge 业务落地与重复幂等"]
+```
+
+## 十二、源码阅读路线
+
+### 12.1 推荐顺序
+
+1. 先读 [edge.proto](../../../common/edge-api/src/main/proto/edge.proto#L16)，记住 envelope、消息 type、版本和 field number。
+2. 再读 [EdgeRpcClient](../../../common/edge-api/src/main/java/org/thingsboard/edge/rpc/EdgeRpcClient.java#L35)，明确 Edge 侧公开 API 的 `void` 发送语义。
+3. 读 [EdgeGrpcClient.connect(...)](../../../common/edge-api/src/main/java/org/thingsboard/edge/rpc/EdgeGrpcClient.java#L132)，跟踪 channel、stub、gzip、CONNECT 和 output callback。
+4. 读 [EdgeGrpcService.init()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L198)，标出 server 配置和三个 executor。
+5. 读 [EdgeGrpcService.handleMsgs(...)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcService.java#L268)，理解“创建 session”与“处理消息”的分界。
+6. 精读 [EdgeGrpcSession.initInputStream()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L213)，画出 CONNECT、SYNC、UPLINK 和 stream close 分支。
+7. 读 [processConnect(...)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L1028)，确认认证和版本 attribute 的实际时机。
+8. 读 [processEdgeEvents()](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L469) 与 [sendDownlinkMsgsPack(...)](../../../application/src/main/java/org/thingsboard/server/service/edge/rpc/EdgeGrpcSession.java#L603)，跟踪游标、pending、ACK 和重试。
+9. 读 [DefaultTbClusterService.pushEdgeSyncMsgToCore(...)](../../../application/src/main/java/org/thingsboard/server/service/queue/DefaultTbClusterService.java#L679)，再读 [AppActor](../../../application/src/main/java/org/thingsboard/server/actors/app/AppActor.java#L278) 与 [TenantActor](../../../application/src/main/java/org/thingsboard/server/actors/tenant/TenantActor.java#L408)，补齐跨节点路径。
+10. 最后读 Edge event DAO、TTL cleanup、AttributesService 和具体 processor，确认每个 downlink/uplink 的数据库事实。
+
+### 12.2 阅读时的四列笔记法
+
+| 入口/方法 | 执行线程 | 状态所有者 | 完成点 |
+|---|---|---|---|
+| `EdgeGrpcClient.sendUplinkMsg` | 调用方线程 + observer 写入 | client stream | 写入调用返回 |
+| `EdgeGrpcSession.onUplinkMsg` | gRPC callback + callback executor | processor Future | `UplinkResponseMsg` 发送 |
+| `EdgeGrpcService.onToEdgeSessionMsg` | `edge-service` 单线程 | `sessions`/flag | session 方法被调用 |
+| `sendDownlinkMsgsPack` | send scheduler | `pendingMsgsMap` | ACK 清空或 retry stop |
+| `processSyncRequest` | Controller/本地 service | `localSyncEdgeRequests` | 20 秒 callback 或 response |
+
+### 12.3 后续关联章节
+
+- [第 39 章：Edge 同步流程](../39-edge-sync/)：深入 `edge_event`、Edge processor、游标和实体分流。
+- [第 42 章：失败恢复与可观测性](../42-failure-recovery-observability/)：比较 gRPC ACK、Queue commit、Future 和业务事实。
+- [第 43 章：异步执行、回调、线程池、Actor 与消息队列](../43-async-callback-execution/)：理解本章 callback executor、Actor mailbox 与 queue 的线程边界。
+- [第 21 章：TimescaleDB 写入流程](../21-timescale-write/)：当 Edge uplink 进入 telemetry processor 后，继续追踪时序写入。
+
+## 十三、生产规范与面试题
+
+### 13.1 gRPC 开发规范
+
+1. **协议先行**：所有跨 Edge/Cloud 的字段先改 `edge.proto`，再生成 Java 代码；不在 envelope 中临时拼 JSON 替代 schema。
+2. **编号不可复用**：删除字段保留编号并标记 deprecated；新增字段不能占用旧编号。
+3. **严格区分 ACK**：明确 transport、Connect、uplink processor、downlink business、DB cursor、Queue commit 的完成语义。
+4. **observer 单写者**：所有 `StreamObserver.onNext()` 经过一个有边界的串行化策略；不要从多个 callback 直接并发写。
+5. **不在 Netty/Actor 线程阻塞**：数据库、外部调用和可能等待的 Future 放到专用 executor，并给出 timeout。
+6. **错误回调必须闭合**：stream error、executor rejection、Future failure、shutdown 和 timeout 都要让 pending 状态有明确终点。
+7. **消息大小有预算**：按最大实体数量、protobuf 序列化尺寸、gzip CPU 和 inbound 内存一起调参。
+8. **重试必须幂等**：重试 id、实体 UUID、cursor 推进和业务副作用要能关联；不要把随机 downlink id 当数据库幂等键。
+9. **安全默认 TLS**：生产启用 TLS，保护 routing key/secret；证书轮换要包含 Cloud server、Edge trust store 和连接重建。
+10. **可观测性分层**：至少记录 edgeId、sessionId、uplink/downlink id、attempt、queue cursor、requestId、线程池和队列 lag。
+
+### 13.2 配置建议
+
+```yaml
+edges:
+  enabled: "${EDGES_ENABLED:true}"
+  rpc:
+    port: "${EDGES_RPC_PORT:7070}"
+    keep_alive_time_sec: "${EDGES_RPC_KEEP_ALIVE_TIME_SEC:10}"
+    keep_alive_timeout_sec: "${EDGES_RPC_KEEP_ALIVE_TIMEOUT_SEC:5}"
+    ssl:
+      enabled: "${EDGES_RPC_SSL_ENABLED:false}"
+    max_inbound_message_size: "${EDGES_RPC_MAX_INBOUND_MESSAGE_SIZE:4194304}"
+  storage:
+    max_read_records_count: "${EDGES_STORAGE_MAX_READ_RECORDS_COUNT:50}"
+    no_read_records_sleep: "${EDGES_NO_READ_RECORDS_SLEEP:1000}"
+    sleep_between_batches: "${EDGES_SLEEP_BETWEEN_BATCHES:60000}"
+  scheduler_pool_size: "${EDGES_SCHEDULER_POOL_SIZE:1}"
+  send_scheduler_pool_size: "${EDGES_SEND_SCHEDULER_POOL_SIZE:1}"
+  grpc_callback_thread_pool_size: "${EDGES_GRPC_CALLBACK_POOL_SIZE:1}"
+```
+
+| 配置 | release-3.6 默认 | 建议 |
+|---|---:|---|
+| `edges.enabled` | `true` | 不使用 Edge 时关闭，减少监听端口和执行器 |
+| `edges.rpc.port` | `7070` | 仅在受控网络开放，配合 TLS/防火墙 |
+| `edges.rpc.ssl.enabled` | `false` | 生产改为 true，并验证 cert/private key |
+| `edges.rpc.max_inbound_message_size` | 4 MiB | 依据最大 batch 实测，避免盲目放大 |
+| `edges.storage.max_read_records_count` | `50` | 结合 Edge RTT、DB page cost 和消息大小调节 |
+| `edges.storage.no_read_records_sleep` | `1000 ms` | 减少空轮询；通知丢失敏感场景需观察延迟 |
+| `edges.storage.sleep_between_batches` | `60000 ms` | 与网络恢复时间和告警噪声平衡 |
+| `edges.scheduler_pool_size` | `1` | 先确认 event check workload，再增加；不要掩盖 DB 慢查询 |
+| `edges.send_scheduler_pool_size` | `1` | 增加前先检查 observer 写锁和 Edge 端处理能力 |
+| `edges.grpc_callback_thread_pool_size` | `1` | callback 只做短操作；阻塞时隔离并按 in-flight 测算 |
+
+### 13.3 常见面试题与标准答案
+
+#### 1. `handleMsgs` 是 unary RPC 吗？
+
+不是。`rpc handleMsgs(stream RequestMsg) returns (stream ResponseMsg)` 是 bidi streaming；方法建立一次 stream，双方各自通过 `StreamObserver` 多次发送消息。
+
+#### 2. `channel.build()` 之后 Edge 算连接成功吗？
+
+不算。它只构造 `ManagedChannel`；需要 stream 建立并收到 server 返回的 `ConnectResponseCode.ACCEPTED` 才算业务 session 建立。
+
+#### 3. 为什么 `DownlinkResponseMsg` 仍使用 `UPLINK_RPC_MESSAGE`？
+
+因为 `RequestMsgType` 只有 CONNECT、UPLINK、SYNC 三类。Cloud 在 `UPLINK_RPC_MESSAGE` 分支中分别检查 `hasUplinkMsg()` 和 `hasDownlinkResponseMsg()`，复用了一个 Edge 到 Cloud 的上行 envelope。
+
+#### 4. gRPC ACK 能证明数据库提交了吗？
+
+不能。Downlink ACK 只表示 Edge 对 downlink 的处理结果；Uplink response 只表示 Cloud processor Future 聚合结果。数据库提交、Queue commit、Rule Engine 完成和设备最终副作用是不同边界。
+
+#### 5. 为什么需要 `edge_event`，不能直接从实体表查变化吗？
+
+需要一个面向 Edge、可按 Edge/时间/sequence 分页的变化队列，以支持断线恢复、游标推进、TTL 和实体删除。直接扫描实体当前态无法可靠表达历史删除与动作顺序。
+
+#### 6. `pendingMsgsMap` 是 durable queue 吗？
+
+不是。它是 session 内存状态，重启或断线会丢失。恢复依赖 PostgreSQL `edge_event` 和已保存游标，因此会有重复或 TTL 后无法恢复历史事件的窗口。
+
+#### 7. 为什么 server 还要有 Actor 和 Queue？
+
+因为产生事件的节点和持有 Edge TCP session 的节点可能不同。Queue 跨节点传递通知，App/Tenant Actor 本地路由，最终由目标节点的 `EdgeGrpcService.sessions` 找到 stream。
+
+#### 8. `Futures.allAsList` 是否创建跨表事务？
+
+不创建。它只等待多个 Future 的完成结果；已成功的 DAO 操作不会因另一个 Future 失败而自动回滚。
+
+#### 9. 10 次重试后为什么 Future 可能仍是成功完成？
+
+`stopCurrentSendDownlinkMsgsTask(false)` 会把 `sendDownlinkMsgsFuture` 设置为 false；源码把“任务停止/批次结束”和“所有消息已被 Edge 接收”分开了，调用方必须检查 Boolean、日志和通信失败通知。
+
+#### 10. 为什么要比较 session id？
+
+同一个 Edge 重连后，新 session 会覆盖 `sessions` 映射。旧 session 的迟到 `onError/onCompleted` 如果无 session id 检查，可能误删新 session。
+
+#### 11. `GrpcCallbackExecutorService` 是 gRPC Netty worker 吗？
+
+不是。它是 ThingsBoard Spring Bean，继承 `AbstractListeningExecutor`，给 Guava Future callback 使用。Netty transport callback 与业务 callback 的线程和生命周期不同。
+
+#### 12. 为什么默认 callback pool 只有 1 个线程？
+
+源码默认配置是 1，强调 callback 应短小、顺序推进成本低。若 callback 中出现阻塞，一个线程会拖慢所有 Edge，需要先把阻塞工作拆到专用 executor，再按吞吐和 in-flight 数量扩容。
+
+#### 13. gRPC stream 为什么还要 gzip？
+
+protobuf 已经是二进制编码，但实体配置和重复字符串仍可能有压缩收益；gzip 可以减少网络字节，但会消耗 CPU，不能替代 batch 大小控制和 flow control。
+
+#### 14. TLS 开启后就是双向认证吗？
+
+从当前源码看，不应这样表述。server 使用 cert/private key，client 构建 trust manager；本章没有看到 mTLS client certificate/key 的配置。是否双向认证要继续检查部署证书和 Netty SSL context。
+
+#### 15. `syncEdge` HTTP 200 是否表示 full sync 完成？
+
+不表示。Controller 等待的是 `FromEdgeSyncResponse`，它表示请求已经路由并启动；真正的多页 downlink 和 `SyncCompletedMsg` 之后异步进行。
+
+#### 16. Edge 断线后 gRPC 会自动恢复 pending map 吗？
+
+不会。stream 和 session 状态是本地内存；重连后通过 edge event 游标和 full sync 重新建立当前态，未 ACK 事件可能重复，已过 TTL 的历史事件可能无法恢复。
+
+#### 17. 为什么消息超出 max inbound size 会从 pending 删除？
+
+当前实现先记录通信失败通知，再移除该 downlink，避免永久重试一个永远无法被 client 接收的消息。但这也意味着 cursor/批次推进可能与 Edge 实际状态不一致，必须监控并修复配置或数据拆包。
+
+#### 18. gRPC 能替代 Kafka 吗？
+
+不能直接替代。gRPC 适合 Cloud 与已连接 Edge 的低延迟双向会话；Kafka/TB Queue 提供跨节点、服务解耦、缓冲和消费组语义。两者在本系统中协作而非互斥。
+
+#### 19. 多个 Edge client 会共享一个发送锁吗？
+
+当前 `EdgeGrpcClient.uplinkMsgLock` 是 static，多个实例在同一个 JVM 内会共享该锁；这是实现事实，可能降低并行度。server session 的 `downlinkMsgLock` 也为 static，扩容前应核对锁竞争。
+
+#### 20. 如何定位“Edge 在线但数据不下发”？
+
+依次核对 CONNECT accepted、`sessions` 当前 session id、Core notification lag、Actor 路由、`sessionNewEvents`、`edge_event` 分页、send scheduler、消息大小、Edge ACK、游标 attributes 和 Edge 业务落地。在线状态只证明 stream/连接层，不证明事件链完整。
+
+#### 21. keepalive 能否替代业务 timeout？
+
+不能。keepalive 检测 HTTP/2 连接是否仍可通信；它不会为某个 Uplink processor Future、Full Sync 或 REST callback 设置 deadline，也不会取消数据库副作用。
+
+#### 22. `maxInboundMessageSize` 是否提供背压？
+
+不提供。它只拒绝超过上限的单条入站消息。持续发送许多合法小消息仍可能压满 executor、DB 或对端处理能力；显式 flow control、队列容量和拒绝策略仍需单独设计。
+
+#### 23. client 的 `onCompleted()` 会自动重连吗？
+
+不会。当前实现只记录 stream 正常关闭日志；业务 `onError` callback 和自动重连都没有在该分支触发，Edge 上层必须拥有连接状态机。
+
+#### 24. `EdgeRpcClient.sendUplinkMsg()` 返回 `void` 表示什么？
+
+只表示调用没有返回 Future。同步返回最多说明本次 `inputStream.onNext()` 没抛出可见异常，真正的 Cloud 处理结果要通过匹配 `uplinkMsgId` 的 `UplinkResponseMsg` callback 判断。
+
+#### 25. 当前源码是否显式使用 gRPC readiness flow control？
+
+本章范围内没有看到 `ClientCallStreamObserver.isReady()`、`ServerCallStreamObserver.isReady()` 或 `setOnReadyHandler()`。static lock 串行写 observer，但不会限制未被对端消费的数据量。
+
+#### 26. 为什么 `getQueueStartTsAndSeqId().get()` 值得重点检查？
+
+它在 event-check scheduler task 中同步等待 attributes Future。默认检查池只有一个线程，DB 或 callback 变慢时可能阻塞其他 Edge 的检查，表现为 channel 在线但下行延迟增加。
+
+#### 27. Protobuf 字段删除后可以复用编号吗？
+
+不可以。旧 Edge 仍可能按原编号编码或保存消息；复用会把旧数据解释成新字段。应保留编号、标记 deprecated，并以新编号增加字段。
+
+#### 28. TLS 已启用，为什么仍不能在错误消息里记录 secret？
+
+TLS 只保护传输中的字节。当前认证失败路径把提供的 secret 写入 failure message，可能进入应用日志或通知系统；这些副本不受 gRPC TLS 保护，必须做应用层脱敏。
+
+### 13.4 本章结论
+
+ThingsBoard release-3.6 的 gRPC 是一条长期双向传输管道；可靠同步由 protobuf contract、Edge session、`edge_event` 持久队列、游标 attributes、Actor/Queue 路由、Future callback、ACK 和重试共同组成。理解它的关键不是记住 gRPC API，而是沿每条消息标出：谁创建它、在哪条线程运行、哪个对象持有状态、哪个 id 关联响应、哪一步才形成可恢复的数据库事实。
+
+---
+
+[上一篇：43 异步执行、回调、线程池、Actor 与消息队列](../43-async-callback-execution/) | [全书目录](../../SUMMARY.md) | [详细 PlantUML 源文件](sequence.puml) | [时序图 SVG](sequence.svg) | [架构图 SVG](../../assets/architecture/44-grpc-edge-communication.svg) | [下一篇：全书目录](../../SUMMARY.md)

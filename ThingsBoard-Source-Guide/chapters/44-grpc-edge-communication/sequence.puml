@@ -1,0 +1,393 @@
+@startuml
+title 44.1 Edge gRPC channel, stream and CONNECT
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #E8F3F6
+skinparam ParticipantFontColor #111827
+skinparam LifeLineBorderColor #64748B
+skinparam NoteBorderColor #9A5B13
+skinparam NoteBackgroundColor #FFF3DF
+skinparam NoteFontColor #111827
+skinparam GroupBorderColor #176B87
+skinparam GroupBackgroundColor #F8FAFC
+
+participant "Edge caller" as Caller
+participant "EdgeGrpcClient" as Client
+participant "Netty ManagedChannel" as Channel
+participant "Generated async stub" as Stub
+participant "EdgeGrpcService" as Service
+participant "EdgeGrpcSession" as Session
+database "EdgeService / PostgreSQL" as DB
+
+Caller -> Client: connect(routingKey, secret, callbacks)
+Client -> Channel: NettyChannelBuilder.forAddress(host, port)
+Client -> Channel: maxInboundMessageSize + keepalive + TLS/plaintext
+Client -> Channel: build()
+Client -> Stub: EdgeRpcServiceGrpc.newStub(channel)
+Client -> Stub: withCompression("gzip").handleMsgs(outputObserver)
+Stub -> Service: handleMsgs(StreamObserver<ResponseMsg>)
+Service -> Session: new EdgeGrpcSession(...)
+Session --> Stub: StreamObserver<RequestMsg>
+Stub --> Client: inputStream
+
+note over Client,Session
+ManagedChannel and stream construction are transport setup.
+Business authentication is not complete yet.
+end note
+
+Client -> Session: RequestMsg(CONNECT, routingKey, secret, EdgeVersion.V_3_6_4, clientMaxSize)
+Session -> DB: findEdgeByRoutingKey(SYS_TENANT_ID, routingKey)
+DB --> Session: Optional<Edge>
+alt edge found and secret matches
+    Session -> Service: sessionOpenListener(edgeId, session)
+    Service -> Service: sessions.put(edgeId, session)
+    Session -> DB: save server attribute edgeVersion (future ignored)
+    Session --> Client: ConnectResponse(ACCEPTED, configuration, serverMaxSize)
+    Session -> Session: connected = true
+    Client -> Caller: onEdgeUpdate(configuration)
+else bad credentials
+    Session --> Client: ConnectResponse(BAD_CREDENTIALS)
+    Session --> Client: outputStream.onError(...)
+    Client -> Client: disconnect(true)
+    Client -> Caller: onError(EdgeConnectionException)
+else server processing error
+    Session --> Client: ConnectResponse(SERVER_UNAVAILABLE)
+end
+@enduml
+
+@startuml
+title 44.2 Edge Uplink processing and response
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #E8F3F6
+skinparam ParticipantFontColor #111827
+skinparam NoteBorderColor #9A5B13
+skinparam NoteBackgroundColor #FFF3DF
+skinparam NoteFontColor #111827
+
+participant "Edge business" as Business
+participant "EdgeGrpcClient" as Client
+participant "EdgeGrpcSession" as Session
+participant "RateLimitService" as Rate
+participant "Edge processors" as Processors
+database "DAO / PostgreSQL / Timescale / Cassandra" as DB
+participant "GrpcCallbackExecutor" as Callback
+
+Business -> Client: sendUplinkMsg(UplinkMsg)
+Client -> Client: static uplinkMsgLock.lock()
+Client -> Session: RequestMsg(type=UPLINK, uplinkMsg=msg)
+Client -> Client: unlock()
+Session -> Rate: check EDGE_UPLINK_MESSAGES
+Session -> Rate: check per Edge limit
+alt rate limit rejected
+    Session --> Client: UplinkResponse(success=false, "Rate limit reached")
+    Client -> Business: onUplinkResponse(response)
+else accepted
+    Session -> Processors: processUplinkMsg(msg)
+    loop each repeated message collection
+        Processors -> DB: service/DAO operation
+        DB --> Processors: ListenableFuture<Void>
+    end
+    Processors --> Session: Futures.allAsList(result)
+    alt all futures succeeded
+        Session -> Callback: onSuccess
+        Callback -> Session: sendResponseMessage(id, true, null)
+        Session --> Client: UplinkResponse(success=true, id)
+    else any future failed
+        Session -> Callback: onFailure(root cause)
+        Callback -> Session: sendResponseMessage(id, false, error)
+        Session --> Client: UplinkResponse(success=false, id)
+    end
+    Client -> Business: onUplinkResponse.accept(response)
+end
+
+note over Processors,DB
+Futures.allAsList aggregates completion only.
+It is not a transaction spanning all processors.
+end note
+@enduml
+
+@startuml
+title 44.3 Incremental Cloud-to-Edge downlink
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #E8F3F6
+skinparam ParticipantFontColor #111827
+skinparam NoteBorderColor #9A5B13
+skinparam NoteBackgroundColor #FFF3DF
+skinparam NoteFontColor #111827
+
+participant "Business service / Edge event listener" as Business
+database "PostgreSQL edge_event" as Events
+participant "DefaultTbClusterService" as Cluster
+queue "TB Core notification" as Queue
+participant "AppActor / TenantActor" as Actors
+participant "EdgeGrpcService" as Service
+participant "EdgeGrpcSession" as Session
+participant "Edge client" as Edge
+database "Server attributes cursor" as Cursor
+
+Business -> Events: insert EdgeEvent after entity change
+Events --> Cluster: save future success
+Cluster -> Queue: onEdgeEventUpdate(edgeId)
+Queue -> Actors: EdgeEventUpdateMsg
+Actors -> Service: onToEdgeSessionMsg(msg)
+Service -> Service: edge-service.execute
+Service -> Service: sessionNewEvents[edgeId] = true
+Service -> Session: processEdgeEvents()
+Session -> Cursor: find(queueStartTs, queueStartSeqId)
+Cursor --> Session: cursor pair
+Session -> Events: fetch page after cursor
+Events --> Session: List<EdgeEvent>
+Session -> Session: convertToDownlinkMsgsPack
+Session -> Session: pendingMsgsMap.put(downlinkMsgId, msg)
+Session -> Edge: ResponseMsg.downlinkMsg
+Edge -> Edge: apply entity/action
+Edge --> Session: DownlinkResponse(success=true, id)
+Session -> Session: pendingMsgsMap.remove(id)
+Session -> Cursor: save new queueStartTs/queueStartSeqId
+Cursor --> Session: Future success
+Session --> Service: processEdgeEvents future completes
+
+note over Session,Cursor
+Sending, Edge ACK and cursor persistence are not one transaction.
+Crash before cursor save can replay the page.
+end note
+@enduml
+
+@startuml
+title 44.4 Full Sync request and fetcher chain
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #E8F3F6
+skinparam ParticipantFontColor #111827
+skinparam NoteBorderColor #9A5B13
+skinparam NoteBackgroundColor #FFF3DF
+skinparam NoteFontColor #111827
+
+participant "EdgeController" as Controller
+participant "Origin EdgeGrpcService" as Origin
+queue "TB Core notification" as Queue
+participant "Owner App/Tenant Actor" as Actor
+participant "Owner EdgeGrpcService" as Owner
+participant "EdgeGrpcSession" as Session
+participant "EdgeSyncCursor" as Cursor
+participant "EdgeEventFetcher" as Fetcher
+database "Entity DAO" as DB
+participant "Remote Edge" as Edge
+
+Controller -> Origin: processSyncRequest(request, responseConsumer)
+Origin -> Origin: localSyncEdgeRequests.put(requestId)
+Origin -> Queue: ToEdgeSyncRequest
+Queue -> Actor: EdgeSessionMsg
+Actor -> Owner: onToEdgeSessionMsg
+Owner -> Session: startSyncProcess(true)
+Owner -> Queue: FromEdgeSyncResponse(success=true)
+Queue --> Origin: processSyncResponse(requestId)
+Origin --> Controller: DeferredResult HTTP 200
+
+note over Controller,Session
+HTTP 200 means the owner session accepted the sync request.
+It does not mean all full-sync pages have reached the Edge.
+end note
+
+Session -> Session: syncCompleted=false
+Session -> Session: interrupt normal downlink task
+Session -> Cursor: new EdgeSyncCursor(edge, fullSync=true)
+loop while cursor.hasNext()
+    Session -> Cursor: getNext()
+    Cursor --> Session: fetcher
+    Session -> Fetcher: fetch page
+    Fetcher -> DB: query current assigned entities
+    DB --> Fetcher: page
+    Fetcher --> Session: temporary EdgeEvents
+    Session -> Edge: DownlinkMsg pack
+    Edge --> Session: DownlinkResponse ACKs
+    Session -> Session: callback -> doSync(cursor)
+end
+Session -> Edge: DownlinkMsg(SyncCompletedMsg)
+alt Edge returns success ACK
+    Edge --> Session: DownlinkResponse ACK
+else no ACK after maximum attempts
+    Session -> Session: stopCurrentSendDownlinkMsgsTask(false)
+end
+Session -> Session: syncCompleted=true
+@enduml
+
+@startuml
+title 44.5 Downlink ACK, retry, size rejection and completion
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #E8F3F6
+skinparam ParticipantFontColor #111827
+skinparam NoteBorderColor #9A5B13
+skinparam NoteBackgroundColor #FFF3DF
+skinparam NoteFontColor #111827
+
+participant "EdgeGrpcSession" as Session
+collections "pendingMsgsMap" as Pending
+participant "edge-send-scheduler" as Scheduler
+participant "Remote Edge" as Edge
+participant "NotificationRuleProcessor" as Notify
+participant "SettableFuture<Boolean>" as Future
+
+Session -> Future: create()
+Session -> Pending: clear(); put all messages
+Session -> Scheduler: submit(attempt=1)
+loop attempt 1..10 while pending
+    Scheduler -> Pending: copy values
+    alt serialized size exceeds client maximum
+        Scheduler -> Notify: EdgeCommunicationFailureTrigger
+        Scheduler -> Pending: remove(messageId)
+    else size allowed
+        Scheduler -> Edge: ResponseMsg.downlinkMsg
+        alt success ACK
+            Edge --> Session: DownlinkResponse(success=true, id)
+            Session -> Pending: remove(id)
+        else negative ACK or ACK missing
+            Edge --> Session: failure response or no response
+            Session -> Pending: keep id
+        end
+    end
+    alt pending empty
+        Session -> Future: set(false)
+        Session -> Scheduler: cancel scheduled task
+    else attempt < 10
+        Scheduler -> Scheduler: schedule next after sleep_between_batches
+    else attempt = 10
+        Scheduler -> Notify: delivery failure notification
+        Scheduler -> Future: set(false)
+    end
+end
+
+note over Pending,Future
+Future completion can mean "task stopped" after discarding messages.
+It must not be interpreted as universal remote success.
+end note
+@enduml
+
+@startuml
+title 44.6 Disconnect, stale callback and reconnect
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #E8F3F6
+skinparam ParticipantFontColor #111827
+skinparam NoteBorderColor #9A5B13
+skinparam NoteBackgroundColor #FFF3DF
+skinparam NoteFontColor #111827
+
+participant "Old Edge stream" as Old
+participant "Old EdgeGrpcSession" as OldSession
+collections "EdgeGrpcService.sessions" as Sessions
+participant "New Edge stream" as New
+participant "New EdgeGrpcSession" as NewSession
+database "edge_event + cursor" as Durable
+
+Old -> OldSession: transport onError/onCompleted
+OldSession -> OldSession: connected=false
+OldSession -> Sessions: onEdgeDisconnect(edge, oldSessionId)
+
+New -> NewSession: CONNECT accepted
+NewSession -> Sessions: onEdgeConnect(edgeId, newSession)
+Sessions -> Sessions: put(edgeId, newSession)
+
+OldSession -> Sessions: late close callback(oldSessionId)
+Sessions -> Sessions: get(edgeId).sessionId == oldSessionId?
+alt current id differs
+    Sessions --> OldSession: stale; do not remove new session
+else current id matches
+    Sessions -> Sessions: remove(edgeId)
+end
+
+NewSession -> Durable: read persisted cursor
+Durable --> NewSession: resume point
+NewSession -> Durable: re-read uncommitted events
+
+note over NewSession,Durable
+In-memory pending messages are not restored.
+Recovery is database cursor based and may replay messages.
+end note
+@enduml
+
+@startuml
+title 44.7 Thread and executor transitions
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontColor #111827
+skinparam ArrowColor #253746
+skinparam ArrowThickness 1.5
+skinparam ParticipantBorderColor #334155
+skinparam ParticipantBackgroundColor #E8F3F6
+skinparam ParticipantFontColor #111827
+skinparam NoteBorderColor #9A5B13
+skinparam NoteBackgroundColor #FFF3DF
+skinparam NoteFontColor #111827
+
+participant "gRPC/Netty callback" as Netty
+participant "EdgeGrpcSession" as Session
+participant "App/Tenant Actor dispatcher" as Actor
+participant "edge-service single thread" as ServiceThread
+participant "edge-event-check-scheduler" as Check
+participant "edge-send-scheduler" as Send
+participant "GrpcCallbackExecutor" as Callback
+database "DAO executor / JDBC" as DAO
+
+Netty -> Session: onNext(RequestMsg)
+Session -> DAO: connect lookup / processor calls
+DAO --> Callback: ListenableFuture completion
+Callback -> Session: uplink response / sync continuation
+
+Actor -> ServiceThread: executorService.execute(EdgeSessionMsg)
+ServiceThread -> ServiceThread: mutate session flags / start sync
+ServiceThread -> Check: schedule event check
+Check -> Session: processEdgeEvents()
+Session -> DAO: read event page / attributes
+DAO --> Callback: future callbacks
+Callback -> Session: convert / update cursor / continue
+Session -> Send: submit or schedule downlink pack
+Send -> Session: sendDownlinkMsg(ResponseMsg)
+Session -> Netty: outputStream.onNext()
+
+note over Netty,DAO
+Do not block Netty callbacks or Actor dispatchers.
+Callback, scheduler and JDBC pools are different capacity domains.
+end note
+@enduml

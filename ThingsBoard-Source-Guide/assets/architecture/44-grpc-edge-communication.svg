@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120" role="img" aria-labelledby="title desc">
+  <title id="title">ThingsBoard release-3.6 gRPC 与 Edge 同步架构</title>
+  <desc id="desc">展示 Edge、Cloud gRPC、Actor、TB Queue、PostgreSQL edge_event 和业务数据库之间的边界与数据流。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#253746"/>
+    </marker>
+    <marker id="blue-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#176b87"/>
+    </marker>
+    <style>
+      .title { font: 700 30px Arial, "Microsoft YaHei", sans-serif; fill: #111827; }
+      .subtitle { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #475569; }
+      .box-title { font: 700 20px Arial, "Microsoft YaHei", sans-serif; fill: #111827; }
+      .label { font: 16px Arial, "Microsoft YaHei", sans-serif; fill: #111827; }
+      .small { font: 14px Arial, "Microsoft YaHei", sans-serif; fill: #334155; }
+      .boundary { fill: #f8fafc; stroke: #64748b; stroke-width: 2; }
+      .edge-box { fill: #e8f3f6; stroke: #176b87; stroke-width: 2; }
+      .cloud-box { fill: #fff3df; stroke: #9a5b13; stroke-width: 2; }
+      .queue-box { fill: #eef2ff; stroke: #4f46e5; stroke-width: 2; }
+      .db-box { fill: #ecfdf5; stroke: #166534; stroke-width: 2; }
+      .memory-box { fill: #fff7ed; stroke: #c2410c; stroke-width: 2; }
+      .arrow { fill: none; stroke: #253746; stroke-width: 2.4; marker-end: url(#arrow); }
+      .blue-arrow { fill: none; stroke: #176b87; stroke-width: 2.4; marker-end: url(#blue-arrow); }
+      .dashed { fill: none; stroke: #64748b; stroke-width: 2; stroke-dasharray: 8 7; marker-end: url(#arrow); }
+      .legend-line { fill: none; stroke: #253746; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1120" fill="#ffffff"/>
+  <text x="70" y="65" class="title">ThingsBoard release-3.6：gRPC 与 Edge 同步架构</text>
+  <text x="70" y="98" class="subtitle">gRPC 负责长期双向传输；Actor/TB Queue 负责 Cloud 集群路由；edge_event 与 attributes 提供可恢复状态。</text>
+
+  <rect x="55" y="145" width="430" height="820" rx="8" class="boundary"/>
+  <text x="85" y="188" class="box-title">Edge JVM</text>
+  <text x="85" y="216" class="small">common/edge-api + Edge 业务组件</text>
+
+  <rect x="85" y="255" width="370" height="155" rx="6" class="edge-box"/>
+  <text x="110" y="292" class="box-title">EdgeGrpcClient</text>
+  <text x="110" y="325" class="label">ManagedChannel / Netty</text>
+  <text x="110" y="352" class="label">async stub + gzip + TLS trust</text>
+  <text x="110" y="379" class="label">StreamObserver&lt;RequestMsg&gt;</text>
+
+  <rect x="85" y="470" width="370" height="180" rx="6" class="memory-box"/>
+  <text x="110" y="507" class="box-title">Edge 本地状态</text>
+  <text x="110" y="540" class="label">UplinkMsg / SyncRequestMsg</text>
+  <text x="110" y="568" class="label">DownlinkResponseMsg ACK</text>
+  <text x="110" y="596" class="label">Edge 端实体、属性、遥测处理</text>
+  <text x="110" y="624" class="label">重连策略由 Edge 侧调用方负责</text>
+
+  <rect x="85" y="710" width="370" height="150" rx="6" class="edge-box"/>
+  <text x="110" y="747" class="box-title">EdgeGrpcClient 回调</text>
+  <text x="110" y="780" class="label">onUplinkResponse</text>
+  <text x="110" y="808" class="label">onEdgeUpdate / onDownlink</text>
+  <text x="110" y="836" class="label">onError / onCompleted</text>
+
+  <rect x="530" y="145" width="1215" height="820" rx="8" class="boundary"/>
+  <text x="560" y="188" class="box-title">Cloud JVM / ThingsBoard Application</text>
+  <text x="560" y="216" class="small">Edge RPC service 与集群内部异步层分离</text>
+
+  <rect x="570" y="255" width="390" height="170" rx="6" class="cloud-box"/>
+  <text x="595" y="292" class="box-title">EdgeGrpcService</text>
+  <text x="595" y="325" class="label">NettyServerBuilder / port 7070</text>
+  <text x="595" y="353" class="label">TLS / keepalive / max inbound size</text>
+  <text x="595" y="381" class="label">handleMsgs(outputStream)</text>
+  <text x="595" y="409" class="label">sessions: EdgeId -> Session</text>
+
+  <rect x="1010" y="255" width="390" height="170" rx="6" class="cloud-box"/>
+  <text x="1035" y="292" class="box-title">EdgeGrpcSession</text>
+  <text x="1035" y="325" class="label">CONNECT authentication</text>
+  <text x="1035" y="353" class="label">Uplink / Downlink / ACK</text>
+  <text x="1035" y="381" class="label">pendingMsgsMap + retry</text>
+  <text x="1035" y="409" class="label">EdgeSyncCursor + callbacks</text>
+
+  <rect x="1450" y="255" width="260" height="170" rx="6" class="memory-box"/>
+  <text x="1475" y="292" class="box-title">执行器</text>
+  <text x="1475" y="325" class="label">edge-service</text>
+  <text x="1475" y="353" class="label">edge-event-check</text>
+  <text x="1475" y="381" class="label">edge-send</text>
+  <text x="1475" y="409" class="label">Grpc callback</text>
+
+  <rect x="570" y="500" width="350" height="185" rx="6" class="queue-box"/>
+  <text x="595" y="537" class="box-title">集群路由</text>
+  <text x="595" y="570" class="label">DefaultTbClusterService</text>
+  <text x="595" y="598" class="label">TB Core notification topic</text>
+  <text x="595" y="626" class="label">queue key = EdgeId</text>
+  <text x="595" y="654" class="label">跨节点传递 EdgeSessionMsg</text>
+
+  <rect x="970" y="500" width="350" height="185" rx="6" class="queue-box"/>
+  <text x="995" y="537" class="box-title">Actor 路由</text>
+  <text x="995" y="570" class="label">DefaultTbCoreConsumerService</text>
+  <text x="995" y="598" class="label">AppActor</text>
+  <text x="995" y="626" class="label">TenantActor</text>
+  <text x="995" y="654" class="label">onToEdgeSessionMsg</text>
+
+  <rect x="1370" y="500" width="340" height="185" rx="6" class="db-box"/>
+  <text x="1395" y="537" class="box-title">业务处理边界</text>
+  <text x="1395" y="570" class="label">Edge processor</text>
+  <text x="1395" y="598" class="label">Device / Alarm / Relation</text>
+  <text x="1395" y="626" class="label">Attributes / Telemetry</text>
+  <text x="1395" y="654" class="label">DAO Future 聚合</text>
+
+  <rect x="570" y="760" width="530" height="150" rx="6" class="db-box"/>
+  <text x="595" y="797" class="box-title">PostgreSQL：可恢复同步事实</text>
+  <text x="595" y="830" class="label">edge_event：增量事件、created_time 分区、seqId</text>
+  <text x="595" y="858" class="label">Edge server attributes：queueStartTs / queueStartSeqId</text>
+  <text x="595" y="886" class="label">Edge 表：routingKey / secret / configuration</text>
+
+  <rect x="1150" y="760" width="560" height="150" rx="6" class="db-box"/>
+  <text x="1175" y="797" class="box-title">可选业务存储</text>
+  <text x="1175" y="830" class="label">TimescaleDB：telemetry 时序数据，不是 gRPC inbox</text>
+  <text x="1175" y="858" class="label">Cassandra：配置选择的业务 DAO，不是 stream 队列</text>
+  <text x="1175" y="886" class="label">Redis/Caffeine：缓存，不持有 StreamObserver</text>
+
+  <path d="M455 335 L570 335" class="blue-arrow"/>
+  <text x="475" y="320" class="small">HTTP/2 bidi stream</text>
+  <path d="M960 335 L1010 335" class="arrow"/>
+  <text x="970" y="320" class="small">new session</text>
+  <path d="M1400 335 L1450 335" class="arrow"/>
+  <text x="1390" y="320" class="small">callbacks</text>
+
+  <path d="M1010 390 C850 450 760 460 745 500" class="arrow"/>
+  <text x="790" y="452" class="small">event notification</text>
+  <path d="M920 592 L970 592" class="arrow"/>
+  <path d="M1320 592 L1370 592" class="arrow"/>
+  <path d="M745 685 L745 760" class="arrow"/>
+  <text x="760" y="730" class="small">read page / update cursor</text>
+  <path d="M1540 685 L1540 760" class="arrow"/>
+  <text x="1560" y="730" class="small">DAO writes</text>
+
+  <path d="M1370 850 C1250 720 1130 680 1030 425" class="dashed"/>
+  <text x="1190" y="720" class="small">processor Future</text>
+  <path d="M1010 390 C900 760 720 700 455 790" class="blue-arrow"/>
+  <text x="620" y="720" class="small">Downlink / ACK over same stream</text>
+
+  <rect x="70" y="1000" width="1660" height="70" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <path d="M100 1035 L170 1035" class="legend-line"/>
+  <text x="185" y="1041" class="small">gRPC 双向流</text>
+  <path d="M390 1035 L460 1035" class="dashed"/>
+  <text x="475" y="1041" class="small">可选/异步业务边界</text>
+  <rect x="715" y="1018" width="22" height="22" class="queue-box"/>
+  <text x="750" y="1041" class="small">TB Queue / Actor 路由</text>
+  <rect x="1015" y="1018" width="22" height="22" class="db-box"/>
+  <text x="1050" y="1041" class="small">持久化事实</text>
+  <text x="1330" y="1041" class="small">关键：ACK 不等于 DB commit，不等于端到端完成</text>
+</svg>
